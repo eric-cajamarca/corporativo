@@ -187,11 +187,32 @@
         <p>Explora las funcionalidades más importantes en pocos minutos.</p>
       </div>
       <div class="row g-4">
-        @for (video of videos; track video.titulo) {
+        @for (video of videos; track video.id) {
           <div class="col-md-6 col-lg-4">
             <div class="video-card">
-              <div class="ratio ratio-16x9">
-                <iframe [src]="video.url" title="{{ video.titulo }}" allowfullscreen></iframe>
+              <div class="video-embed">
+                @if (video.reproduciendo && video.embedUrl) {
+                  <iframe
+                    [src]="video.embedUrl"
+                    [title]="video.titulo"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                  </iframe>
+                } @else {
+                  <button
+                    type="button"
+                    class="video-poster"
+                    (click)="reproducirVideo(video)"
+                    [attr.aria-label]="'Reproducir: ' + video.titulo">
+                    <img
+                      [src]="miniaturaUrl(video.id)"
+                      [alt]="video.titulo"
+                      loading="lazy"
+                      width="480"
+                      height="360" />
+                    <span class="video-play" aria-hidden="true"></span>
+                  </button>
+                }
               </div>
               <p class="video-title">{{ video.titulo }}</p>
             </div>

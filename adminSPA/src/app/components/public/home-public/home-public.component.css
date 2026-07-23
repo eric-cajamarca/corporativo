@@ -115,6 +115,66 @@
   height: 100%;
 }
 
+/* Miniatura propia (sin iframe idle de YouTube, que deforma el preview) */
+.video-embed {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.video-embed iframe,
+.video-poster,
+.video-poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.video-poster {
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: #0f172a;
+}
+
+.video-poster img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.video-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 68px;
+  height: 48px;
+  margin: -24px 0 0 -34px;
+  border-radius: 14px;
+  background: #ff0000;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.video-play::before {
+  content: '';
+  position: absolute;
+  left: 26px;
+  top: 14px;
+  border-style: solid;
+  border-width: 10px 0 10px 16px;
+  border-color: transparent transparent transparent #fff;
+}
+
+.video-poster:hover .video-play,
+.video-poster:focus-visible .video-play {
+  background: #cc0000;
+}
+
 .plan-card--featured {
   border: 2px solid #4f7cff;
   box-shadow: 0 16px 32px rgba(79, 124, 255, 0.2);

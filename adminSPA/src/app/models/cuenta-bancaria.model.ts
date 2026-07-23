@@ -3,6 +3,8 @@ export interface CuentaBancaria {
   idEmpresa: string;
   nombreBanco: string;
   numeroCuenta: string;
+  /** Código de cuenta interbancario (20 dígitos). */
+  cci: string | null;
   tipoCuenta: string;
   moneda: string;
   saldoActual: number;
@@ -20,6 +22,7 @@ export interface CuentasBancariasListResponse {
 export interface CuentaBancariaPayload {
   nombreBanco: string;
   numeroCuenta: string;
+  cci?: string | null;
   tipoCuenta: string;
   moneda: string;
   estado?: boolean;

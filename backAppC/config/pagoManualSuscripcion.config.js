@@ -57,6 +57,7 @@ async function obtenerCuentasPrincipal(pool, idEmpresaPrincipal) {
         idCuentaBancaria,
         nombreBanco,
         numeroCuenta,
+        cci,
         tipoCuenta,
         moneda,
         CONVERT(VARCHAR(10), fechaApertura, 23) AS fechaApertura
@@ -106,6 +107,7 @@ async function getPagoManualSuscripcionConfig(pool) {
       idCuentaBancaria: f.idCuentaBancaria,
       banco: trimOrNull(f.nombreBanco),
       cuenta: trimOrNull(f.numeroCuenta),
+      cci: trimOrNull(f.cci),
       tipoCuenta: trimOrNull(f.tipoCuenta),
       moneda: trimOrNull(f.moneda) || 'PEN',
       titular
@@ -121,7 +123,7 @@ async function getPagoManualSuscripcionConfig(pool) {
             titular,
             banco: preferida.banco || base.bcp.banco || 'BCP',
             cuenta: preferida.cuenta,
-            cci: base.bcp.cci,
+            cci: preferida.cci || base.bcp.cci,
             tipoCuenta: preferida.tipoCuenta,
             moneda: preferida.moneda
           }

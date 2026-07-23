@@ -10,6 +10,7 @@ async function listarPorEmpresa(pool, idEmpresa) {
         idEmpresa,
         nombreBanco,
         numeroCuenta,
+        cci,
         tipoCuenta,
         moneda,
         saldoActual,
@@ -39,6 +40,7 @@ async function obtenerPorId(pool, idEmpresa, idCuentaBancaria) {
         idEmpresa,
         nombreBanco,
         numeroCuenta,
+        cci,
         tipoCuenta,
         moneda,
         saldoActual,
@@ -60,6 +62,7 @@ async function insertar(pool, row) {
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('nombreBanco', sql.VarChar(100), row.nombreBanco)
     .input('numeroCuenta', sql.VarChar(30), row.numeroCuenta)
+    .input('cci', sql.VarChar(20), row.cci || null)
     .input('tipoCuenta', sql.VarChar(20), row.tipoCuenta)
     .input('moneda', sql.VarChar(3), row.moneda)
     .input('saldoActual', sql.Decimal(18, 6), row.saldoActual ?? 0)
@@ -68,10 +71,10 @@ async function insertar(pool, row) {
     .input('idCuentaContable', sql.VarChar(20), row.idCuentaContable || null)
     .query(`
       INSERT INTO dbo.CuentasBancarias (
-        idCuentaBancaria, idEmpresa, nombreBanco, numeroCuenta, tipoCuenta, moneda,
+        idCuentaBancaria, idEmpresa, nombreBanco, numeroCuenta, cci, tipoCuenta, moneda,
         saldoActual, fechaApertura, fechaCierre, estado, idCuentaContable
       ) VALUES (
-        @idCuentaBancaria, @idEmpresa, @nombreBanco, @numeroCuenta, @tipoCuenta, @moneda,
+        @idCuentaBancaria, @idEmpresa, @nombreBanco, @numeroCuenta, @cci, @tipoCuenta, @moneda,
         @saldoActual, @fechaApertura, NULL, @estado, @idCuentaContable
       )
     `);
@@ -84,6 +87,7 @@ async function actualizar(pool, row) {
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('nombreBanco', sql.VarChar(100), row.nombreBanco)
     .input('numeroCuenta', sql.VarChar(30), row.numeroCuenta)
+    .input('cci', sql.VarChar(20), row.cci || null)
     .input('tipoCuenta', sql.VarChar(20), row.tipoCuenta)
     .input('moneda', sql.VarChar(3), row.moneda)
     .input('estado', sql.Bit, row.estado ? 1 : 0)
@@ -93,6 +97,7 @@ async function actualizar(pool, row) {
       UPDATE dbo.CuentasBancarias
       SET nombreBanco = @nombreBanco,
           numeroCuenta = @numeroCuenta,
+          cci = @cci,
           tipoCuenta = @tipoCuenta,
           moneda = @moneda,
           estado = @estado,
@@ -131,6 +136,7 @@ async function listarActivasTextoPdf(pool, idEmpresa) {
       SELECT
         nombreBanco,
         numeroCuenta,
+        cci,
         tipoCuenta,
         moneda
       FROM dbo.CuentasBancarias
@@ -148,9 +154,11 @@ async function listarActivasTextoPdf(pool, idEmpresa) {
       const banco = (f.nombreBanco != null ? String(f.nombreBanco).trim() : '') || 'BANCO';
       const tipo = (f.tipoCuenta != null ? String(f.tipoCuenta).trim() : '') || 'CTA';
       const num = f.numeroCuenta != null ? String(f.numeroCuenta).trim() : '';
+      const cci = f.cci != null ? String(f.cci).trim() : '';
       const mon = (f.moneda != null ? String(f.moneda).trim() : '') || 'PEN';
       if (!num) return '';
-      return `${banco} - ${tipo}: ${num} (${mon})`;
+      const cciPart = cci ? ` CCI: ${cci}` : '';
+      return `${banco} - ${tipo}: ${num}${cciPart} (${mon})`;
     })
     .filter(Boolean)
     .join('\n');

@@ -124,6 +124,7 @@ export class IndexConfiguracionComponent implements OnInit {
   cuentaBancariaForm = {
     nombreBanco: '',
     numeroCuenta: '',
+    cci: '',
     tipoCuenta: 'AHORROS',
     moneda: 'PEN',
     estado: true,
@@ -652,6 +653,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cuentaBancariaForm = {
       nombreBanco: '',
       numeroCuenta: '',
+      cci: '',
       tipoCuenta: 'AHORROS',
       moneda: 'PEN',
       estado: true,
@@ -665,6 +667,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cuentaBancariaForm = {
       nombreBanco: cuenta.nombreBanco || '',
       numeroCuenta: cuenta.numeroCuenta || '',
+      cci: cuenta.cci || '',
       tipoCuenta: (cuenta.tipoCuenta || 'AHORROS').toUpperCase(),
       moneda: (cuenta.moneda || 'PEN').toUpperCase(),
       estado: cuenta.estado === true || cuenta.estado === 1,
@@ -679,6 +682,8 @@ export class IndexConfiguracionComponent implements OnInit {
         return 'Ingrese el nombre del banco.';
       case 'NUMERO_CUENTA_REQUERIDO':
         return 'Ingrese el número de cuenta.';
+      case 'CCI_INVALIDO':
+        return 'El CCI debe tener exactamente 20 dígitos.';
       case 'TIPO_CUENTA_REQUERIDO':
         return 'Seleccione el tipo de cuenta.';
       case 'MONEDA_INVALIDA':
@@ -705,9 +710,11 @@ export class IndexConfiguracionComponent implements OnInit {
     }
 
     this.cuentaBancariaGuardando = true;
+    const cciRaw = (this.cuentaBancariaForm.cci || '').trim();
     const payload = {
       nombreBanco,
       numeroCuenta,
+      cci: cciRaw || null,
       tipoCuenta: (this.cuentaBancariaForm.tipoCuenta || 'AHORROS').trim().toUpperCase(),
       moneda: (this.cuentaBancariaForm.moneda || 'PEN').trim().toUpperCase(),
       estado: !!this.cuentaBancariaForm.estado,

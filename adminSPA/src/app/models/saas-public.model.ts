@@ -30,6 +30,7 @@ export interface PagoManualInfo {
     idCuentaBancaria: string;
     banco: string | null;
     cuenta: string | null;
+    cci?: string | null;
     tipoCuenta: string | null;
     moneda: string;
     titular: string | null;

@@ -224,7 +224,7 @@
                         <span class="medio-tick"></span>
                       </span>
                       <span class="medio-body">
-                        <span class="medio-name">Yape, Plin o depósito BCP</span>
+                        <span class="medio-name">Yape o depósito en cuenta bancaria</span>
                         <span class="medio-desc">Transferencia + voucher por WhatsApp</span>
                       </span>
                     </label>
@@ -260,7 +260,7 @@
                     </button>
                   } @else {
                     <p class="checkout-hint mb-0">
-                      Culqi aún no está disponible. Marque <strong>Yape, Plin o depósito BCP</strong> para pagar ahora.
+                      Culqi aún no está disponible. Marque <strong>Yape o depósito en cuenta bancaria</strong> para pagar ahora.
                     </p>
                   }
                 </section>
@@ -270,7 +270,7 @@
                 <section class="pago-manual">
                   <div class="pago-manual-head">
                     <span class="pago-manual-badge">Validación manual</span>
-                    <h2 class="pago-manual-title">Yape, Plin o depósito BCP</h2>
+                    <h2 class="pago-manual-title">Yape o depósito en cuenta bancaria</h2>
                     <p class="pago-manual-lead">
                       Elija el medio, pague y envíe el <strong>voucher</strong> al WhatsApp
                       <strong class="wa-num">{{ c.pagoManual?.whatsappDisplay || '993289440' }}</strong>.
@@ -305,7 +305,7 @@
                           </span>
                           <span class="medio-body">
                             <span class="medio-name">Yape</span>
-                            <span class="medio-desc">Al {{ c.pagoManual?.yapePlin || '993289440' }}</span>
+                            <span class="medio-desc">Realiza el Yape al {{ c.pagoManual?.yapePlin || '993289440' }}. A nombre de Eric Ort**</span>
                           </span>
                         </label>
                     <!--
@@ -334,7 +334,7 @@
                             <span class="medio-tick"></span>
                           </span>
                           <span class="medio-body">
-                            <span class="medio-name">Depósito BCP</span>
+                            <span class="medio-name">Depósito en cuenta bancaria</span>
                             <span class="medio-desc">Transferencia a cuenta</span>
                           </span>
                         </label>
@@ -362,6 +362,9 @@
                                     }
                                     · {{ cta.moneda }}
                                     · <span class="user-select-all">{{ cta.cuenta }}</span>
+                                    @if (cta.cci) {
+                                      · CCI: <span class="user-select-all">{{ cta.cci }}</span>
+                                    }
                                   </li>
                                 }
                               </ul>
@@ -373,6 +376,9 @@
                                 Titular: <strong>{{ pm.bcp.titular }}</strong>.
                               }
                               Cuenta: <strong class="user-select-all">{{ pm.bcp.cuenta }}</strong>.
+                              @if (pm.bcp.cci) {
+                                CCI: <strong class="user-select-all">{{ pm.bcp.cci }}</strong>.
+                              }
                             } @else {
                               Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
                               Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
@@ -402,8 +408,7 @@
                       class="btn btn-checkout-wa w-100"
                       [disabled]="procesando() || !aceptoPoliticas || !emailListo()"
                       (click)="reportarPagoManual()">
-                      <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>
-                      Ya pagué — registrar y abrir WhatsApp
+                      Ya pagué — registrar pago
                     </button>
                   } @else {
                     <div class="pago-ok-panel">

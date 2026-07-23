@@ -14,9 +14,19 @@ function normalizarTexto(v, max) {
   return s.substring(0, max);
 }
 
+function normalizarCci(v) {
+  const digitos = String(v == null ? '' : v).replace(/\D/g, '');
+  if (!digitos) return null;
+  if (digitos.length > 20) throw new Error('CCI_INVALIDO');
+  // En Perú el CCI tiene 20 dígitos; si envían algo, debe ser exactamente 20.
+  if (digitos.length !== 20) throw new Error('CCI_INVALIDO');
+  return digitos;
+}
+
 function validarPayload(body, { esCreacion }) {
   const nombreBanco = normalizarTexto(body?.nombreBanco, 100);
   const numeroCuenta = normalizarTexto(body?.numeroCuenta, 30);
+  const cci = normalizarCci(body?.cci);
   const tipoCuenta = normalizarTexto(body?.tipoCuenta || 'AHORROS', 20).toUpperCase();
   const moneda = normalizarTexto(body?.moneda || 'PEN', 3).toUpperCase();
   const idCuentaContable = normalizarTexto(body?.idCuentaContable, 20) || null;
@@ -38,6 +48,7 @@ function validarPayload(body, { esCreacion }) {
   return {
     nombreBanco,
     numeroCuenta,
+    cci,
     tipoCuenta,
     moneda,
     idCuentaContable,
@@ -87,6 +98,7 @@ async function actualizar(pool, user, idCuentaBancaria, body) {
     idEmpresa,
     nombreBanco: datos.nombreBanco,
     numeroCuenta: datos.numeroCuenta,
+    cci: datos.cci,
     tipoCuenta: datos.tipoCuenta,
     moneda: datos.moneda,
     estado: datos.estado,

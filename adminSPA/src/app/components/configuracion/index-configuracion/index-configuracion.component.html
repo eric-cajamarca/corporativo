@@ -595,6 +595,7 @@
                       <tr>
                         <th>Banco</th>
                         <th>Nº cuenta</th>
+                        <th>CCI</th>
                         <th>Tipo</th>
                         <th>Moneda</th>
                         <th>Apertura</th>
@@ -607,6 +608,13 @@
                         <tr>
                           <td>{{ c.nombreBanco }}</td>
                           <td><code>{{ c.numeroCuenta }}</code></td>
+                          <td>
+                            @if (c.cci) {
+                              <code>{{ c.cci }}</code>
+                            } @else {
+                              <span class="text-muted">—</span>
+                            }
+                          </td>
                           <td>{{ c.tipoCuenta }}</td>
                           <td>{{ c.moneda }}</td>
                           <td>{{ c.fechaApertura || '—' }}</td>
@@ -985,6 +993,20 @@
                 <div class="mb-3">
                   <label for="cbNumeroCuenta" class="form-label">Número de cuenta *</label>
                   <input type="text" class="form-control" id="cbNumeroCuenta" [(ngModel)]="cuentaBancariaForm.numeroCuenta" name="cbNumeroCuenta" placeholder="Ej: 191-2345678-0-12" maxlength="30">
+                </div>
+                <div class="mb-3">
+                  <label for="cbCci" class="form-label">CCI (código interbancario)</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="cbCci"
+                    [(ngModel)]="cuentaBancariaForm.cci"
+                    name="cbCci"
+                    placeholder="20 dígitos, ej: 00219100123456789012"
+                    maxlength="25"
+                    inputmode="numeric"
+                    autocomplete="off">
+                  <div class="form-text">Opcional. Si lo completa, debe tener exactamente 20 dígitos.</div>
                 </div>
                 <div class="row g-3 mb-3">
                   <div class="col-md-6">

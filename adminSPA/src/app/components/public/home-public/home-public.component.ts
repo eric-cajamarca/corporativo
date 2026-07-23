@@ -7,8 +7,10 @@ import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
 
 interface PublicVideo {
+  id: string;
   titulo: string;
-  url: SafeResourceUrl;
+  reproduciendo: boolean;
+  embedUrl: SafeResourceUrl | null;
 }
 
 interface PublicReferido {
@@ -58,11 +60,27 @@ export class HomePublicComponent implements OnInit {
 
   ngOnInit(): void {
     this.videos = [
-      { titulo: 'Tour rápido del sistema', url: this.safeUrl('https://www.youtube.com/embed/ysz5S6PUM-U') },
-      { titulo: 'Cómo registrar una venta', url: this.safeUrl('https://www.youtube.com/embed/jfKfPfyJRdk') },
-      { titulo: 'Reportes y análisis en minutos', url: this.safeUrl('https://www.youtube.com/embed/5qap5aO4i9A') }
+      this.crearVideo('pNDpE6WNHko', 'Presentación y Crear cuenta'),
+      this.crearVideo('RsibE0r07Bk', 'Pasos iniciales de configuración'),
+      this.crearVideo('vNkwHwWK3Hw', 'Gestión de cajas')
     ];
     this.cargarPlanes();
+  }
+
+  miniaturaUrl(videoId: string): string {
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  }
+
+  reproducirVideo(video: PublicVideo): void {
+    if (video.reproduciendo) return;
+    video.embedUrl = this.safeUrl(
+      `https://www.youtube.com/embed/${video.id}?autoplay=1&start=0&rel=0`
+    );
+    video.reproduciendo = true;
+  }
+
+  private crearVideo(id: string, titulo: string): PublicVideo {
+    return { id, titulo, reproduciendo: false, embedUrl: null };
   }
 
   private cargarPlanes(): void {

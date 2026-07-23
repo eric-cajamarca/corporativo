@@ -27,7 +27,8 @@ const crear = async (req, res) => {
       error.message === 'NUMERO_CUENTA_REQUERIDO' ||
       error.message === 'TIPO_CUENTA_REQUERIDO' ||
       error.message === 'MONEDA_INVALIDA' ||
-      error.message === 'FECHA_APERTURA_INVALIDA'
+      error.message === 'FECHA_APERTURA_INVALIDA' ||
+      error.message === 'CCI_INVALIDO'
     ) {
       return res.status(400).json({ message: error.message });
     }
@@ -53,7 +54,8 @@ const actualizar = async (req, res) => {
       error.message === 'BANCO_REQUERIDO' ||
       error.message === 'NUMERO_CUENTA_REQUERIDO' ||
       error.message === 'TIPO_CUENTA_REQUERIDO' ||
-      error.message === 'MONEDA_INVALIDA'
+      error.message === 'MONEDA_INVALIDA' ||
+      error.message === 'CCI_INVALIDO'
     ) {
       return res.status(400).json({ message: error.message });
     }
