@@ -21,12 +21,15 @@ api.post('/empresa', empresasController.createEmpresa);
 // Ruta pública para verificar empresa con código enviado por WhatsApp.
 api.post('/empresa/verificar', empresasController.verificarEmpresaCodigo);
 // Envío de código de activación: ruta pública en empresaPublic.js (POST /api/empresa/enviar-codigo-activacion).
-//api.put('/empresa/:id',[auth.auth,path], empresasController.updateEmpresa);
-api.put('/empresa/:id', auth.auth,uploadLogo, empresasController.updateEmpresa); // Cambia 'archivo' por el nombre del campo del formulario
+
+// Integraciones: rutas fijas ANTES de /empresa/:id (si no, "integraciones" se toma como id).
+api.get('/empresa/integraciones', auth.auth, empresasController.getIntegraciones);
+api.put('/empresa/integraciones', auth.auth, empresasController.putIntegraciones);
+api.put('/empresa/integraciones/credenciales', auth.auth, empresasController.putCredencialesProveedor);
+
+api.put('/empresa/:id', auth.auth,uploadLogo, empresasController.updateEmpresa);
 api.put('/cambiar_estado_empresa/:id',auth.auth, empresasController.cambiar_estado_empresa);
 api.delete('/direccion_empresa/:id',auth.auth, empresasController.deleteDireccion_id);
-
-
 
 api.get('/direccionempresa',auth.auth, empresasController.getDireccionEmpresa_id);
 api.post('/direccion_empresa', auth.auth, empresasController.createDireccionEmpresa);
@@ -36,10 +39,5 @@ api.put('/cambiar_principal/:id',auth.auth, empresasController.cambiar_principal
 
 // Estado de configuración de la empresa
 api.get('/estado_configuracion',auth.auth, empresasController.getEstadoConfiguracion);
-
-// Integraciones y APIs de pago (empresa del usuario logueado)
-api.get('/empresa/integraciones', auth.auth, empresasController.getIntegraciones);
-api.put('/empresa/integraciones', auth.auth, empresasController.putIntegraciones);
-api.put('/empresa/integraciones/credenciales', auth.auth, empresasController.putCredencialesProveedor);
 
 module.exports = api;

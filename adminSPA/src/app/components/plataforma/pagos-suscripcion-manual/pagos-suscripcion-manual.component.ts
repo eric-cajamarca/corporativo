@@ -204,10 +204,10 @@ export class PagosSuscripcionManualComponent implements OnInit {
       return 'Ruta no encontrada (404). Reinicie el servidor backend para cargar /pagos-manuales/eliminar.';
     }
     if (e?.status === 402) {
-      return 'Suscripción bloqueada para esta operación. Use la empresa principal de la plataforma.';
+      return 'Suscripción bloqueada para esta operación.';
     }
     if (e?.status === 403) {
-      return 'No autorizado. Debe ser admin de la empresa principal.';
+      return 'No autorizado para esta operación.';
     }
     return fallback;
   }

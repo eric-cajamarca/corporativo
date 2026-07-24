@@ -850,7 +850,7 @@ export class IndexConfiguracionComponent implements OnInit {
       if (typeof iziToast !== 'undefined') {
         iziToast.warning({
           title: 'Permisos',
-          message: 'Solo superAdmin de la empresa principal puede ejecutar backups.',
+          message: 'No tiene permisos para ejecutar backups.',
           position: 'topRight'
         });
       }
@@ -904,7 +904,7 @@ export class IndexConfiguracionComponent implements OnInit {
       if (typeof iziToast !== 'undefined') {
         iziToast.warning({
           title: 'Permisos',
-          message: 'Solo superAdmin de la empresa principal puede editar esta configuración.',
+          message: 'No tiene permisos para editar esta configuración.',
           position: 'topRight'
         });
       }
@@ -994,7 +994,7 @@ export class IndexConfiguracionComponent implements OnInit {
         this.sistemaGuardando = false;
         const msg =
           err?.error?.message ||
-          'No se pudo guardar la configuración. Solo superAdmin de la empresa principal puede editar.';
+          'No se pudo guardar la configuración. No tiene permisos para editar.';
         if (typeof iziToast !== 'undefined') {
           iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
         }

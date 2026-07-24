@@ -100,7 +100,9 @@ async function getPagoManualSuscripcionConfig(pool) {
       trimOrNull(empresa?.razon_Social) ||
       trimOrNull(empresa?.nombreComercial) ||
       base.bcp.titular;
-    const yapePlin = trimOrNull(empresa?.celular) || base.yapePlin;
+    const celularEmpresa = trimOrNull(empresa?.celular);
+    const whatsappDisplay = celularEmpresa || base.whatsappDisplay;
+    const yapePlin = celularEmpresa || base.yapePlin;
 
     const filas = await obtenerCuentasPrincipal(pool, idPrincipal);
     const cuentas = filas.map((f) => ({
@@ -117,6 +119,8 @@ async function getPagoManualSuscripcionConfig(pool) {
 
     return {
       ...base,
+      whatsappDisplay,
+      whatsappE164: digitosWhatsApp(whatsappDisplay),
       yapePlin,
       bcp: preferida
         ? {

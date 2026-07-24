@@ -273,7 +273,7 @@
                     <h2 class="pago-manual-title">Yape o depósito en cuenta bancaria</h2>
                     <p class="pago-manual-lead">
                       Elija el medio, pague y envíe el <strong>voucher</strong> al WhatsApp
-                      <strong class="wa-num">{{ c.pagoManual?.whatsappDisplay || '993289440' }}</strong>.
+                      <strong class="wa-num">{{ c.pagoManual?.whatsappDisplay }}</strong>.
                       El administrador habilitará el plan.
                     </p>
                   </div>
@@ -283,7 +283,7 @@
                       <i class="bi bi-whatsapp"></i>
                     </span>
                     <div>
-                      <strong>WhatsApp 993289440</strong>
+                      <strong>WhatsApp {{ c.pagoManual?.whatsappDisplay }}</strong>
                       <p class="mb-0">
                         Envíe la captura o PDF del voucher con el número de orden. Allí se validará el pago.
                       </p>
@@ -305,7 +305,7 @@
                           </span>
                           <span class="medio-body">
                             <span class="medio-name">Yape</span>
-                            <span class="medio-desc">Realiza el Yape al {{ c.pagoManual?.yapePlin || '993289440' }}. A nombre de Eric Ort**</span>
+                            <span class="medio-desc">Realiza el Yape al {{ c.pagoManual?.yapePlin }}. A nombre de Eric Ort**</span>
                           </span>
                         </label>
                     <!--
@@ -320,7 +320,7 @@
                           </span>
                           <span class="medio-body">
                             <span class="medio-name">Plin</span>
-                            <span class="medio-desc">Al {{ c.pagoManual?.yapePlin || '993289440' }}</span>
+                            <span class="medio-desc">Al {{ c.pagoManual?.yapePlin }}</span>
                           </span>
                         </label>
                         -->
@@ -345,7 +345,7 @@
                       @if (medioPagoManual === 'yape' || medioPagoManual === 'plin') {
                         <p class="mb-0">
                           Pague con <strong>{{ medioPagoManual === 'yape' ? 'Yape' : 'Plin' }}</strong> al
-                          <strong>{{ c.pagoManual?.yapePlin || '993289440' }}</strong>
+                          <strong>{{ c.pagoManual?.yapePlin }}</strong>
                           por el monto de la orden y guarde el voucher.
                         </p>
                       } @else {
@@ -380,13 +380,13 @@
                                 CCI: <strong class="user-select-all">{{ pm.bcp.cci }}</strong>.
                               }
                             } @else {
-                              Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
-                              Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
+                              Por ahora no hay cuentas bancarias disponibles.
+                              Solicite los datos por WhatsApp indicando la orden
                               <code>{{ c.orderNumber }}</code>.
                             }
                           } @else {
-                            Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
-                            Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
+                            Por ahora no hay cuentas bancarias disponibles.
+                            Solicite los datos por WhatsApp indicando la orden
                             <code>{{ c.orderNumber }}</code>.
                           }
                         </p>
@@ -414,7 +414,7 @@
                     <div class="pago-ok-panel">
                       <p class="mb-2">
                         Orden en <strong>pendiente de validación</strong>. Envíe el voucher al WhatsApp
-                        <strong>993289440</strong> con su número de orden.
+                        <strong>{{ c.pagoManual?.whatsappDisplay }}</strong> con su número de orden.
                       </p>
                       <button type="button" class="btn btn-checkout-wa w-100 mb-2" (click)="abrirWhatsAppVoucher()">
                         <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>

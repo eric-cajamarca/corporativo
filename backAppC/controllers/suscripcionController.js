@@ -23,7 +23,7 @@ const crearPagoSuscripcion = async (req, res) => {
     }
     if (error.message === 'NO_PRINCIPAL') {
       return res.status(503).json({
-        message: 'No hay empresa principal configurada para recibir pagos. Contacte al administrador.'
+        message: 'El pago no está disponible en este momento. Contacte al soporte.'
       });
     }
     console.error('Error crear pago suscripción:', error?.message || error);
@@ -124,7 +124,7 @@ const actualizarPlanCatalogo = async (req, res) => {
   } catch (error) {
     if (error.message === 'NO_AUTORIZADO_CATALOGO') {
       return res.status(403).json({
-        message: 'Solo el superAdmin de la empresa principal de la plataforma puede editar el catálogo de planes.'
+        message: 'No tiene permisos para editar el catálogo de planes.'
       });
     }
     if (
@@ -166,7 +166,9 @@ const solicitarUpgrade = async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
     if (error.message === 'CULQI_NO_CONFIGURADO' || error.message === 'NO_PRINCIPAL') {
-      return res.status(503).json({ message: error.message });
+      return res.status(503).json({
+        message: 'El pago en línea no está disponible en este momento. Intente más tarde o contacte a soporte.'
+      });
     }
     console.error('solicitarUpgrade:', error);
     res.status(500).json({ message: 'Error al solicitar cambio de plan' });
@@ -296,7 +298,7 @@ const eliminarPagoManual = async (req, res) => {
     if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
       return res.status(403).json({
         message: 'NO_AUTORIZADO_CONCILIACION',
-        detail: 'No autorizado para eliminar pagos de suscripción (solo admin de la empresa principal).'
+        detail: 'No autorizado para eliminar pagos de suscripción.'
       });
     }
     if (error.message === 'NO_ELIMINAR_PAGADO') {

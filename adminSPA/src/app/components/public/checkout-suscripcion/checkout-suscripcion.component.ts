@@ -182,7 +182,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     const c = this.checkout();
     if (!c) return;
     const pm = c.pagoManual;
-    const wa = pm?.whatsappE164 || '51993289440';
+    const wa = pm?.whatsappE164 || '';
+    if (!wa) return;
     const ciclo = this.etiquetaCiclo(c.billingCycle);
     const medio =
       this.medioPagoManual === 'yape' ? 'Yape' : this.medioPagoManual === 'plin' ? 'Plin' : 'Depósito BCP';
@@ -261,7 +262,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     const pk = (c.culqiPublicKey || '').trim();
     if (!pk) {
       this.errorMsg.set(
-        'No hay clave pública Culqi. Configure Culqi en la empresa principal (integraciones) y vuelva a intentar.'
+        'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.'
       );
       return;
     }

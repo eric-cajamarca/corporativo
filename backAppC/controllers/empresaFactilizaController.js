@@ -2,7 +2,7 @@ const factilizaRepository = require('../repositories/factiliza.repository');
 const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 const { withPool } = require('../utils/dbPool.util');
 
-/** Igual que listado de empresas / política 2FA: superAdmin + empresa principal (EMPRESA_PRINCIPAL_ID). */
+/** Acceso plataforma: superAdmin + empresa dueña (EMPRESA_PRINCIPAL_ID). */
 function requireSuperAdminPlataforma(req, res) {
   if (!req.user) {
     res.status(401).json({ message: 'No autorizado' });
@@ -10,7 +10,7 @@ function requireSuperAdminPlataforma(req, res) {
   }
   if (!puedeAccesoListadoPlataformaEmpresas(req)) {
     res.status(403).json({
-      message: 'Solo el superAdmin de la plataforma (empresa principal) puede acceder a esta función.'
+      message: 'No tiene permisos para acceder a esta función.'
     });
     return false;
   }

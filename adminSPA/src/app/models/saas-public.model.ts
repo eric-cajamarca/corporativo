@@ -25,7 +25,7 @@ export interface PagoManualInfo {
     tipoCuenta?: string | null;
     moneda?: string | null;
   };
-  /** Cuentas activas de la empresa principal (CuentasBancarias). */
+  /** Cuentas bancarias activas para depósito. */
   cuentas?: Array<{
     idCuentaBancaria: string;
     banco: string | null;

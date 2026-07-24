@@ -30,10 +30,10 @@ const iniciarCheckout = async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
     if (error.message === 'NO_PRINCIPAL') {
-      return res.status(503).json({ message: 'Plataforma sin empresa principal configurada (esPrincipal).' });
+      return res.status(503).json({ message: 'El pago en línea no está disponible en este momento. Intente más tarde o use otro medio de pago.' });
     }
     if (error.message === 'CULQI_NO_CONFIGURADO') {
-      return res.status(503).json({ message: 'Culqi no está configurado en la empresa principal.' });
+      return res.status(503).json({ message: 'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.' });
     }
     console.error('iniciarCheckout:', error);
     res.status(500).json({ message: 'Error al iniciar checkout' });

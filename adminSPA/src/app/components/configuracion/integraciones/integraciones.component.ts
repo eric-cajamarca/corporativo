@@ -99,9 +99,12 @@ export class IntegracionesComponent implements OnInit {
         this.guardandoFlags.set(false);
         iziToast.success({ title: 'Guardado', message: 'Opciones de integración actualizadas.' });
       },
-      error: () => {
+      error: (err) => {
         this.guardandoFlags.set(false);
-        iziToast.error({ title: 'Error', message: 'No se pudieron guardar las opciones.' });
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudieron guardar las opciones.'
+        });
       }
     });
   }

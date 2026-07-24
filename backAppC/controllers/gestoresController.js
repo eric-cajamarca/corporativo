@@ -387,7 +387,7 @@ const guardar_configuracion = async function (req, res) {
         }
         if (error.message === 'NO_AUTORIZADO_CONFIG_SISTEMA') {
             return res.status(403).json({
-                message: 'Solo superAdmin de la empresa principal puede editar esta configuración.',
+                message: 'No tiene permisos para editar esta configuración.',
                 data: undefined
             });
         }
@@ -422,7 +422,7 @@ const ejecutar_backup_ahora = async function (req, res) {
         console.error('Error en ejecutar_backup_ahora:', error.message);
         if (error.message === 'NO_AUTORIZADO_CONFIG_SISTEMA') {
             return res.status(403).json({
-                message: 'Solo superAdmin de la empresa principal puede ejecutar backups.',
+                message: 'No tiene permisos para ejecutar backups.',
                 data: undefined
             });
         }
