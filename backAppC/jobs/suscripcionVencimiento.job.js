@@ -10,7 +10,12 @@ async function ejecutarUnaVez() {
   if (!isSaas()) return;
   try {
     await withPool(async (pool) => {
-      const n = await empresaSuscripcionRepository.marcarVencidas(pool, new Date());
+      const ahora = new Date();
+      const aplicados = await empresaSuscripcionRepository.aplicarPlanesPendientesAlVencer(pool, ahora);
+      if (aplicados > 0) {
+        console.error('Suscripción vencimiento: planes pendientes aplicados:', aplicados);
+      }
+      const n = await empresaSuscripcionRepository.marcarVencidas(pool, ahora);
       if (n > 0) {
         console.error('Suscripción vencimiento: empresas marcadas VENCIDA:', n);
       }

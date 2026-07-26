@@ -22,6 +22,7 @@ import { SidebarStateService } from '../../services/sidebar-state.service';
 import { NotificacionesService } from '../../services/notificaciones.service';
 import { NotificacionItem } from '../../models/notificacion.model';
 import { EmpresaService } from '../../services/empresa.service';
+import { AyudaTutorialesModalComponent } from './ayuda-tutoriales-modal/ayuda-tutoriales-modal.component';
 
 declare const iziToast: any;
 
@@ -33,7 +34,8 @@ declare const iziToast: any;
     CommonModule,
     ConsultarPlacaModalComponent,
     ConsultarSoatModalComponent,
-    AppBannerRibbonComponent
+    AppBannerRibbonComponent,
+    AyudaTutorialesModalComponent
   ],
   templateUrl: './topnav.component.html',
   styleUrl: './topnav.component.css'
@@ -64,6 +66,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
   // Modales de consultas Factiliza
   public mostrarModalPlaca = false;
   public mostrarModalSoat = false;
+  /** Centro de ayuda / tutoriales (manuales PDF) */
+  public mostrarModalAyuda = false;
   /** Cantidad de vehículos con SOAT vencido (para notificación en menú) */
   public soatVencidoCount = 0;
   private soatVencidoToastYaMostrado = false;
@@ -302,6 +306,10 @@ export class TopnavComponent implements OnInit, OnDestroy {
 
   abrirModalSoat(): void {
     this.mostrarModalSoat = true;
+  }
+
+  abrirModalAyuda(): void {
+    this.mostrarModalAyuda = true;
   }
 
   /**

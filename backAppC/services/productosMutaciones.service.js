@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { v4: uuidv4 } = require('uuid');
 const ProductosRepository = require('../repositories/productos.repository');
 const preciosVRepository = require('../repositories/preciosV.repository');
 const inventarioRepository = require('../repositories/inventario.repository');
@@ -191,6 +192,27 @@ async function crearProductoCompra(pool, datosProducto) {
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
+    if (!datosProducto.idProducto) {
+      datosProducto.idProducto = uuidv4();
+    }
+    const idUsuario =
+      datosProducto.idUsuario ||
+      (await resolverIdUsuarioParaProducto(pool, datosProducto.idEmpresa, datosProducto.idUsuarioToken));
+    if (!idUsuario) {
+      throw new Error('No se pudo resolver el usuario para crear el producto de la compra');
+    }
+    datosProducto.idUsuario = idUsuario;
+    datosProducto.FIngreso = datosProducto.FIngreso || new Date();
+    datosProducto.estado = datosProducto.estado != null ? datosProducto.estado : 1;
+    datosProducto.facturar = datosProducto.facturar || 'SI';
+    datosProducto.alertaMinimo = datosProducto.alertaMinimo != null ? datosProducto.alertaMinimo : 5;
+    datosProducto.alertaMaximo = datosProducto.alertaMaximo != null ? datosProducto.alertaMaximo : 50;
+    datosProducto.VecesVendidas = datosProducto.VecesVendidas != null ? datosProducto.VecesVendidas : 0;
+    datosProducto.tipoProducto = datosProducto.tipoProducto || 'S';
+    datosProducto.permiteDescripcionEnVenta = datosProducto.permiteDescripcionEnVenta ? 1 : 0;
+    datosProducto.fProduccion = datosProducto.fProduccion || null;
+    datosProducto.fVencimiento = datosProducto.fVencimiento || null;
+
     let codigoFinal = String(datosProducto.Codigo || '').trim();
     if (!codigoFinal) {
       codigoFinal = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, datosProducto.idEmpresa);
@@ -205,7 +227,7 @@ async function crearProductoCompra(pool, datosProducto) {
       }
     }
     datosProducto.Codigo = codigoFinal;
-    await ProductosRepository.insertarProductoCompraValores(transaction, datosProducto);
+    await ProductosRepository.insertarProducto(transaction, datosProducto);
     await transaction.commit();
     return datosProducto.idProducto;
   } catch (err) {

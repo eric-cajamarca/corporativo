@@ -110,6 +110,10 @@ async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
     if (isTicket) {
       pdfOptions.width = '80mm';
       pdfOptions.height = '297mm';
+    } else if (String(formato).toLowerCase() === 'a4-landscape') {
+      pdfOptions.format = 'A4';
+      pdfOptions.landscape = true;
+      pdfOptions.margin = { top: '0.5cm', bottom: '0.5cm', left: '0.6cm', right: '0.6cm' };
     } else {
       pdfOptions.format = formato === 'A5' ? 'A5' : 'A4';
     }

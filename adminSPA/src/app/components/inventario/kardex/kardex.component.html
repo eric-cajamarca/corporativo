@@ -3,7 +3,9 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
         <h1 class="content-title mb-1">Kardex</h1>
-        <p class="content-subtitle text-muted mb-0">Movimientos de inventario por producto (compras, ventas y movimientos) ordenados por fecha.</p>
+        <p class="content-subtitle text-muted mb-0">
+          Movimientos de inventario por producto. Sin producto seleccionado puede descargar el Formato 13.1 (inventario permanente valorizado de todos los productos).
+        </p>
       </div>
       <a routerLink="/inventario" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i> Volver
@@ -24,7 +26,7 @@
         </div>
         
         <div class="col-md-6 kardex-producto-picker">
-          <label class="form-label">Producto <span class="text-danger">*</span></label>
+          <label class="form-label">Producto <span class="text-muted small">(opcional)</span></label>
           <div class="d-flex flex-wrap gap-2 align-items-stretch">
             <button type="button" class="btn btn-success" (click)="abrirBuscadorProductos()">
               <i class="bi bi-search me-1"></i> Buscar producto
@@ -40,12 +42,12 @@
                 </button>
               </div>
             } @else {
-              <span class="text-muted small align-self-center">Seleccione un producto para consultar el kardex.</span>
+              <span class="text-muted small align-self-center">Sin producto: descargue PDF o Excel del Formato 13.1 (todos los productos).</span>
             }
           </div>
         </div>
         <div class="col-md-2">
-          <button type="submit" class="btn btn-primary w-100" [disabled]="cargando">
+          <button type="submit" class="btn btn-primary w-100" [disabled]="cargando || !productoSeleccionado">
             @if (cargando) {
               <span class="spinner-border spinner-border-sm me-1"></span>
             }
@@ -56,16 +58,48 @@
 
       <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
         <input type="text" class="form-control form-control-sm" style="max-width: 200px;" placeholder="Buscar en tabla..." [(ngModel)]="filtroTexto" [ngModelOptions]="{standalone: true}" />
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="buscar()" title="Actualizar">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="buscar()" title="Actualizar" [disabled]="!productoSeleccionado">
           <i class="bi bi-arrow-repeat"></i>
         </button>
+        @if (!productoSeleccionado) {
+          <span class="vr d-none d-md-inline"></span>
+          <button
+            class="btn btn-sm btn-outline-danger"
+            (click)="exportarPdfCompleto()"
+            [disabled]="exportandoCompleto"
+            title="Descargar PDF Formato 13.1 — Inventario permanente valorizado (todos los productos)">
+            @if (exportandoPdfCompleto) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+            } @else {
+              <i class="bi bi-file-pdf"></i>
+            }
+            PDF
+          </button>
+          <button
+            class="btn btn-sm btn-outline-success"
+            (click)="exportarExcelCompleto()"
+            [disabled]="exportandoCompleto"
+            title="Descargar Excel Formato 13.1 — Inventario permanente valorizado (todos los productos)">
+            @if (exportandoExcelCompleto) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+            } @else {
+              <i class="bi bi-file-excel"></i>
+            }
+            Excel
+          </button>
+        }
         @if (data?.producto) {
           <span class="vr d-none d-md-inline"></span>
           <button class="btn btn-sm btn-outline-primary" (click)="imprimir()" title="Imprimir">
             <i class="bi bi-printer"></i> Imprimir
           </button>
-          <button class="btn btn-sm btn-outline-danger" (click)="exportarPdf()" title="Exportar PDF">
-            <i class="bi bi-file-pdf"></i> PDF
+          <button class="btn btn-sm btn-outline-danger" (click)="exportarPdf()" [disabled]="exportandoPdfProducto" title="Exportar PDF">
+            @if (exportandoPdfProducto) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+            } @else {
+              <i class="bi bi-file-pdf"></i>
+            }
+            PDF
           </button>
           <button class="btn btn-sm btn-outline-success" (click)="exportarExcel()" title="Exportar a Excel">
             <i class="bi bi-file-excel"></i> Excel
@@ -172,8 +206,17 @@
         <p class="text-muted mb-0">Producto no encontrado.</p>
       }
 
-      @if (!data && !cargando) {
-        <p class="text-muted mb-0">Seleccione un producto y pulse Buscar para ver el kardex.</p>
+      @if (!data && !cargando && !exportandoCompleto) {
+        <p class="text-muted mb-0">
+          Seleccione un producto y pulse Buscar para ver el kardex, o descargue el
+          <strong>Excel Formato 13.1</strong> (todos los productos) sin elegir producto.
+        </p>
+      }
+      @if (exportandoCompleto) {
+        <p class="text-muted mb-0">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Generando Formato 13.1 de todos los productos… esto puede tardar unos segundos.
+        </p>
       }
     </div>
   </div>

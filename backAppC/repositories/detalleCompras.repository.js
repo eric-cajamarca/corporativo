@@ -6,10 +6,37 @@ async function listarPorCompra(pool, idEmpresa, idCompra) {
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idCompra', sql.UniqueIdentifier, idCompra)
     .query(`
-      SELECT d.*
+      SELECT
+        d.idDetalleCompra,
+        d.idEmpresa,
+        d.idSucursal,
+        d.idCompra,
+        d.cantidad,
+        d.idProducto,
+        d.idPresentacion,
+        d.pUnitario,
+        d.total,
+        d.idUsuario,
+        RTRIM(LTRIM(ISNULL(p.Codigo, ''))) AS codigo,
+        RTRIM(LTRIM(ISNULL(p.descripcion, ''))) AS descripcion,
+        CONVERT(VARCHAR(19), p.fProduccion, 120) AS fProduccion,
+        CONVERT(VARCHAR(19), p.fVencimiento, 120) AS fVencimiento,
+        p.idCategoria,
+        p.idMarca,
+        cat.nombre AS categoriaNombre,
+        m.nombre AS marcaNombre,
+        pr.codigo AS presentacionCodigo,
+        pr.descripcion AS presentacionDescripcion,
+        s.nombre AS sucursalNombre
       FROM DetalleCompras d
       INNER JOIN Compras c ON c.idCompra = d.idCompra AND c.idEmpresa = @idEmpresa
+      LEFT JOIN Productos p ON p.idProducto = d.idProducto AND p.idEmpresa = d.idEmpresa
+      LEFT JOIN Categorias cat ON cat.idCategoria = p.idCategoria
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = ISNULL(d.idPresentacion, p.idPresentacion)
+      LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal AND ISNULL(s.estado, 1) = 1
       WHERE d.idCompra = @idCompra AND d.idEmpresa = @idEmpresa
+      ORDER BY d.idDetalleCompra
     `);
   return result.recordset;
 }

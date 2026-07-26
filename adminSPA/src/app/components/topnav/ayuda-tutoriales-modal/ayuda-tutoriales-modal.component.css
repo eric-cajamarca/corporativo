@@ -1,0 +1,78 @@
+.ayuda-modal .modal-header {
+  align-items: flex-start;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.ayuda-subtitle {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-top: 2px;
+}
+
+.tutorial-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tutorial-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e9ecef;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.tutorial-item:hover {
+  background: #f8fafc;
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 8px rgba(31, 59, 115, 0.08);
+}
+
+.tutorial-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1f3b73 0%, #4f7cff 100%);
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.tutorial-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tutorial-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.tutorial-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.tutorial-action {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.tutorial-item:hover .tutorial-action {
+  color: #4f7cff;
+}

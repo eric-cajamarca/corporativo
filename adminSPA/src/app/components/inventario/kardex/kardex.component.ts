@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import {
   MovimientoInventarioService,
   KardexResponse,
+  KardexCompletoResponse,
   KardexFila,
   MovimientoDetalle
 } from '../../../services/movimiento-inventario.service';
@@ -13,9 +14,11 @@ import { BuscadorProductosModalService } from '../../../services/buscador-produc
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { VentasService, ComprobantePdfData } from '../../../services/ventas.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
+import { PdfService } from '../../../services/pdf.service';
+import { EmpresaService } from '../../../services/empresa.service';
 import { formatFechaLocal } from '../../../utils/fecha-local.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -40,13 +43,22 @@ export class KardexComponent implements AfterViewInit {
   private comprasService = inject(ComprasService);
   private ventasService = inject(VentasService);
   private excelService = inject(ExcelService);
+  private pdfService = inject(PdfService);
+  private empresaService = inject(EmpresaService);
   private fb = inject(FormBuilder);
 
   form: FormGroup;
   productoSeleccionado: { idProducto: string; codigo: string; descripcion: string } | null = null;
   data: KardexResponse | null = null;
   cargando = false;
+  exportandoPdfProducto = false;
+  exportandoExcelCompleto = false;
+  exportandoPdfCompleto = false;
   filtroTexto = '';
+
+  get exportandoCompleto(): boolean {
+    return this.exportandoExcelCompleto || this.exportandoPdfCompleto;
+  }
 
   modalTipo: 'COMPRA' | 'VENTA' | 'MOVIMIENTO' | null = null;
   modalCargando = false;
@@ -208,11 +220,70 @@ export class KardexComponent implements AfterViewInit {
     window.print();
   }
 
+  private payloadEmpresaPdf(extra?: {
+    razonSocial?: string;
+    nombre?: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+    correo?: string;
+    rubro?: string;
+    establecimiento?: string;
+  }): Record<string, string> {
+    const emp = this.empresaService.getEmpresaActual();
+    return {
+      razonSocial: extra?.razonSocial || emp?.nombre || '',
+      nombre: extra?.nombre || extra?.razonSocial || emp?.nombre || '',
+      ruc: extra?.ruc || emp?.ruc || '',
+      direccion: extra?.direccion || emp?.direccion || '',
+      telefono: extra?.telefono || emp?.telefono || '',
+      correo: extra?.correo || emp?.correo || '',
+      rubro: extra?.rubro || emp?.rubro || '',
+      establecimiento: extra?.establecimiento || 'ALMACEN GENERAL'
+    };
+  }
+
+  /** PDF del kardex del producto (solo encabezado empresa + tabla, sin UI de la pantalla). */
   exportarPdf(): void {
-    window.print();
+    if (!this.data?.producto || !this.data?.filas) {
+      iziToast.warning({ title: 'Sin datos', message: 'Busque un producto primero.', position: 'topRight' });
+      return;
+    }
+    const fechaDesde = this.form.get('fechaDesde')?.value || '';
+    const fechaHasta = this.form.get('fechaHasta')?.value || '';
+    const filename = `kardex_${this.data.producto.codigo || 'producto'}_${this.formatearFecha(fechaDesde)}_${this.formatearFecha(fechaHasta)}.pdf`.replace(/\//g, '-');
+    this.exportandoPdfProducto = true;
+    this.pdfService.generarPdfKardexProducto({
+      empresa: this.payloadEmpresaPdf(),
+      producto: this.data.producto,
+      saldoInicial: this.data.saldoInicial,
+      filas: this.data.filas,
+      totales: this.data.totales,
+      fechaDesde,
+      fechaHasta,
+      nombreArchivo: filename
+    }, filename).subscribe({
+      next: (blob) => {
+        this.exportandoPdfProducto = false;
+        this.pdfService.descargar(blob, filename);
+        iziToast.success({ title: 'PDF', message: 'Kardex exportado correctamente', position: 'topRight' });
+      },
+      error: (err) => {
+        this.exportandoPdfProducto = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo generar el PDF del kardex',
+          position: 'topRight'
+        });
+      }
+    });
   }
 
   exportarExcel(): void {
+    if (!this.productoSeleccionado) {
+      this.exportarExcelCompleto();
+      return;
+    }
     if (!this.data?.producto || !this.data?.filas) {
       iziToast.warning({ title: 'Sin datos', message: 'Busque un producto primero.', position: 'topRight' });
       return;
@@ -261,6 +332,132 @@ export class KardexComponent implements AfterViewInit {
       },
       error: (err) => {
         iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo generar el Excel', position: 'topRight' });
+      }
+    });
+  }
+
+  private nombreArchivoFormato131(fechaDesde: string, fechaHasta: string): string {
+    return `formato_13.1_kardex_${this.formatearFecha(fechaDesde)}_${this.formatearFecha(fechaHasta)}`.replace(/\//g, '-');
+  }
+
+  private cargarKardexCompleto(): Observable<KardexCompletoResponse> | null {
+    const fechaDesde = this.form.get('fechaDesde')?.value || '';
+    const fechaHasta = this.form.get('fechaHasta')?.value || '';
+    if (!fechaDesde || !fechaHasta) {
+      iziToast.warning({ title: 'Periodo requerido', message: 'Seleccione fecha desde y hasta.', position: 'topRight' });
+      return null;
+    }
+    return this.movimientoService.obtenerKardexCompleto(fechaDesde, fechaHasta);
+  }
+
+  /** Formato 13.1 Excel: todos los productos de la empresa logueada. */
+  exportarExcelCompleto(): void {
+    const fechaDesde = this.form.get('fechaDesde')?.value || '';
+    const fechaHasta = this.form.get('fechaHasta')?.value || '';
+    const req$ = this.cargarKardexCompleto();
+    if (!req$) return;
+
+    this.exportandoExcelCompleto = true;
+    req$.subscribe({
+      next: (resp) => {
+        if (!resp?.productos?.length) {
+          this.exportandoExcelCompleto = false;
+          iziToast.warning({
+            title: 'Sin datos',
+            message: 'No hay productos con movimientos o saldo en el periodo.',
+            position: 'topRight'
+          });
+          return;
+        }
+        const filename = this.nombreArchivoFormato131(fechaDesde, fechaHasta);
+        this.excelService.generarExcelKardex131({
+          empresa: resp.empresa,
+          periodo: resp.periodo,
+          productos: resp.productos,
+          filename
+        }).subscribe({
+          next: (blob) => {
+            this.exportandoExcelCompleto = false;
+            this.excelService.descargar(blob, filename + '.xlsx');
+            iziToast.success({
+              title: 'Excel',
+              message: `Formato 13.1 exportado (${resp.productos.length} productos)`,
+              position: 'topRight'
+            });
+          },
+          error: (err) => {
+            this.exportandoExcelCompleto = false;
+            iziToast.error({
+              title: 'Error',
+              message: err?.error?.message || 'No se pudo generar el Excel formato 13.1',
+              position: 'topRight'
+            });
+          }
+        });
+      },
+      error: (err) => {
+        this.exportandoExcelCompleto = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo obtener el kardex completo',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  /** Formato 13.1 PDF: todos los productos de la empresa logueada. */
+  exportarPdfCompleto(): void {
+    const fechaDesde = this.form.get('fechaDesde')?.value || '';
+    const fechaHasta = this.form.get('fechaHasta')?.value || '';
+    const req$ = this.cargarKardexCompleto();
+    if (!req$) return;
+
+    this.exportandoPdfCompleto = true;
+    req$.subscribe({
+      next: (resp) => {
+        if (!resp?.productos?.length) {
+          this.exportandoPdfCompleto = false;
+          iziToast.warning({
+            title: 'Sin datos',
+            message: 'No hay productos con movimientos o saldo en el periodo.',
+            position: 'topRight'
+          });
+          return;
+        }
+        const filename = this.nombreArchivoFormato131(fechaDesde, fechaHasta) + '.pdf';
+        this.pdfService.generarPdfKardex131({
+          empresa: this.payloadEmpresaPdf(resp.empresa),
+          periodo: resp.periodo,
+          productos: resp.productos,
+          nombreArchivo: filename
+        }, filename).subscribe({
+          next: (blob) => {
+            this.exportandoPdfCompleto = false;
+            this.pdfService.descargar(blob, filename);
+            iziToast.success({
+              title: 'PDF',
+              message: `Formato 13.1 exportado (${resp.productos.length} productos)`,
+              position: 'topRight'
+            });
+          },
+          error: (err) => {
+            this.exportandoPdfCompleto = false;
+            iziToast.error({
+              title: 'Error',
+              message: err?.error?.message || 'No se pudo generar el PDF formato 13.1',
+              position: 'topRight'
+            });
+          }
+        });
+      },
+      error: (err) => {
+        this.exportandoPdfCompleto = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo obtener el kardex completo',
+          position: 'topRight'
+        });
       }
     });
   }

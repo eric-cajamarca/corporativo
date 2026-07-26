@@ -322,67 +322,72 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
     this._comprasService.obtener_detalle_compras_idcompra(id).subscribe(
       response => {
-                        if (response.data != undefined) {
-
-          response.data.forEach((element: any) => {
-            const selectedObject = this.productos.find((item: any) => item.idProducto == element.idProducto);
-            element.producto = selectedObject;
-
-            const selectedObjectSucursal = this.sucursales.find((item: any) => item.idSucursal == element.idSucursal);
-            element.sucursal = selectedObjectSucursal;
-
-            if (element.producto) {
-              const p = element.producto;
-              // El API de productos devuelve categoria y marca como nombres (string), no como IDs
-              const selectedObjectCategoria = this.categoria.find((c: any) =>
-                (c.nombre || '').trim() === (p.categoria || '').trim()
-              ) ?? this.categoria.find((c: any) => c.idCategoria == p.idCategoria);
-              element.categoria = selectedObjectCategoria;
-
-              const selectedObjectMarca = this.marcas.find((m: any) =>
-                (m.nombre || '').trim() === (p.marca || '').trim()
-              ) ?? this.marcas.find((m: any) => m.idMarca == p.idMarca);
-              element.marca = selectedObjectMarca;
-
-              // Presentación: el API devuelve descripcionPres y codigoPresentacion
-              const selectedObjectPresentacion = this.presentacion.find((pr: any) =>
-                (pr.Descripcion || pr.descripcion || '').trim() === (p.descripcionPres || '').trim() ||
-                (pr.codigo || '').trim() === (p.codigoPresentacion || '').trim()
-              ) ?? this.presentacion.find((pr: any) => pr.idPresentacion == p.idPresentacion);
-              element.presentacion = selectedObjectPresentacion;
-            } else {
-              element.categoria = undefined;
-              element.presentacion = undefined;
-              element.marca = undefined;
+        if (response.data != undefined) {
+          const rows = Array.isArray(response.data) ? response.data : [];
+          rows.forEach((element: any) => {
+            // Preferir datos enriquecidos del API; cache local solo como respaldo
+            const cachedProducto = this.productos.find(
+              (item: any) =>
+                String(item.idProducto || '').toLowerCase() === String(element.idProducto || '').toLowerCase()
+            );
+            if (!element.producto && cachedProducto) {
+              element.producto = cachedProducto;
             }
-          });
-          this.detalleCompras = response.data;
-          this.detalleCompras_const = this.detalleCompras;
+            if (!element.sucursal) {
+              element.sucursal = this.sucursales.find(
+                (item: any) =>
+                  String(item.idSucursal || '').toLowerCase() === String(element.idSucursal || '').toLowerCase()
+              );
+            }
+            if (!element.categoria && element.producto) {
+              const p = element.producto;
+              element.categoria =
+                this.categoria.find((c: any) => (c.nombre || '').trim() === (p.categoria || '').trim()) ??
+                this.categoria.find((c: any) => c.idCategoria == (p.idCategoria ?? element.idCategoria));
+            }
+            if (!element.marca && element.producto) {
+              const p = element.producto;
+              element.marca =
+                this.marcas.find((m: any) => (m.nombre || '').trim() === (p.marca || '').trim()) ??
+                this.marcas.find((m: any) => m.idMarca == (p.idMarca ?? element.idMarca));
+            }
+            if (!element.presentacion || !(element.presentacion.Descripcion || element.presentacion.descripcion)) {
+              const p = element.producto;
+              element.presentacion =
+                this.presentacion.find(
+                  (pr: any) =>
+                    (pr.Descripcion || pr.descripcion || '').trim() === (p?.descripcionPres || '').trim() ||
+                    (pr.codigo || '').trim() === (p?.codigoPresentacion || '').trim()
+                ) ??
+                this.presentacion.find(
+                  (pr: any) => pr.idPresentacion == (p?.idPresentacion ?? element.idPresentacion)
+                ) ??
+                element.presentacion;
+            }
 
-          this.detalleCompras.forEach((element: any) => {
-            element.cUnitario = element.pUnitario;
-            element.subtotal = element.total;
-            if (element.producto) {
-              element.idPresentacion = element.producto.idPresentacion;
-              element.idCategoria = element.producto.idCategoria;
-              element.descripcion = element.producto.descripcion;
+            element.cUnitario = element.cUnitario ?? element.pUnitario;
+            element.subtotal = element.subtotal ?? element.total;
+            if (!element.codigo && element.producto) {
               element.codigo = element.producto.Codigo ?? element.producto.codigo;
+            }
+            if (!element.descripcion && element.producto) {
+              element.descripcion = element.producto.descripcion;
+            }
+            if (element.fProduccion == null && element.producto) {
               element.fProduccion = element.producto.fProduccion;
+            }
+            if (element.fVencimiento == null && element.producto) {
               element.fVencimiento = element.producto.fVencimiento;
             }
-            if (element.sucursal) {
-              element.idSucursal = element.sucursal.idSucursal;
-            }
           });
-
-
-
-
+          this.detalleCompras = rows;
+          this.detalleCompras_const = this.detalleCompras;
           this.loadDetalleCompras = false;
-                  }
+        }
       },
       error => {
-              }
+        this.loadDetalleCompras = false;
+      }
     );
 
 

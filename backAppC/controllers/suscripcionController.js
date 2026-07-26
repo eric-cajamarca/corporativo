@@ -6,6 +6,7 @@ const suscripcionPublicService = require('../services/suscripcionPublic.service'
 const { withPool } = require('../utils/dbPool.util');
 const suscripcionCatalogoAdminService = require('../services/suscripcionCatalogoAdmin.service');
 const suscripcionConciliacionService = require('../services/suscripcionConciliacion.service');
+const suscripcionDowngradeService = require('../services/suscripcionDowngrade.service');
 
 const crearPagoSuscripcion = async (req, res) => {
   try {
@@ -327,6 +328,60 @@ const eliminarPagoManual = async (req, res) => {
   }
 };
 
+const programarDowngrade = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const data = await withPool((pool) =>
+      suscripcionDowngradeService.programarDowngrade(pool, req.user, req.body || {})
+    );
+    return res.status(200).json({ data, message: data.mensaje });
+  } catch (error) {
+    const code = error.message;
+    if (code === 'NO_AUTH') {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (
+      code === 'PLAN_INVALIDO' ||
+      code === 'CICLO_FACTURACION_INVALIDO' ||
+      code === 'DOWNGRADE_NO_APLICA' ||
+      code === 'MISMO_PLAN' ||
+      code === 'NO_ES_DOWNGRADE'
+    ) {
+      const mensajes = {
+        PLAN_INVALIDO: 'Plan no válido.',
+        CICLO_FACTURACION_INVALIDO: 'Ciclo de facturación no válido.',
+        DOWNGRADE_NO_APLICA: 'No tiene una suscripción vigente para programar un plan menor.',
+        MISMO_PLAN: 'Ya tiene este plan. Para renovar use el checkout al vencer.',
+        NO_ES_DOWNGRADE: 'Ese plan no es menor que el actual. Para subir de plan use el pago en checkout.'
+      };
+      return res.status(400).json({ message: code, detail: mensajes[code] || code });
+    }
+    console.error('programarDowngrade:', error);
+    return res.status(500).json({ message: 'Error al programar el cambio de plan' });
+  }
+};
+
+const cancelarDowngrade = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const data = await withPool((pool) => suscripcionDowngradeService.cancelarDowngrade(pool, req.user));
+    return res.status(200).json({ data, message: data.message });
+  } catch (error) {
+    if (error.message === 'NO_AUTH') {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (error.message === 'SIN_SUSCRIPCION') {
+      return res.status(400).json({ message: 'No hay suscripción para esta empresa.' });
+    }
+    console.error('cancelarDowngrade:', error);
+    return res.status(500).json({ message: 'Error al cancelar el cambio programado' });
+  }
+};
+
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
@@ -334,6 +389,8 @@ module.exports = {
   actualizarPlanCatalogo,
   miEstado,
   solicitarUpgrade,
+  programarDowngrade,
+  cancelarDowngrade,
   conciliacionCulqi,
   conciliacionCulqiCsv,
   listarPagosManuales,

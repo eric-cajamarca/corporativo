@@ -4,6 +4,7 @@ const { construirHtmlAnalisisFinanciero } = require('../services/analisisFinanci
 const { construirHtmlReportesNegocio } = require('../services/reportesNegocioPdf.service');
 const { construirHtmlComprasDetallado } = require('../services/comprasDetallePdf.service');
 const { construirHtmlVentasDetallado } = require('../services/ventasDetallePdf.service');
+const { construirHtmlKardex131, construirHtmlKardexProducto } = require('../services/kardex131Pdf.service');
 
 async function generatePdf(req, res) {
   const { datos, tipo, fontSize, formato } = req.body;
@@ -12,7 +13,8 @@ async function generatePdf(req, res) {
     return res.status(400).json({ error: 'Datos son requeridos' });
   }
 
-  const formatoPdf = formato === 'ticket' || formato === 'A5' ? formato : 'A4';
+  const formatoPdf =
+    formato === 'ticket' || formato === 'A5' || formato === 'A4-landscape' ? formato : 'A4';
   const fontSizeNum = typeof fontSize === 'number' ? fontSize : 10;
 
   try {
@@ -33,6 +35,14 @@ async function generatePdf(req, res) {
 
       case 'ventas-detallado':
         html = construirHtmlVentasDetallado(datos);
+        break;
+
+      case 'kardex-13.1':
+        html = construirHtmlKardex131(datos);
+        break;
+
+      case 'kardex-producto':
+        html = construirHtmlKardexProducto(datos);
         break;
 
       case 'factura': {

@@ -1,6 +1,7 @@
 const { generateExcelFromData } = require('../services/excel.service');
 const { generateExcelComprasDetallado } = require('../services/comprasDetalleExcel.service');
 const { generateExcelVentasDetallado } = require('../services/ventasDetalleExcel.service');
+const { generateExcelKardex131 } = require('../services/kardex131Excel.service');
 
 async function generateExcel(req, res) {
   const { data } = req.body;
@@ -15,6 +16,8 @@ async function generateExcel(req, res) {
       excelBuffer = await generateExcelComprasDetallado(data);
     } else if (data.tipo === 'ventas-detallado') {
       excelBuffer = await generateExcelVentasDetallado(data);
+    } else if (data.tipo === 'kardex-13.1') {
+      excelBuffer = await generateExcelKardex131(data);
     } else if (data.rows && data.columns) {
       excelBuffer = await generateExcelFromData(data);
     }

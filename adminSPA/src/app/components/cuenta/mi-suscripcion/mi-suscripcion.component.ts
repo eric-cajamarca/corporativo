@@ -24,6 +24,7 @@ export class MiSuscripcionComponent implements OnInit {
   vinculoOk = signal(false);
   orderNumber = '';
   vinculando = signal(false);
+  cancelandoDowngrade = signal(false);
   /** Evita doble auto-vinculación al recargar tras éxito. */
   private autoVinculoEjecutado = false;
 
@@ -191,5 +192,22 @@ export class MiSuscripcionComponent implements OnInit {
       return 'Ver planes';
     }
     return 'Actualizar plan';
+  }
+
+  cancelarDowngradeProgramado(): void {
+    this.cancelandoDowngrade.set(true);
+    this.errorMsg.set(null);
+    this.saas.cancelarDowngrade().subscribe({
+      next: () => {
+        this.cancelandoDowngrade.set(false);
+        this.vinculoOk.set(true);
+        this.vinculoMsg.set('Cambio de plan programado cancelado.');
+        this.cargar(false);
+      },
+      error: (err) => {
+        this.cancelandoDowngrade.set(false);
+        this.errorMsg.set(err?.error?.message || 'No se pudo cancelar el cambio programado.');
+      }
+    });
   }
 }

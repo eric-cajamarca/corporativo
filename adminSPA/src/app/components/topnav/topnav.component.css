@@ -44,7 +44,9 @@
 .topnav-left {
   display: flex;
   align-items: center;
+  align-self: center;
   gap: 16px;
+  height: 100%;
 }
 
 .topnav-toggle {
@@ -75,6 +77,37 @@
   color: #212529;
 }
 
+.topnav-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  line-height: 0;
+  background: transparent;
+  height: auto;
+  padding: 0;
+  margin: 0;
+}
+
+.topnav-logo-img {
+  height: 36px;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+}
+
+@media (max-width: 575.98px) {
+  .topnav-logo-img {
+    height: 22px;
+  }
+}
+
 /* =============================================
    LADO DERECHO
    ============================================= */
@@ -100,6 +133,15 @@
 .topnav-btn:hover {
   background: #f8f9fa;
   color: #212529;
+}
+
+.topnav-btn-ayuda {
+  color: #4f7cff;
+}
+
+.topnav-btn-ayuda:hover {
+  background: #eef2ff;
+  color: #1f3b73;
 }
 
 /* Tipo de cambio */

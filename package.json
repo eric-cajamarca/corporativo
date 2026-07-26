@@ -9,5 +9,8 @@
     "e2e:ui": "npm run e2e:ui --prefix adminSPA",
     "e2e:headed": "npm run e2e:headed --prefix adminSPA",
     "e2e:api": "npm run e2e:api --prefix adminSPA"
+  },
+  "dependencies": {
+    "docx": "^9.7.1"
   }
 }

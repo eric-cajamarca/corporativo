@@ -269,6 +269,40 @@ function fechaFinDesdePlan(planCode, billingCycle, desde) {
   return d;
 }
 
+/** Fallback si SaasPlan no tiene fila (mismo orden que migraciones catálogo). */
+const ORDEN_PLAN_FALLBACK = {
+  enterprise: 0,
+  demo: 5,
+  basico: 15,
+  emprendedor: 20,
+  profesional: 30,
+  empresarial: 90,
+  pendiente: 0
+};
+
+async function obtenerOrdenPlanAsync(pool, planCode) {
+  const key = (planCode || '').toString().trim().toLowerCase();
+  if (!key) return 0;
+  const row = await saasPlanRepository.obtenerPorPlanCode(pool, key);
+  if (row && row.orden != null && Number.isFinite(Number(row.orden))) {
+    return Number(row.orden);
+  }
+  return ORDEN_PLAN_FALLBACK[key] != null ? ORDEN_PLAN_FALLBACK[key] : 0;
+}
+
+/**
+ * true si destino es plan menor (orden estricto) respecto al actual.
+ * Mismo planCode no es downgrade (renovación / mismo plan).
+ */
+async function esDowngradePlanAsync(pool, planCodeActual, planCodeDestino) {
+  const a = (planCodeActual || '').toString().trim().toLowerCase();
+  const b = (planCodeDestino || '').toString().trim().toLowerCase();
+  if (!a || !b || a === b) return false;
+  const ordenA = await obtenerOrdenPlanAsync(pool, a);
+  const ordenB = await obtenerOrdenPlanAsync(pool, b);
+  return ordenB < ordenA;
+}
+
 module.exports = {
   listarPlanesCatalogo,
   listarPlanesCatalogoAsync,
@@ -279,5 +313,8 @@ module.exports = {
   montoSolesAsync,
   montoCulqiCentimos,
   montoCulqiCentimosAsync,
-  fechaFinDesdePlan
+  fechaFinDesdePlan,
+  obtenerOrdenPlanAsync,
+  esDowngradePlanAsync,
+  ORDEN_PLAN_FALLBACK
 };

@@ -119,13 +119,29 @@ async function obtenerMiEstado(pool, idEmpresa) {
     }
   }
 
+  let planPendienteResumen = null;
+  if (suscripcion?.planCodePendiente) {
+    try {
+      planPendienteResumen = await saasPlanesService.obtenerResumenPlanAsync(
+        pool,
+        suscripcion.planCodePendiente
+      );
+    } catch (errPend) {
+      console.error('contexto: obtenerMiEstado plan pendiente', errPend);
+      planPendienteResumen = null;
+    }
+  }
+
   return {
     deploymentMode,
     suscripcion,
     planCatalogo,
     limitesUso,
     onboarding,
-    checkoutsOrden
+    checkoutsOrden,
+    planPendiente: planPendienteResumen,
+    billingCyclePendiente: suscripcion?.billingCyclePendiente || null,
+    downgradeAplicaEn: suscripcion?.planCodePendiente ? suscripcion.fechaFin || null : null
   };
 }
 

@@ -42,6 +42,26 @@ export class PdfService {
     );
   }
 
+  generarPdfKardex131(datos: Record<string, unknown>, nombreArchivo?: string): Observable<Blob> {
+    const payload: Record<string, unknown> = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'kardex-13.1', fontSize: 8, formato: 'A4-landscape' },
+      { responseType: 'blob' }
+    );
+  }
+
+  generarPdfKardexProducto(datos: Record<string, unknown>, nombreArchivo?: string): Observable<Blob> {
+    const payload: Record<string, unknown> = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'kardex-producto', fontSize: 8, formato: 'A4-landscape' },
+      { responseType: 'blob' }
+    );
+  }
+
   generarPdfDinamico(datos: PdfDatosDinamicos, tipo: string = 'reporte', fontSize: number = 10, formato?: 'A4' | 'A5' | 'ticket'): Observable<Blob> {
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,

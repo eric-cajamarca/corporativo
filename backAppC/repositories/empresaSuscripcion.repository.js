@@ -15,7 +15,9 @@ async function obtenerPorEmpresa(pool, idEmpresa) {
         CONVERT(VARCHAR(19), fechaFin, 120) AS fechaFin,
         idCheckoutOrigen,
         migracionDemoPendiente,
-        ISNULL(contadorComprobantesSunatAceptados, 0) AS contadorComprobantesSunatAceptados
+        ISNULL(contadorComprobantesSunatAceptados, 0) AS contadorComprobantesSunatAceptados,
+        planCodePendiente,
+        billingCyclePendiente
       FROM EmpresaSuscripcion
       WHERE idEmpresa = @idEmpresa
     `);
@@ -70,8 +72,40 @@ async function actualizarEstadoYPlan(pool, idEmpresa, patch) {
     sets.push('migracionDemoPendiente = @migracionDemoPendiente');
     req.input('migracionDemoPendiente', sql.Bit, patch.migracionDemoPendiente ? 1 : 0);
   }
+  if (patch.planCodePendiente !== undefined) {
+    sets.push('planCodePendiente = @planCodePendiente');
+    req.input('planCodePendiente', sql.VarChar(30), patch.planCodePendiente);
+  }
+  if (patch.billingCyclePendiente !== undefined) {
+    sets.push('billingCyclePendiente = @billingCyclePendiente');
+    req.input('billingCyclePendiente', sql.VarChar(10), patch.billingCyclePendiente);
+  }
   if (sets.length === 0) return;
   await req.query(`UPDATE EmpresaSuscripcion SET ${sets.join(', ')} WHERE idEmpresa = @idEmpresa`);
+}
+
+/**
+ * Aplica planCodePendiente / billingCyclePendiente a filas vencidas y limpia pendientes.
+ * @returns {number} filas con pendiente aplicado
+ */
+async function aplicarPlanesPendientesAlVencer(pool, fechaReferencia) {
+  const r = await pool
+    .request()
+    .input('ahora', sql.DateTime2, fechaReferencia)
+    .query(`
+      UPDATE EmpresaSuscripcion
+      SET
+        planCode = planCodePendiente,
+        billingCycle = ISNULL(billingCyclePendiente, billingCycle),
+        planCodePendiente = NULL,
+        billingCyclePendiente = NULL
+      WHERE estado IN ('DEMO', 'ACTIVA')
+        AND fechaFin IS NOT NULL
+        AND fechaFin < @ahora
+        AND planCodePendiente IS NOT NULL
+        AND LTRIM(RTRIM(planCodePendiente)) <> ''
+    `);
+  return r.rowsAffected[0] || 0;
 }
 
 async function marcarVencidas(pool, fechaReferencia) {
@@ -128,6 +162,7 @@ module.exports = {
   obtenerPorEmpresa,
   insertar,
   actualizarEstadoYPlan,
+  aplicarPlanesPendientesAlVencer,
   marcarVencidas,
   incrementarContadorComprobantesSunatAceptados,
   actualizarContadorSunatSiInferior

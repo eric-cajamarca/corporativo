@@ -35,6 +35,13 @@ const iniciarCheckout = async (req, res) => {
     if (error.message === 'CULQI_NO_CONFIGURADO') {
       return res.status(503).json({ message: 'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.' });
     }
+    if (error.message === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
+      return res.status(409).json({
+        message: 'DOWNGRADE_PROGRAMADO_REQUERIDO',
+        detail:
+          'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
+      });
+    }
     console.error('iniciarCheckout:', error);
     res.status(500).json({ message: 'Error al iniciar checkout' });
   }

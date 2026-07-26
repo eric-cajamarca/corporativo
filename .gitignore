@@ -24,6 +24,7 @@ respaldo/
 CRM/
 infra/
 analisis-grupo-salvacion/
+flayers/
 
 # Caché / pruebas (por si se generan fuera de adminSPA/.gitignore)
 **/.angular/cache/

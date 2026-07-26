@@ -255,12 +255,27 @@ export class MovimientoInventarioService {
       withCredentials: true
     });
   }
+
+  /** Formato 13.1: kardex valorizado de todos los productos */
+  obtenerKardexCompleto(fechaDesde: string, fechaHasta: string): Observable<KardexCompletoResponse> {
+    let params = new HttpParams();
+    if (fechaDesde) params = params.set('fechaDesde', fechaDesde);
+    if (fechaHasta) params = params.set('fechaHasta', fechaHasta);
+    return this.http.get<KardexCompletoResponse>(this.baseUrl + 'kardex-completo', {
+      params,
+      withCredentials: true
+    });
+  }
 }
 
 export interface KardexProducto {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  unidadMedida?: string;
+  unidadDescripcion?: string;
+  tipoExistencia?: string;
+  tipoExistenciaDescripcion?: string;
 }
 
 export interface KardexSaldoInicial {
@@ -273,6 +288,9 @@ export interface KardexFila {
   fecha: string;
   tipoMov: string;
   nroDocum: string;
+  serie?: string;
+  numero?: string;
+  tipoDocumento?: string;
   idRef: string;
   tipoRef: 'COMPRA' | 'VENTA' | 'MOVIMIENTO';
   cantidadEntrada: number;
@@ -281,6 +299,8 @@ export interface KardexFila {
   cantidadSalida: number;
   pUnitarioSalida: number;
   importeSalida: number;
+  pUnitarioSalidaValorizado?: number;
+  importeSalidaValorizado?: number;
   saldoCantidad: number;
   saldoPUnitario: number;
   saldoImporte: number;
@@ -293,6 +313,7 @@ export interface KardexTotales {
   totalEntradaImporte: number;
   totalSalidaCantidad: number;
   totalSalidaImporte: number;
+  totalSalidaImporteValorizado?: number;
   saldoFinalCantidad: number;
   saldoFinalImporte: number;
   saldoFinalPUnitario?: number;
@@ -304,4 +325,55 @@ export interface KardexResponse {
   saldoInicial: KardexSaldoInicial | null;
   filas: KardexFila[];
   totales: KardexTotales | null;
+}
+
+export interface KardexCompletoProducto {
+  codigo: string;
+  descripcion: string;
+  tipoExistencia: string;
+  tipoExistenciaDescripcion: string;
+  unidadMedida: string;
+  filas: {
+    fecha: string;
+    tipoDocumento: string;
+    serie: string;
+    numero: string;
+    tipoOperacion: string;
+    cantidadEntrada: number;
+    costoUnitarioEntrada: number;
+    importeEntrada: number;
+    cantidadSalida: number;
+    costoUnitarioSalida: number;
+    importeSalida: number;
+    saldoCantidad: number;
+    saldoCostoUnitario: number;
+    saldoImporte: number;
+  }[];
+  totales: {
+    totalEntradaCantidad: number;
+    totalEntradaImporte: number;
+    totalSalidaCantidad: number;
+    totalSalidaImporte: number;
+    saldoFinalCantidad: number;
+    saldoFinalCostoUnitario: number;
+    saldoFinalImporte: number;
+  };
+}
+
+export interface KardexCompletoResponse {
+  empresa: {
+    razonSocial: string;
+    nombre?: string;
+    ruc: string;
+    establecimiento: string;
+    direccion?: string;
+    telefono?: string;
+    correo?: string;
+    rubro?: string;
+  };
+  periodo: {
+    fechaDesde: string;
+    fechaHasta: string;
+  };
+  productos: KardexCompletoProducto[];
 }

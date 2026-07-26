@@ -154,6 +154,25 @@ exports.kardex = async (req, res) => {
 };
 
 /**
+ * GET /api/inventario/kardex-completo?fechaDesde=...&fechaHasta=...
+ * Formato 13.1: inventario permanente valorizado de todos los productos.
+ */
+exports.kardexCompleto = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const fechaDesde = req.query.fechaDesde || null;
+    const fechaHasta = req.query.fechaHasta || null;
+    const resultado = await kardexService.obtenerKardexCompleto(req.user.empresa, fechaDesde, fechaHasta);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('inventarioController kardexCompleto:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener kardex completo' });
+  }
+};
+
+/**
  * GET /api/inventario/costo-sugerido?idProducto=&idSucursal=
  */
 exports.costoSugerido = async (req, res) => {

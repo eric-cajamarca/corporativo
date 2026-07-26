@@ -4,7 +4,10 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { CheckoutIniciado } from '../models/saas-public.model';
-import { MiEstadoSuscripcionResponse } from '../models/saas-subscription.model';
+import {
+  DowngradeProgramadoResponse,
+  MiEstadoSuscripcionResponse
+} from '../models/saas-subscription.model';
 
 @Injectable({ providedIn: 'root' })
 export class SaasSubscriptionService {
@@ -60,6 +63,29 @@ export class SaasSubscriptionService {
         headers: this.headers,
         withCredentials: true
       })
+      .pipe(map((r) => r.data));
+  }
+
+  programarDowngrade(body: {
+    planCode: string;
+    billingCycle: string;
+  }): Observable<DowngradeProgramadoResponse> {
+    return this.http
+      .post<{ data: DowngradeProgramadoResponse }>(
+        `${this.baseUrl}suscripcion/programar-downgrade`,
+        JSON.stringify(body),
+        { headers: this.headers, withCredentials: true }
+      )
+      .pipe(map((r) => r.data));
+  }
+
+  cancelarDowngrade(): Observable<{ ok: boolean; message?: string }> {
+    return this.http
+      .post<{ data: { ok: boolean; message?: string } }>(
+        `${this.baseUrl}suscripcion/cancelar-downgrade`,
+        JSON.stringify({}),
+        { headers: this.headers, withCredentials: true }
+      )
       .pipe(map((r) => r.data));
   }
 

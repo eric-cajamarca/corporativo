@@ -9,7 +9,51 @@ const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 async function obtenerDetallePorCompra(pool, user, idCompra) {
   if (!user) throw new Error('NO_AUTH');
   await assertAlgunoPermiso(pool, user, 'VER_COMPRAS', 'CREAR_COMPRAS', 'EDITAR_COMPRAS');
-  return detalleComprasRepository.listarPorCompra(pool, user.empresa, idCompra);
+  const rows = await detalleComprasRepository.listarPorCompra(pool, user.empresa, idCompra);
+  return (rows || []).map((r) => ({
+    idDetalleCompra: r.idDetalleCompra,
+    idEmpresa: r.idEmpresa,
+    idSucursal: r.idSucursal,
+    idCompra: r.idCompra,
+    cantidad: r.cantidad,
+    idProducto: r.idProducto,
+    idPresentacion: r.idPresentacion,
+    pUnitario: r.pUnitario,
+    cUnitario: r.pUnitario,
+    total: r.total,
+    subtotal: r.total,
+    idUsuario: r.idUsuario,
+    codigo: r.codigo || '',
+    descripcion: r.descripcion || '',
+    fProduccion: r.fProduccion || null,
+    fVencimiento: r.fVencimiento || null,
+    idCategoria: r.idCategoria,
+    idMarca: r.idMarca,
+    categoria: r.categoriaNombre ? { idCategoria: r.idCategoria, nombre: r.categoriaNombre } : undefined,
+    marca: r.marcaNombre ? { idMarca: r.idMarca, nombre: r.marcaNombre } : undefined,
+    presentacion: {
+      idPresentacion: r.idPresentacion,
+      codigo: r.presentacionCodigo || '',
+      Descripcion: r.presentacionDescripcion || '',
+      descripcion: r.presentacionDescripcion || ''
+    },
+    sucursal: r.sucursalNombre
+      ? { idSucursal: r.idSucursal, nombre: r.sucursalNombre }
+      : undefined,
+    producto: r.idProducto
+      ? {
+          idProducto: r.idProducto,
+          Codigo: r.codigo || '',
+          codigo: r.codigo || '',
+          descripcion: r.descripcion || '',
+          idCategoria: r.idCategoria,
+          idMarca: r.idMarca,
+          idPresentacion: r.idPresentacion,
+          fProduccion: r.fProduccion || null,
+          fVencimiento: r.fVencimiento || null
+        }
+      : undefined
+  }));
 }
 
 async function crearDetalleCompraCompleto(pool, user, body) {

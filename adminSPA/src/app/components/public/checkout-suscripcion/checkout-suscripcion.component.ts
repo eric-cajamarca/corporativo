@@ -110,6 +110,14 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.procesando.set(false);
+          const code = err?.error?.message;
+          if (code === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
+            this.errorMsg.set(
+              err?.error?.detail ||
+                'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
+            );
+            return;
+          }
           this.errorMsg.set(err?.error?.message || 'No se pudo iniciar el pago.');
         }
       });

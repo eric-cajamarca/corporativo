@@ -1,0 +1,42 @@
+@if (visible) {
+  <div class="modal-backdrop fade show" (click)="cerrar()"></div>
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="ayudaTutorialesTitle">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content ayuda-modal">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="ayudaTutorialesTitle">
+              <i class="bi bi-question-circle me-2"></i>Centro de ayuda
+            </h5>
+            <p class="ayuda-subtitle mb-0">Tutoriales y manuales de EFAFERP</p>
+          </div>
+          <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrar()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            Seleccione un tutorial para abrir el PDF en una nueva pestaña.
+          </p>
+          <div class="tutorial-list">
+            @for (t of tutoriales; track t.id) {
+              <button type="button" class="tutorial-item" (click)="abrirPdf(t)">
+                <span class="tutorial-icon" aria-hidden="true">
+                  <i class="bi" [ngClass]="t.icono"></i>
+                </span>
+                <span class="tutorial-text">
+                  <span class="tutorial-title">{{ t.titulo }}</span>
+                  <span class="tutorial-desc">{{ t.descripcion }}</span>
+                </span>
+                <span class="tutorial-action" aria-hidden="true">
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </span>
+              </button>
+            }
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrar()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

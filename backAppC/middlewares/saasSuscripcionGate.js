@@ -28,6 +28,8 @@ function isWhitelistedPublic(pathname, method) {
   if (pathname.startsWith('/api/suscripcion/mi-estado')) return true;
   if (pathname.startsWith('/api/suscripcion/crear-pago')) return true;
   if (pathname.startsWith('/api/suscripcion/solicitar-upgrade')) return true;
+  if (pathname.startsWith('/api/suscripcion/programar-downgrade')) return true;
+  if (pathname.startsWith('/api/suscripcion/cancelar-downgrade')) return true;
   // Admin plataforma (empresa principal): validar / limpiar pagos manuales
   if (pathname.startsWith('/api/suscripcion/pagos-manuales')) return true;
   return false;

@@ -24,5 +24,6 @@ router.get('/movimientos/:id/lineas', inventarioController.listarLineasMovimient
 router.get('/movimientos/:id', inventarioController.obtenerMovimientoPorId);
 router.get('/tipos-movimiento', inventarioController.tiposMovimiento);
 router.get('/kardex', inventarioController.kardex);
+router.get('/kardex-completo', inventarioController.kardexCompleto);
 
 module.exports = router;

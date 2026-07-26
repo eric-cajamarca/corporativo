@@ -55,6 +55,18 @@ async function iniciarCheckout(pool, body, authUser) {
   const plan = await saasPlanesService.resolverPlanInternoAsync(pool, planCode);
   if (!plan) throw new Error('PLAN_INVALIDO');
 
+  if (idEmpresaCliente && planCode !== 'demo') {
+    const suscripcionDowngradeService = require('./suscripcionDowngrade.service');
+    const bloquear = await suscripcionDowngradeService.debeBloquearCheckoutPorDowngrade(
+      pool,
+      idEmpresaCliente,
+      planCode
+    );
+    if (bloquear) {
+      throw new Error('DOWNGRADE_PROGRAMADO_REQUERIDO');
+    }
+  }
+
   if (planCode === 'demo') {
     const monto = 0;
     const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);

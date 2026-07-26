@@ -1183,29 +1183,9 @@ exports.actualizarCUnitarioDesdeCompra = async (executor, idEmpresa, idProducto,
     `);
 };
 
+/** Alta desde compra: mismo INSERT nominado que el catálogo (evita error 213 si Productos tiene columnas nuevas). */
 exports.insertarProductoCompraValores = async (transaction, detalle) => {
-  return transaction
-    .request()
-    .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
-    .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
-    .input('Codigo', sql.VarChar, detalle.Codigo)
-    .input('idCategoria', sql.Int, detalle.idCategoria)
-    .input('descripcion', sql.VarChar, detalle.descripcion)
-    .input('idMarca', sql.Int, detalle.idMarca)
-    .input('idPresentacion', sql.Int, detalle.idPresentacion)
-    .input('cUnitario', sql.Decimal(18, 5), detalle.cUnitario)
-    .input('fProduccion', sql.VarChar, detalle.fProduccion)
-    .input('fVencimiento', sql.VarChar, detalle.fVencimiento)
-    .input('alertaMinimo', sql.Decimal, detalle.alertaMinimo)
-    .input('alertaMaximo', sql.Decimal, detalle.alertaMaximo)
-    .input('VecesVendidas', sql.Int, detalle.VecesVendidas)
-    .input('facturar', sql.VarChar, detalle.facturar)
-    .input('idUsuario', sql.UniqueIdentifier, detalle.idUsuario)
-    .input('FIngreso', sql.DateTime, detalle.FIngreso)
-    .input('estado', sql.Bit, detalle.estado)
-    .query(
-      'INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)'
-    );
+  return exports.insertarProducto(transaction, detalle);
 };
 
 /**

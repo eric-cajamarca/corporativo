@@ -164,6 +164,32 @@
           </div>
         }
         @if (e.deploymentMode === 'saas') {
+          @if (e.planPendiente || e.suscripcion?.planCodePendiente) {
+            <div class="alert alert-info mb-3">
+              <strong>Cambio de plan programado.</strong>
+              Pasará a
+              <strong>{{ e.planPendiente?.nombre || e.suscripcion?.planCodePendiente }}</strong>
+              @if (e.billingCyclePendiente || e.suscripcion?.billingCyclePendiente) {
+                ({{ etiquetaCiclo(e.billingCyclePendiente || e.suscripcion?.billingCyclePendiente) }})
+              }
+              en su próxima renovación
+              @if (e.downgradeAplicaEn || e.suscripcion?.fechaFin) {
+                ({{ e.downgradeAplicaEn || e.suscripcion?.fechaFin }}).
+              } @else {
+                .
+              }
+              No se cobra ahora; mantiene su plan actual hasta esa fecha.
+              <div class="mt-2">
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  [disabled]="cancelandoDowngrade()"
+                  (click)="cancelarDowngradeProgramado()">
+                  {{ cancelandoDowngrade() ? 'Cancelando…' : 'Cancelar cambio programado' }}
+                </button>
+              </div>
+            </div>
+          }
           <div class="card shadow-sm">
             <div class="card-body">
               <h2 class="h5 card-title">Renovar o cambiar plan</h2>

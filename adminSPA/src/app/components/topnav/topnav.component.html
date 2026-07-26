@@ -11,10 +11,10 @@
         <i class="fas fa-bars"></i>
       </button>
 
-      <!-- Breadcrumb o título de página -->
-      <div class="topnav-title d-none d-md-flex">
-        <span class="text-muted">Sistema de Gestión</span>
-      </div>
+      <!-- Marca EFAFERP -->
+      <a class="topnav-brand-logo" routerLink="/home" title="EFAFERP">
+        <img src="assets/img/logo-efaferp.png" alt="EFAFERP" class="topnav-logo-img" />
+      </a>
     </div>
 
     <!-- Lado derecho -->
@@ -159,6 +159,17 @@
           </div>
         </div>
       </div>
+
+      <!-- Centro de ayuda / tutoriales (junto a campana y pin) -->
+      <button
+        type="button"
+        class="topnav-btn topnav-btn-ayuda"
+        title="Centro de ayuda — Tutoriales"
+        aria-label="Abrir centro de ayuda"
+        (click)="abrirModalAyuda()">
+        <i class="bi bi-question-circle-fill"></i>
+      </button>
+
       <!-- Separador -->
       <div class="topnav-divider d-none d-md-block"></div>
 
@@ -218,6 +229,10 @@
             <i class="bi bi-gear-fill me-2"></i>
             Configuración
           </a>
+          <a class="dropdown-item" (click)="abrirModalAyuda(); $event.preventDefault()">
+            <i class="bi bi-question-circle-fill me-2"></i>
+            Tutoriales
+          </a>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item text-danger" (click)="logout(); $event.preventDefault()">
             <i class="bi bi-box-arrow-right me-2"></i>
@@ -242,14 +257,18 @@
   (closed)="mostrarModalSoat = false">
 </app-consultar-soat-modal>
 
+<app-ayuda-tutoriales-modal
+  [visible]="mostrarModalAyuda"
+  (closed)="mostrarModalAyuda = false">
+</app-ayuda-tutoriales-modal>
+
 <!-- Mensaje cuando no está autenticado -->
 <nav class="topnav topnav-guest" *ngIf="!isAuthenticated">
   <div class="topnav-container">
     <div class="topnav-left">
-      <div class="topnav-brand">
-        <i class="bi bi-building-fill me-2"></i>
-        <span>Sistema de Gestión</span>
-      </div>
+      <a class="topnav-brand-logo" routerLink="/publico" title="EFAFERP">
+        <img src="assets/img/logo-efaferp.png" alt="EFAFERP" class="topnav-logo-img" />
+      </a>
     </div>
     <div class="topnav-right">
       <a [routerLink]="['/login-empresa']" class="btn btn-primary btn-sm">

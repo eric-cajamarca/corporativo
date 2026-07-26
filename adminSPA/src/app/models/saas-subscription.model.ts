@@ -65,4 +65,17 @@ export interface MiEstadoSuscripcionResponse {
   limitesUso: LimitesUsoSuscripcion | null;
   /** SaaS: historial de órdenes CHK-… vinculadas o de la suscripción actual. */
   checkoutsOrden?: SuscripcionCheckoutOrdenResumen[];
+  /** Plan menor programado para la próxima renovación. */
+  planPendiente?: PlanSuscripcionResumen | null;
+  billingCyclePendiente?: string | null;
+  downgradeAplicaEn?: string | null;
+}
+
+export interface DowngradeProgramadoResponse {
+  planCodeActual: string;
+  planCodePendiente: string;
+  billingCyclePendiente: string;
+  aplicaEn: string | null;
+  planPendiente: PlanSuscripcionResumen | null;
+  mensaje: string;
 }

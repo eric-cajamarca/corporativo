@@ -77,4 +77,6 @@ export interface SuscripcionEmpresaRow {
   idCheckoutOrigen: string | null;
   migracionDemoPendiente: boolean;
   contadorComprobantesSunatAceptados?: number;
+  planCodePendiente?: string | null;
+  billingCyclePendiente?: string | null;
 }

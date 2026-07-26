@@ -123,7 +123,9 @@ async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
       estado: 'ACTIVA',
       fechaFin,
       idCheckoutOrigen: chk.idCheckout,
-      migracionDemoPendiente: false
+      migracionDemoPendiente: false,
+      planCodePendiente: null,
+      billingCyclePendiente: null
     });
   }
   return empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);

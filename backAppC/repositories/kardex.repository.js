@@ -101,8 +101,12 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
       .query(`
-        SELECT idProducto, codigo, descripcion FROM Productos
-        WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto
+        SELECT p.idProducto, p.codigo, p.descripcion,
+               ISNULL(pr.codigo, 'NIU') AS unidadMedida,
+               ISNULL(pr.descripcion, 'UNIDAD') AS unidadDescripcion
+        FROM Productos p
+        LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
+        WHERE p.idEmpresa = @idEmpresa AND p.idProducto = @idProducto
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -112,11 +116,14 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       .query(`
         SELECT CONVERT(VARCHAR(19), c.fEmision, 120) AS fecha, 'COM' AS tipoMov,
                ISNULL(c.serie,'') + ':' + ISNULL(c.numero,'') AS nroDocum, c.idCompra AS idRef, 'COMPRA' AS tipoRef,
+               ISNULL(c.serie,'') AS serie, ISNULL(c.numero,'') AS numero,
+               RTRIM(LTRIM(ISNULL(comp.codigo, '00'))) AS tipoDocumento,
                dc.cantidad AS cantidadEntrada, dc.pUnitario AS pUnitarioEntrada, dc.total AS importeEntrada,
                0 AS cantidadSalida, 0 AS pUnitarioSalida, 0 AS importeSalida,
                0 AS costoUnitarioSalida, 0 AS eliminado, NULL AS idEstadoSunat, NULL AS observaciones
         FROM DetalleCompras dc
         INNER JOIN Compras c ON dc.idCompra = c.idCompra AND c.idEmpresa = dc.idEmpresa
+        LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
         WHERE dc.idEmpresa = @idEmpresa AND dc.idProducto = @idProducto
           AND c.fEmision >= @fechaDesde AND c.fEmision < DATEADD(day, 1, @fechaHasta)
       `),
@@ -128,12 +135,15 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       .query(`
         SELECT CONVERT(VARCHAR(19), v.fEmision, 120) AS fecha, 'VEN' AS tipoMov,
                ISNULL(v.serie,'') + ':' + ISNULL(v.numero,'') AS nroDocum, v.idVenta AS idRef, 'VENTA' AS tipoRef,
+               ISNULL(v.serie,'') AS serie, ISNULL(v.numero,'') AS numero,
+               RTRIM(LTRIM(ISNULL(comp.codigo, '00'))) AS tipoDocumento,
                0 AS cantidadEntrada, 0 AS pUnitarioEntrada, 0 AS importeEntrada,
                dv.cantidad AS cantidadSalida, dv.pVenta AS pUnitarioSalida, dv.subtotal AS importeSalida,
                ISNULL(dv.costoUnitario, 0) AS costoUnitarioSalida,
                ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, NULL AS observaciones
         FROM DetalleVenta dv
         INNER JOIN Ventas v ON dv.idVenta = v.idVenta
+        LEFT JOIN Comprobantes comp ON comp.idComprobante = v.idComprobante AND comp.idEmpresa = v.idEmpresa
         WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto
           AND v.fEmision >= @fechaDesde AND v.fEmision < DATEADD(day, 1, @fechaHasta)
       `),
@@ -145,6 +155,8 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       .query(`
         SELECT CONVERT(VARCHAR(19), m.fMovimiento, 120) AS fecha, m.tipoMovimiento AS tipoMov,
                ISNULL(m.docRelacionado,'') AS nroDocum, m.idMovimiento AS idRef, 'MOVIMIENTO' AS tipoRef,
+               CAST('' AS VARCHAR(20)) AS serie, ISNULL(m.docRelacionado,'') AS numero,
+               '00' AS tipoDocumento,
                CASE WHEN m.tipoMovimiento IN ('EN','AJ') THEN m.cantidad ELSE 0 END AS cantidadEntrada,
                ISNULL(m.costoUnitario,0) AS pUnitarioEntrada,
                CASE WHEN m.tipoMovimiento IN ('EN','AJ') THEN m.cantidad * ISNULL(m.costoUnitario,0) ELSE 0 END AS importeEntrada,
@@ -236,11 +248,17 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
     const cantidadSalida = parseFloat(r.cantidadSalida) || 0;
     const pUnitarioSalida = parseFloat(r.pUnitarioSalida) || 0;
     const costoUnitarioSalida = parseFloat(r.costoUnitarioSalida) || 0;
+    const tipoDocumento = r.tipoDocumento != null && String(r.tipoDocumento).trim() !== ''
+      ? String(r.tipoDocumento).trim()
+      : '00';
 
     return {
       fecha: r.fecha,
       tipoMov: r.tipoMov,
       nroDocum: r.nroDocum,
+      serie: r.serie != null ? String(r.serie).trim() : '',
+      numero: r.numero != null ? String(r.numero).trim() : '',
+      tipoDocumento,
       idRef: r.idRef,
       tipoRef: r.tipoRef,
       cantidadEntrada,
@@ -292,7 +310,11 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
   lastPpc = cantidadIni !== 0 ? importeIniFinal / cantidadIni : lastPpc;
 
   const filasConSaldo = [];
+  let totalSalidaImporteValorizado = 0;
   for (const f of todas) {
+    let pUnitarioSalidaValorizado = 0;
+    let importeSalidaValorizado = 0;
+
     if (!f.excluidoDeTotales) {
       if (f.cantidadEntrada > 0) {
         saldoValor += f.cantidadEntrada * f.pUnitarioEntrada;
@@ -301,6 +323,9 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       if (f.cantidadSalida > 0) {
         const ppc = saldoCant > 0 ? saldoValor / saldoCant : lastPpc;
         const costoSalida = f.costoUnitarioSalida > 0 ? f.costoUnitarioSalida : ppc;
+        pUnitarioSalidaValorizado = round2(costoSalida);
+        importeSalidaValorizado = round2(f.cantidadSalida * costoSalida);
+        totalSalidaImporteValorizado += importeSalidaValorizado;
         saldoValor -= f.cantidadSalida * costoSalida;
         saldoCant -= f.cantidadSalida;
       }
@@ -318,6 +343,9 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       fecha: f.fecha,
       tipoMov: f.tipoMov,
       nroDocum: f.nroDocum,
+      serie: f.serie,
+      numero: f.numero,
+      tipoDocumento: f.tipoDocumento,
       idRef: f.idRef,
       tipoRef: f.tipoRef,
       cantidadEntrada: f.cantidadEntrada,
@@ -326,6 +354,8 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       cantidadSalida: f.cantidadSalida,
       pUnitarioSalida: f.pUnitarioSalida,
       importeSalida: f.importeSalida,
+      pUnitarioSalidaValorizado,
+      importeSalidaValorizado,
       saldoCantidad,
       saldoPUnitario,
       saldoImporte,
@@ -344,7 +374,11 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
     producto: {
       idProducto: producto.idProducto,
       codigo: producto.codigo,
-      descripcion: producto.descripcion
+      descripcion: producto.descripcion,
+      unidadMedida: producto.unidadMedida || 'NIU',
+      unidadDescripcion: producto.unidadDescripcion || 'UNIDAD',
+      tipoExistencia: '01',
+      tipoExistenciaDescripcion: 'MERCADERIAS'
     },
     saldoInicial: {
       cantidad: round3(cantidadIni),
@@ -357,10 +391,54 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       totalEntradaImporte: round2(totalEntradaImporte),
       totalSalidaCantidad: totalSalidaCant,
       totalSalidaImporte: round2(totalSalidaImporte),
+      totalSalidaImporteValorizado: round2(totalSalidaImporteValorizado),
       saldoFinalCantidad: saldoFinalCantidad,
       saldoFinalImporte: saldoFinalImporte,
       saldoFinalPUnitario: saldoFinalPUnit,
       stockActualSistema: stockLotes
     }
   };
+};
+
+/**
+ * Lista productos de la empresa para el kardex completo (formato 13.1).
+ */
+exports.listarProductosParaKardex = async (pool, idEmpresa) => {
+  const r = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT p.idProducto, p.codigo, p.descripcion,
+             ISNULL(pr.codigo, 'NIU') AS unidadMedida,
+             ISNULL(pr.descripcion, 'UNIDAD') AS unidadDescripcion
+      FROM Productos p
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
+      WHERE p.idEmpresa = @idEmpresa
+        AND ISNULL(p.estado, 1) = 1
+      ORDER BY p.codigo, p.descripcion
+    `);
+  return r.recordset || [];
+};
+
+/**
+ * Cabecera empresa + establecimiento (sucursal principal) para formato 13.1.
+ */
+exports.obtenerCabeceraEmpresaKardex = async (pool, idEmpresa) => {
+  const r = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        e.razon_Social AS razonSocial,
+        e.razon_Social AS nombre,
+        e.ruc,
+        e.correo,
+        e.celular AS telefono,
+        e.rubro,
+        ISNULL(s.direccion, de.direccion) AS direccion,
+        ISNULL(s.nombre, 'ALMACEN GENERAL') AS establecimiento
+      FROM Empresas e
+      LEFT JOIN Sucursal s ON s.idEmpresa = e.idEmpresa AND ISNULL(s.esPrincipal, 0) = 1
+      LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
+      WHERE e.idEmpresa = @idEmpresa
+    `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
 };

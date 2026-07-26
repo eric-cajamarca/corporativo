@@ -9,6 +9,7 @@ import { SaasSubscriptionService } from '../../../services/saas-subscription.ser
 import { AuthService } from '../../../services/auth.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
+import { MiEstadoSuscripcionResponse } from '../../../models/saas-subscription.model';
 import { formatLimitePlan } from '../../../utils/saas-plan-resumen.util';
 
 type EdicionPlan = {
@@ -31,10 +32,14 @@ export class PlanesPublicComponent implements OnInit {
   ciclo = signal<'monthly' | 'yearly'>('monthly');
   cargando = signal(true);
   errorMsg = signal<string | null>(null);
+  avisoMsg = signal<string | null>(null);
   modoEnterprise = signal(false);
   puedeEditar = signal(false);
   edicion = signal<Record<string, EdicionPlan>>({});
   guardandoPlan = signal<string | null>(null);
+  programando = signal(false);
+  /** Estado de suscripción si hay sesión (para badges y downgrade). */
+  miEstado = signal<MiEstadoSuscripcionResponse | null>(null);
 
   constructor(
     private saasPublic: SaasPublicService,
@@ -58,41 +63,24 @@ export class PlanesPublicComponent implements OnInit {
   private cargarPlanesYPermisoEdicion(): void {
     this.cargando.set(true);
     this.errorMsg.set(null);
-    /** Solo API pública aquí; el editor de catálogo exige sesión y no debe bloquear a visitantes anónimos. */
     this.saasPublic.listarPlanes().subscribe({
       next: (planes) => {
         this.planes.set(planes);
         this.auth.verifyToken().pipe(take(1)).subscribe({
           next: () => {
             if (this.auth.isAuthenticated()) {
-              this.saasSubscription
-                .getPlanesCatalogoEditor()
-                .pipe(catchError(() => of({ puedeEditar: false })))
-                .subscribe({
-                  next: (editor) => {
-                    this.puedeEditar.set(!!editor?.puedeEditar);
-                    if (this.puedeEditar()) {
-                      this.initEdicion(planes);
-                    } else {
-                      this.edicion.set({});
-                    }
-                    this.cargando.set(false);
-                  },
-                  error: () => {
-                    this.puedeEditar.set(false);
-                    this.edicion.set({});
-                    this.cargando.set(false);
-                  }
-                });
+              this.cargarEstadoYEditor(planes);
             } else {
               this.puedeEditar.set(false);
               this.edicion.set({});
+              this.miEstado.set(null);
               this.cargando.set(false);
             }
           },
           error: () => {
             this.puedeEditar.set(false);
             this.edicion.set({});
+            this.miEstado.set(null);
             this.cargando.set(false);
           }
         });
@@ -102,6 +90,36 @@ export class PlanesPublicComponent implements OnInit {
         this.cargando.set(false);
       }
     });
+  }
+
+  private cargarEstadoYEditor(planes: PlanCatalogoItem[]): void {
+    this.saasSubscription
+      .getMiEstado()
+      .pipe(catchError(() => of(null)))
+      .subscribe({
+        next: (estado) => {
+          this.miEstado.set(estado);
+          this.saasSubscription
+            .getPlanesCatalogoEditor()
+            .pipe(catchError(() => of({ puedeEditar: false })))
+            .subscribe({
+              next: (editor) => {
+                this.puedeEditar.set(!!editor?.puedeEditar);
+                if (this.puedeEditar()) {
+                  this.initEdicion(planes);
+                } else {
+                  this.edicion.set({});
+                }
+                this.cargando.set(false);
+              },
+              error: () => {
+                this.puedeEditar.set(false);
+                this.edicion.set({});
+                this.cargando.set(false);
+              }
+            });
+        }
+      });
   }
 
   private initEdicion(list: PlanCatalogoItem[]): void {
@@ -127,7 +145,7 @@ export class PlanesPublicComponent implements OnInit {
         nextVal = String(value);
       } else {
         const n = Math.floor(Number(value));
-        nextVal = Number.isFinite(n) ? n : prev[field] as number;
+        nextVal = Number.isFinite(n) ? n : (prev[field] as number);
       }
       return { ...m, [planCode]: { ...prev, [field]: nextVal } as EdicionPlan };
     });
@@ -159,7 +177,66 @@ export class PlanesPublicComponent implements OnInit {
     void this.router.navigate(['/crear-empresa']);
   }
 
+  esPlanActual(planCode: string): boolean {
+    const s = this.miEstado()?.suscripcion;
+    if (!s) return false;
+    return String(s.planCode || '').toLowerCase() === planCode.toLowerCase();
+  }
+
+  esPlanPendiente(planCode: string): boolean {
+    const p = this.miEstado()?.suscripcion?.planCodePendiente || this.miEstado()?.planPendiente?.planCode;
+    if (!p) return false;
+    return String(p).toLowerCase() === planCode.toLowerCase();
+  }
+
+  etiquetaBotonPlan(planCode: string): string {
+    if (this.esPlanActual(planCode)) return 'Plan actual';
+    if (this.esPlanPendiente(planCode)) return 'Programado';
+    return 'Elegir';
+  }
+
   elegirPlan(planCode: string): void {
+    this.errorMsg.set(null);
+    this.avisoMsg.set(null);
+    if (!this.auth.isAuthenticated()) {
+      this.irCheckout(planCode);
+      return;
+    }
+    this.programando.set(true);
+    this.saasSubscription
+      .programarDowngrade({ planCode, billingCycle: this.ciclo() })
+      .subscribe({
+        next: (data) => {
+          this.programando.set(false);
+          const fecha = data.aplicaEn
+            ? new Date(data.aplicaEn).toLocaleDateString('es-PE')
+            : 'su próxima renovación';
+          const nombre = data.planPendiente?.nombre || data.planCodePendiente;
+          this.avisoMsg.set(
+            `El cambio a «${nombre}» se aplicará en su próxima renovación (${fecha}). No se realizará ningún cobro ahora.`
+          );
+          this.cargarPlanesYPermisoEdicion();
+        },
+        error: (err) => {
+          this.programando.set(false);
+          const code = err?.error?.message || '';
+          if (code === 'NO_ES_DOWNGRADE' || code === 'DOWNGRADE_NO_APLICA') {
+            this.irCheckout(planCode);
+            return;
+          }
+          if (code === 'MISMO_PLAN') {
+            this.avisoMsg.set('Ya tiene este plan. Al renovar podrá pagar el mismo plan desde el checkout.');
+            return;
+          }
+          const detail = err?.error?.detail;
+          this.errorMsg.set(
+            typeof detail === 'string' ? detail : typeof code === 'string' && code ? code : 'No se pudo procesar el cambio de plan.'
+          );
+        }
+      });
+  }
+
+  private irCheckout(planCode: string): void {
     void this.router.navigate(['/suscribirse', planCode], {
       queryParams: { billing: this.ciclo() }
     });
@@ -173,7 +250,6 @@ export class PlanesPublicComponent implements OnInit {
     return this.ciclo() === 'yearly' ? 'año' : 'mes';
   }
 
-  /** Formato de límites numéricos (ej. 3 000). */
   formatLimite(val: number | undefined | null): string {
     return formatLimitePlan(val);
   }

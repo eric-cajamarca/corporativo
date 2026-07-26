@@ -463,9 +463,14 @@ const actualizar_producto_compra = async function (datosProducto, user) {
 };
 
 const crear_producto_compra = async (datosProducto, user) => {
-  const detalle = datosProducto;
+  const detalle = {
+    ...datosProducto,
+    idUsuario: datosProducto.idUsuario || user?.sub || user?.idUsuario,
+    idUsuarioToken: user?.sub || user?.idUsuario
+  };
   try {
     await withPool(async (pool) => productosMutacionesService.crearProductoCompra(pool, detalle));
+    datosProducto.idProducto = detalle.idProducto;
     return detalle.idProducto;
   } catch (error) {
     console.error('crear_producto_compra:', error);

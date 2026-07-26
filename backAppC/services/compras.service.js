@@ -244,7 +244,7 @@ exports.crearCompraCompleta = async (idEmpresa, idUsuario, body) => {
     for (const linea of detalles) {
         let idProducto = linea.idProducto;
         if ((idProducto == null || idProducto === '') && linea.nuevoProducto) {
-            const np = { ...linea.nuevoProducto, idEmpresa };
+            const np = { ...linea.nuevoProducto, idEmpresa, idUsuarioToken: idUsuario };
             await withPool((pool) => productosMutacionesService.crearProductoCompra(pool, np));
             idProducto = np.idProducto;
         }
