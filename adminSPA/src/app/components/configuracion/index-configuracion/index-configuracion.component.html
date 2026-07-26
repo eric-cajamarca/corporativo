@@ -114,10 +114,29 @@
                       <option value="en">English</option>
                     </select>
                   </div>
+                  <div class="col-12">
+                    <div class="form-check form-switch mt-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="avisoWhatsAppLoginAdmin"
+                        [(ngModel)]="configuracion.avisoWhatsAppLoginAdmin"
+                        name="avisoWhatsAppLoginAdmin"
+                      >
+                      <label class="form-check-label" for="avisoWhatsAppLoginAdmin">
+                        Avisar por WhatsApp al iniciar sesión un administrador
+                      </label>
+                    </div>
+                    <div class="form-text">
+                      Usa el WhatsApp vinculado de la empresa (Baileys) y envía al celular registrado del dueño.
+                      Requiere sesión WhatsApp conectada en Configuración → Vincular WhatsApp.
+                    </div>
+                  </div>
                 </div>
                 <div class="mt-3">
-                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionGeneral()">
-                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionGeneral()" [disabled]="generalGuardando">
+                    <i class="fas fa-save me-2"></i>{{ generalGuardando ? 'Guardando…' : 'Guardar Cambios' }}
                   </button>
                 </div>
               </form>

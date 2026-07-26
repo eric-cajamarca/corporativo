@@ -1,10 +1,22 @@
 const factilizaRepository = require('../repositories/factiliza.repository');
 const empresaRepository = require('../repositories/empresa.repository');
+const empresaWhatsAppRepository = require('../repositories/empresaWhatsApp.repository');
+const suscripcionRepository = require('../repositories/suscripcion.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
 const whatsappFactilizaService = require('./whatsappFactiliza.service');
+const whatsappGatewayClient = require('./whatsappGateway.client');
 const geoIpCliente = require('../utils/geoIpCliente.util');
 const { getAhoraAppYmdHms } = require('../utils/fechaDisplay.util');
+const {
+  interpretarBooleanoConfig,
+  crearLectorConfiguracionEmpresa
+} = require('../utils/configBoolean.util');
+const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
+
+/** ConfiguracionEmpresa: aviso WhatsApp al celular del dueño al iniciar sesión un Administrador (vía Baileys de la empresa). */
+const CLAVE_AVISO_WHATSAPP_LOGIN_ADMIN = 'AVISO_WHATSAPP_LOGIN_ADMIN';
 
 /**
  * Override opcional por .env. Si se define, se usa SIEMPRE en lugar de la BD.
@@ -57,10 +69,41 @@ function decodificarNumeroDeParametroRuta(parametroRuta) {
 const ALERT_DEV_CACHE_TTL_MS = parseInt(process.env.ALERT_DEV_CACHE_TTL_MS, 10) || 5 * 60 * 1000;
 let cacheNumeroDev = { numero: '', ts: 0 };
 
+async function obtenerIdEmpresaPrincipalAlertas(pool) {
+  try {
+    const id = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
+    if (id) return String(id);
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alert_empresa_principal_lookup_error',
+      err: err.message
+    }));
+  }
+  const envId = process.env.EMPRESA_PRINCIPAL_ID && String(process.env.EMPRESA_PRINCIPAL_ID).trim();
+  return envId || '';
+}
+
+async function obtenerTelefonoVinculadoEmpresa(pool, idEmpresa) {
+  if (!idEmpresa) return '';
+  try {
+    const row = await empresaWhatsAppRepository.getByEmpresa(pool, idEmpresa);
+    return soloDigitos(row && row.telefonoVinculado);
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alert_telefono_vinculado_lookup_error',
+      err: err.message
+    }));
+    return '';
+  }
+}
+
 /**
- * Resuelve el numero del desarrollador para alertas:
+ * Resuelve el numero del desarrollador / ops para alertas:
  *   1) ALERT_DEV_WHATSAPP en .env si esta definido (override),
- *   2) decode(parametroRuta) de FactilizaConfig (Factiliza WHATSAPP, estado=1).
+ *   2) decode(parametroRuta) de FactilizaConfig (Factiliza WHATSAPP),
+ *   3) telefonoVinculado Baileys de la empresa principal.
  * Retorna '' si ninguno produce un numero >= 9 digitos.
  */
 async function obtenerNumeroDev(pool) {
@@ -80,6 +123,20 @@ async function obtenerNumeroDev(pool) {
     console.error('context:', JSON.stringify({
       level: 'warn',
       message: 'alert_dev_lookup_error',
+      err: err.message
+    }));
+  }
+  try {
+    const idPrincipal = await obtenerIdEmpresaPrincipalAlertas(pool);
+    const vinculado = await obtenerTelefonoVinculadoEmpresa(pool, idPrincipal);
+    if (vinculado.length >= 9) {
+      cacheNumeroDev = { numero: vinculado, ts: ahora };
+      return vinculado;
+    }
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alert_dev_vinculado_lookup_error',
       err: err.message
     }));
   }
@@ -172,8 +229,92 @@ async function avisarPorEmailFactilizaCaida(detalle) {
   }
 }
 
+/**
+ * Envío por Baileys (gateway) desde la sesión de una empresa. No lanza.
+ * Normaliza celular PE (9 dígitos → 51…) igual que el bot operativo.
+ */
+async function enviarTextoBaileysEmpresa(idEmpresa, numeroDestino, texto) {
+  const { digitos: digits } = normalizarTelefonoWhatsApp(numeroDestino);
+  if (digits.length < 9) {
+    return { ok: false, skipped: true, reason: 'destino_invalido', canal: 'baileys' };
+  }
+  const t = String(texto || '').trim().slice(0, 3500);
+  if (!t) return { ok: false, skipped: true, reason: 'texto_vacio', canal: 'baileys' };
+  if (!idEmpresa) return { ok: false, error: 'sin_empresa', canal: 'baileys' };
+  if (!whatsappGatewayClient.isConfigured()) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alerta_baileys_gateway_no_configurado'
+    }));
+    return { ok: false, error: 'gateway_no_configurado', canal: 'baileys' };
+  }
+  try {
+    const resultado = await whatsappGatewayClient.sendText(idEmpresa, digits, t, { skipThrottle: true });
+    if (resultado.success) {
+      return { ok: true, canal: 'baileys', status: resultado.status };
+    }
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_baileys_api_no_ok',
+      status: resultado.status,
+      apiMessage: resultado.message,
+      destinoOfuscado: ofuscarNumero(digits)
+    }));
+    return {
+      ok: false,
+      canal: 'baileys',
+      status: resultado.status,
+      message: resultado.message
+    };
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_baileys_send_error',
+      err: err.message,
+      destinoOfuscado: ofuscarNumero(digits)
+    }));
+    return { ok: false, canal: 'baileys', error: err.message };
+  }
+}
+
+/**
+ * Fallback: sesión Baileys de la empresa principal.
+ * Destino: el indicado; si es inválido, el telefonoVinculado de la principal (mismo número de ops).
+ */
+async function enviarTextoFallbackBaileysPrincipal(pool, numeroDestino, texto) {
+  const idPrincipal = await obtenerIdEmpresaPrincipalAlertas(pool);
+  if (!idPrincipal) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alerta_baileys_fallback_sin_empresa_principal'
+    }));
+    return { ok: false, error: 'sin_empresa_principal', canal: 'baileys' };
+  }
+  let destino = soloDigitos(numeroDestino);
+  if (destino.length < 9) {
+    destino = await obtenerTelefonoVinculadoEmpresa(pool, idPrincipal);
+  }
+  if (destino.length < 9) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alerta_baileys_fallback_sin_destino'
+    }));
+    return { ok: false, skipped: true, reason: 'destino_invalido', canal: 'baileys' };
+  }
+  console.error('context:', JSON.stringify({
+    level: 'info',
+    message: 'alerta_whatsapp_fallback_baileys_principal',
+    destinoOfuscado: ofuscarNumero(destino)
+  }));
+  return enviarTextoBaileysEmpresa(idPrincipal, destino, texto);
+}
+
+/**
+ * Envía texto por Factiliza WHATSAPP. Si no está disponible o falla, usa Baileys
+ * de la empresa principal. No lanza; registra error en consola.
+ */
 async function enviarTextoPlataforma(pool, numeroDestino, texto) {
-  const digits = soloDigitos(numeroDestino);
+  const digits = normalizarTelefonoWhatsApp(numeroDestino).digitos;
   if (digits.length < 9) {
     console.error('context:', JSON.stringify({
       level: 'info',
@@ -186,64 +327,69 @@ async function enviarTextoPlataforma(pool, numeroDestino, texto) {
   if (!t) return { ok: false, skipped: true, reason: 'texto_vacio' };
 
   let config;
+  let factilizaDisponible = true;
   try {
     config = await obtenerConfigWhatsApp(pool);
   } catch (err) {
+    factilizaDisponible = false;
     console.error('context:', JSON.stringify({
       level: 'error',
       message: 'alerta_whatsapp_config_load_error',
       err: err.message
     }));
-    return { ok: false, error: 'config_load_error' };
   }
   if (!config || !config.tokenDefault || !String(config.parametroRuta || '').trim()) {
-    console.error('context:', JSON.stringify({
-      level: 'warn',
-      message: 'alerta_whatsapp_config_incompleta',
-      detail: 'Factiliza WHATSAPP no tiene tokenDefault o parametroRuta. UPDATE FactilizaConfig requerido.'
-    }));
-    return { ok: false, error: 'config_incompleta' };
+    factilizaDisponible = false;
+    if (config !== undefined) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'alerta_whatsapp_config_incompleta',
+        detail: 'Factiliza WHATSAPP no tiene tokenDefault o parametroRuta. Se intenta Baileys empresa principal.'
+      }));
+    }
   }
 
-  try {
-    const resultado = await whatsappFactilizaService.sendText(config, digits, t);
-    if (resultado.success) {
-      factilizaWhatsAppHealth.falloConsecutivos = 0;
-      factilizaWhatsAppHealth.ultimoExitoTs = Date.now();
-      factilizaWhatsAppHealth.notificadoDownEmail = false;
-      return { ok: true, status: resultado.status };
+  if (factilizaDisponible) {
+    try {
+      const resultado = await whatsappFactilizaService.sendText(config, digits, t);
+      if (resultado.success) {
+        factilizaWhatsAppHealth.falloConsecutivos = 0;
+        factilizaWhatsAppHealth.ultimoExitoTs = Date.now();
+        factilizaWhatsAppHealth.notificadoDownEmail = false;
+        return { ok: true, canal: 'factiliza', status: resultado.status };
+      }
+      factilizaWhatsAppHealth.falloConsecutivos += 1;
+      factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
+      factilizaWhatsAppHealth.ultimoErrorMsg = String(resultado.message || '').slice(0, 200);
+      console.error('context:', JSON.stringify({
+        level: 'error',
+        message: 'alerta_whatsapp_api_no_ok',
+        status: resultado.status,
+        apiMessage: resultado.message,
+        destinoOfuscado: ofuscarNumero(digits),
+        falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
+      }));
+      if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
+        await avisarPorEmailFactilizaCaida(`API responde ${resultado.status} ${resultado.message}`);
+      }
+    } catch (err) {
+      factilizaWhatsAppHealth.falloConsecutivos += 1;
+      factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
+      factilizaWhatsAppHealth.ultimoErrorMsg = String(err.message || '').slice(0, 200);
+      console.error('context:', JSON.stringify({
+        level: 'error',
+        message: 'alerta_whatsapp_send_error',
+        err: err.message,
+        destinoOfuscado: ofuscarNumero(digits),
+        falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
+      }));
+      if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
+        await avisarPorEmailFactilizaCaida(`Error en send: ${err.message}`);
+      }
     }
-    factilizaWhatsAppHealth.falloConsecutivos += 1;
-    factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
-    factilizaWhatsAppHealth.ultimoErrorMsg = String(resultado.message || '').slice(0, 200);
-    console.error('context:', JSON.stringify({
-      level: 'error',
-      message: 'alerta_whatsapp_api_no_ok',
-      status: resultado.status,
-      apiMessage: resultado.message,
-      destinoOfuscado: ofuscarNumero(digits),
-      falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
-    }));
-    if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
-      await avisarPorEmailFactilizaCaida(`API responde ${resultado.status} ${resultado.message}`);
-    }
-    return { ok: false, status: resultado.status, message: resultado.message };
-  } catch (err) {
-    factilizaWhatsAppHealth.falloConsecutivos += 1;
-    factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
-    factilizaWhatsAppHealth.ultimoErrorMsg = String(err.message || '').slice(0, 200);
-    console.error('context:', JSON.stringify({
-      level: 'error',
-      message: 'alerta_whatsapp_send_error',
-      err: err.message,
-      destinoOfuscado: ofuscarNumero(digits),
-      falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
-    }));
-    if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
-      await avisarPorEmailFactilizaCaida(`Error en send: ${err.message}`);
-    }
-    return { ok: false, error: err.message };
   }
+
+  return enviarTextoFallbackBaileysPrincipal(pool, digits, t);
 }
 
 /**
@@ -478,20 +624,90 @@ Hallazgos: ${sospechosos.join(' | ')}`;
 /** Solo administrador de empresa: aviso al celular de Empresas. superAdmin usa notificarLoginSuperAdminExitoso. */
 const ROLES_ADMIN_LOGIN_WHATSAPP = ['Administrador'];
 
+async function estaActivoAvisoWhatsAppLoginAdmin(pool, idEmpresa) {
+  try {
+    const rows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+    const getConfig = crearLectorConfiguracionEmpresa(rows);
+    // Sin fila en BD: activo (comportamiento histórico). Solo se apaga si el usuario lo desactiva.
+    return interpretarBooleanoConfig(getConfig(CLAVE_AVISO_WHATSAPP_LOGIN_ADMIN, 'true'), true);
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'aviso_login_admin_config_error',
+      err: err.message
+    }));
+    return true;
+  }
+}
+
 /**
  * Aviso por WhatsApp al celular registrado en Empresas tras login exitoso de administrador.
- * No lanza; fallos solo en consola. Requiere Factiliza WHATSAPP configurado (igual que alertas de login fallido).
+ * Si ConfiguracionEmpresa.AVISO_WHATSAPP_LOGIN_ADMIN = false, no envía.
+ * Remitente: sesión Baileys vinculada de esa empresa. Destino: Empresas.celular (dueño).
  */
 exports.notificarLoginAdminExitoso = async (pool, params) => {
   const { idEmpresa, email, ipCliente, rol } = params || {};
-  if (!idEmpresa || !ROLES_ADMIN_LOGIN_WHATSAPP.includes(rol)) return;
+  const rolNorm = (rol || '').toString().trim();
+  if (!idEmpresa || !ROLES_ADMIN_LOGIN_WHATSAPP.includes(rolNorm)) {
+    console.error('context:', JSON.stringify({
+      level: 'info',
+      message: 'aviso_login_admin_skip_rol',
+      rol: rolNorm || null
+    }));
+    return;
+  }
 
   try {
-    const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
-    if (!emp) return;
+    const activo = await estaActivoAvisoWhatsAppLoginAdmin(pool, idEmpresa);
+    if (!activo) {
+      console.error('context:', JSON.stringify({
+        level: 'info',
+        message: 'aviso_login_admin_skip_desactivado'
+      }));
+      return;
+    }
 
-    const celularEmpresa = soloDigitos(emp.celular);
-    if (celularEmpresa.length < 9) return;
+    const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
+    if (!emp) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'aviso_login_admin_skip_sin_empresa'
+      }));
+      return;
+    }
+
+    const celularNorm = normalizarTelefonoWhatsApp(emp.celular);
+    if (celularNorm.digitos.length < 9) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'aviso_login_admin_skip_celular_invalido',
+        destinoOfuscado: ofuscarNumero(emp.celular)
+      }));
+      return;
+    }
+
+    const waEmpresa = await empresaWhatsAppRepository.getByEmpresa(pool, idEmpresa);
+    const estadoSesion = waEmpresa ? String(waEmpresa.estadoSesion || '').toLowerCase() : '';
+    const proveedor = waEmpresa ? String(waEmpresa.proveedor || '').toLowerCase() : '';
+    if (!waEmpresa || proveedor !== 'baileys' || estadoSesion !== 'conectado') {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'aviso_login_admin_skip_sesion_baileys',
+        proveedor: proveedor || null,
+        estadoSesion: estadoSesion || null
+      }));
+      return;
+    }
+
+    const vinculadoNorm = normalizarTelefonoWhatsApp(waEmpresa.telefonoVinculado);
+    if (vinculadoNorm.digitos && vinculadoNorm.digitos === celularNorm.digitos) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'aviso_login_admin_skip_mismo_numero',
+        detail: 'El celular de la empresa coincide con el WhatsApp vinculado; WhatsApp no entrega mensaje a sí mismo.'
+      }));
+      return;
+    }
 
     const razon = emp.razon_Social || 'Empresa';
     const ruc = emp.ruc != null ? String(emp.ruc).trim() : '';
@@ -509,7 +725,21 @@ Correo de la sesión: ${emailLinea}
 IP de origen: ${ipLinea}
 Ubicación aprox. (por IP): ${ubicacionTxt}`;
 
-    await enviarTextoPlataforma(pool, celularEmpresa, texto);
+    const r = await enviarTextoBaileysEmpresa(idEmpresa, celularNorm.digitos, texto);
+    if (r.ok) {
+      console.error('context:', JSON.stringify({
+        level: 'info',
+        message: 'aviso_login_admin_enviado',
+        destinoOfuscado: ofuscarNumero(celularNorm.digitos)
+      }));
+    } else if (!r.skipped) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'aviso_login_admin_baileys_fallo',
+        error: r.error || r.message || 'unknown',
+        destinoOfuscado: ofuscarNumero(celularNorm.digitos)
+      }));
+    }
   } catch (err) {
     console.error('notificarLoginAdminExitoso:', err.message);
   }

@@ -43,8 +43,11 @@ export class IndexConfiguracionComponent implements OnInit {
     logo: '',
     moneda: 'PEN',
     idioma: 'es',
-    zonaHoraria: 'America/Lima'
+    zonaHoraria: 'America/Lima',
+    /** Aviso WhatsApp (Baileys de la empresa) al celular del dueño cuando inicia sesión un Administrador */
+    avisoWhatsAppLoginAdmin: true
   };
+  public generalGuardando = false;
 
   // Configuración de facturación (series, ruta y opciones de envío se cargan/guardan en API)
   public facturacion = {
@@ -253,6 +256,7 @@ export class IndexConfiguracionComponent implements OnInit {
 
   cargarConfiguracion(): void {
     this.cargarEmpresaYDireccion();
+    this.cargarConfiguracionGeneralFlags();
     this.cargarConfiguracionFacturacion();
     this.cargarVentasDefaults();
     this.cargarConfiguracionInventario();
@@ -378,8 +382,54 @@ export class IndexConfiguracionComponent implements OnInit {
     });
   }
 
+  cargarConfiguracionGeneralFlags(): void {
+    this._gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = res?.data ?? [];
+        const getVal = (clave: string, def: string) =>
+          (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
+        this.configuracion.avisoWhatsAppLoginAdmin = interpretarBooleanoConfig(
+          getVal('AVISO_WHATSAPP_LOGIN_ADMIN', 'true'),
+          true
+        );
+      },
+      error: () => {}
+    });
+  }
+
   guardarConfiguracionGeneral(): void {
-        // Llamada al backend para guardar
+    this.generalGuardando = true;
+    const configs: ConfiguracionEmpresa[] = [
+      {
+        clave: 'AVISO_WHATSAPP_LOGIN_ADMIN',
+        valor: this.configuracion.avisoWhatsAppLoginAdmin ? 'true' : 'false',
+        descripcion:
+          'Avisar por WhatsApp (sesión vinculada de la empresa) al celular del dueño cuando inicia sesión un Administrador',
+        tipoDato: 'BOOLEAN'
+      }
+    ];
+    this._gestoresService.guardarConfiguracion(configs).subscribe({
+      next: () => {
+        this.generalGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Guardado',
+            message: 'Configuración general actualizada.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        this.generalGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudo guardar la configuración general.',
+            position: 'topRight'
+          });
+        }
+      }
+    });
   }
 
   /** Carga configuración de facturación electrónica desde el API */
