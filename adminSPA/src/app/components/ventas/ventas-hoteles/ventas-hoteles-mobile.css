@@ -1,0 +1,224 @@
+/**
+ * Vista móvil recepción hotel (rubro HOTEL).
+ * Scoped a app-ventas-hoteles: no afecta desktop (≥992px), gestora ni otros rubros.
+ */
+@media (max-width: 991.98px) {
+  app-ventas-hoteles {
+    display: block;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  app-ventas-hoteles .hotel-main {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  app-ventas-hoteles .hotel-header {
+    padding: 0.85rem 1rem;
+  }
+  app-ventas-hoteles .hotel-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+  }
+  app-ventas-hoteles .hotel-title {
+    font-size: 1.15rem;
+  }
+  app-ventas-hoteles .hotel-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  app-ventas-hoteles .hotel-header-stats {
+    gap: 0.4rem;
+    flex: 1;
+  }
+  app-ventas-hoteles .hotel-stat {
+    min-width: 0;
+    flex: 1;
+    padding: 0.35rem 0.4rem;
+  }
+  app-ventas-hoteles .hotel-stat-value {
+    font-size: 1.1rem;
+  }
+  app-ventas-hoteles .hotel-stat-label {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+  }
+  app-ventas-hoteles .hotel-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  app-ventas-hoteles .hotel-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.55rem 0.25rem;
+    font-size: 0.72rem;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+    border-bottom: 3px solid transparent;
+    box-sizing: border-box;
+  }
+  app-ventas-hoteles .hotel-tab i {
+    font-size: 0.85rem;
+  }
+  app-ventas-hoteles .hotel-tab .hotel-tab-txt {
+    font-size: 0.68rem;
+    word-break: break-word;
+  }
+  app-ventas-hoteles .hotel-content {
+    padding: 0.85rem 0.75rem 5rem;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  app-ventas-hoteles .hotel-section,
+  app-ventas-hoteles .hotel-section-header {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  app-ventas-hoteles .hotel-section-header .btn,
+  app-ventas-hoteles .hotel-section-header .d-flex {
+    max-width: 100%;
+  }
+  app-ventas-hoteles .hotel-section-title {
+    font-size: 1.05rem;
+  }
+  app-ventas-hoteles .hotel-rooms-grid-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  app-ventas-hoteles .hotel-room-card-compact {
+    padding: 0.7rem 0.55rem;
+  }
+  app-ventas-hoteles .hotel-card-compact-numero {
+    font-size: 1.35rem;
+  }
+  app-ventas-hoteles .hotel-card-compact-actions {
+    gap: 0.35rem;
+  }
+  app-ventas-hoteles .hotel-card-compact-actions .btn {
+    flex: 1 1 calc(50% - 0.35rem);
+    min-height: 2.35rem;
+    padding: 0.35rem 0.4rem;
+    font-size: 0.75rem;
+  }
+  app-ventas-hoteles .hotel-habitaciones-filtro-wrap {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  app-ventas-hoteles .hotel-rooms-grid-housekeeping {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  app-ventas-hoteles .hk-action-btn {
+    min-height: 2.4rem;
+    font-size: 0.68rem;
+  }
+  app-ventas-hoteles .historial-mes-card {
+    max-width: none;
+  }
+  app-ventas-hoteles .hotel-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  app-ventas-hoteles .hotel-modal .hotel-modal-content,
+  app-ventas-hoteles .hotel-modal-lg .hotel-modal-content,
+  app-ventas-hoteles .hotel-modal-xl .hotel-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
+    margin: 0;
+  }
+  app-ventas-hoteles .hotel-modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  app-ventas-hoteles .hotel-modal-footer .btn {
+    min-height: 2.5rem;
+  }
+  app-ventas-hoteles .hotel-modal-body .row.g-2 > [class*='col-'] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] thead {
+    display: none;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: 0;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr.fila-vacia,
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+  app-ventas-hoteles .table[class*='table-hotel-'][class*='-responsive'] tbody tr.fila-vacia td::before {
+    display: none;
+  }
+  app-ventas-hoteles .table-hotel-historial-consumo-responsive tfoot tr {
+    display: block;
+    margin-top: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #e7f1ff;
+    padding: 0.5rem 0;
+  }
+  app-ventas-hoteles .table-hotel-historial-consumo-responsive tfoot th {
+    display: block;
+    width: 100% !important;
+    text-align: left !important;
+    border: 0;
+    padding: 0.35rem 1rem;
+  }
+  app-ventas-hoteles .table-hotel-reservas-responsive td[data-label='Acciones'] {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  app-ventas-hoteles .table-hotel-reservas-responsive td[data-label='Acciones'] .btn {
+    flex: 1 1 auto;
+    min-height: 2.35rem;
+  }
+}

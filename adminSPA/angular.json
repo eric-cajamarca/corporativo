@@ -35,8 +35,8 @@
             "styles": [
               "node_modules/bootstrap/dist/css/bootstrap.min.css",
               "node_modules/izitoast/dist/css/iziToast.min.css",
-              "src/styles.css"
-              
+              "src/styles.css",
+              "src/app/components/ventas/ventas-hoteles/ventas-hoteles-mobile.css"
             ],
             "scripts": [
               "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js",

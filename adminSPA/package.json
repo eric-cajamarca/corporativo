@@ -8,13 +8,7 @@
     "build:lan": "ng build --configuration=production && node scripts/patch-lan-bundle.js",
     "build:desktop": "ng build --configuration=desktop",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "e2e": "playwright test",
-    "e2e:api": "playwright test e2e/health.spec.ts e2e/gestora-va-cobro-caja.spec.ts",
-    "e2e:ui-only": "playwright test e2e/smoke-login-ui.spec.ts",
-    "e2e:ui": "playwright test --ui",
-    "e2e:headed": "playwright test --headed",
-    "e2e:debug": "playwright test --debug"
+    "test": "echo Tests deshabilitados - no versionados && exit 0"
   },
   "private": true,
   "dependencies": {

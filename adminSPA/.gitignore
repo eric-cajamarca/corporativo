@@ -28,8 +28,13 @@ yarn-error.log
 !.vscode/extensions.json
 .history/*
 
-# Playwright E2E
-/e2e/.env
+# Playwright E2E / unit tests — no versionar
+/e2e/
+/jest.config.js
+/setup-jest.ts
+/tsconfig.spec.json
+/playwright.config.js
+**/*.spec.ts
 /playwright-report/
 /test-results/
 

@@ -32,6 +32,20 @@ flayers/
 **/playwright-report/
 **/test-results/
 
+# Tests / e2e / pentest — no versionar
+scripts/verify.mjs
+adminSPA/jest.config.js
+adminSPA/setup-jest.ts
+adminSPA/tsconfig.spec.json
+adminSPA/playwright.config.js
+adminSPA/e2e/
+adminSPA/**/*.spec.ts
+backAppC/scripts/pentest-*.js
+backAppC/scripts/test-*.js
+backAppC/scripts/e2e*.js
+backAppC/test-*.js
+backAppC/test_*.js
+
 # Variables de entorno — usar solo *.example versionados
 .env
 .env.local

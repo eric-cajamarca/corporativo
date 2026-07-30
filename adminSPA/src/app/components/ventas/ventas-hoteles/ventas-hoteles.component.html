@@ -1,85 +1,90 @@
 <div class="page-body hotel-main">
   <!-- Cabecera módulo hotelería -->
   <header class="hotel-header">
-        <div class="hotel-header-inner">
+    <div class="hotel-header-inner">
       <div class="hotel-header-brand">
         <span class="hotel-icon" aria-hidden="true"></span>
         <div>
-          <h1 class="hotel-title">Módulo de Hotelería</h1>
+          <h1 class="hotel-title">
+            <span class="hotel-title-desk">Módulo de Hotelería</span>
+            <span class="hotel-title-mob">Recepción</span>
+          </h1>
           <p class="hotel-subtitle">Reservas, estancias y consumo</p>
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-      <div class="hotel-header-stats">
-        <div class="hotel-stat">
-          <span class="hotel-stat-value">{{ reservas.length }}</span>
-          <span class="hotel-stat-label">Reservas</span>
+      <div class="hotel-header-actions">
+        <div class="hotel-header-stats">
+          <div class="hotel-stat">
+            <span class="hotel-stat-value">{{ reservas.length }}</span>
+            <span class="hotel-stat-label">Reservas</span>
+          </div>
+          <div class="hotel-stat">
+            <span class="hotel-stat-value">{{ confirmadasCount }}</span>
+            <span class="hotel-stat-label">Confirmadas</span>
+          </div>
+          <div class="hotel-stat">
+            <span class="hotel-stat-value">{{ estanciasActivasCount }}</span>
+            <span class="hotel-stat-label">In-house</span>
+          </div>
         </div>
-        <div class="hotel-stat">
-          <span class="hotel-stat-value">{{ confirmadasCount }}</span>
-          <span class="hotel-stat-label">Confirmadas</span>
-        </div>
-        <div class="hotel-stat">
-          <span class="hotel-stat-value">{{ estanciasActivasCount }}</span>
-          <span class="hotel-stat-label">In-house</span>
-        </div>
-      </div>
-      <a routerLink="/hotel/configuracion" class="btn btn-outline-light btn-sm">
-        <i class="fas fa-cog me-1"></i> Configuración
-      </a>
+        <a routerLink="/hotel/configuracion" class="btn btn-outline-light btn-sm hotel-btn-config">
+          <i class="fas fa-cog"></i><span class="hotel-btn-config-txt"> Configuración</span>
+        </a>
       </div>
     </div>
   </header>
 
   <!-- Pestañas -->
-  <nav class="hotel-tabs">
+  <nav class="hotel-tabs" aria-label="Secciones recepción hotel">
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'calendario'"
       (click)="setTab('calendario')">
-      <i class="fas fa-calendar-alt me-2"></i>
-      Calendario
+      <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+      <span class="hotel-tab-txt">Calendario</span>
     </button>
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'reservas'"
       (click)="setTab('reservas')">
-      <i class="fas fa-calendar-check me-2"></i>
-      Reservas
+      <i class="fas fa-calendar-check" aria-hidden="true"></i>
+      <span class="hotel-tab-txt">Reservas</span>
     </button>
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'habitaciones'"
       (click)="setTab('habitaciones')">
-      <i class="fas fa-door-open me-2"></i>
-      Habitaciones
+      <i class="fas fa-door-open" aria-hidden="true"></i>
+      <span class="hotel-tab-txt">Habitaciones</span>
     </button>
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'consumo'"
       (click)="setTab('consumo')">
-      <i class="fas fa-receipt me-2"></i>
-      Consumo / Ventas
+      <i class="fas fa-receipt" aria-hidden="true"></i>
+      <span class="hotel-tab-txt hotel-tab-full">Consumo / Ventas</span>
+      <span class="hotel-tab-txt hotel-tab-short">Consumo</span>
     </button>
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'housekeeping'"
       (click)="setTab('housekeeping')">
-      <i class="fas fa-broom me-2"></i>
-      Housekeeping
+      <i class="fas fa-broom" aria-hidden="true"></i>
+      <span class="hotel-tab-txt hotel-tab-full">Housekeeping</span>
+      <span class="hotel-tab-txt hotel-tab-short">HK</span>
     </button>
     <button
       type="button"
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'reportes'"
       (click)="setTab('reportes')">
-      <i class="fas fa-chart-bar me-2"></i>
-      Reportes
+      <i class="fas fa-chart-bar" aria-hidden="true"></i>
+      <span class="hotel-tab-txt">Reportes</span>
     </button>
   </nav>
 
@@ -103,11 +108,11 @@
             </button>
           </div>
         </div>
-        <div class="d-flex flex-wrap gap-3 mb-3 small">
+        <div class="d-flex flex-wrap gap-3 mb-3 small hotel-cal-legend">
           <span><span class="tape-legend tape-bar-estancia"></span> In-house</span>
-          <span><span class="tape-legend tape-bar-reserva"></span> Reserva confirmada</span>
+          <span><span class="tape-legend tape-bar-reserva"></span> Reserva</span>
           <span><span class="tape-legend tape-bar-bloqueo"></span> Bloqueo</span>
-          <span class="text-muted ms-2">Arrastre una barra de reserva para cambiar fechas</span>
+          <span class="text-muted ms-2 hotel-cal-drag-hint">Arrastre una barra de reserva para cambiar fechas</span>
         </div>
         @if (errorMessage()) {
           <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
@@ -115,7 +120,34 @@
         @if (calendarioLoading()) {
           <p class="text-muted">Cargando calendario…</p>
         } @else {
-          <div class="hotel-tape-chart">
+          <!-- Vista móvil: lista por habitación (sin tape chart) -->
+          <div class="hotel-cal-mobile">
+            @for (hab of (calendarioData?.habitaciones ?? productosHabitacion); track hab.idProducto) {
+              <div class="hotel-cal-m-card">
+                <div class="hotel-cal-m-head">
+                  <strong>{{ hab.codigo }}</strong>
+                  <span class="small text-muted text-truncate">{{ hab.descripcion }}</span>
+                </div>
+                <div class="hotel-cal-m-events">
+                  @for (ev of getEventosHabitacion(hab.idProducto); track ev.idReserva || ev.idEstancia || ev.idBloqueo) {
+                    <button type="button" class="hotel-cal-chip" [ngClass]="claseBarraEvento(ev)"
+                      (click)="onClickEventoCalendario(ev, hab)">
+                      {{ labelEventoCalendario(ev) }}
+                    </button>
+                  } @empty {
+                    <span class="small text-muted">Sin eventos en el rango</span>
+                  }
+                </div>
+              </div>
+            }
+            @if ((calendarioData?.habitaciones ?? productosHabitacion).length === 0) {
+              <div class="hotel-empty mt-3">
+                <p class="mb-0 text-muted">No hay habitaciones (productos ZZ) para mostrar.</p>
+              </div>
+            }
+          </div>
+          <!-- Vista desktop: tape chart -->
+          <div class="hotel-tape-chart hotel-cal-desktop">
             <div class="tape-header-row">
               <div class="tape-room-col tape-header-cell">Habitación</div>
               <div class="tape-days-header">
@@ -146,7 +178,7 @@
             }
           </div>
           @if ((calendarioData?.habitaciones ?? productosHabitacion).length === 0) {
-            <div class="hotel-empty mt-3">
+            <div class="hotel-empty mt-3 hotel-cal-desktop">
               <p class="mb-0 text-muted">No hay habitaciones (productos ZZ) para mostrar.</p>
             </div>
           }
@@ -228,9 +260,10 @@
         <div class="hotel-section-header">
           <h2 class="hotel-section-title">Estado de habitaciones</h2>
         </div>
-        <p class="text-muted small mb-3">
-          Verde: libre · Amarillo: reserva con llegada hoy · Rojo: huésped in-house · Gris: bloqueada o fuera de servicio.
-          Check-in solo si está <strong>limpia</strong> o <strong>en limpieza</strong> (no sucia ni fuera de servicio).
+        <p class="text-muted small mb-3 hotel-hab-legend">
+          <span class="hotel-hab-legend-full">Verde: libre · Amarillo: reserva con llegada hoy · Rojo: huésped in-house · Gris: bloqueada o fuera de servicio.
+          Check-in solo si está <strong>limpia</strong> o <strong>en limpieza</strong> (no sucia ni fuera de servicio).</span>
+          <span class="hotel-hab-legend-short">Libre · Reserva hoy · In-house · Bloqueada. Check-in solo limpia / en limpieza.</span>
         </p>
         @if (errorMessage()) {
           <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>

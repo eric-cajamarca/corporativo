@@ -190,7 +190,12 @@ export class VentasHotelesComponent implements OnInit {
       next: (res) => { this.documentos = res.data || []; },
       error: () => { this.documentos = []; }
     });
-    this.cargarCalendario();
+    // Recepción móvil: tab Habitaciones primero (solo viewport < md; desktop/gestora no aplica).
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 991.98px)').matches) {
+      this.setTab('habitaciones');
+    } else {
+      this.cargarCalendario();
+    }
   }
 
   cargarDatos(): void {
