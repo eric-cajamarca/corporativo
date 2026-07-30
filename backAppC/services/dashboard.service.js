@@ -55,9 +55,9 @@ function obtenerRangoFechas(periodo, fechaReferencia) {
       fechaFin.setHours(23, 59, 59, 999);
       break;
     default:
-      // Default: Este Mes
-      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+      // Default: Hoy
+      fechaInicio = new Date(hoy);
+      fechaFin = new Date(hoy);
       fechaFin.setHours(23, 59, 59, 999);
   }
 
@@ -81,11 +81,11 @@ function obtenerRangoFechas(periodo, fechaReferencia) {
 const PERIODOS_VALIDOS = ["Hoy", "Esta Semana", "Este Mes", "Este Año"];
 
 function normalizarPeriodo(periodo) {
-  const p = (periodo || "Este Mes").toString().trim();
+  const p = (periodo || "Hoy").toString().trim();
   const match = PERIODOS_VALIDOS.find(
     (v) => v.toLowerCase() === p.toLowerCase()
   );
-  return match || "Este Mes";
+  return match || "Hoy";
 }
 
 exports.obtenerResumenDashboardService = async (pool, user, periodo, fechaReferencia) => {
@@ -133,6 +133,20 @@ exports.obtenerResumenDashboardService = async (pool, user, periodo, fechaRefere
   };
 
   return cache.getCached(cacheKey, fetchDashboard, ttlSeconds);
+};
+
+exports.obtenerResumenDiarioService = async (pool, user, fechaReferencia) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const idEmpresa = user.empresa;
+  const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const cacheKey = `dashboard:resumen-diario:${idEmpresa}:${fechaRef}`;
+  const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
+  const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
+
+  const fetchResumen = () =>
+    DashboardRepository.obtenerResumenDiarioRepo(pool, idEmpresa, fechaRef);
+
+  return cache.getCached(cacheKey, fetchResumen, ttlSeconds);
 };
 
 function mergeGraficoVista(a, b) {

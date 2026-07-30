@@ -24,7 +24,8 @@ respaldo/
 CRM/
 infra/
 analisis-grupo-salvacion/
-flayers/
+# Flayers PNG/marketing locales (no subir). HTML del sitio va en adminSPA/public/flayers/
+/flayers/
 
 # Caché / pruebas (por si se generan fuera de adminSPA/.gitignore)
 **/.angular/cache/

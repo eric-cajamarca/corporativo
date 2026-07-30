@@ -115,6 +115,102 @@
   height: 100%;
 }
 
+.pain-card {
+  border-top: 4px solid #4f7cff;
+}
+
+.pain-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(79, 124, 255, 0.12);
+  color: #4f7cff;
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.pain-card h4 {
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.pain-card p {
+  color: #64748b;
+  margin-bottom: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.recurso-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.recurso-card:hover {
+  border-color: #4f7cff;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(79, 124, 255, 0.15);
+  color: inherit;
+  text-decoration: none;
+}
+
+.recurso-card--fiestas:hover {
+  border-color: #dc2626;
+  box-shadow: 0 16px 36px rgba(220, 38, 38, 0.12);
+}
+
+.recurso-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4f7cff;
+  background: rgba(79, 124, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+  width: fit-content;
+}
+
+.recurso-tag--fiestas {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.recurso-card h4 {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.recurso-card p {
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  flex: 1;
+  margin-bottom: 0;
+}
+
+@media (min-width: 1200px) {
+  .col-xl {
+    flex: 1 1 0;
+    max-width: 20%;
+  }
+}
+
 /* Miniatura propia (sin iframe idle de YouTube, que deforma el preview) */
 .video-embed {
   aspect-ratio: 16 / 9;

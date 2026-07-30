@@ -1,0 +1,385 @@
+/* EFAFERP · Flayers HTML personalizados por tema */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy: #1a3560;
+  --navy-dark: #122847;
+  --blue: #2563eb;
+  --blue-light: #3b82f6;
+  --blue-soft: #eff6ff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --white: #ffffff;
+  --bar-dark: #2d3748;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --header-from: #1a3560;
+  --header-to: #1e4080;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #e2e8f0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 72px 16px 32px;
+}
+
+.flayer-toolbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--navy-dark);
+  padding: 10px 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.flayer-toolbar a,
+.flayer-toolbar button {
+  background: #fff;
+  color: var(--navy);
+  border: none;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.flayer-toolbar a.btn-planes {
+  background: var(--accent);
+  color: #fff;
+}
+
+.flayer {
+  width: 1080px;
+  max-width: 100%;
+  min-height: 1350px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+
+/* ── Temas ── */
+.theme-inventario {
+  --accent: #0284c7;
+  --accent-soft: #e0f2fe;
+  --header-from: #0c4a6e;
+  --header-to: #0369a1;
+}
+
+.theme-robos {
+  --accent: #dc2626;
+  --accent-soft: #fef2f2;
+  --header-from: #7f1d1d;
+  --header-to: #1a3560;
+}
+
+.theme-utilidad {
+  --accent: #16a34a;
+  --accent-soft: #f0fdf4;
+  --header-from: #14532d;
+  --header-to: #166534;
+}
+
+.theme-cobranzas {
+  --accent: #ea580c;
+  --accent-soft: #fff7ed;
+  --header-from: #9a3412;
+  --header-to: #c2410c;
+}
+
+.theme-fiestas {
+  --accent: #dc2626;
+  --accent-soft: #fef2f2;
+  --header-from: #991b1b;
+  --header-to: #1a3560;
+}
+
+.flayer-header {
+  background: linear-gradient(180deg, var(--header-from) 0%, var(--header-to) 100%);
+  padding: 48px 56px 40px;
+  text-align: center;
+  color: #fff;
+  position: relative;
+}
+
+.theme-inventario .flayer-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 20%, rgba(255,255,255,0.12), transparent 45%);
+  pointer-events: none;
+}
+
+.theme-robos .flayer-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(-45deg, transparent, transparent 18px, rgba(255,255,255,0.04) 18px, rgba(255,255,255,0.04) 36px);
+  pointer-events: none;
+}
+
+.theme-utilidad .flayer-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 15% 80%, rgba(255,255,255,0.1), transparent 40%);
+  pointer-events: none;
+}
+
+.theme-cobranzas .flayer-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.15), transparent 55%);
+  pointer-events: none;
+}
+
+.fiestas-ribbon {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, #dc2626 0, #dc2626 28px, #fff 28px, #fff 56px);
+}
+
+.efaf-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.efaf-logo-mark { display: flex; flex-direction: column; gap: 5px; }
+.efaf-logo-mark span {
+  display: block; height: 7px; border-radius: 3px;
+  background: linear-gradient(90deg, #93c5fd, #60a5fa);
+}
+.efaf-logo-mark span:nth-child(1) { width: 36px; }
+.efaf-logo-mark span:nth-child(2) { width: 28px; margin-left: 4px; }
+.efaf-logo-mark span:nth-child(3) { width: 20px; margin-left: 8px; }
+
+.theme-utilidad .efaf-logo-mark span { background: linear-gradient(90deg, #86efac, #4ade80); }
+.theme-robos .efaf-logo-mark span,
+.theme-fiestas .efaf-logo-mark span,
+.theme-cobranzas .efaf-logo-mark span { background: linear-gradient(90deg, #fda4af, #fb7185); }
+
+.efaf-logo-text { font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }
+
+.flayer-header h1,
+.flayer-header .subtitle {
+  position: relative;
+  z-index: 1;
+}
+
+.flayer-header h1 {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+
+.flayer-header .subtitle {
+  font-size: 22px;
+  font-weight: 500;
+  opacity: 0.88;
+}
+
+.flayer-ui-bar {
+  background: var(--bar-dark);
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  border-bottom: 3px solid var(--accent);
+}
+
+.flayer-ui-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.flayer-ui-item .ico {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+
+.flayer-ui-item.active .ico {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.flayer-ui-item.active { color: #fff; }
+
+.flayer-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 40px 48px;
+}
+
+.flayer-steps {
+  padding-right: 32px;
+  border-right: 1px solid #e2e8f0;
+}
+
+.flayer-steps h2,
+.flayer-tips h2 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+.flayer-step {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 22px;
+  align-items: flex-start;
+}
+
+.flayer-step-num {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 16px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.flayer-step-content p {
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--text);
+  font-weight: 600;
+  padding-top: 4px;
+}
+
+.flayer-step-icon { font-size: 22px; margin-top: 6px; opacity: 0.75; }
+
+.flayer-tips { padding-left: 32px; }
+
+.flayer-tips-badge {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; margin-bottom: 16px;
+}
+
+.flayer-tip-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 16px; font-size: 16px; line-height: 1.45;
+  color: var(--text); font-weight: 500;
+}
+
+.flayer-tip-item .tip-ico {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; font-weight: 800;
+}
+
+.flayer-highlight {
+  margin-top: 20px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  padding: 16px 20px;
+}
+
+.flayer-highlight strong {
+  display: block; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent); margin-bottom: 6px;
+}
+
+.flayer-highlight p {
+  font-size: 15px; line-height: 1.5; color: var(--navy); font-weight: 600;
+}
+
+.flayer-cta {
+  margin: 0 48px 32px;
+  background: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 75%, white) 100%);
+  border-radius: 16px;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #fff;
+  flex-wrap: wrap;
+}
+
+.flayer-cta-text {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 18px; font-weight: 600;
+}
+
+.flayer-cta-text .cta-ico {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+
+.flayer-cta-btn {
+  background: #fff;
+  color: var(--accent);
+  padding: 12px 28px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.flayer-cta-btn:hover { opacity: 0.92; }
+
+.flayer-footer {
+  background: var(--navy-dark);
+  padding: 28px 48px;
+  text-align: center;
+  color: #fff;
+}
+
+.theme-fiestas .flayer-footer {
+  background: linear-gradient(90deg, #7f1d1d, #122847);
+}
+
+.flayer-footer-slogan {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 22px; font-weight: 700; margin-bottom: 10px;
+}
+
+.flayer-footer-meta { font-size: 13px; opacity: 0.75; }
+
+@media print {
+  body { background: #fff; padding: 0; }
+  .flayer-toolbar { display: none !important; }
+  .flayer { box-shadow: none; }
+}
+
+@media (max-width: 900px) {
+  .flayer-body { grid-template-columns: 1fr; }
+  .flayer-steps { border-right: none; padding-right: 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 24px; }
+  .flayer-tips { padding-left: 0; }
+  .flayer-header h1 { font-size: 28px; }
+}

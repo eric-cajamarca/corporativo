@@ -5,7 +5,7 @@ import { CommonModule } from '@angular/common';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
-import { DashboardService, ResumenDashboard } from '../../services/dashboard.service';
+import { DashboardService, ResumenDashboard, ResumenDiario } from '../../services/dashboard.service';
 import { EmpresaService } from '../../services/empresa.service';
 import { SaasSubscriptionService } from '../../services/saas-subscription.service';
 import { OnboardingWizardComponent } from '../onboarding/onboarding-wizard/onboarding-wizard.component';
@@ -33,7 +33,11 @@ export class InicioComponent implements OnInit, OnDestroy {
   public userRole: string = '';
 
   // Período seleccionado
-  public periodoSeleccionado: string = 'Este Mes';
+  public periodoSeleccionado: string = 'Hoy';
+
+  /** Resumen operativo del día */
+  public resumenDiario: ResumenDiario | null = null;
+  public cargandoResumenDiario = false;
 
   // KPIs principales
   public ventasTotales: number = 0;
@@ -59,7 +63,7 @@ export class InicioComponent implements OnInit, OnDestroy {
   public ventasMensualesChart: number[] = [];
   public ventasMensualesLabels: string[] = [];
   // Vistas del gráfico de tendencia: porDiaHora | mesPorDia | seisMeses | doceMeses
-  public vistaGraficoVentas: 'porDiaHora' | 'mesPorDia' | 'seisMeses' | 'doceMeses' = 'doceMeses';
+  public vistaGraficoVentas: 'porDiaHora' | 'mesPorDia' | 'seisMeses' | 'doceMeses' = 'porDiaHora';
   public graficoVentas: { porDiaHora?: { etiquetas: string[]; datos: number[]; leyenda: string }; mesPorDia?: { etiquetas: string[]; datos: number[]; leyenda: string }; seisMeses?: { etiquetas: string[]; datos: number[]; leyenda: string }; doceMeses?: { etiquetas: string[]; datos: number[]; leyenda: string } } | null = null;
 
   // Alertas y notificaciones
@@ -189,6 +193,7 @@ export class InicioComponent implements OnInit, OnDestroy {
   private cargarDatosDashboard(): void {
     this.cargandoDatos.set(true);
     this.porEmpresaDashboard = [];
+    this.cargarResumenDiario();
 
     if (this.esGestora) {
       this.dashboardService.obtenerResumenConsolidado(this.periodoSeleccionado).subscribe({
@@ -372,6 +377,37 @@ export class InicioComponent implements OnInit, OnDestroy {
     } else {
       console.warn('Módulo no encontrado:', module);
     }
+  }
+
+  /**
+   * Carga el resumen operativo del día (siempre datos de hoy).
+   */
+  private cargarResumenDiario(): void {
+    if (this.esGestora) {
+      this.resumenDiario = null;
+      return;
+    }
+    this.cargandoResumenDiario = true;
+    this.dashboardService.obtenerResumenDiario().subscribe({
+      next: (response) => {
+        this.resumenDiario = response.data ?? null;
+        this.cargandoResumenDiario = false;
+      },
+      error: (error) => {
+        console.error('Error al cargar resumen diario:', error);
+        this.resumenDiario = null;
+        this.cargandoResumenDiario = false;
+      }
+    });
+  }
+
+  /** Etiqueta legible de la fecha del resumen diario */
+  get etiquetaFechaResumen(): string {
+    if (!this.resumenDiario?.fecha) return 'Hoy';
+    const partes = this.resumenDiario.fecha.split('-');
+    if (partes.length !== 3) return this.resumenDiario.fecha;
+    const d = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+    return d.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
   /**

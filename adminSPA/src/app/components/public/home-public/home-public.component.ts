@@ -19,6 +19,14 @@ interface PublicReferido {
   comentario: string;
 }
 
+interface PublicRecurso {
+  slug: string;
+  titulo: string;
+  descripcion: string;
+  tag: string;
+  url: string;
+}
+
 @Component({
   selector: 'app-home-public',
   standalone: true,
@@ -32,6 +40,44 @@ export class HomePublicComponent implements OnInit {
   readonly errorPlanes = signal<string | null>(null);
 
   videos: PublicVideo[] = [];
+
+  readonly recursos: PublicRecurso[] = [
+    {
+      slug: 'inventario',
+      titulo: 'Control de inventario',
+      descripcion: 'Evita vender a ciegas y recupera el control de tu stock.',
+      tag: 'Inventario',
+      url: '/flayers/inventario.html'
+    },
+    {
+      slug: 'robos-internos',
+      titulo: 'Robos internos',
+      descripcion: 'Señales de alerta y cómo detectar mermas sin explicación.',
+      tag: 'Seguridad',
+      url: '/flayers/robos-internos.html'
+    },
+    {
+      slug: 'utilidad-producto',
+      titulo: 'Utilidad por producto',
+      descripcion: 'Vender mucho no es lo mismo que ganar mucho.',
+      tag: 'Finanzas',
+      url: '/flayers/utilidad-producto.html'
+    },
+    {
+      slug: 'cobranzas',
+      titulo: 'Cobranzas',
+      descripcion: 'Reglas simples para cobrar a tiempo y no quedarte sin capital.',
+      tag: 'Créditos',
+      url: '/flayers/cobranzas.html'
+    },
+    {
+      slug: 'fiestas-patrias',
+      titulo: 'Fiestas Patrias',
+      descripcion: 'Celebra el 28 de julio controlando tu negocio como corresponde.',
+      tag: 'Perú',
+      url: '/flayers/fiestas-patrias.html'
+    }
+  ];
 
   readonly referidos: PublicReferido[] = [
     {

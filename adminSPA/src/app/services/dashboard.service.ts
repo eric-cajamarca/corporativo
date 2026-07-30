@@ -36,6 +36,35 @@ export interface ResumenDashboard {
   alertas: { titulo: string; mensaje: string; icono: string; tipo: string; tiempo: string }[];
 }
 
+export interface VentaMedioPagoResumen {
+  medio: string;
+  monto: number;
+}
+
+export interface EnvioMananaResumen {
+  idEnvio: string | number;
+  cliente: string;
+  direccion: string;
+  fechaProgramada: string;
+  estado: string;
+}
+
+export interface ResumenDiario {
+  fecha: string;
+  ventasTotales: number;
+  ventasAyer: number;
+  ventasVariacionPct: number;
+  ventasPorMedioPago: VentaMedioPagoResumen[];
+  ventasAlCredito: number;
+  cobranzasDia: number;
+  porCobrarTotal: number;
+  comprasDia: number;
+  utilidadDia: number;
+  ingresosDia: number;
+  enviosManana: EnvioMananaResumen[];
+  mensajeResumen: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -77,5 +106,16 @@ export class DashboardService {
     }) as Observable<{
       data: { consolidado: ResumenDashboard; porEmpresa: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] };
     }>;
+  }
+
+  /** Resumen operativo del día (ventas por medio de pago, cobranzas, envíos mañana). */
+  obtenerResumenDiario(): Observable<{ data: ResumenDiario }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    const params = new URLSearchParams();
+    params.set('fechaReferencia', getFechaHoyLocal());
+    return this._http.get<{ data: ResumenDiario }>(this.url + 'dashboard/resumen-diario?' + params.toString(), {
+      headers,
+      withCredentials: true
+    });
   }
 }

@@ -476,3 +476,288 @@ exports.obtenerResumenDashboardRepo = async (
     alertas
   };
 };
+
+function addDaysYmd(ymd, days) {
+  const m = String(ymd || "").trim().slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return ymd;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Resumen operativo del día para el dueño del negocio (sin IA).
+ * @param {object} pool
+ * @param {string} idEmpresa
+ * @param {string} fechaReferencia - YYYY-MM-DD
+ */
+exports.obtenerResumenDiarioRepo = async (pool, idEmpresa, fechaReferencia) => {
+  const fecha = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const fechaAyer = addDaysYmd(fecha, -1);
+  const fechaManana = addDaysYmd(fecha, 1);
+  const toNum = (val) => (val != null && typeof val === "number" ? val : parseFloat(val) || 0);
+
+  const baseReq = () =>
+    pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa).input("fecha", sql.Date, fecha);
+
+  const ventasTotalesPromise = baseReq().query(`
+    SELECT ISNULL(SUM(
+      CASE
+        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+        ELSE v.total
+      END
+    ), 0) AS total
+    FROM Ventas v
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+    WHERE v.idEmpresa = @idEmpresa
+      AND ISNULL(v.eliminado, 0) = 0
+      AND CONVERT(DATE, v.fEmision) = @fecha
+  `);
+
+  const ventasAyerPromise = pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fecha", sql.Date, fechaAyer)
+    .query(`
+    SELECT ISNULL(SUM(
+      CASE
+        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+        ELSE v.total
+      END
+    ), 0) AS total
+    FROM Ventas v
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+    WHERE v.idEmpresa = @idEmpresa
+      AND ISNULL(v.eliminado, 0) = 0
+      AND CONVERT(DATE, v.fEmision) = @fecha
+  `);
+
+  /** Forma de pago igual que arqueo de caja: MovimientosCaja + FormasPago (prioridad) + MediosPago. */
+  const pagosPorMedioPromise = baseReq().query(`
+    SELECT
+      ISNULL(
+        NULLIF(LTRIM(RTRIM(fp.descripcion)), ''),
+        ISNULL(NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')
+      ) AS medio,
+      ISNULL(SUM(mc.monto), 0) AS monto
+    FROM MovimientosCaja mc
+    INNER JOIN Ventas v ON v.idVenta = mc.idVenta
+    INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+    LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
+    WHERE mc.idEmpresa = @idEmpresa
+      AND v.idEmpresa = @idEmpresa
+      AND ISNULL(mc.eliminado, 0) = 0
+      AND mc.idVenta IS NOT NULL
+      AND CONVERT(DATE, v.fEmision) = @fecha
+    GROUP BY fp.descripcion, mp.descripcion
+  `).catch(() => null);
+
+  const ventasCreditoPromise = baseReq().query(`
+    SELECT ISNULL(SUM(cc.montoTotal), 0) AS total
+    FROM CreditosClientes cc
+    WHERE cc.idEmpresa = @idEmpresa
+      AND CONVERT(DATE, cc.fechaCredito) = @fecha
+      AND UPPER(LTRIM(RTRIM(ISNULL(cc.estado, '')))) <> 'CANCELADO'
+  `).catch(() => ({ recordset: [{ total: 0 }] }));
+
+  const cobranzasDiaPromise = baseReq().query(`
+    SELECT ISNULL(SUM(pc.montoPagado), 0) AS total
+    FROM PagosCuotas pc
+    WHERE pc.idEmpresa = @idEmpresa
+      AND CONVERT(DATE, pc.fechaPago) = @fecha
+  `).catch(() => ({ recordset: [{ total: 0 }] }));
+
+  const porCobrarPromise = pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+    SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS total
+    FROM CuotasCredito cu
+    WHERE cu.idEmpresa = @idEmpresa
+      AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+      AND cu.saldoPendiente > 0
+  `).catch(() => ({ recordset: [{ total: 0 }] }));
+
+  const comprasDiaPromise = baseReq().query(`
+    SELECT ISNULL(SUM(c.total), 0) AS total
+    FROM Compras c
+    WHERE c.idEmpresa = @idEmpresa
+      AND CONVERT(DATE, c.fEmision) = @fecha
+  `).catch(() => ({ recordset: [{ total: 0 }] }));
+
+  const [
+    ventasTotalesRs,
+    ventasAyerRs,
+    pagosPorMedioRs,
+    ventasCreditoRs,
+    cobranzasDiaRs,
+    porCobrarRs,
+    comprasDiaRs
+  ] = await Promise.all([
+    ventasTotalesPromise,
+    ventasAyerPromise,
+    pagosPorMedioPromise,
+    ventasCreditoPromise,
+    cobranzasDiaPromise,
+    porCobrarPromise,
+    comprasDiaPromise
+  ]);
+
+  const ventasTotales = toNum(ventasTotalesRs.recordset?.[0]?.total);
+  const ventasAyer = toNum(ventasAyerRs.recordset?.[0]?.total);
+  const ventasCredito = toNum(ventasCreditoRs.recordset?.[0]?.total);
+  const cobranzasDia = toNum(cobranzasDiaRs.recordset?.[0]?.total);
+  const porCobrarTotal = toNum(porCobrarRs.recordset?.[0]?.total);
+  const comprasDia = toNum(comprasDiaRs.recordset?.[0]?.total);
+
+  const ventasVariacionPct =
+    ventasAyer > 0 ? ((ventasTotales - ventasAyer) / ventasAyer) * 100 : (ventasTotales > 0 ? 100 : 0);
+
+  const mapMedios = new Map();
+  let pagosRows = pagosPorMedioRs?.recordset || [];
+  if (!pagosPorMedioRs || pagosRows.length === 0) {
+    try {
+      const fallback = await baseReq().query(`
+        SELECT
+          ISNULL(
+            NULLIF(LTRIM(RTRIM(fp.descripcion)), ''),
+            ISNULL(NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')
+          ) AS medio,
+          ISNULL(SUM(dpv.monto), 0) AS monto
+        FROM DetallePagoVenta dpv
+        INNER JOIN Ventas v ON v.idVenta = dpv.idVenta AND v.idEmpresa = @idEmpresa
+        LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
+        LEFT JOIN MediosPago mp ON mp.idMediosPago = dpv.idMediosPago
+        WHERE v.idEmpresa = @idEmpresa
+          AND ISNULL(v.eliminado, 0) = 0
+          AND CONVERT(DATE, v.fEmision) = @fecha
+        GROUP BY fp.descripcion, mp.descripcion
+
+        UNION ALL
+
+        SELECT
+          ISNULL(
+            NULLIF(LTRIM(RTRIM(fp.descripcion)), ''),
+            ISNULL(NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')
+          ) AS medio,
+          ISNULL(SUM(v.total), 0) AS monto
+        FROM Ventas v
+        LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
+        LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+        WHERE v.idEmpresa = @idEmpresa
+          AND ISNULL(v.eliminado, 0) = 0
+          AND CONVERT(DATE, v.fEmision) = @fecha
+          AND NOT EXISTS (SELECT 1 FROM DetallePagoVenta dpv2 WHERE dpv2.idVenta = v.idVenta)
+        GROUP BY fp.descripcion, mp.descripcion
+      `);
+      pagosRows = fallback.recordset || [];
+    } catch (_) {
+      pagosRows = [];
+    }
+  }
+  pagosRows.forEach((r) => {
+    const medio = String(r.medio || "Sin especificar").trim();
+    mapMedios.set(medio, (mapMedios.get(medio) || 0) + toNum(r.monto));
+  });
+  const ventasPorMedioPago = Array.from(mapMedios.entries())
+    .map(([medio, monto]) => ({ medio, monto: Number(monto) }))
+    .filter((x) => x.monto > 0)
+    .sort((a, b) => b.monto - a.monto);
+
+  let kpisFin = { utilidadNeta: 0, ingresos: 0, costos: 0, utilidadBruta: 0, gastosOperativos: 0 };
+  try {
+    kpisFin = await calcularResumenFinancieroPeriodo(pool, idEmpresa, fecha, fecha, {
+      fechaInicioAnterior: fechaAyer,
+      fechaFinAnterior: fechaAyer
+    });
+  } catch (_) {}
+
+  let enviosManana = [];
+  try {
+    const envRs = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("fechaManana", sql.Date, fechaManana)
+      .query(`
+      SELECT TOP 15
+        e.idEnvio,
+        ISNULL(c.rSocial, ISNULL(e.contactoDestinatario, 'Cliente')) AS cliente,
+        ISNULL(e.direccionEntrega, '') AS direccion,
+        CONVERT(VARCHAR(19), ISNULL(e.fechaProgramada, e.fechaSolicitud), 120) AS fechaProgramada,
+        ISNULL(ee.descripcion, 'Programado') AS estado
+      FROM Envios e
+      LEFT JOIN Clientes c ON c.idCliente = e.idCliente AND c.idEmpresa = e.idEmpresa
+      LEFT JOIN EstadosEnvio ee ON ee.idEstadoEnvio = e.idEstadoEnvio
+      WHERE e.idEmpresa = @idEmpresa
+        AND CONVERT(DATE, ISNULL(e.fechaProgramada, e.fechaSolicitud)) = @fechaManana
+        AND ISNULL(e.idEstadoEnvio, 0) NOT IN (4, 5)
+      ORDER BY ISNULL(e.fechaProgramada, e.fechaSolicitud)
+    `);
+    enviosManana = (envRs.recordset || []).map((r) => ({
+      idEnvio: r.idEnvio,
+      cliente: r.cliente,
+      direccion: r.direccion,
+      fechaProgramada: r.fechaProgramada,
+      estado: r.estado
+    }));
+  } catch (_) {}
+
+  return {
+    fecha,
+    ventasTotales: Number(ventasTotales),
+    ventasAyer: Number(ventasAyer),
+    ventasVariacionPct: Number(ventasVariacionPct),
+    ventasPorMedioPago,
+    ventasAlCredito: Number(ventasCredito),
+    cobranzasDia: Number(cobranzasDia),
+    porCobrarTotal: Number(porCobrarTotal),
+    comprasDia: Number(comprasDia),
+    utilidadDia: Number(kpisFin.utilidadNeta || 0),
+    ingresosDia: Number(kpisFin.ingresos || ventasTotales),
+    enviosManana,
+    mensajeResumen: buildMensajeResumenDiario({
+      fecha,
+      ventasTotales,
+      ventasPorMedioPago,
+      ventasAlCredito: ventasCredito,
+      cobranzasDia,
+      porCobrarTotal,
+      comprasDia,
+      utilidadDia: kpisFin.utilidadNeta || 0,
+      ventasVariacionPct,
+      enviosManana
+    })
+  };
+};
+
+function buildMensajeResumenDiario(d) {
+  const fmt = (n) => `S/ ${Number(n || 0).toFixed(2)}`;
+  const lineas = [`Hoy vendiste ${fmt(d.ventasTotales)}.`];
+  if (d.ventasPorMedioPago?.length) {
+    d.ventasPorMedioPago.slice(0, 6).forEach((p) => {
+      lineas.push(`${p.medio}: ${fmt(p.monto)}`);
+    });
+  }
+  if (Number(d.ventasAlCredito) > 0) {
+    lineas.push(`Al crédito (nuevos): ${fmt(d.ventasAlCredito)}`);
+  }
+  if (Number(d.cobranzasDia) > 0) {
+    lineas.push(`Cobranzas del día: ${fmt(d.cobranzasDia)}`);
+  }
+  if (Number(d.porCobrarTotal) > 0) {
+    lineas.push(`Por cobrar (total): ${fmt(d.porCobrarTotal)}`);
+  }
+  if (Number(d.comprasDia) > 0) {
+    lineas.push(`Compras: ${fmt(d.comprasDia)}`);
+  }
+  lineas.push(`Utilidad del día: ${fmt(d.utilidadDia)}`);
+  const varPct = Number(d.ventasVariacionPct || 0);
+  if (varPct !== 0) {
+    lineas.push(`vs. ayer: ${varPct >= 0 ? "+" : ""}${varPct.toFixed(1)}% en ventas`);
+  }
+  if (Array.isArray(d.enviosManana) && d.enviosManana.length > 0) {
+    lineas.push(`Envíos programados para mañana: ${d.enviosManana.length}`);
+  }
+  return lineas.join(" · ");
+}
