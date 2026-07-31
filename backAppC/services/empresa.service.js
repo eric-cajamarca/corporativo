@@ -492,8 +492,8 @@ exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) 
     // Estructura: idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo, fCreacion
     const listasPredeterminadas = [
         { nombre: 'Precio Normal', principal: true, conIgv: true, idMoneda: 1 },
-        { nombre: 'Precio Cliente', principal: true, conIgv: true, idMoneda: 1 },
-        { nombre: 'Precio Mayorista', principal: true, conIgv: true, idMoneda: 1 },
+        { nombre: 'Precio Cliente', principal: false, conIgv: true, idMoneda: 1 },
+        { nombre: 'Precio Mayorista', principal: false, conIgv: true, idMoneda: 1 },
     ];
 
     const listasCreadas = [];

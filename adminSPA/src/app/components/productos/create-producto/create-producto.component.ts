@@ -610,8 +610,25 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     });
   }
 
+  private prioridadNombreLista(nombre: string): number {
+    const n = String(nombre || '').trim().toLowerCase();
+    if (n === 'precio normal' || n === 'normal') return 0;
+    if (n === 'precio cliente' || n === 'cliente') return 1;
+    if (n === 'precio mayorista' || n === 'mayorista') return 2;
+    return 100;
+  }
+
   abrirModalPreciosTodas(): void {
-    this.preciosPorListaModal = (this.listasPrecio || []).map((l: any) => ({
+    const activas = (this.listasPrecio || [])
+      .filter((l: any) => l?.activo === true || l?.activo === 1 || l?.activo === '1')
+      .slice()
+      .sort((a: any, b: any) => {
+        const pa = this.prioridadNombreLista(a?.nombre);
+        const pb = this.prioridadNombreLista(b?.nombre);
+        if (pa !== pb) return pa - pb;
+        return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es');
+      });
+    this.preciosPorListaModal = activas.map((l: any) => ({
       idLista: Number(l.idLista),
       nombre: String(l.nombre || 'Lista'),
       precio: this.precioVenta && this.precioVenta > 0 ? Number(this.precioVenta) : 0

@@ -147,7 +147,10 @@
                                 </div>
                             </td>
                             <td class="text-end" data-label="P. Actual">
-                                <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
+                                <span class="fw-semibold" *ngIf="listaSeleccionadaId !== LISTA_TODAS">
+                                  {{simboloMoneda}} {{producto.precioActual || '0.00'}}
+                                </span>
+                                <span class="text-muted" *ngIf="listaSeleccionadaId === LISTA_TODAS">—</span>
                             </td>
                             <td class="text-center col-n-precio" data-label="N. Precio">
                                 <div class="input-group input-group-sm justify-content-center">
@@ -164,7 +167,9 @@
                                            readonly
                                            class="form-control text-end"
                                            style="cursor: pointer;"
-                                           placeholder="Clic para editar listas"
+                                           [value]="preciosEstablecidosTexto(producto)"
+                                           [attr.title]="preciosEstablecidosTexto(producto) || 'Clic para editar listas'"
+                                           [placeholder]="preciosEstablecidosTexto(producto) ? '' : 'Sin precios — clic para editar'"
                                            (click)="abrirModalPreciosTodasPara(producto)"
                                            (focus)="abrirModalPreciosTodasPara(producto)">
                                     <button class="btn btn-outline-secondary" type="button"

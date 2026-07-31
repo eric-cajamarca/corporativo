@@ -292,7 +292,14 @@ exports.obtenerListasPrecioEmpresa = async (pool, idEmpresa) => {
                 FROM ListasPrecio lp
                 LEFT JOIN Sucursal s ON lp.idSucursal = s.idSucursal
                 WHERE lp.idEmpresa = @idEmpresa 
-                ORDER BY lp.principal DESC, lp.nombre ASC
+                ORDER BY
+                  CASE
+                    WHEN LOWER(LTRIM(RTRIM(lp.nombre))) IN (N'precio normal', N'normal') THEN 0
+                    WHEN LOWER(LTRIM(RTRIM(lp.nombre))) IN (N'precio cliente', N'cliente') THEN 1
+                    WHEN LOWER(LTRIM(RTRIM(lp.nombre))) IN (N'precio mayorista', N'mayorista') THEN 2
+                    ELSE 100
+                  END,
+                  lp.nombre ASC
             `);
         
         return result.recordset;

@@ -200,7 +200,9 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
       descripcionPres: producto.descripcionPres,
       idSucursal: producto.idSucursal,
       sucursal: producto.sucursal,
+      /** Costo del último lote (fechaIngreso); si no hay lote, Productos.cUnitario */
       cUnitario: producto.cUnitario,
+      idLoteUltimo: producto.idLoteUltimo || null,
       pVenta,
       stock: producto.stock,
       tipoProducto: producto.tipoProducto,
@@ -270,7 +272,8 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             pr.descripcion as descripcionPres,
             ss.idSucursal,
             s.nombre as sucursal,
-            p.cUnitario,
+            CONVERT(DECIMAL(18,6), ISNULL(ul.costoUnitario, p.cUnitario)) AS cUnitario,
+            ul.idLote AS idLoteUltimo,
             ss.cantidad as stock,
             p.tipoProducto,
             p.fProduccion,
@@ -289,6 +292,17 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
         INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
         INNER JOIN Empresas e ON ss.idEmpresa = e.idEmpresa
+        OUTER APPLY (
+          SELECT TOP 1 l.idLote, l.costoUnitario
+          FROM Lotes l
+          WHERE l.idEmpresa = ss.idEmpresa
+            AND l.idProducto = ss.idProducto
+            AND l.idSucursal = ss.idSucursal
+          ORDER BY
+            CASE WHEN l.fechaIngreso IS NULL THEN 1 ELSE 0 END,
+            l.fechaIngreso DESC,
+            l.idLote DESC
+        ) ul
         WHERE ss.idEmpresa IN (${inClause}) ${filtroSucursalSql}
 
         UNION ALL
@@ -308,7 +322,8 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             pr2.descripcion as descripcionPres,
             ${idSucursalSinLotesExpr} AS idSucursal,
             s2.nombre as sucursal,
-            p.cUnitario,
+            CONVERT(DECIMAL(18,6), ISNULL(p.cUnitario, 0)) AS cUnitario,
+            CAST(NULL AS UNIQUEIDENTIFIER) AS idLoteUltimo,
             CAST(0 AS DECIMAL(18, 3)) AS stock,
             p.tipoProducto,
             p.fProduccion,

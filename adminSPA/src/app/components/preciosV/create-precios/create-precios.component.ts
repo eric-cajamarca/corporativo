@@ -6,6 +6,7 @@ import { forkJoin, of } from 'rxjs';
 import { PreciosService } from '../../../services/precios.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
+import { LotesService } from '../../../services/lotes.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
@@ -27,6 +28,8 @@ export interface ProductoPreciosFila {
   idPresentacion: number;
   cUnitario: number | null;
   nuevoCUnitario: number;
+  /** Último lote de la sucursal (para sincronizar costo al guardar). */
+  idLoteUltimo?: string | null;
   fProduccion?: string | null;
   fVencimiento?: string | null;
   tipoProducto?: string;
@@ -154,6 +157,7 @@ export class CreatePreciosComponent implements OnInit {
     private fb: FormBuilder,
     private preciosService: PreciosService,
     private _productosService : ProductoService,
+    private _lotesService: LotesService,
     private _sucursalService: SucursalService,
     private _tablasSunatService: TablasSunatService,
     public sidebarState: SidebarStateService
@@ -174,7 +178,7 @@ export class CreatePreciosComponent implements OnInit {
   ngOnInit(): void {
     this.permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
     this.cargarListasPrecio();
-    this.cargarProductos();
+    this.cargarProductos({ evitarCache: true });
     this.cargarSucursales();
     this.cargarMonedas();
   }
@@ -491,14 +495,7 @@ export class CreatePreciosComponent implements OnInit {
 
     const costos$ =
       costosACambiar.length > 0
-        ? forkJoin(
-            costosACambiar.map((p) =>
-              this._productosService.actualizarProducto(
-                p.idProducto,
-                this.construirPayloadActualizarCosto(p)
-              )
-            )
-          )
+        ? forkJoin(costosACambiar.map((p) => this.persistirCostoUnitario(p)))
         : of(null);
 
     forkJoin({ precios: precios$, costos: costos$ }).subscribe({
@@ -524,13 +521,39 @@ export class CreatePreciosComponent implements OnInit {
     });
   }
 
+  /** Orden fijo: Normal → Cliente → Mayorista → resto (alfabético). */
+  private prioridadNombreLista(nombre: string): number {
+    const n = String(nombre || '').trim().toLowerCase();
+    if (n === 'precio normal' || n === 'normal') return 0;
+    if (n === 'precio cliente' || n === 'cliente') return 1;
+    if (n === 'precio mayorista' || n === 'mayorista') return 2;
+    return 100;
+  }
+
+  private esListaActiva(lista: { activo?: boolean | number | string }): boolean {
+    const a = lista?.activo;
+    return a === true || a === 1 || a === '1';
+  }
+
+  /** Listas activas en el orden del modal TODAS / resumen N. Precio. */
+  private listasActivasOrdenadas(): any[] {
+    return (this.listasPrecio || [])
+      .filter((l) => this.esListaActiva(l))
+      .slice()
+      .sort((a, b) => {
+        const pa = this.prioridadNombreLista(a?.nombre);
+        const pb = this.prioridadNombreLista(b?.nombre);
+        if (pa !== pb) return pa - pb;
+        return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es');
+      });
+  }
+
   abrirModalPreciosTodasPara(producto: ProductoPreciosFila): void {
     if (this.listaSeleccionadaId !== this.LISTA_TODAS) {
       return;
     }
     this.productoModalTodas = producto;
-    const base = this.listasPrecio || [];
-    this.preciosTodasListas = base.map((l: any) => {
+    this.preciosTodasListas = this.listasActivasOrdenadas().map((l: any) => {
       const idLista = Number(l.idLista);
       const precioData = producto.precios?.[idLista];
       const precioRaw = precioData?.precio != null ? Number(precioData.precio) : 0;
@@ -582,6 +605,23 @@ export class CreatePreciosComponent implements OnInit {
     return Math.abs(nu - orig) > 1e-9;
   }
 
+  /**
+   * Precios ya cargados en listas activas, separados por coma (modo TODAS).
+   * Mismo orden que el modal: Normal, Cliente, Mayorista, luego el resto.
+   */
+  preciosEstablecidosTexto(producto: ProductoPreciosFila): string {
+    const mapa = producto.precios || {};
+    const valores: string[] = [];
+    for (const lista of this.listasActivasOrdenadas()) {
+      const id = Number(lista.idLista);
+      if (Number.isNaN(id) || !mapa[id]) continue;
+      const n = Number(mapa[id]?.precio);
+      if (!Number.isFinite(n)) continue;
+      valores.push(n.toFixed(2));
+    }
+    return valores.join(', ');
+  }
+
   private construirPayloadActualizarCosto(p: ProductoPreciosFila): ProductoCreate {
     return {
       Codigo: (p.codigo ?? p.sku ?? '').trim(),
@@ -594,6 +634,22 @@ export class CreatePreciosComponent implements OnInit {
       fVencimiento: p.fVencimiento || undefined,
       tipoProducto: p.tipoProducto === 'C' || p.tipoProducto === 'S' ? p.tipoProducto : 'S'
     };
+  }
+
+  /** Actualiza Productos.cUnitario y, si existe, el costo del último lote. */
+  private persistirCostoUnitario(p: ProductoPreciosFila) {
+    const producto$ = this._productosService.actualizarProducto(
+      p.idProducto,
+      this.construirPayloadActualizarCosto(p)
+    );
+    const idLote = p.idLoteUltimo ? String(p.idLoteUltimo).trim() : '';
+    if (!idLote) {
+      return producto$;
+    }
+    const lote$ = this._lotesService.actualizar_lote(idLote, {
+      costoUnitario: Number(p.nuevoCUnitario)
+    });
+    return forkJoin([producto$, lote$]);
   }
 
   // Funciones auxiliares
