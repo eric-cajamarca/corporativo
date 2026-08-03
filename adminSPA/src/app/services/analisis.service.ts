@@ -171,7 +171,7 @@ export class AnalisisService {
     });
   }
 
-  // Gastos operativos (para estado de resultados)
+  // Gastos operativos / costos fijos (puntuales y recurrentes)
   listarGastos(fechaDesde?: string, fechaHasta?: string): Observable<any> {
     let params = '';
     if (fechaDesde || fechaHasta) {
@@ -183,9 +183,28 @@ export class AnalisisService {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url + 'analisis/gastos' + params, { headers, withCredentials: true });
   }
-  crearGasto(datos: { fecha: string; tipo: string; monto: number; descripcion?: string }): Observable<any> {
+  crearGasto(datos: {
+    fecha: string;
+    tipo: string;
+    monto: number;
+    descripcion?: string;
+    esRecurrente?: boolean;
+    fechaFin?: string | null;
+    activo?: boolean;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url + 'analisis/gastos', datos, { headers, withCredentials: true });
+  }
+  actualizarGasto(idGasto: string, datos: {
+    fecha: string;
+    tipo: string;
+    monto: number;
+    descripcion?: string;
+    fechaFin?: string | null;
+    activo?: boolean;
+  }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.put(this.url + 'analisis/gastos/' + encodeURIComponent(idGasto), datos, { headers, withCredentials: true });
   }
   eliminarGasto(idGasto: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});

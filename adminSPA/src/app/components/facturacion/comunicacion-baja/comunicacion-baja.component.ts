@@ -8,7 +8,6 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa as EmpresaModel } from '../../../models/empresa.model';
-import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -23,27 +22,27 @@ declare var bootstrap: any;
 export class ComunicacionBajaComponent implements OnInit {
 
   sidebarState = inject(SidebarStateService);
+  /** Resultados de búsqueda en el modal (serie/número). */
   comprobantes: ComprobanteParaBaja[] = [];
-  totalComprobantes = 0;
-  paginaComprobantes = 1;
-  readonly porPaginaComprobantes = 10;
-  filtroComprobante = '';
   motivos: MotivoBaja[] = [];
-  /** IDs seleccionados para dar de baja */
-  seleccionados: Set<string> = new Set();
-  /** Motivo por comprobante (idComprobante -> descripcion) */
-  motivoPorComprobante: Record<string, string> = {};
   motivoDefault = '01';
   loadingComprobantes = false;
   enviando = false;
   listado: ComunicacionBajaHistorialItem[] = [];
   totalListado = 0;
+  /** Vacío = sin filtro de fechas (historial completo). */
   fechaDesde = '';
   fechaHasta = '';
   idEstadoSunat: number | null = null;
   pagina = 1;
   /** Tamaño de página del historial (sincronizado con API). */
   readonly porPagina = 10;
+
+  /** Modal búsqueda / baja uno a uno */
+  modalSerie = '';
+  modalNumero = '';
+  busquedaModalRealizada = false;
+  comprobanteSeleccionadoId: string | null = null;
   /** Texto completo de descripción SUNAT en el modal. */
   descripcionModalTexto = '';
   consultandoId: string | null = null;
@@ -70,8 +69,6 @@ export class ComunicacionBajaComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.establecerRangoMes();
-    this.cargarComprobantes();
     this.cargarMotivos();
     this.cargarListado();
     this._empresaService.getEmpresa$().subscribe((emp) => {
@@ -79,49 +76,77 @@ export class ComunicacionBajaComponent implements OnInit {
     });
   }
 
-  establecerRangoMes(): void {
-    const hoy = new Date();
-    const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    this.fechaDesde = formatFechaLocal(primerDia);
-    this.fechaHasta = getFechaHoyLocal();
+  abrirModalBuscarBaja(): void {
+    this.modalSerie = '';
+    this.modalNumero = '';
+    this.comprobantes = [];
+    this.comprobanteSeleccionadoId = null;
+    this.busquedaModalRealizada = false;
+    setTimeout(() => {
+      const el = document.getElementById('modalBuscarBaja');
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
   }
 
-  cargarComprobantes(pagina = this.paginaComprobantes): void {
-    this.paginaComprobantes = pagina;
+  cerrarModalBuscarBaja(): void {
+    const el = document.getElementById('modalBuscarBaja');
+    if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+    this.comprobantes = [];
+    this.comprobanteSeleccionadoId = null;
+    this.busquedaModalRealizada = false;
+  }
+
+  buscarComprobanteEnModal(): void {
+    const serie = (this.modalSerie || '').trim().toUpperCase();
+    const numeroPad = (this.modalNumero || '').trim();
+    if (!serie || !numeroPad) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Búsqueda', message: 'Indique serie y número del comprobante.' });
+      }
+      return;
+    }
+    // Buscar con y sin ceros a la izquierda: el API hace LIKE sobre serie-número
+    const buscar = `${serie}-${numeroPad}`;
     this.loadingComprobantes = true;
+    this.busquedaModalRealizada = true;
+    this.comprobanteSeleccionadoId = null;
     this._facturacionService.listarComprobantesParaBaja({
-      pagina,
-      porPagina: this.porPaginaComprobantes,
-      buscar: (this.filtroComprobante || '').trim() || undefined
+      pagina: 1,
+      porPagina: 20,
+      buscar
     }).subscribe({
       next: (res) => {
-        this.comprobantes = res?.data ?? [];
-        this.totalComprobantes = res?.total ?? 0;
+        let rows = res?.data ?? [];
+        // Preferir coincidencia exacta serie+número (normalizando ceros)
+        const numNorm = numeroPad.replace(/^0+(?=\d)/, '') || '0';
+        const exactos = rows.filter((c) => {
+          const s = String(c.serie || '').trim().toUpperCase();
+          const n = String(c.numero || '').trim().replace(/^0+(?=\d)/, '') || '0';
+          return s === serie && n === numNorm;
+        });
+        if (exactos.length) rows = exactos;
+        this.comprobantes = rows;
         this.loadingComprobantes = false;
+        if (rows.length === 1) {
+          this.comprobanteSeleccionadoId = rows[0].idComprobanteElectronico;
+        }
       },
       error: () => {
         this.loadingComprobantes = false;
         this.comprobantes = [];
-        this.totalComprobantes = 0;
         if (typeof iziToast !== 'undefined') {
-          iziToast.error({ title: 'Error', message: 'No se pudieron cargar los comprobantes.' });
+          iziToast.error({ title: 'Error', message: 'No se pudo buscar el comprobante.' });
         }
       }
     });
   }
 
-  buscarComprobantes(): void {
-    this.paginaComprobantes = 1;
-    this.cargarComprobantes(1);
-  }
-
-  limpiarFiltroComprobante(): void {
-    this.filtroComprobante = '';
-    this.buscarComprobantes();
-  }
-
-  onPaginaComprobantesChange(pagina: number): void {
-    this.cargarComprobantes(pagina);
+  seleccionarComprobanteBaja(c: ComprobanteParaBaja): void {
+    this.comprobanteSeleccionadoId = c?.idComprobanteElectronico || null;
   }
 
   cargarMotivos(): void {
@@ -217,47 +242,30 @@ export class ComunicacionBajaComponent implements OnInit {
     }
   }
 
-  toggleSeleccion(id: string): void {
-    if (this.seleccionados.has(id)) {
-      this.seleccionados.delete(id);
-      delete this.motivoPorComprobante[id];
-    } else {
-      this.seleccionados.add(id);
-      const desc = this.motivos.find(m => m.codigoSunat === this.motivoDefault)?.descripcion || 'Anulación de la operación';
-      this.motivoPorComprobante[id] = desc;
-    }
-    this.seleccionados = new Set(this.seleccionados);
-  }
-
-  estaSeleccionado(id: string): boolean {
-    return this.seleccionados.has(id);
-  }
-
   get descripcionMotivoDefault(): string {
     return this.motivos.find(m => m.codigoSunat === this.motivoDefault)?.descripcion || 'Anulación de la operación';
   }
 
-  enviarBaja(): void {
-    if (this.seleccionados.size === 0) {
+  /** Envía la baja de un único comprobante seleccionado en el modal. */
+  enviarBajaUno(): void {
+    const id = this.comprobanteSeleccionadoId;
+    if (!id) {
       if (typeof iziToast !== 'undefined') {
-        iziToast.warning({ title: 'Selección', message: 'Seleccione al menos un comprobante a dar de baja.' });
+        iziToast.warning({ title: 'Selección', message: 'Seleccione un comprobante para dar de baja.' });
       }
       return;
     }
-    const comprobantes = Array.from(this.seleccionados).map(id => ({
-      idComprobanteElectronico: id,
-      motivoBaja: this.motivoPorComprobante[id] || this.descripcionMotivoDefault
-    }));
     this.enviando = true;
-    this._facturacionService.enviarComunicacionBaja(comprobantes).subscribe({
+    this._facturacionService.enviarComunicacionBaja([{
+      idComprobanteElectronico: id,
+      motivoBaja: this.descripcionMotivoDefault
+    }]).subscribe({
       next: (res) => {
         this.enviando = false;
-        this.seleccionados = new Set();
-        this.motivoPorComprobante = {};
         if (typeof iziToast !== 'undefined') {
           iziToast.success({ title: 'Enviado', message: res?.message ?? 'Comunicación de baja enviada. Consulte el estado.' });
         }
-        this.cargarComprobantes();
+        this.cerrarModalBuscarBaja();
         this.pagina = 1;
         this.cargarListado();
       },
@@ -282,7 +290,6 @@ export class ComunicacionBajaComponent implements OnInit {
           iziToast.info({ title: 'Estado', message: res?.mensaje ?? 'Consultado.' });
         }
         this.cargarListado();
-        this.cargarComprobantes();
       },
       error: (err) => {
         this.consultandoId = null;
@@ -468,6 +475,11 @@ export class ComunicacionBajaComponent implements OnInit {
     if (!f) return '—';
     const s = String(f).trim().slice(0, 19).replace('T', ' ');
     return s || '—';
+  }
+
+  /** Fecha legible en historial (evita ISO completo con Z). */
+  formatearFechaHistorial(f: string | undefined | null): string {
+    return this.formatearFechaCorta(f);
   }
 
   /** Abre el modal de envío por WhatsApp con el archivo seleccionado (PDF, XML o CDR). */

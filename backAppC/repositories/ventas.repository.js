@@ -1180,7 +1180,11 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           v.idMediosPago,
           v.idEstadoPago,
           ISNULL(v.eliminado, 0) AS eliminado,
-          v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
+          v.compRelacionado, v.observaciones, v.tipoComprobanteRef,
+          v.codigoMotivoNotaCredito, v.codigoMotivoNotaDebito,
+          v.idMotivoNotaCredito, v.idMotivoNotaDebito,
+          mnc.descripcion AS descripcionMotivoNotaCredito,
+          mnd.descripcion AS descripcionMotivoNotaDebito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           ISNULL(mp.descripcion, ISNULL(fp.descripcion, 'Contado')) AS condicionPago,
           ISNULL(mp.codigo, '009') AS codigoCondicionPago,
@@ -1191,6 +1195,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ${SQL_SELECT_USUARIO_VENTAS}
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN MotivoNotaCredito mnc ON mnc.idMotivoNotaCredito = v.idMotivoNotaCredito
+        LEFT JOIN MotivoNotaDebito mnd ON mnd.idMotivoNotaDebito = v.idMotivoNotaDebito
         LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList})
@@ -1218,7 +1224,11 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           v.idMediosPago,
           v.idEstadoPago,
           ISNULL(v.eliminado, 0) AS eliminado,
-          v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
+          v.compRelacionado, v.observaciones, v.tipoComprobanteRef,
+          v.codigoMotivoNotaCredito, v.codigoMotivoNotaDebito,
+          v.idMotivoNotaCredito, v.idMotivoNotaDebito,
+          mnc.descripcion AS descripcionMotivoNotaCredito,
+          mnd.descripcion AS descripcionMotivoNotaDebito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           'Contado' AS condicionPago,
           '009' AS codigoCondicionPago,
@@ -1229,6 +1239,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ${SQL_SELECT_USUARIO_VENTAS}
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN MotivoNotaCredito mnc ON mnc.idMotivoNotaCredito = v.idMotivoNotaCredito
+        LEFT JOIN MotivoNotaDebito mnd ON mnd.idMotivoNotaDebito = v.idMotivoNotaDebito
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList2})
         ${SQL_JOIN_USUARIO_VENTAS}
         WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList2})
@@ -1734,6 +1746,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       observaciones: cab.observaciones != null ? String(cab.observaciones).trim() : '',
       tipoComprobanteRef: cab.tipoComprobanteRef != null ? String(cab.tipoComprobanteRef).trim() : '',
       codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : '',
+      codigoMotivoNotaDebito: cab.codigoMotivoNotaDebito != null ? String(cab.codigoMotivoNotaDebito).trim() : '',
+      descripcionMotivoNotaCredito: cab.descripcionMotivoNotaCredito != null ? String(cab.descripcionMotivoNotaCredito).trim() : '',
+      descripcionMotivoNotaDebito: cab.descripcionMotivoNotaDebito != null ? String(cab.descripcionMotivoNotaDebito).trim() : '',
       eliminado: !!cab.eliminado,
       tieneDespachos: tieneDespachosPdf,
       tieneNotasCreditoDebito: tieneNotasCreditoDebitoPdf,

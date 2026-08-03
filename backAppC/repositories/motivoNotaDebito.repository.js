@@ -5,7 +5,7 @@ async function listar(pool, { buscar, pagina = 1, porPagina = 20 }) {
     const countResult = await pool.request()
         .input('buscar', sql.VarChar(150), buscar ? `%${buscar}%` : null)
         .query(`
-            SELECT COUNT(*) AS total FROM MotivoNotaCredito
+            SELECT COUNT(*) AS total FROM MotivoNotaDebito
             WHERE ISNULL(activo, 1) = 1
             AND (@buscar IS NULL OR descripcion LIKE @buscar OR codigoSunat LIKE @buscar)
         `);
@@ -16,8 +16,8 @@ async function listar(pool, { buscar, pagina = 1, porPagina = 20 }) {
         .input('offset', sql.Int, offset)
         .input('porPagina', sql.Int, porPagina)
         .query(`
-            SELECT idMotivoNotaCredito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
-            FROM MotivoNotaCredito
+            SELECT idMotivoNotaDebito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
+            FROM MotivoNotaDebito
             WHERE ISNULL(activo, 1) = 1
             AND (@buscar IS NULL OR descripcion LIKE @buscar OR codigoSunat LIKE @buscar)
             ORDER BY codigoSunat
@@ -27,13 +27,13 @@ async function listar(pool, { buscar, pagina = 1, porPagina = 20 }) {
     return { items: dataResult.recordset, total };
 }
 
-async function obtenerPorId(pool, idMotivoNotaCredito) {
+async function obtenerPorId(pool, idMotivoNotaDebito) {
     const result = await pool.request()
-        .input('idMotivoNotaCredito', sql.UniqueIdentifier, idMotivoNotaCredito)
+        .input('idMotivoNotaDebito', sql.UniqueIdentifier, idMotivoNotaDebito)
         .query(`
-            SELECT idMotivoNotaCredito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
-            FROM MotivoNotaCredito
-            WHERE idMotivoNotaCredito = @idMotivoNotaCredito
+            SELECT idMotivoNotaDebito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
+            FROM MotivoNotaDebito
+            WHERE idMotivoNotaDebito = @idMotivoNotaDebito
         `);
     return result.recordset[0] || null;
 }
@@ -42,8 +42,8 @@ async function obtenerPorCodigo(pool, codigoSunat) {
     const result = await pool.request()
         .input('codigoSunat', sql.VarChar(2), codigoSunat)
         .query(`
-            SELECT idMotivoNotaCredito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
-            FROM MotivoNotaCredito
+            SELECT idMotivoNotaDebito, codigoSunat, descripcion, ISNULL(activo, 1) AS activo
+            FROM MotivoNotaDebito
             WHERE codigoSunat = @codigoSunat AND ISNULL(activo, 1) = 1
         `);
     return result.recordset[0] || null;
@@ -54,31 +54,31 @@ async function crear(pool, { codigoSunat, descripcion }) {
         .input('codigoSunat', sql.VarChar(2), codigoSunat)
         .input('descripcion', sql.VarChar(150), descripcion)
         .query(`
-            INSERT INTO MotivoNotaCredito (codigoSunat, descripcion, activo)
-            OUTPUT INSERTED.idMotivoNotaCredito, INSERTED.codigoSunat, INSERTED.descripcion, INSERTED.activo
+            INSERT INTO MotivoNotaDebito (codigoSunat, descripcion, activo)
+            OUTPUT INSERTED.idMotivoNotaDebito, INSERTED.codigoSunat, INSERTED.descripcion, INSERTED.activo
             VALUES (@codigoSunat, @descripcion, 1)
         `);
     return result.recordset[0];
 }
 
-async function actualizar(pool, { idMotivoNotaCredito, codigoSunat, descripcion }) {
+async function actualizar(pool, { idMotivoNotaDebito, codigoSunat, descripcion }) {
     await pool.request()
-        .input('idMotivoNotaCredito', sql.UniqueIdentifier, idMotivoNotaCredito)
+        .input('idMotivoNotaDebito', sql.UniqueIdentifier, idMotivoNotaDebito)
         .input('codigoSunat', sql.VarChar(2), codigoSunat)
         .input('descripcion', sql.VarChar(150), descripcion)
         .query(`
-            UPDATE MotivoNotaCredito
+            UPDATE MotivoNotaDebito
             SET codigoSunat = @codigoSunat, descripcion = @descripcion
-            WHERE idMotivoNotaCredito = @idMotivoNotaCredito
+            WHERE idMotivoNotaDebito = @idMotivoNotaDebito
         `);
 }
 
-async function eliminar(pool, idMotivoNotaCredito) {
+async function eliminar(pool, idMotivoNotaDebito) {
     await pool.request()
-        .input('idMotivoNotaCredito', sql.UniqueIdentifier, idMotivoNotaCredito)
+        .input('idMotivoNotaDebito', sql.UniqueIdentifier, idMotivoNotaDebito)
         .query(`
-            DELETE FROM MotivoNotaCredito
-            WHERE idMotivoNotaCredito = @idMotivoNotaCredito
+            DELETE FROM MotivoNotaDebito
+            WHERE idMotivoNotaDebito = @idMotivoNotaDebito
         `);
 }
 

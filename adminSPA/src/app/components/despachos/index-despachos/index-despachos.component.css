@@ -35,15 +35,18 @@
 
 
 
-.card-body{
-    margin-left: 0px;
-    padding-left: 0px;
+.table-card > .card-body {
+  padding: 1.25rem 1.5rem;
 }
 
-.input-group{
-    margin-top: 10px;
-    width: 80%;
-    padding-left: 0px;
+.table-card > .card-body > p.text-muted {
+  margin-bottom: 1rem;
+}
+
+.table-card > .card-body > .input-group-lg {
+  margin-top: 0.25rem;
+  max-width: 100%;
+  width: 100%;
 }
 
 .select-empresa{

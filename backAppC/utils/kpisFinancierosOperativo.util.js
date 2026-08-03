@@ -1,10 +1,11 @@
 const sql = require('mssql');
 const { partesAhoraApp, partesFechaHoraEnTz, getAppTimezone } = require('./fechaDisplay.util');
+const GastosRepository = require('../repositories/gastos.repository');
 
 /**
  * KPIs financieros operativos compartidos (Inicio /dashboard y Análisis /analisis).
  * Ventas y costo desde Ventas + DetalleVenta; gastos operativos solo tabla Gastos
- * (evita doble conteo con egresos de caja que suelen duplicar gastos ya registrados).
+ * (incluye recurrentes mensuales; evita doble conteo con egresos de caja).
  */
 
 function fmtYmd(d) {
@@ -103,21 +104,10 @@ async function obtenerVentasPeriodo(pool, idEmpresa, fechaInicio, fechaFin) {
   return Number((r.recordset[0] || {}).ventasTotales || 0);
 }
 
-/** Gastos operativos del período (solo tabla Gastos). */
+/** Gastos operativos del período (puntuales + recurrentes activos por mes). */
 async function obtenerGastosOperativosPeriodo(pool, idEmpresa, fechaInicio, fechaFin) {
   try {
-    const r = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT ISNULL(SUM(monto), 0) AS total
-        FROM Gastos
-        WHERE idEmpresa = @idEmpresa
-          AND fecha >= @fechaInicio AND fecha <= @fechaFin
-      `);
-    return Number((r.recordset[0] || {}).total || 0);
+    return await GastosRepository.obtenerTotalGastosPeriodo(pool, idEmpresa, fechaInicio, fechaFin);
   } catch (_) {
     return 0;
   }
@@ -125,27 +115,11 @@ async function obtenerGastosOperativosPeriodo(pool, idEmpresa, fechaInicio, fech
 
 /** Gastos agrupados por mes (YYYY-MM) en un rango de fechas. */
 async function obtenerGastosAgrupadosPorMes(pool, idEmpresa, fechaInicio, fechaFin) {
-  const gastosPorPeriodo = {};
   try {
-    const rg = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT
-          CONCAT(YEAR(fecha), '-', RIGHT('0' + CAST(MONTH(fecha) AS VARCHAR(2)), 2)) AS periodo,
-          ISNULL(SUM(monto), 0) AS gastos
-        FROM Gastos
-        WHERE idEmpresa = @idEmpresa
-          AND fecha >= @fechaInicio AND fecha <= @fechaFin
-        GROUP BY YEAR(fecha), MONTH(fecha)
-      `);
-    (rg.recordset || []).forEach((row) => {
-      gastosPorPeriodo[row.periodo] = Number(row.gastos || 0);
-    });
-  } catch (_) {}
-  return gastosPorPeriodo;
+    return await GastosRepository.obtenerGastosAgrupadosPorMes(pool, idEmpresa, fechaInicio, fechaFin);
+  } catch (_) {
+    return {};
+  }
 }
 
 function calcularMargenesYVariaciones({

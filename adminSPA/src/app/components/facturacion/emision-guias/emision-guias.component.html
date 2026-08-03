@@ -168,34 +168,12 @@
                         <td class="small" data-label="Fecha">{{ row.fechaEmision.slice(0,10) || '—' }}</td>
                         <td data-label="Estado"><span [class]="claseEstado(row)">{{ etiquetaEstado(row) }}</span></td>
                         <td class="small" data-label="Doc. origen">{{ docOrigen(row) }}</td>
-                        <td class="text-end text-nowrap" data-label="Acciones">
-                          <!-- Editar: pendiente o error -->
-                          <a
-                            *ngIf="esEditable(row)"
-                            class="btn btn-sm btn-outline-warning me-1"
-                            [routerLink]="row.tipoDocumento === '31' ? ['/facturacion/guias-transportista'] : ['/facturacion/guias-remision']"
-                            [queryParams]="{ editar: row.idGuiaElectronica }"
-                            title="Editar datos de la guía (mismo correlativo)">
-                            <i class="bi bi-pencil"></i>
-                          </a>
-
-                          <!-- Enviar: solo si pendiente/error -->
-                          <button
-                            *ngIf="esPendiente(row)"
-                            type="button"
-                            class="btn btn-sm btn-outline-primary me-1"
-                            (click)="enviar(row)"
-                            [disabled]="enviandoId === row.idGuiaElectronica"
-                            title="Enviar a SUNAT">
-                            <span *ngIf="enviandoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
-                            <i *ngIf="enviandoId !== row.idGuiaElectronica" class="bi bi-send"></i>
-                          </button>
-
-                          <!-- Consultar ticket: solo si EN_PROCESO -->
+                        <td class="text-end text-nowrap eg-acciones" data-label="Acciones">
+                          <!-- Visibles: consultar estado (si aplica), imprimir, WhatsApp -->
                           <button
                             *ngIf="esEnProceso(row)"
                             type="button"
-                            class="btn btn-sm btn-warning me-1"
+                            class="btn btn-sm btn-warning"
                             (click)="consultarTicket(row)"
                             [disabled]="consultandoTicketId === row.idGuiaElectronica"
                             title="Consultar estado en SUNAT">
@@ -204,33 +182,8 @@
                           </button>
 
                           <button
-                            *ngIf="puedeConsultarEstadoSol(row)"
                             type="button"
-                            class="btn btn-sm btn-outline-dark me-1"
-                            (click)="consultarEstadoSol(row)"
-                            [disabled]="sincronizandoSolId === row.idGuiaElectronica"
-                            title="Sincronizar estado con SUNAT (CLAVE SOL). Use si dio de baja la guía en el portal y aquí sigue como aceptada.">
-                            <span *ngIf="sincronizandoSolId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
-                            <i *ngIf="sincronizandoSolId !== row.idGuiaElectronica" class="bi bi-cloud-arrow-down"></i>
-                          </button>
-
-                          <!-- Ver detalle -->
-                          <button
-                            type="button"
-                            class="btn btn-sm me-1"
-                            [class.btn-info]="guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica"
-                            [class.btn-secondary]="guiaSeleccionada?.idGuiaElectronica === row.idGuiaElectronica"
-                            (click)="verDetalle(row)"
-                            [disabled]="cargandoDetalle"
-                            title="Ver detalle">
-                            <span *ngIf="cargandoDetalle && guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
-                            <i *ngIf="!(cargandoDetalle && guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica)" class="bi bi-eye"></i>
-                          </button>
-
-                          <!-- Imprimir PDF (A4 o Ticket) -->
-                          <button
-                            type="button"
-                            class="btn btn-sm btn-outline-secondary me-1"
+                            class="btn btn-sm btn-outline-secondary"
                             (click)="abrirModalFormatoImpresion(row)"
                             [disabled]="imprimiendoId === row.idGuiaElectronica"
                             title="Imprimir (elegir formato)">
@@ -238,26 +191,95 @@
                             <i *ngIf="imprimiendoId !== row.idGuiaElectronica" class="bi bi-printer"></i>
                           </button>
 
-                          <!-- WhatsApp -->
                           <button
                             type="button"
-                            class="btn btn-sm btn-outline-success me-1"
+                            class="btn btn-sm btn-outline-success"
                             (click)="enviarWhatsapp(row)"
                             title="Enviar por WhatsApp">
                             <i class="bi bi-whatsapp"></i>
                           </button>
 
-                          <!-- Eliminar: solo si no está aceptada -->
-                          <button
-                            *ngIf="row.idEstadoSunat !== 1"
-                            type="button"
-                            class="btn btn-sm btn-outline-danger"
-                            (click)="eliminar(row)"
-                            [disabled]="eliminandoId === row.idGuiaElectronica"
-                            title="Eliminar">
-                            <span *ngIf="eliminandoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
-                            <i *ngIf="eliminandoId !== row.idGuiaElectronica" class="bi bi-trash"></i>
-                          </button>
+                          <!-- Resto en dropdown -->
+                          <div class="dropdown d-inline-block">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-secondary dropdown-toggle eg-btn-mas"
+                              data-bs-toggle="dropdown"
+                              aria-expanded="false"
+                              title="Más acciones">
+                              <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                              @if (esEditable(row)) {
+                                <li>
+                                  <a
+                                    class="dropdown-item"
+                                    [routerLink]="row.tipoDocumento === '31' ? ['/facturacion/guias-transportista'] : ['/facturacion/guias-remision']"
+                                    [queryParams]="{ editar: row.idGuiaElectronica }">
+                                    <i class="bi bi-pencil me-2 text-warning"></i> Editar
+                                  </a>
+                                </li>
+                              }
+                              @if (esPendiente(row)) {
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item"
+                                    (click)="enviar(row)"
+                                    [disabled]="enviandoId === row.idGuiaElectronica">
+                                    <i class="bi bi-send me-2 text-primary"></i>
+                                    @if (enviandoId === row.idGuiaElectronica) {
+                                      Enviando…
+                                    } @else {
+                                      Enviar a SUNAT
+                                    }
+                                  </button>
+                                </li>
+                              }
+                              <li>
+                                <button
+                                  type="button"
+                                  class="dropdown-item"
+                                  (click)="verDetalle(row)"
+                                  [disabled]="cargandoDetalle">
+                                  <i class="bi bi-eye me-2 text-info"></i> Ver detalle
+                                </button>
+                              </li>
+                              @if (puedeConsultarEstadoSol(row)) {
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item"
+                                    (click)="consultarEstadoSol(row)"
+                                    [disabled]="sincronizandoSolId === row.idGuiaElectronica">
+                                    <i class="bi bi-cloud-arrow-down me-2"></i>
+                                    @if (sincronizandoSolId === row.idGuiaElectronica) {
+                                      Sincronizando…
+                                    } @else {
+                                      Sincronizar con SUNAT (SOL)
+                                    }
+                                  </button>
+                                </li>
+                              }
+                              @if (row.idEstadoSunat !== 1) {
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item text-danger"
+                                    (click)="eliminar(row)"
+                                    [disabled]="eliminandoId === row.idGuiaElectronica">
+                                    <i class="bi bi-trash me-2"></i>
+                                    @if (eliminandoId === row.idGuiaElectronica) {
+                                      Eliminando…
+                                    } @else {
+                                      Eliminar
+                                    }
+                                  </button>
+                                </li>
+                              }
+                            </ul>
+                          </div>
                         </td>
                       </tr>
                     }

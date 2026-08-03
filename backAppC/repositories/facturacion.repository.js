@@ -816,10 +816,17 @@ exports.obtenerIdComprobantePorCodigoRepo = async (pool, idEmpresa, codigo, idSu
  * @returns {{ idVenta: number, idComprobanteElectronico: string } | null }
  */
 exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) => {
-  const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, items } = datos;
+  const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, codigoMotivoNotaDebito, items } = datos;
   if (!idComprobanteElectronicoOrigen || !["07", "08"].includes(String(tipoNota).trim()) || !Array.isArray(items) || items.length === 0) {
     return null;
   }
+  const motivoNotaCreditoRepository = require("./motivoNotaCredito.repository");
+  const motivoNotaDebitoRepository = require("./motivoNotaDebito.repository");
+  const normalizarCodigoMotivo = (raw, fallback) => {
+    let c = String(raw || fallback || "01").trim();
+    if (c.length === 1) c = `0${c}`;
+    return c.slice(0, 2);
+  };
   const transaction = pool.transaction();
   try {
     await transaction.begin();
@@ -898,15 +905,41 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
     insertVenta.input("observaciones", sql.VarChar(500), "");
     insertVenta.input("idUsuario", sql.UniqueIdentifier, idUsuario);
     insertVenta.input("tipoComprobanteRef", sql.VarChar(2), ceOrigen.tipoComprobante || null);
-    insertVenta.input("codigoMotivoNotaCredito", sql.VarChar(2), tipoNota === "07" ? (codigoMotivoNotaCredito || "01") : null);
+
+    let codigoMotivoNc = null;
+    let codigoMotivoNd = null;
+    let idMotivoNc = null;
+    let idMotivoNd = null;
+    if (tn === "07") {
+      codigoMotivoNc = normalizarCodigoMotivo(codigoMotivoNotaCredito, "01");
+      const motivoNc = await motivoNotaCreditoRepository.obtenerPorCodigo(pool, codigoMotivoNc);
+      if (!motivoNc) {
+        await transaction.rollback();
+        throw new Error(`Motivo de nota de crédito ${codigoMotivoNc} no existe en el catálogo global (Catálogo 09).`);
+      }
+      idMotivoNc = motivoNc.idMotivoNotaCredito;
+    } else {
+      codigoMotivoNd = normalizarCodigoMotivo(codigoMotivoNotaDebito || codigoMotivoNotaCredito, "01");
+      const motivoNd = await motivoNotaDebitoRepository.obtenerPorCodigo(pool, codigoMotivoNd);
+      if (!motivoNd) {
+        await transaction.rollback();
+        throw new Error(`Motivo de nota de débito ${codigoMotivoNd} no existe en el catálogo global (Catálogo 10).`);
+      }
+      idMotivoNd = motivoNd.idMotivoNotaDebito;
+    }
+
+    insertVenta.input("codigoMotivoNotaCredito", sql.VarChar(2), codigoMotivoNc);
+    insertVenta.input("codigoMotivoNotaDebito", sql.VarChar(2), codigoMotivoNd);
+    insertVenta.input("idMotivoNotaCredito", sql.UniqueIdentifier, idMotivoNc);
+    insertVenta.input("idMotivoNotaDebito", sql.UniqueIdentifier, idMotivoNd);
 
     const ventaInsertResult = await insertVenta.query(`
       DECLARE @ins TABLE (idVenta INT);
       INSERT INTO Ventas (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio,
-        subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito)
+        subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito, codigoMotivoNotaDebito, idMotivoNotaCredito, idMotivoNotaDebito)
       OUTPUT INSERTED.idVenta INTO @ins
       VALUES (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fEmision, @idCliente, @idMoneda, @tCambio,
-        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 2, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito);
+        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 2, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito, @codigoMotivoNotaDebito, @idMotivoNotaCredito, @idMotivoNotaDebito);
       SELECT idVenta FROM @ins;
     `);
     const idVenta = ventaInsertResult.recordset && ventaInsertResult.recordset[0] && ventaInsertResult.recordset[0].idVenta;
@@ -1705,12 +1738,19 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
       serieRef: parts[0] || "",
       numeroRef: parts.length >= 2 ? parts[1].replace(/\D/g, "") : ""
     };
+    const esNc = comp.tipoComprobante === "07";
     const motivo = {
-      codigo: (venta.codigoMotivoNotaCredito || "01").trim(),
-      descripcion: comp.tipoComprobante === "07" ? "Anulación de la operación" : "Otros conceptos"
+      codigo: (esNc
+        ? (venta.codigoMotivoNotaCredito || "01")
+        : (venta.codigoMotivoNotaDebito || venta.codigoMotivoNotaCredito || "01")
+      ).trim(),
+      descripcion: (esNc
+        ? (venta.descripcionMotivoNotaCredito || "Anulación de la operación")
+        : (venta.descripcionMotivoNotaDebito || "Intereses por mora")
+      ).trim()
     };
     const payloadNota = { ...payload, documentoReferencia, motivo };
-    xml = comp.tipoComprobante === "07"
+    xml = esNc
       ? generadorXmlUblSunat.generarXmlUblCreditNote(payloadNota, numeroComprobante)
       : generadorXmlUblSunat.generarXmlUblDebitNote(payloadNota, numeroComprobante);
   } else {
@@ -1880,12 +1920,19 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
         serieRef: parts[0] || "",
         numeroRef: parts.length >= 2 ? parts[1].replace(/\D/g, "") : ""
       };
+      const esNc = comp.tipoComprobante === "07";
       const motivo = {
-        codigo: (venta.codigoMotivoNotaCredito || "01").trim(),
-        descripcion: comp.tipoComprobante === "07" ? "Anulación de la operación" : "Otros conceptos"
+        codigo: (esNc
+          ? (venta.codigoMotivoNotaCredito || "01")
+          : (venta.codigoMotivoNotaDebito || venta.codigoMotivoNotaCredito || "01")
+        ).trim(),
+        descripcion: (esNc
+          ? (venta.descripcionMotivoNotaCredito || "Anulación de la operación")
+          : (venta.descripcionMotivoNotaDebito || "Intereses por mora")
+        ).trim()
       };
       const payloadNota = { ...payload, documentoReferencia, motivo };
-      xml = comp.tipoComprobante === "07"
+      xml = esNc
         ? generadorXmlUblSunat.generarXmlUblCreditNote(payloadNota, numeroComprobante)
         : generadorXmlUblSunat.generarXmlUblDebitNote(payloadNota, numeroComprobante);
     } else {

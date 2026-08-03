@@ -108,11 +108,17 @@ exports.revocarPorTokenRaw = async (pool, rawRefresh) => {
   const row = await sesionRefreshTokenRepository.buscarActivoPorHash(pool, h);
   if (row) {
     await sesionRefreshTokenRepository.marcarRevocado(pool, row.idRefresh);
+    try {
+      require('../middlewares/autenticate').invalidateSessionCache(row.idRefresh, row.idUsuario, row.idEmpresa);
+    } catch (_) { /* ignore */ }
   }
 };
 
 exports.revocarTodosUsuarioEmpresa = async (pool, idUsuario, idEmpresa) => {
   await sesionRefreshTokenRepository.revocarTodosUsuarioEmpresa(pool, idUsuario, idEmpresa);
+  try {
+    require('../middlewares/autenticate').invalidateSessionCache('', idUsuario, idEmpresa);
+  } catch (_) { /* ignore */ }
 };
 
 exports.revocarTodosPorEmpresa = async (pool, idEmpresa) => {
@@ -163,6 +169,9 @@ exports.revocarSesionDispositivo = async (pool, idRefresh, idUsuario, idEmpresa)
   if (!n) {
     throw new Error('SESION_NO_ENCONTRADA');
   }
+  try {
+    require('../middlewares/autenticate').invalidateSessionCache(idRefresh, idUsuario, idEmpresa);
+  } catch (_) { /* ignore */ }
 };
 
 /**

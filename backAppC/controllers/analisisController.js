@@ -253,14 +253,14 @@ const obtenerDiagnosticoFinanciero = async (req, res) => {
   }
 };
 
-// Gastos (para an?lisis financiero: gastos operativos por per?odo)
+// Gastos (puntuales y recurrentes para análisis financiero)
 const listarGastos = async (req, res) => {
   try {
     const { fechaDesde, fechaHasta } = req.query;
-    const list = await withPool(async (pool) =>
+    const data = await withPool(async (pool) =>
       GastosService.listarPorPeriodo(pool, req.user, fechaDesde, fechaHasta)
     );
-    res.status(200).send({ data: list });
+    res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
       return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -278,11 +278,39 @@ const crearGasto = async (req, res) => {
     if (error.message === 'NO_ACCESS') {
       return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
-    if (error.message && error.message.includes('monto')) {
+    if (error.message && (
+      error.message.includes('monto') ||
+      error.message.includes('fecha') ||
+      error.message.includes('Tipo')
+    )) {
       return res.status(400).send({ message: error.message, data: undefined });
     }
     console.error('Error crear gasto:', error);
     res.status(500).send({ message: 'Error al registrar gasto', data: undefined });
+  }
+};
+
+const actualizarGasto = async (req, res) => {
+  try {
+    const { idGasto } = req.params;
+    const row = await withPool(async (pool) =>
+      GastosService.actualizar(pool, req.user, idGasto, req.body)
+    );
+    res.status(200).send({ data: row });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message && (
+      error.message.includes('monto') ||
+      error.message.includes('fecha') ||
+      error.message.includes('Tipo') ||
+      error.message.includes('no encontrado')
+    )) {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
+    console.error('Error actualizar gasto:', error);
+    res.status(500).send({ message: 'Error al actualizar gasto', data: undefined });
   }
 };
 
@@ -314,5 +342,6 @@ module.exports = {
   obtenerDiagnosticoFinanciero,
   listarGastos,
   crearGasto,
+  actualizarGasto,
   eliminarGasto
 };

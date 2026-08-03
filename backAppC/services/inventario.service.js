@@ -551,7 +551,7 @@ exports.obtenerTiposMovimiento = () => {
 /**
  * Stock actual por producto (Lotes agregados). Requiere VER_INVENTARIO o Administrador.
  * Query: idSucursal?, idUbicacion? (stock en esa ubicación; requiere INVENTARIO_CONTROL_UBICACIONES y idSucursal),
- * categoria?, marca?, filtroStock=todos|cero|minimo, buscar?,
+ * categoria?, marca?, filtroStock=todos|cero|minimo|negativos, buscar?,
  * catalogoConteoFisico=1|true|si — incluye productos inactivos (solo catálogo conteo físico; mismo permiso VER_INVENTARIO).
  */
 exports.obtenerStockActual = async (user, query) => {
@@ -571,7 +571,9 @@ exports.obtenerStockActual = async (user, query) => {
       ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
     ];
     const filtroStockRaw = (query.filtroStock || 'todos').toString().toLowerCase();
-    const filtroStock = ['todos', 'cero', 'minimo'].includes(filtroStockRaw) ? filtroStockRaw : 'todos';
+    const filtroStock = ['todos', 'cero', 'minimo', 'negativos'].includes(filtroStockRaw)
+      ? filtroStockRaw
+      : 'todos';
     const rawCatConteo = query.catalogoConteoFisico != null ? String(query.catalogoConteoFisico).trim().toLowerCase() : '';
     const incluirInactivos =
       rawCatConteo === '1' || rawCatConteo === 'true' || rawCatConteo === 'si' || rawCatConteo === 'yes';
@@ -693,6 +695,13 @@ exports.obtenerProductosVendidos = async (user, query) => {
       query.agrupar === '1' ||
       query.agrupar === 'true' ||
       String(query.agrupar || '').toLowerCase() === 'si';
+    const soloNoVendidosRaw = String(query.soloNoVendidos || query.modo || '').toLowerCase();
+    const soloNoVendidos =
+      soloNoVendidosRaw === '1' ||
+      soloNoVendidosRaw === 'true' ||
+      soloNoVendidosRaw === 'si' ||
+      soloNoVendidosRaw === 'novendidos' ||
+      soloNoVendidosRaw === 'no_vendidos';
     let idCliente = query.idCliente;
     if (idCliente === '' || idCliente === undefined) {
       idCliente = null;
@@ -707,7 +716,8 @@ exports.obtenerProductosVendidos = async (user, query) => {
       categoriaLike: query.categoria || null,
       productoLike: query.producto || null,
       agrupar,
-      buscar: query.buscar || null
+      buscar: query.buscar || null,
+      soloNoVendidos
     });
   });
 };
@@ -740,6 +750,13 @@ exports.obtenerProductosComprados = async (user, query) => {
       query.agrupar === '1' ||
       query.agrupar === 'true' ||
       String(query.agrupar || '').toLowerCase() === 'si';
+    const soloNoCompradosRaw = String(query.soloNoComprados || query.modo || '').toLowerCase();
+    const soloNoComprados =
+      soloNoCompradosRaw === '1' ||
+      soloNoCompradosRaw === 'true' ||
+      soloNoCompradosRaw === 'si' ||
+      soloNoCompradosRaw === 'nocomprados' ||
+      soloNoCompradosRaw === 'no_comprados';
     let idProveedor = query.idProveedor;
     if (idProveedor === '' || idProveedor === undefined) {
       idProveedor = null;
@@ -756,9 +773,11 @@ exports.obtenerProductosComprados = async (user, query) => {
       proveedorRucLike: query.proveedorRuc || null,
       proveedorRazonLike: query.proveedorRazon || null,
       idComprobante,
+      categoriaLike: query.categoria || null,
       productoLike: query.producto || null,
       agrupar,
-      buscar: query.buscar || null
+      buscar: query.buscar || null,
+      soloNoComprados
     });
   });
 };

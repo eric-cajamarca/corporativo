@@ -152,6 +152,8 @@ export class MovimientoInventarioService {
     producto?: string | null;
     agrupar: boolean;
     buscar?: string | null;
+    /** true = productos activos sin ventas en el período */
+    soloNoVendidos?: boolean;
   }): Observable<ProductosVendidosResponse> {
     let hp = new HttpParams()
       .set('fechaDesde', params.fechaDesde)
@@ -163,6 +165,7 @@ export class MovimientoInventarioService {
     if (params.categoria?.trim()) hp = hp.set('categoria', params.categoria.trim());
     if (params.producto?.trim()) hp = hp.set('producto', params.producto.trim());
     if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
+    if (params.soloNoVendidos) hp = hp.set('soloNoVendidos', '1');
     return this.http.get<ProductosVendidosResponse>(this.baseUrl + 'productos-vendidos', {
       params: hp,
       withCredentials: true
@@ -176,6 +179,7 @@ export class MovimientoInventarioService {
     proveedorRuc?: string | null;
     proveedorRazon?: string | null;
     idComprobante?: string | null;
+    categoria?: string | null;
     producto?: string | null;
     agrupar: boolean;
     buscar?: string | null;
@@ -188,6 +192,7 @@ export class MovimientoInventarioService {
     if (params.proveedorRuc?.trim()) hp = hp.set('proveedorRuc', params.proveedorRuc.trim());
     if (params.proveedorRazon?.trim()) hp = hp.set('proveedorRazon', params.proveedorRazon.trim());
     if (params.idComprobante?.trim()) hp = hp.set('idComprobante', params.idComprobante.trim());
+    if (params.categoria?.trim()) hp = hp.set('categoria', params.categoria.trim());
     if (params.producto?.trim()) hp = hp.set('producto', params.producto.trim());
     if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
     return this.http.get<ProductosCompradosResponse>(this.baseUrl + 'productos-comprados', {
@@ -206,7 +211,7 @@ export class MovimientoInventarioService {
     codigoUbicacionConteo?: string | null;
     categoria?: string | null;
     marca?: string | null;
-    filtroStock?: 'todos' | 'cero' | 'minimo';
+    filtroStock?: 'todos' | 'cero' | 'minimo' | 'negativos';
     buscar?: string | null;
     /** Catálogo conteo físico: incluye productos inactivos (mismo permiso que stock actual). */
     catalogoConteoFisico?: boolean;

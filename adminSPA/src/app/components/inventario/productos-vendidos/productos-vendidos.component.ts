@@ -8,15 +8,23 @@ import { MovimientoInventarioService } from '../../../services/movimiento-invent
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { CategoriaService } from '../../../services/categoria.service';
+import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 import { ProductoVendidoFila, ProductosVendidosTotales } from '../../../models/productos-vendidos.model';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
 
+interface CategoriaOpcion {
+  idCategoria: string | number;
+  nombre: string;
+}
+
 @Component({
   selector: 'app-productos-vendidos',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent],
   templateUrl: './productos-vendidos.component.html',
   styleUrl: './productos-vendidos.component.css'
 })
@@ -25,20 +33,32 @@ export class ProductosVendidosComponent implements OnInit {
   private inventarioService = inject(MovimientoInventarioService);
   private excelService = inject(ExcelService);
   private pdfService = inject(PdfService);
+  private buscadorProductosModal = inject(BuscadorProductosModalService);
+  private categoriaService = inject(CategoriaService);
 
   fechaDesde = '';
   fechaHasta = '';
+  idCliente = '';
   clienteRuc = '';
   clienteRazon = '';
   filtroCategoria = '';
   filtroProducto = '';
   agrupar = false;
+  /** false = vendidos, true = no vendidos en el período */
+  soloNoVendidos = false;
   buscar = '';
 
   items: ProductoVendidoFila[] = [];
   totales: ProductosVendidosTotales = { cantidad: 0, costo: 0, venta: 0, utilidad: 0 };
   cargando = false;
   mostrarColumnaEmpresa = false;
+
+  mostrarModalCliente = false;
+  mostrarModalCategoria = false;
+  categorias: CategoriaOpcion[] = [];
+  categoriasFiltradas: CategoriaOpcion[] = [];
+  buscarCategoriaModal = '';
+  cargandoCategorias = false;
 
   private buscarSubject = new Subject<string>();
 
@@ -64,12 +84,14 @@ export class ProductosVendidosComponent implements OnInit {
       .obtenerProductosVendidos({
         fechaDesde: this.fechaDesde,
         fechaHasta: this.fechaHasta,
+        idCliente: this.idCliente || null,
         clienteRuc: this.clienteRuc || null,
         clienteRazon: this.clienteRazon || null,
         categoria: this.filtroCategoria || null,
         producto: this.filtroProducto || null,
-        agrupar: this.agrupar,
-        buscar: this.buscar || null
+        agrupar: this.soloNoVendidos ? true : this.agrupar,
+        buscar: this.buscar || null,
+        soloNoVendidos: this.soloNoVendidos
       })
       .subscribe({
         next: (res) => {
@@ -93,7 +115,18 @@ export class ProductosVendidosComponent implements OnInit {
     this.cargar();
   }
 
+  setModoVendidos(noVendidos: boolean): void {
+    this.soloNoVendidos = noVendidos;
+    this.cargar();
+  }
+
+  onClienteManual(): void {
+    this.idCliente = '';
+    this.cargar();
+  }
+
   todosCliente(): void {
+    this.idCliente = '';
     this.clienteRuc = '';
     this.clienteRazon = '';
     this.cargar();
@@ -105,6 +138,7 @@ export class ProductosVendidosComponent implements OnInit {
   }
 
   setAgrupar(v: boolean): void {
+    if (this.soloNoVendidos) return;
     this.agrupar = v;
     this.cargar();
   }
@@ -113,16 +147,100 @@ export class ProductosVendidosComponent implements OnInit {
     const hoy = getFechaHoyLocal();
     this.fechaDesde = hoy;
     this.fechaHasta = hoy;
+    this.idCliente = '';
     this.clienteRuc = '';
     this.clienteRazon = '';
     this.filtroCategoria = '';
     this.filtroProducto = '';
     this.agrupar = false;
+    this.soloNoVendidos = false;
     this.buscar = '';
     this.cargar();
   }
 
+  abrirModalCliente(): void {
+    this.mostrarModalCliente = true;
+  }
+
+  cerrarModalCliente(): void {
+    this.mostrarModalCliente = false;
+  }
+
+  seleccionarCliente(cliente: {
+    idCliente?: string | number;
+    id?: string | number;
+    ruc?: string;
+    rSocial?: string;
+    r_Social?: string;
+    nombre?: string;
+  }): void {
+    this.idCliente = String(cliente?.idCliente ?? cliente?.id ?? '').trim();
+    this.clienteRuc = String(cliente?.ruc ?? '').trim();
+    this.clienteRazon = String(cliente?.rSocial ?? cliente?.r_Social ?? cliente?.nombre ?? '').trim();
+    this.cerrarModalCliente();
+    this.cargar();
+  }
+
+  abrirModalCategoria(): void {
+    this.mostrarModalCategoria = true;
+    this.buscarCategoriaModal = '';
+    if (!this.categorias.length) {
+      this.cargarCategorias();
+    } else {
+      this.filtrarCategoriasModal();
+    }
+  }
+
+  cerrarModalCategoria(): void {
+    this.mostrarModalCategoria = false;
+  }
+
+  private cargarCategorias(): void {
+    this.cargandoCategorias = true;
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        this.categorias = raw
+          .map((c: { idCategoria?: string | number; nombre?: string }) => ({
+            idCategoria: c.idCategoria ?? '',
+            nombre: String(c.nombre || '').trim()
+          }))
+          .filter((c: CategoriaOpcion) => !!c.nombre)
+          .sort((a: CategoriaOpcion, b: CategoriaOpcion) => a.nombre.localeCompare(b.nombre, 'es'));
+        this.filtrarCategoriasModal();
+        this.cargandoCategorias = false;
+      },
+      error: () => {
+        this.categorias = [];
+        this.categoriasFiltradas = [];
+        this.cargandoCategorias = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las categorías', position: 'topRight' });
+      }
+    });
+  }
+
+  filtrarCategoriasModal(): void {
+    const q = this.buscarCategoriaModal.trim().toLowerCase();
+    this.categoriasFiltradas = !q
+      ? [...this.categorias]
+      : this.categorias.filter((c) => c.nombre.toLowerCase().includes(q));
+  }
+
+  seleccionarCategoria(cat: CategoriaOpcion): void {
+    this.filtroCategoria = cat.nombre;
+    this.cerrarModalCategoria();
+    this.cargar();
+  }
+
+  async abrirBuscadorProducto(): Promise<void> {
+    const p = await this.buscadorProductosModal.abrir({ modo: 'catalogo' });
+    if (!p) return;
+    this.filtroProducto = String(p.codigo || p.descripcion || '').trim();
+    this.cargar();
+  }
+
   exportarExcel(): void {
+    const titulo = this.soloNoVendidos ? 'Productos no vendidos' : 'Productos vendidos';
     const cols = this.mostrarColumnaEmpresa
       ? ['#', 'Fecha', 'Producto', 'Empresa', 'Cantidad', 'Costo', 'Venta', 'Utilidad']
       : ['#', 'Fecha', 'Producto', 'Cantidad', 'Costo', 'Venta', 'Utilidad'];
@@ -146,9 +264,9 @@ export class ProductosVendidosComponent implements OnInit {
       this.totales.utilidad
     ]);
     const excelData: ExcelData = {
-      title: 'Productos vendidos',
-      filename: `productos_vendidos_${Date.now()}`,
-      worksheetName: 'Vendidos',
+      title: titulo,
+      filename: `${this.soloNoVendidos ? 'productos_no_vendidos' : 'productos_vendidos'}_${Date.now()}`,
+      worksheetName: this.soloNoVendidos ? 'No vendidos' : 'Vendidos',
       columns: cols,
       rows
     };
@@ -164,6 +282,7 @@ export class ProductosVendidosComponent implements OnInit {
   }
 
   exportarPdf(): void {
+    const titulo = this.soloNoVendidos ? 'Productos no vendidos' : 'Productos vendidos';
     const columnas = this.mostrarColumnaEmpresa
       ? ['#', 'Fecha', 'Producto', 'Empresa', 'Cantidad', 'Costo', 'Venta', 'Utilidad']
       : ['#', 'Fecha', 'Producto', 'Cantidad', 'Costo', 'Venta', 'Utilidad'];
@@ -177,10 +296,13 @@ export class ProductosVendidosComponent implements OnInit {
     });
     filas.push(['Total', '', '', ...(this.mostrarColumnaEmpresa ? [''] : []), this.totales.cantidad, this.totales.costo, this.totales.venta, this.totales.utilidad]);
     this.pdfService
-      .generarPdfDinamico({ titulo: 'Productos vendidos', columnas, filas }, 'lista-compras', 8)
+      .generarPdfDinamico({ titulo, columnas, filas }, 'lista-compras', 8)
       .subscribe({
         next: (blob) => {
-          this.pdfService.descargar(blob, `productos_vendidos_${Date.now()}.pdf`);
+          this.pdfService.descargar(
+            blob,
+            `${this.soloNoVendidos ? 'productos_no_vendidos' : 'productos_vendidos'}_${Date.now()}.pdf`
+          );
           iziToast.success({ title: 'PDF', message: 'Generado correctamente', position: 'topRight' });
         },
         error: () => {

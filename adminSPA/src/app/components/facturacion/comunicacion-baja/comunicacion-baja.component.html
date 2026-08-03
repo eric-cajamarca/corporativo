@@ -6,114 +6,17 @@
     </div>
 
     <div class="card shadow-sm mb-3">
-      <div class="card-header bg-light">
-        <h6 class="mb-0">Comprobantes aceptados a dar de baja</h6>
+      <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h6 class="mb-0">Dar de baja un comprobante</h6>
+        <button type="button" class="btn btn-primary btn-sm" (click)="abrirModalBuscarBaja()">
+          <i class="bi bi-search me-1"></i> Buscar comprobante a dar de baja
+        </button>
       </div>
       <div class="card-body">
-        <p class="small text-muted mb-2">Seleccione los comprobantes y el motivo; luego pulse "Enviar comunicación de baja".</p>
-        <div class="row mb-3 g-2 align-items-end">
-          <div class="col-md-4">
-            <label class="form-label small">Motivo por defecto</label>
-            <select class="form-select form-select-sm" [(ngModel)]="motivoDefault">
-              @for (m of motivos; track m.idMotivoBaja) {
-                <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
-              }
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small">Buscar comprobante</label>
-            <div class="input-group input-group-sm">
-              <input type="text" class="form-control" placeholder="Serie-número, ej. F001-00000038"
-                     [(ngModel)]="filtroComprobante" (keyup.enter)="buscarComprobantes()">
-              <button type="button" class="btn btn-primary" (click)="buscarComprobantes()" [disabled]="loadingComprobantes">
-                <i class="bi bi-search"></i>
-              </button>
-              @if (filtroComprobante.trim()) {
-                <button type="button" class="btn btn-outline-secondary" (click)="limpiarFiltroComprobante()" [disabled]="loadingComprobantes" title="Limpiar búsqueda">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              }
-            </div>
-          </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button type="button" class="btn btn-outline-secondary btn-sm w-100" (click)="cargarComprobantes()" [disabled]="loadingComprobantes">
-              <i class="bi bi-arrow-clockwise"></i> Actualizar
-            </button>
-          </div>
-        </div>
-        @if (loadingComprobantes) {
-          <p class="small text-muted"><i class="bi bi-hourglass-split"></i> Cargando comprobantes...</p>
-        } @else if (totalComprobantes === 0) {
-          <p class="small text-muted">
-            @if (filtroComprobante.trim()) {
-              No hay comprobantes que coincidan con «{{ filtroComprobante.trim() }}».
-            } @else {
-              No hay facturas o notas (01/07/08) en estado Aceptado para dar de baja.
-            }
-          </p>
-        } @else {
-          <div class="table-responsive">
-            <table class="table table-sm table-hover table-bordered table-comunicacion-baja-comprobantes-responsive">
-              <thead class="table-light">
-                <tr>
-                  <th style="width:2.5rem"></th>
-                  <th>Tipo</th>
-                  <th>Serie-Número</th>
-                  <th>Fecha emisión</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (c of comprobantes; track c.idComprobanteElectronico) {
-                  <tr>
-                    <td data-label="Seleccionar">
-                      <input type="checkbox" class="form-check-input" [checked]="estaSeleccionado(c.idComprobanteElectronico)"
-                             (change)="toggleSeleccion(c.idComprobanteElectronico)">
-                    </td>
-                    <td data-label="Tipo">{{ tipoDocLabel(c.tipoComprobante) }}</td>
-                    <td data-label="Serie-Núm.">{{ c.serie }}-{{ c.numero }}</td>
-                    <td data-label="Fecha">{{ c.fechaEmision }}</td>
-                    <td data-label="Motivo">
-                      @if (estaSeleccionado(c.idComprobanteElectronico)) {
-                        <select class="form-select form-select-sm" style="max-width:220px"
-                                [ngModel]="motivoPorComprobante[c.idComprobanteElectronico]"
-                                (ngModelChange)="motivoPorComprobante[c.idComprobanteElectronico]=$event">
-                          @for (m of motivos; track m.idMotivoBaja) {
-                            <option [value]="m.descripcion">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
-                          }
-                        </select>
-                      } @else {
-                        <span class="text-muted">—</span>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          @if (totalComprobantes > porPaginaComprobantes) {
-            <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
-              <span class="text-muted small">
-                Mostrando {{ (paginaComprobantes - 1) * porPaginaComprobantes + 1 }} – {{ min(paginaComprobantes * porPaginaComprobantes, totalComprobantes) }} de {{ totalComprobantes }}
-              </span>
-              <ngb-pagination
-                [(page)]="paginaComprobantes"
-                [pageSize]="porPaginaComprobantes"
-                [collectionSize]="totalComprobantes"
-                [maxSize]="5"
-                [rotate]="true"
-                [boundaryLinks]="true"
-                class="mb-0"
-                (pageChange)="onPaginaComprobantesChange($event)">
-              </ngb-pagination>
-            </div>
-          }
-        }
-        @if (!loadingComprobantes && seleccionados.size > 0) {
-          <button type="button" class="btn btn-primary mt-3" (click)="enviarBaja()" [disabled]="enviando">
-            @if (enviando) { Enviando... } @else { Enviar comunicación de baja ({{ seleccionados.size }} comprobante(s)) }
-          </button>
-        }
+        <p class="small text-muted mb-0">
+          Busque por <strong>serie</strong> y <strong>número</strong> el comprobante aceptado (factura o nota) y délo de baja
+          <strong>uno a uno</strong>.
+        </p>
       </div>
     </div>
 
@@ -162,7 +65,7 @@
                 <tr class="cb-historial-row" (click)="abrirModalDescripcion(item)" role="button" tabindex="0"
                     (keydown.enter)="abrirModalDescripcion(item)" (keydown.space)="$event.preventDefault(); abrirModalDescripcion(item)"
                     title="Clic para ver la descripción completa">
-                  <td data-label="Fecha">{{ item.fechaComunicacion }}</td>
+                  <td data-label="Fecha">{{ formatearFechaHistorial(item.fechaComunicacion) }}</td>
                   <td data-label="Correlativo">{{ item.numeroCorrelativo }}</td>
                   <td class="small" data-label="Ticket">{{ item.ticketSunat || '—' }}</td>
                   <td data-label="Estado">{{ descripcionEstado(item) }}</td>
@@ -269,8 +172,98 @@
           </div>
         }
         @if (totalListado === 0) {
-          <p class="small text-muted mb-0 mt-2">No hay comunicaciones de baja en el rango indicado.</p>
+          <p class="small text-muted mb-0 mt-2">No hay comunicaciones de baja registradas.</p>
         }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: buscar y dar de baja un comprobante -->
+<div class="modal fade" id="modalBuscarBaja" tabindex="-1" aria-labelledby="modalBuscarBajaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalBuscarBajaLabel">Buscar comprobante a dar de baja</h5>
+        <button type="button" class="btn-close" (click)="cerrarModalBuscarBaja()" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Ingrese serie y número. Solo puede dar de baja un comprobante por envío.</p>
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-3">
+            <label class="form-label small mb-0">Serie</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="modalSerie"
+                   placeholder="F001" (keydown.enter)="buscarComprobanteEnModal()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-0">Número</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="modalNumero"
+                   placeholder="00000038" (keydown.enter)="buscarComprobanteEnModal()">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-0">Motivo</label>
+            <select class="form-select form-select-sm" [(ngModel)]="motivoDefault">
+              @for (m of motivos; track m.idMotivoBaja) {
+                <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-outline-primary btn-sm w-100"
+                    (click)="buscarComprobanteEnModal()" [disabled]="loadingComprobantes">
+              <i class="bi bi-search me-1"></i> Buscar
+            </button>
+          </div>
+        </div>
+
+        @if (loadingComprobantes) {
+          <p class="small text-muted mb-0"><i class="bi bi-hourglass-split"></i> Buscando…</p>
+        } @else if (busquedaModalRealizada && comprobantes.length === 0) {
+          <p class="small text-warning mb-0">No se encontró un comprobante aceptado con esa serie y número.</p>
+        } @else if (comprobantes.length > 0) {
+          <div class="table-responsive">
+            <table class="table table-sm table-hover table-bordered mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:2.5rem"></th>
+                  <th>Tipo</th>
+                  <th>Serie-Número</th>
+                  <th>Fecha emisión</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of comprobantes; track c.idComprobanteElectronico) {
+                  <tr (click)="seleccionarComprobanteBaja(c)" role="button" class="cb-modal-row"
+                      [class.table-primary]="comprobanteSeleccionadoId === c.idComprobanteElectronico">
+                    <td>
+                      <input type="radio" class="form-check-input" name="comprobanteBaja"
+                             [checked]="comprobanteSeleccionadoId === c.idComprobanteElectronico"
+                             (change)="seleccionarComprobanteBaja(c)"
+                             (click)="$event.stopPropagation()">
+                    </td>
+                    <td>{{ tipoDocLabel(c.tipoComprobante) }}</td>
+                    <td>{{ c.serie }}-{{ c.numero }}</td>
+                    <td>{{ c.fechaEmision }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalBuscarBaja()" [disabled]="enviando">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-primary btn-sm"
+                (click)="enviarBajaUno()"
+                [disabled]="enviando || !comprobanteSeleccionadoId">
+          @if (enviando) {
+            Enviando…
+          } @else {
+            Dar de baja
+          }
+        </button>
       </div>
     </div>
   </div>

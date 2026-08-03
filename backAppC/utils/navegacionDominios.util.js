@@ -391,8 +391,8 @@ function construirNavegacionPorDominios(ctx) {
         { nombre: 'Tipo Movimientos', ruta: '/catalogos/tipo-movimientos', permiso: 'VER_CONFIGURACION', visible: true },
         { nombre: 'Conceptos', ruta: '/catalogos/conceptos', permiso: 'VER_CONFIGURACION', visible: true },
         { nombre: 'Clasificación Conceptos', ruta: '/catalogos/clasificacion-conceptos', permiso: 'VER_CONFIGURACION', visible: true },
-        { nombre: 'Motivo Traslado', ruta: '/catalogos/motivo-traslado', permiso: 'VER_CONFIGURACION', visible: true },
-        { nombre: 'Motivo Nota Credito', ruta: '/catalogos/motivo-nota-credito', permiso: 'VER_CONFIGURACION', visible: true }
+        { nombre: 'Motivo Traslado', ruta: '/catalogos/motivo-traslado', permiso: 'VER_CONFIGURACION', visible: false },
+        { nombre: 'Motivo Nota Credito', ruta: '/catalogos/motivo-nota-credito', permiso: 'VER_CONFIGURACION', visible: false }
       ]
     });
 

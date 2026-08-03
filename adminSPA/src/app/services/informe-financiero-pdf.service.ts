@@ -89,7 +89,21 @@ export class InformeFinancieroPdfService {
         catchError(() => of(null))
       ),
       gastos: this.analisisService.listarGastos(rango.fechaInicio, rango.fechaFin).pipe(
-        map((r) => (Array.isArray(r.data) ? r.data : [])),
+        map((r) => {
+          const data = r?.data;
+          if (Array.isArray(data)) return data;
+          const delPeriodo = Array.isArray(data?.delPeriodo) ? data.delPeriodo : [];
+          const recurrentes = Array.isArray(data?.recurrentes) ? data.recurrentes : [];
+          return [
+            ...recurrentes
+              .filter((g: { activo?: boolean }) => g.activo !== false)
+              .map((g: { descripcion?: string }) => ({
+                ...g,
+                descripcion: `${g.descripcion || 'Costo fijo'} (recurrente mensual)`
+              })),
+            ...delPeriodo
+          ];
+        }),
         catchError(() => of([]))
       ),
       flujoSerie: incluirSerie

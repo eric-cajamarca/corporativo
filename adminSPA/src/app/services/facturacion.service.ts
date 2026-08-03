@@ -410,6 +410,7 @@ export class FacturacionService {
     idComprobanteElectronicoOrigen: string;
     tipoNota: '07' | '08';
     codigoMotivoNotaCredito?: string;
+    codigoMotivoNotaDebito?: string;
     items: { idProducto: string; cantidad: number; pVenta: number; subtotal: number; total: number }[];
   }): Observable<{ data: { idVenta: string; idComprobanteElectronico: string } }> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});

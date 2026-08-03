@@ -9,6 +9,9 @@ import { ComprobanteService } from '../../../services/comprobante.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { CategoriaService } from '../../../services/categoria.service';
+import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
 import { ProductoCompradoFila, ProductosCompradosTotales } from '../../../models/productos-comprados.model';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
@@ -20,10 +23,15 @@ interface ComprobanteCompraOpcion {
   codigo?: string;
 }
 
+interface CategoriaOpcion {
+  idCategoria: string | number;
+  nombre: string;
+}
+
 @Component({
   selector: 'app-productos-comprados',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, IndexProveedorComponent],
   templateUrl: './productos-comprados.component.html',
   styleUrl: './productos-comprados.component.css'
 })
@@ -33,12 +41,16 @@ export class ProductosCompradosComponent implements OnInit {
   private comprobanteService = inject(ComprobanteService);
   private excelService = inject(ExcelService);
   private pdfService = inject(PdfService);
+  private buscadorProductosModal = inject(BuscadorProductosModalService);
+  private categoriaService = inject(CategoriaService);
 
   fechaDesde = '';
   fechaHasta = '';
+  idProveedor = '';
   proveedorRuc = '';
   proveedorRazon = '';
   idComprobante = '';
+  filtroCategoria = '';
   filtroProducto = '';
   agrupar = false;
   buscar = '';
@@ -49,6 +61,13 @@ export class ProductosCompradosComponent implements OnInit {
   totales: ProductosCompradosTotales = { cantidad: 0, importe: 0 };
   cargando = false;
   mostrarColumnaEmpresa = false;
+
+  mostrarModalProveedor = false;
+  mostrarModalCategoria = false;
+  categorias: CategoriaOpcion[] = [];
+  categoriasFiltradas: CategoriaOpcion[] = [];
+  buscarCategoriaModal = '';
+  cargandoCategorias = false;
 
   private buscarSubject = new Subject<string>();
 
@@ -87,9 +106,11 @@ export class ProductosCompradosComponent implements OnInit {
       .obtenerProductosComprados({
         fechaDesde: this.fechaDesde,
         fechaHasta: this.fechaHasta,
+        idProveedor: this.idProveedor || null,
         proveedorRuc: this.proveedorRuc || null,
         proveedorRazon: this.proveedorRazon || null,
         idComprobante: this.idComprobante || null,
+        categoria: this.filtroCategoria || null,
         producto: this.filtroProducto || null,
         agrupar: this.agrupar,
         buscar: this.buscar || null
@@ -116,9 +137,20 @@ export class ProductosCompradosComponent implements OnInit {
     this.cargar();
   }
 
+  onProveedorManual(): void {
+    this.idProveedor = '';
+    this.cargar();
+  }
+
   todosProveedor(): void {
+    this.idProveedor = '';
     this.proveedorRuc = '';
     this.proveedorRazon = '';
+    this.cargar();
+  }
+
+  todosCategoria(): void {
+    this.filtroCategoria = '';
     this.cargar();
   }
 
@@ -131,12 +163,90 @@ export class ProductosCompradosComponent implements OnInit {
     const hoy = getFechaHoyLocal();
     this.fechaDesde = hoy;
     this.fechaHasta = hoy;
+    this.idProveedor = '';
     this.proveedorRuc = '';
     this.proveedorRazon = '';
     this.idComprobante = '';
+    this.filtroCategoria = '';
     this.filtroProducto = '';
     this.agrupar = false;
     this.buscar = '';
+    this.cargar();
+  }
+
+  abrirModalProveedor(): void {
+    this.mostrarModalProveedor = true;
+  }
+
+  cerrarModalProveedor(): void {
+    this.mostrarModalProveedor = false;
+  }
+
+  seleccionarProveedor(proveedor: Record<string, unknown>): void {
+    this.idProveedor = String(proveedor?.['idProveedor'] ?? proveedor?.['id'] ?? '').trim();
+    this.proveedorRuc = String(proveedor?.['ruc'] ?? '').trim();
+    this.proveedorRazon = String(
+      proveedor?.['rSocial'] ?? proveedor?.['r_Social'] ?? proveedor?.['razonSocial'] ?? ''
+    ).trim();
+    this.cerrarModalProveedor();
+    this.cargar();
+  }
+
+  abrirModalCategoria(): void {
+    this.mostrarModalCategoria = true;
+    this.buscarCategoriaModal = '';
+    if (!this.categorias.length) {
+      this.cargarCategorias();
+    } else {
+      this.filtrarCategoriasModal();
+    }
+  }
+
+  cerrarModalCategoria(): void {
+    this.mostrarModalCategoria = false;
+  }
+
+  private cargarCategorias(): void {
+    this.cargandoCategorias = true;
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        this.categorias = raw
+          .map((c: { idCategoria?: string | number; nombre?: string }) => ({
+            idCategoria: c.idCategoria ?? '',
+            nombre: String(c.nombre || '').trim()
+          }))
+          .filter((c: CategoriaOpcion) => !!c.nombre)
+          .sort((a: CategoriaOpcion, b: CategoriaOpcion) => a.nombre.localeCompare(b.nombre, 'es'));
+        this.filtrarCategoriasModal();
+        this.cargandoCategorias = false;
+      },
+      error: () => {
+        this.categorias = [];
+        this.categoriasFiltradas = [];
+        this.cargandoCategorias = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las categorías', position: 'topRight' });
+      }
+    });
+  }
+
+  filtrarCategoriasModal(): void {
+    const q = this.buscarCategoriaModal.trim().toLowerCase();
+    this.categoriasFiltradas = !q
+      ? [...this.categorias]
+      : this.categorias.filter((c) => c.nombre.toLowerCase().includes(q));
+  }
+
+  seleccionarCategoria(cat: CategoriaOpcion): void {
+    this.filtroCategoria = cat.nombre;
+    this.cerrarModalCategoria();
+    this.cargar();
+  }
+
+  async abrirBuscadorProducto(): Promise<void> {
+    const p = await this.buscadorProductosModal.abrir({ modo: 'catalogo' });
+    if (!p) return;
+    this.filtroProducto = String(p.codigo || p.descripcion || '').trim();
     this.cargar();
   }
 

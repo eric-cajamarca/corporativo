@@ -7,6 +7,7 @@ const clasificacionConceptoController = require('../controllers/clasificacionCon
 const conceptoController = require('../controllers/conceptoController');
 const motivoTrasladoController = require('../controllers/motivoTrasladoController');
 const motivoNotaCreditoController = require('../controllers/motivoNotaCreditoController');
+const motivoNotaDebitoController = require('../controllers/motivoNotaDebitoController');
 
 api.use(auth.auth);
 
@@ -53,5 +54,13 @@ api.get('/motivo-nota-credito/:id', motivoNotaCreditoController.obtenerPorId);
 api.post('/motivo-nota-credito', motivoNotaCreditoController.crear);
 api.put('/motivo-nota-credito/:id', motivoNotaCreditoController.actualizar);
 api.delete('/motivo-nota-credito/:id', motivoNotaCreditoController.eliminar);
+
+// Motivo Nota Débito (Catálogo 10 SUNAT)
+api.get('/motivo-nota-debito', motivoNotaDebitoController.listar);
+api.get('/motivo-nota-debito/codigos-sunat', motivoNotaDebitoController.codigosSunat);
+api.get('/motivo-nota-debito/:id', motivoNotaDebitoController.obtenerPorId);
+api.post('/motivo-nota-debito', motivoNotaDebitoController.crear);
+api.put('/motivo-nota-debito/:id', motivoNotaDebitoController.actualizar);
+api.delete('/motivo-nota-debito/:id', motivoNotaDebitoController.eliminar);
 
 module.exports = api;

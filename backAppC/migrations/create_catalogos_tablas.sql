@@ -63,22 +63,18 @@ BEGIN
 END
 GO
 
--- 6. Motivo Nota Crédito (por empresa; codigoSunat según Catálogo 09 SUNAT)
+-- 6. Motivo Nota Crédito GLOBAL (Catálogo 09 SUNAT; todas las empresas)
+-- Preferir ejecutar también: migrations/seed_motivos_nota_credito_debito.sql
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MotivoNotaCredito')
 BEGIN
     CREATE TABLE MotivoNotaCredito (
         idMotivoNotaCredito UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-        idEmpresa UNIQUEIDENTIFIER NOT NULL,
         codigoSunat VARCHAR(2) NOT NULL,
         descripcion VARCHAR(150) NOT NULL,
-        CONSTRAINT FK_MotivoNotaCredito_idEmpresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE
+        activo BIT NOT NULL DEFAULT 1,
+        CONSTRAINT UQ_MotivoNotaCredito_codigoSunat UNIQUE (codigoSunat)
     );
-    CREATE INDEX IX_MotivoNotaCredito_idEmpresa ON MotivoNotaCredito(idEmpresa);
 END
 GO
 
--- Datos iniciales SUNAT Catálogo 09 (motivos nota de crédito electrónica)
--- Solo insertar si la tabla está vacía para la empresa (opcional: ejecutar por empresa o usar seed en app)
--- Códigos: 01 Anulación de la operación, 02 Anulación por error en RUC, 03 Corrección por error en la descripción,
--- 04 Descuento global, 05 Descuento por ítem, 06 Devolución total, 07 Devolución por ítem, 08 Bonificación,
--- 09 Disminución en el valor, 10 Otros conceptos, 11 Ajustes exportación, 12 Ajustes IVAP, 13 Corrección monto neto/vencimiento
+-- Códigos Cat. 09: 01 Anulación … 13 Corrección monto neto/vencimiento (seed en seed_motivos_nota_credito_debito.sql)

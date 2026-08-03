@@ -205,3 +205,23 @@ export interface RatioCritico {
   rangoOptimo: string;
   estado: 'OPTIMO' | 'ACEPTABLE' | 'PREOCUPANTE' | 'CRITICO';
 }
+
+export interface GastoOperativo {
+  idGasto: string;
+  fecha: string;
+  fechaFin?: string | null;
+  tipo: string;
+  monto: number;
+  descripcion?: string | null;
+  esRecurrente?: boolean;
+  activo?: boolean;
+  fRegistro?: string | null;
+}
+
+export interface GastosAnalisisRespuesta {
+  delPeriodo: GastoOperativo[];
+  recurrentes: GastoOperativo[];
+  totalPeriodo: number;
+  fechaInicio?: string;
+  fechaFin?: string;
+}

@@ -6,6 +6,8 @@ import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { MovimientoInventarioService } from '../../../services/movimiento-inventario.service';
 import { SucursalService } from '../../../services/sucursal.service';
+import { CategoriaService } from '../../../services/categoria.service';
+import { MarcaService } from '../../../services/marca.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -13,6 +15,16 @@ import { StockActualItem } from '../../../models/stock-actual.model';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
+
+interface CategoriaOpcion {
+  idCategoria: string | number;
+  nombre: string;
+}
+
+interface MarcaOpcion {
+  idMarca: string | number;
+  nombre: string;
+}
 
 @Component({
   selector: 'app-stock-actual',
@@ -25,6 +37,8 @@ export class StockActualComponent implements OnInit {
   sidebarState = inject(SidebarStateService);
   private inventarioService = inject(MovimientoInventarioService);
   private sucursalService = inject(SucursalService);
+  private categoriaService = inject(CategoriaService);
+  private marcaService = inject(MarcaService);
   private excelService = inject(ExcelService);
   private pdfService = inject(PdfService);
 
@@ -32,7 +46,7 @@ export class StockActualComponent implements OnInit {
   idSucursal = '';
   filtroCategoria = '';
   filtroMarca = '';
-  filtroStock: 'todos' | 'cero' | 'minimo' = 'todos';
+  filtroStock: 'todos' | 'cero' | 'minimo' | 'negativos' = 'todos';
   buscar = '';
 
   items: StockActualItem[] = [];
@@ -40,6 +54,17 @@ export class StockActualComponent implements OnInit {
   totalValorizado = 0;
   cargando = false;
   mostrarColumnaEmpresa = false;
+
+  mostrarModalCategoria = false;
+  mostrarModalMarca = false;
+  categorias: CategoriaOpcion[] = [];
+  categoriasFiltradas: CategoriaOpcion[] = [];
+  marcas: MarcaOpcion[] = [];
+  marcasFiltradas: MarcaOpcion[] = [];
+  buscarCategoriaModal = '';
+  buscarMarcaModal = '';
+  cargandoCategorias = false;
+  cargandoMarcas = false;
 
   private buscarSubject = new Subject<string>();
 
@@ -123,7 +148,109 @@ export class StockActualComponent implements OnInit {
     this.cargar();
   }
 
-  setFiltroStock(v: 'todos' | 'cero' | 'minimo'): void {
+  abrirModalCategoria(): void {
+    this.mostrarModalCategoria = true;
+    this.buscarCategoriaModal = '';
+    if (!this.categorias.length) {
+      this.cargarCategorias();
+    } else {
+      this.filtrarCategoriasModal();
+    }
+  }
+
+  cerrarModalCategoria(): void {
+    this.mostrarModalCategoria = false;
+  }
+
+  private cargarCategorias(): void {
+    this.cargandoCategorias = true;
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        this.categorias = raw
+          .map((c: { idCategoria?: string | number; nombre?: string }) => ({
+            idCategoria: c.idCategoria ?? '',
+            nombre: String(c.nombre || '').trim()
+          }))
+          .filter((c: CategoriaOpcion) => !!c.nombre)
+          .sort((a: CategoriaOpcion, b: CategoriaOpcion) => a.nombre.localeCompare(b.nombre, 'es'));
+        this.filtrarCategoriasModal();
+        this.cargandoCategorias = false;
+      },
+      error: () => {
+        this.categorias = [];
+        this.categoriasFiltradas = [];
+        this.cargandoCategorias = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las categorías', position: 'topRight' });
+      }
+    });
+  }
+
+  filtrarCategoriasModal(): void {
+    const q = this.buscarCategoriaModal.trim().toLowerCase();
+    this.categoriasFiltradas = !q
+      ? [...this.categorias]
+      : this.categorias.filter((c) => c.nombre.toLowerCase().includes(q));
+  }
+
+  seleccionarCategoria(cat: CategoriaOpcion): void {
+    this.filtroCategoria = cat.nombre;
+    this.cerrarModalCategoria();
+    this.cargar();
+  }
+
+  abrirModalMarca(): void {
+    this.mostrarModalMarca = true;
+    this.buscarMarcaModal = '';
+    if (!this.marcas.length) {
+      this.cargarMarcas();
+    } else {
+      this.filtrarMarcasModal();
+    }
+  }
+
+  cerrarModalMarca(): void {
+    this.mostrarModalMarca = false;
+  }
+
+  private cargarMarcas(): void {
+    this.cargandoMarcas = true;
+    this.marcaService.obtener_marcas().subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        this.marcas = raw
+          .map((m: { idMarca?: string | number; nombre?: string }) => ({
+            idMarca: m.idMarca ?? '',
+            nombre: String(m.nombre || '').trim()
+          }))
+          .filter((m: MarcaOpcion) => !!m.nombre)
+          .sort((a: MarcaOpcion, b: MarcaOpcion) => a.nombre.localeCompare(b.nombre, 'es'));
+        this.filtrarMarcasModal();
+        this.cargandoMarcas = false;
+      },
+      error: () => {
+        this.marcas = [];
+        this.marcasFiltradas = [];
+        this.cargandoMarcas = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las marcas', position: 'topRight' });
+      }
+    });
+  }
+
+  filtrarMarcasModal(): void {
+    const q = this.buscarMarcaModal.trim().toLowerCase();
+    this.marcasFiltradas = !q
+      ? [...this.marcas]
+      : this.marcas.filter((m) => m.nombre.toLowerCase().includes(q));
+  }
+
+  seleccionarMarca(marca: MarcaOpcion): void {
+    this.filtroMarca = marca.nombre;
+    this.cerrarModalMarca();
+    this.cargar();
+  }
+
+  setFiltroStock(v: 'todos' | 'cero' | 'minimo' | 'negativos'): void {
     this.filtroStock = v;
     this.cargar();
   }

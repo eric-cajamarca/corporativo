@@ -3,8 +3,12 @@
     <div class="content-header">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <h1 class="content-title mb-1">Productos vendidos</h1>
-          <p class="content-subtitle text-muted mb-0">Costo, venta y utilidad por línea o agrupado por producto</p>
+          <h1 class="content-title mb-1">{{ soloNoVendidos ? 'Productos no vendidos' : 'Productos vendidos' }}</h1>
+          <p class="content-subtitle text-muted mb-0">
+            {{ soloNoVendidos
+              ? 'Productos activos sin ventas en el período seleccionado'
+              : 'Costo, venta y utilidad por línea o agrupado por producto' }}
+          </p>
         </div>
         <a routerLink="/inventario" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-arrow-left me-1"></i> Volver a inventario
@@ -23,11 +27,13 @@
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargar()" />
             </div>
           </div>
-          <div class="col-lg-4 col-md-6">
+          <div class="col-lg-2 col-md-6">
             <label class="form-label small fw-semibold">Cliente</label>
             <div class="input-group input-group-sm">
-              <input type="text" class="form-control" placeholder="RUC" [(ngModel)]="clienteRuc" (blur)="cargar()" />
-              <input type="text" class="form-control" placeholder="Razón social" [(ngModel)]="clienteRazon" (blur)="cargar()" />
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalCliente()" title="Buscar cliente">
+                <i class="bi bi-search"></i>
+              </button>
+              <input type="text" class="form-control" placeholder="RUC" [(ngModel)]="clienteRuc" (blur)="onClienteManual()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosCliente()" title="Todos los clientes">
                 <i class="bi bi-check2"></i> Todos
               </button>
@@ -36,7 +42,9 @@
           <div class="col-lg-2 col-md-6">
             <label class="form-label small fw-semibold">Categoría</label>
             <div class="input-group input-group-sm">
-              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalCategoria()" title="Elegir categoría">
+                <i class="bi bi-search"></i>
+              </button>
               <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()"><i class="bi bi-check2"></i> Todos</button>
             </div>
@@ -44,7 +52,9 @@
           <div class="col-lg-2 col-md-6">
             <label class="form-label small fw-semibold">Producto</label>
             <div class="input-group input-group-sm">
-              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirBuscadorProducto()" title="Buscar producto">
+                <i class="bi bi-search"></i>
+              </button>
               <input type="text" class="form-control" placeholder="Código o descripción" [(ngModel)]="filtroProducto" (blur)="cargar()" />
             </div>
           </div>
@@ -54,19 +64,47 @@
               <button
                 type="button"
                 class="btn"
-                [class.btn-agrupar-active]="agrupar"
-                [class.btn-outline-secondary]="!agrupar"
+                [disabled]="soloNoVendidos"
+                [class.btn-agrupar-active]="agrupar || soloNoVendidos"
+                [class.btn-outline-secondary]="!(agrupar || soloNoVendidos)"
                 (click)="setAgrupar(true)">
                 Sí
               </button>
               <button
                 type="button"
                 class="btn"
-                [class.btn-agrupar-active]="!agrupar"
-                [class.btn-outline-secondary]="agrupar"
+                [disabled]="soloNoVendidos"
+                [class.btn-agrupar-active]="!agrupar && !soloNoVendidos"
+                [class.btn-outline-secondary]="agrupar || soloNoVendidos"
                 (click)="setAgrupar(false)">
                 No
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-auto">
+            <div class="d-flex align-items-center gap-3">
+              <label class="form-label small fw-semibold mb-0">Mostrar</label>
+              <div class="btn-group btn-group-sm modo-vendidos-toggle" role="group">
+                <button
+                  type="button"
+                  class="btn"
+                  [class.btn-modo-active]="!soloNoVendidos"
+                  [class.btn-outline-secondary]="soloNoVendidos"
+                  (click)="setModoVendidos(false)">
+                  Vendidos
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  [class.btn-modo-active]="soloNoVendidos"
+                  [class.btn-outline-secondary]="!soloNoVendidos"
+                  (click)="setModoVendidos(true)">
+                  No vendidos
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -121,7 +159,9 @@
               </tr>
             } @else if (!items.length) {
               <tr class="fila-vacia">
-                <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Sin resultados</td>
+                <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">
+                  {{ soloNoVendidos ? 'No hay productos sin ventas en este período' : 'Sin resultados' }}
+                </td>
               </tr>
             } @else {
               @for (r of items; track trackFila($index, r); let idx = $index) {
@@ -169,3 +209,57 @@
     </div>
   </div>
 </div>
+
+@if (mostrarModalCliente) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Buscar cliente</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCliente()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-0">
+          <app-index-clientes [modoSelector]="true" (clienteElegido)="seleccionarCliente($event)"></app-index-clientes>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalCliente()"></div>
+}
+
+@if (mostrarModalCategoria) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Elegir categoría</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCategoria()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Filtrar categoría..."
+              [(ngModel)]="buscarCategoriaModal"
+              (input)="filtrarCategoriasModal()" />
+          </div>
+          @if (cargandoCategorias) {
+            <div class="text-center text-muted py-3">Cargando…</div>
+          } @else if (!categoriasFiltradas.length) {
+            <div class="text-center text-muted py-3">Sin categorías</div>
+          } @else {
+            <div class="list-group list-group-flush">
+              @for (c of categoriasFiltradas; track c.idCategoria) {
+                <button type="button" class="list-group-item list-group-item-action" (click)="seleccionarCategoria(c)">
+                  {{ c.nombre }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalCategoria()"></div>
+}

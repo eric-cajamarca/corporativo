@@ -595,12 +595,12 @@ class HtmlBuilderService {
       '05': 'Descuento por ítem',
       '06': 'Devolución total',
       '07': 'Devolución por ítem',
-      '08': 'Disminución en el valor',
-      '09': 'Otros conceptos',
-      '10': 'Ajustes de operaciones de exportación',
-      '11': 'Ajustes afectos al IVAP',
-      '12': 'Beneficio al consumidor — decremento de precio',
-      '13': 'Beneficio al consumidor — venta con beneficio'
+      '08': 'Bonificación',
+      '09': 'Disminución en el valor',
+      '10': 'Otros conceptos',
+      '11': 'Ajustes de operaciones de exportación',
+      '12': 'Ajustes afectos al IVAP',
+      '13': 'Corrección monto neto pendiente / fechas o montos de cuotas'
     };
     return map[c] || 'Motivo de nota de crédito';
   }
@@ -627,12 +627,19 @@ class HtmlBuilderService {
     const compRel = (venta.compRelacionado && String(venta.compRelacionado).trim()) || '—';
     const tipoRef = venta.tipoComprobanteRef != null ? String(venta.tipoComprobanteRef).trim() : '01';
     const tipoLbl = this._etiquetaTipoComprobanteRefSunat(tipoRef);
-    const codMotRaw = venta.codigoMotivoNotaCredito != null ? String(venta.codigoMotivoNotaCredito).trim() : '';
-    const codMot = this._normalizarCodigoMotivoSunat(codMotRaw, '01');
     const esNc = this._esNotaCreditoPdf(codigoComp);
-    const descMot = esNc
+    const codMotRaw = esNc
+      ? (venta.codigoMotivoNotaCredito != null ? String(venta.codigoMotivoNotaCredito).trim() : '')
+      : (venta.codigoMotivoNotaDebito != null
+          ? String(venta.codigoMotivoNotaDebito).trim()
+          : (venta.codigoMotivoNotaCredito != null ? String(venta.codigoMotivoNotaCredito).trim() : ''));
+    const codMot = this._normalizarCodigoMotivoSunat(codMotRaw, '01');
+    const descMotFromDb = esNc
+      ? (venta.descripcionMotivoNotaCredito != null ? String(venta.descripcionMotivoNotaCredito).trim() : '')
+      : (venta.descripcionMotivoNotaDebito != null ? String(venta.descripcionMotivoNotaDebito).trim() : '');
+    const descMot = descMotFromDb || (esNc
       ? this._descripcionMotivoNotaCreditoSunat(codMot)
-      : this._descripcionMotivoNotaDebitoSunat(codMot);
+      : this._descripcionMotivoNotaDebitoSunat(codMot));
     const escComp = this._escapeHtml(compRel);
     const escTipo = this._escapeHtml(tipoLbl);
     const escCod = this._escapeHtml(codMot);

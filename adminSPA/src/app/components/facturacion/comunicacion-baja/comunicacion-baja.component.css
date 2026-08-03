@@ -38,6 +38,14 @@
   margin-bottom: 0.25rem;
 }
 
+.cb-modal-row {
+  cursor: pointer;
+}
+
+.cb-modal-row:hover {
+  background-color: #f8f9fa;
+}
+
 .card-body {
   min-width: 0;
 }

@@ -145,3 +145,32 @@
     display: none;
   }
 }
+
+/* Acciones compactas: visibles + menú "más" */
+.eg-acciones {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.eg-acciones .btn {
+  margin: 0 !important;
+}
+
+.eg-btn-mas.dropdown-toggle::after {
+  margin-left: 0.2rem;
+  vertical-align: 0.1em;
+}
+
+.eg-acciones .dropdown-menu {
+  min-width: 12.5rem;
+  font-size: 0.875rem;
+}
+
+.eg-acciones .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}

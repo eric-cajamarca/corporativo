@@ -12,45 +12,50 @@
       </div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-md-12">
-            <label class="form-label small fw-medium">Por serie y número</label>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small text-muted">Serie</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="serie" placeholder="F001">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small text-muted">Número</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="numero" placeholder="1">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small text-muted">Tipo</label>
-            <select class="form-select form-select-sm" [(ngModel)]="tipoComprobanteRef">
-              <option value="01">Factura</option>
-              <option value="03">Boleta</option>
+          <div class="col-md-3 col-lg-2">
+            <label class="form-label small fw-medium">Buscar por</label>
+            <select class="form-select form-select-sm" [(ngModel)]="modoBusquedaOrigen">
+              <option value="serie">Serie y número</option>
+              <option value="cliente">RUC o razón social</option>
             </select>
           </div>
-          <div class="col-md-2">
-            <button type="button" class="btn btn-outline-primary btn-sm w-100" (click)="buscarPorSerieNumero()" [disabled]="loadingOrigen">
-              <i class="bi bi-search me-1"></i> Buscar
-            </button>
-          </div>
-          <div class="col-md-12 mt-2">
-            <label class="form-label small fw-medium">Por RUC o razón social del cliente</label>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small text-muted">RUC</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="rucCliente" placeholder="20100000001" (keydown.enter)="buscarPorRucRazonSocial()">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small text-muted">Razón social</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="razonSocialCliente" placeholder="Nombre o razón social" (keydown.enter)="buscarPorRucRazonSocial()">
-          </div>
-          <div class="col-md-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm w-100" (click)="buscarPorRucRazonSocial()" [disabled]="loadingListado">
-              <i class="bi bi-search me-1"></i> Buscar
-            </button>
-          </div>
+
+          @if (modoBusquedaOrigen === 'serie') {
+            <div class="col-md-2">
+              <label class="form-label small text-muted">Serie</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="serie" placeholder="F001">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-muted">Número</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="numero" placeholder="1">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-muted">Tipo</label>
+              <select class="form-select form-select-sm" [(ngModel)]="tipoComprobanteRef">
+                <option value="01">Factura</option>
+                <option value="03">Boleta</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-outline-primary btn-sm w-100" (click)="buscarPorSerieNumero()" [disabled]="loadingOrigen">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+            </div>
+          } @else {
+            <div class="col-md-3">
+              <label class="form-label small text-muted">RUC</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="rucCliente" placeholder="20100000001" (keydown.enter)="buscarPorRucRazonSocial()">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-muted">Razón social</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="razonSocialCliente" placeholder="Nombre o razón social" (keydown.enter)="buscarPorRucRazonSocial()">
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-outline-primary btn-sm w-100" (click)="buscarPorRucRazonSocial()" [disabled]="loadingListado">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+            </div>
+          }
         </div>
         @if (loadingOrigen || loadingListado) {
           <p class="small text-muted mt-2 mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
@@ -109,10 +114,20 @@
             </select>
           </div>
           @if (tipoNota === '07') {
-            <div class="col-md-4">
+            <div class="col-md-5">
               <label class="form-label small">Motivo (Catálogo 09)</label>
               <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaCredito">
                 @for (m of motivosNotaCredito; track m.codigoSunat) {
+                  <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
+                }
+              </select>
+            </div>
+          }
+          @if (tipoNota === '08') {
+            <div class="col-md-5">
+              <label class="form-label small">Motivo (Catálogo 10)</label>
+              <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaDebito">
+                @for (m of motivosNotaDebito; track m.codigoSunat) {
                   <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
                 }
               </select>
@@ -201,10 +216,10 @@
           <p class="text-muted small p-3 mb-0">No hay notas registradas con los filtros actuales.</p>
         } @else {
           <div class="table-responsive">
-            <table class="table table-hover table-bordered mb-0 notas-emitidas-table align-middle table-notas-credito-responsive">
+            <table class="table table-sm table-hover table-bordered mb-0 notas-emitidas-table table-notas-credito-responsive">
               <thead class="table-light">
                 <tr>
-                  <th>Acciones</th>
+                  <th class="notas-col-acciones">Acciones</th>
                   <th>Fecha</th>
                   <th>Documento</th>
                   <th>Cliente</th>
@@ -215,7 +230,7 @@
               <tbody>
                 @for (row of notasEmitidas; track row.idVenta) {
                   <tr>
-                    <td class="text-center text-nowrap notas-td-acciones" data-label="Acciones">
+                    <td class="text-nowrap notas-td-acciones" data-label="Acciones">
                       <button type="button" class="btn btn-danger btn-sm notas-btn-accion" (click)="abrirModalPdfNota(row)"
                               [disabled]="pdfNotaCargandoId === row.idVenta" title="PDF / WhatsApp">
                         PDF

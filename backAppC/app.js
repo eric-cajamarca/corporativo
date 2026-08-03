@@ -3,6 +3,7 @@ const { assertProductionEnv } = require('./config/env.validation');
 assertProductionEnv();
 const express = require('express');
 require('express-async-errors');
+const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const { connectDB } = require('./dbConnection');
@@ -89,6 +90,11 @@ const app = express();
 // Tras proxy (nginx, etc.): req.ip y X-Forwarded-For coherentes para login / auditoría
 if (process.env.TRUST_PROXY === '1') {
   app.set('trust proxy', 1);
+}
+
+// Compresión gzip/deflate (útil si Node sirve SPA o respuestas JSON grandes; Nginx también debe tener gzip)
+if (process.env.DISABLE_COMPRESSION !== '1') {
+  app.use(compression({ threshold: 1024 }));
 }
 
 // Seguridad: headers con helmet (CSP relajado en desktop: el build Angular usa onload en <link rel=stylesheet>)

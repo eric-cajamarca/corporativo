@@ -33,9 +33,10 @@ router.get('/punto-equilibrio', analisisController.obtenerPuntoEquilibrio);
 // Diagnóstico completo
 router.get('/diagnostico-financiero', analisisController.obtenerDiagnosticoFinanciero);
 
-// Gastos operativos (para estado de resultados y análisis)
+// Gastos operativos / costos fijos (puntuales y recurrentes)
 router.get('/gastos', analisisController.listarGastos);
 router.post('/gastos', analisisController.crearGasto);
+router.put('/gastos/:idGasto', analisisController.actualizarGasto);
 router.delete('/gastos/:idGasto', analisisController.eliminarGasto);
 
 module.exports = router;

@@ -463,7 +463,7 @@ function construirInClauseUuid(request, ids, prefijo) {
  * @param {string|null} [opts.codigoUbicacionConteo] - columna stockUbicacionConteo por código (gestora / multi-empresa)
  * @param {string|null} opts.categoriaLike - fragmento LIKE
  * @param {string|null} opts.marcaLike
- * @param {string} opts.filtroStock - 'todos' | 'cero' | 'minimo'
+ * @param {string} opts.filtroStock - 'todos' | 'cero' | 'minimo' | 'negativos'
  * @param {string|null} opts.buscar - código o descripción
  * @param {boolean} [opts.incluirInactivos] - si true, incluye productos con estado = 0 (catálogo conteo físico)
  */
@@ -480,6 +480,8 @@ exports.listarStockActual = async (pool, opts) => {
     stockClause = 'COALESCE(stk.stock, 0) = 0';
   } else if (filtroStock === 'minimo') {
     stockClause = '(p.alertaMinimo IS NOT NULL AND COALESCE(stk.stock, 0) <= p.alertaMinimo)';
+  } else if (filtroStock === 'negativos') {
+    stockClause = 'COALESCE(stk.stock, 0) < 0';
   }
 
   const request = pool.request();

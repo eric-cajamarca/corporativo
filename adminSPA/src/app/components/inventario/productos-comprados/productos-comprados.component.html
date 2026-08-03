@@ -23,29 +23,34 @@
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargar()" />
             </div>
           </div>
-          <div class="col-lg-4 col-md-6">
+          <div class="col-lg-2 col-md-6">
             <label class="form-label small fw-semibold">Proveedor</label>
             <div class="input-group input-group-sm">
-              <input type="text" class="form-control" placeholder="RUC" [(ngModel)]="proveedorRuc" (blur)="cargar()" />
-              <input type="text" class="form-control" placeholder="Razón social" [(ngModel)]="proveedorRazon" (blur)="cargar()" />
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalProveedor()" title="Buscar proveedor">
+                <i class="bi bi-search"></i>
+              </button>
+              <input type="text" class="form-control" placeholder="RUC" [(ngModel)]="proveedorRuc" (blur)="onProveedorManual()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosProveedor()" title="Todos los proveedores">
                 <i class="bi bi-check2"></i> Todos
               </button>
             </div>
           </div>
           <div class="col-lg-2 col-md-6">
-            <label class="form-label small fw-semibold">Tipo ingreso</label>
-            <select class="form-select form-select-sm" [(ngModel)]="idComprobante" (change)="cargar()">
-              <option value="">Todos</option>
-              @for (c of tiposComprobanteCompra; track c.idComprobante) {
-                <option [value]="'' + c.idComprobante">{{ c.codigo ? c.codigo + ' — ' : '' }}{{ c.nombre }}</option>
-              }
-            </select>
+            <label class="form-label small fw-semibold">Categoría</label>
+            <div class="input-group input-group-sm">
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalCategoria()" title="Elegir categoría">
+                <i class="bi bi-search"></i>
+              </button>
+              <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
+              <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()"><i class="bi bi-check2"></i> Todos</button>
+            </div>
           </div>
           <div class="col-lg-2 col-md-6">
             <label class="form-label small fw-semibold">Producto</label>
             <div class="input-group input-group-sm">
-              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirBuscadorProducto()" title="Buscar producto">
+                <i class="bi bi-search"></i>
+              </button>
               <input type="text" class="form-control" placeholder="Código o descripción" [(ngModel)]="filtroProducto" (blur)="cargar()" />
             </div>
           </div>
@@ -69,6 +74,18 @@
                 No
               </button>
             </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2 align-items-end">
+          <div class="col-lg-2 col-md-4">
+            <label class="form-label small fw-semibold mb-1">Tipo ingreso</label>
+            <select class="form-select form-select-sm" [(ngModel)]="idComprobante" (change)="cargar()">
+              <option value="">Todos</option>
+              @for (c of tiposComprobanteCompra; track c.idComprobante) {
+                <option [value]="'' + c.idComprobante">{{ c.codigo ? c.codigo + ' — ' : '' }}{{ c.nombre }}</option>
+              }
+            </select>
           </div>
         </div>
       </div>
@@ -122,7 +139,9 @@
               </tr>
             } @else if (!items.length) {
               <tr class="fila-vacia">
-                <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Sin resultados</td>
+                <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">
+                  Sin resultados
+                </td>
               </tr>
             } @else {
               @for (r of items; track trackFila($index, r); let idx = $index) {
@@ -166,3 +185,57 @@
     </div>
   </div>
 </div>
+
+@if (mostrarModalProveedor) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Buscar proveedor</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalProveedor()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-0">
+          <app-index-proveedor [modoSelector]="true" (proveedorElegido)="seleccionarProveedor($event)"></app-index-proveedor>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalProveedor()"></div>
+}
+
+@if (mostrarModalCategoria) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Elegir categoría</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCategoria()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Filtrar categoría..."
+              [(ngModel)]="buscarCategoriaModal"
+              (input)="filtrarCategoriasModal()" />
+          </div>
+          @if (cargandoCategorias) {
+            <div class="text-center text-muted py-3">Cargando…</div>
+          } @else if (!categoriasFiltradas.length) {
+            <div class="text-center text-muted py-3">Sin categorías</div>
+          } @else {
+            <div class="list-group list-group-flush">
+              @for (c of categoriasFiltradas; track c.idCategoria) {
+                <button type="button" class="list-group-item list-group-item-action" (click)="seleccionarCategoria(c)">
+                  {{ c.nombre }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalCategoria()"></div>
+}

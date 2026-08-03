@@ -60,13 +60,30 @@
   opacity: 0.85;
 }
 
-/* Desktop: PDF/XML/CDR apilados en la columna */
+/* Desktop: acciones en fila compacta */
+.notas-emitidas-table > :not(caption) > * > * {
+  padding: 0.35rem 0.5rem;
+  vertical-align: middle;
+}
+
+.notas-col-acciones {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.notas-td-acciones {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .notas-td-acciones .notas-btn-accion {
-  display: block;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 0.35rem;
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  margin: 0;
 }
 
 .notas-buscar-wrap {

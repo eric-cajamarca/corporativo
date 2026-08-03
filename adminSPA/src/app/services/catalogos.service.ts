@@ -174,4 +174,28 @@ export class CatalogosService {
   eliminarMotivoNotaCredito(id: string): Observable<{ data: any }> {
     return this.delete<{ data: any }>('motivo-nota-credito/' + id);
   }
+
+  // Motivo Nota Débito (Catálogo 10 SUNAT)
+  listarMotivoNotaDebito(buscar?: string, pagina?: number, porPagina?: number): Observable<{ data: any[]; total: number }> {
+    const params: any = {};
+    if (buscar != null) params.buscar = buscar;
+    if (pagina != null) params.pagina = String(pagina);
+    if (porPagina != null) params.porPagina = String(porPagina);
+    return this.get<{ data: any[]; total: number }>('motivo-nota-debito', params);
+  }
+  obtenerMotivoNotaDebito(id: string): Observable<{ data: any }> {
+    return this.get<{ data: any }>('motivo-nota-debito/' + id);
+  }
+  codigosSunatMotivoNotaDebito(): Observable<{ data: string[] }> {
+    return this.get<{ data: string[] }>('motivo-nota-debito/codigos-sunat');
+  }
+  crearMotivoNotaDebito(body: { codigoSunat: string; descripcion: string }): Observable<{ data: any }> {
+    return this.post<{ data: any }>('motivo-nota-debito', body);
+  }
+  actualizarMotivoNotaDebito(id: string, body: { codigoSunat: string; descripcion: string }): Observable<{ data: any }> {
+    return this.put<{ data: any }>('motivo-nota-debito/' + id, body);
+  }
+  eliminarMotivoNotaDebito(id: string): Observable<{ data: any }> {
+    return this.delete<{ data: any }>('motivo-nota-debito/' + id);
+  }
 }

@@ -761,7 +761,7 @@ const listarComprobantesOrigenPorCliente = async (req, res, next) => {
 // Crear Nota de Crédito (07) o Débito (08)
 const crearNotaCreditoDebito = async (req, res, next) => {
   try {
-    const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, items, fEmision } = req.body || {};
+    const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, codigoMotivoNotaDebito, items, fEmision } = req.body || {};
     if (!idComprobanteElectronicoOrigen || !tipoNota || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).send({
         message: "Se requieren: idComprobanteElectronicoOrigen, tipoNota ('07' o '08'), items (array con idProducto, cantidad, pVenta, subtotal, total)",
@@ -771,10 +771,12 @@ const crearNotaCreditoDebito = async (req, res, next) => {
     if (!["07", "08"].includes(String(tipoNota).trim())) {
       return res.status(400).send({ message: "tipoNota debe ser '07' (Nota de Crédito) o '08' (Nota de Débito)", data: undefined });
     }
+    const tn = String(tipoNota).trim();
     const result = await withPool(async (pool) => FacturacionServices.crearNotaCreditoDebitoService(pool, req.user, {
       idComprobanteElectronicoOrigen,
-      tipoNota: String(tipoNota).trim(),
-      codigoMotivoNotaCredito: tipoNota === "07" ? (codigoMotivoNotaCredito || "01") : undefined,
+      tipoNota: tn,
+      codigoMotivoNotaCredito: tn === "07" ? (codigoMotivoNotaCredito || "01") : undefined,
+      codigoMotivoNotaDebito: tn === "08" ? (codigoMotivoNotaDebito || "01") : undefined,
       fEmision,
       items: items.map((it) => ({
         idProducto: it.idProducto,

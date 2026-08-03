@@ -36,6 +36,8 @@ export class NotasCreditoDebitoComponent implements OnInit {
 
   sidebarState = inject(SidebarStateService);
   origen: OrigenParaNota | null = null;
+  /** Criterio del buscador de comprobante origen */
+  modoBusquedaOrigen: 'serie' | 'cliente' = 'serie';
   serie = '';
   numero = '';
   tipoComprobanteRef = '01';
@@ -46,7 +48,9 @@ export class NotasCreditoDebitoComponent implements OnInit {
   loadingListado = false;
   tipoNota: '07' | '08' = '07';
   codigoMotivoNotaCredito = '01';
+  codigoMotivoNotaDebito = '01';
   motivosNotaCredito: { codigoSunat: string; descripcion: string }[] = [];
+  motivosNotaDebito: { codigoSunat: string; descripcion: string }[] = [];
   items: ItemEditable[] = [];
   guardando = false;
   creado: { idVenta: string; idComprobanteElectronico: string } | null = null;
@@ -92,6 +96,7 @@ export class NotasCreditoDebitoComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarMotivosNotaCredito();
+    this.cargarMotivosNotaDebito();
     this.cargarNotasEmitidas();
     this.route.queryParams.subscribe((params) => {
       const serie = (params['serie'] || '').trim();
@@ -490,6 +495,32 @@ export class NotasCreditoDebitoComponent implements OnInit {
     });
   }
 
+  cargarMotivosNotaDebito(): void {
+    this._catalogosService.listarMotivoNotaDebito(undefined, 1, 50).subscribe({
+      next: (res) => {
+        const list = res?.data ?? [];
+        this.motivosNotaDebito = list.map((m: any) => ({
+          codigoSunat: m.codigoSunat || '01',
+          descripcion: m.descripcion || m.codigoSunat || 'Intereses por mora'
+        }));
+        if (this.motivosNotaDebito.length === 0) {
+          this.motivosNotaDebito = [
+            { codigoSunat: '01', descripcion: 'Intereses por mora' },
+            { codigoSunat: '02', descripcion: 'Aumento en el valor' },
+            { codigoSunat: '03', descripcion: 'Penalidades / otros conceptos' }
+          ];
+        }
+      },
+      error: () => {
+        this.motivosNotaDebito = [
+          { codigoSunat: '01', descripcion: 'Intereses por mora' },
+          { codigoSunat: '02', descripcion: 'Aumento en el valor' },
+          { codigoSunat: '03', descripcion: 'Penalidades / otros conceptos' }
+        ];
+      }
+    });
+  }
+
   buscarPorSerieNumero(): void {
     const s = (this.serie || '').trim();
     const n = (this.numero || '').trim().replace(/\D/g, '');
@@ -594,6 +625,7 @@ export class NotasCreditoDebitoComponent implements OnInit {
       idComprobanteElectronicoOrigen: this.origen.comprobanteOrigen.idComprobanteElectronico,
       tipoNota: this.tipoNota,
       codigoMotivoNotaCredito: this.tipoNota === '07' ? (this.codigoMotivoNotaCredito || '01') : undefined,
+      codigoMotivoNotaDebito: this.tipoNota === '08' ? (this.codigoMotivoNotaDebito || '01') : undefined,
       fEmision: fechaHoraVentaClienteAhora(),
       items: this.items
         .filter(it => (Number(it.cantidad) || 0) > 0)

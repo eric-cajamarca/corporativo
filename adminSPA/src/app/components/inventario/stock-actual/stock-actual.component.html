@@ -17,6 +17,9 @@
           <div class="col-12 col-md-6 col-lg-3">
             <label class="form-label small fw-semibold">Categoría</label>
             <div class="input-group input-group-sm">
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalCategoria()" title="Elegir categoría">
+                <i class="bi bi-search"></i>
+              </button>
               <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()" title="Todas las categorías">
                 <i class="bi bi-check2"></i> Todos
@@ -26,6 +29,9 @@
           <div class="col-md-3 col-sm-6">
             <label class="form-label small fw-semibold">Marca</label>
             <div class="input-group input-group-sm">
+              <button type="button" class="btn btn-outline-secondary" (click)="abrirModalMarca()" title="Elegir marca">
+                <i class="bi bi-search"></i>
+              </button>
               <input type="text" class="form-control" placeholder="Marca" [(ngModel)]="filtroMarca" (blur)="cargar()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosMarca()" title="Todas las marcas">
                 <i class="bi bi-check2"></i> Todos
@@ -67,6 +73,14 @@
                 [class.btn-outline-secondary]="filtroStock !== 'minimo'"
                 (click)="setFiltroStock('minimo')">
                 Mínimo
+              </button>
+              <button
+                type="button"
+                class="btn"
+                [class.btn-stock-active]="filtroStock === 'negativos'"
+                [class.btn-outline-secondary]="filtroStock !== 'negativos'"
+                (click)="setFiltroStock('negativos')">
+                Negativos
               </button>
             </div>
           </div>
@@ -157,3 +171,77 @@
     </div>
   </div>
 </div>
+
+@if (mostrarModalCategoria) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Elegir categoría</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCategoria()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Filtrar categoría..."
+              [(ngModel)]="buscarCategoriaModal"
+              (input)="filtrarCategoriasModal()" />
+          </div>
+          @if (cargandoCategorias) {
+            <div class="text-center text-muted py-3">Cargando…</div>
+          } @else if (!categoriasFiltradas.length) {
+            <div class="text-center text-muted py-3">Sin categorías</div>
+          } @else {
+            <div class="list-group list-group-flush">
+              @for (c of categoriasFiltradas; track c.idCategoria) {
+                <button type="button" class="list-group-item list-group-item-action" (click)="seleccionarCategoria(c)">
+                  {{ c.nombre }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalCategoria()"></div>
+}
+
+@if (mostrarModalMarca) {
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Elegir marca</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="cerrarModalMarca()" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Filtrar marca..."
+              [(ngModel)]="buscarMarcaModal"
+              (input)="filtrarMarcasModal()" />
+          </div>
+          @if (cargandoMarcas) {
+            <div class="text-center text-muted py-3">Cargando…</div>
+          } @else if (!marcasFiltradas.length) {
+            <div class="text-center text-muted py-3">Sin marcas</div>
+          } @else {
+            <div class="list-group list-group-flush">
+              @for (m of marcasFiltradas; track m.idMarca) {
+                <button type="button" class="list-group-item list-group-item-action" (click)="seleccionarMarca(m)">
+                  {{ m.nombre }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalMarca()"></div>
+}

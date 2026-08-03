@@ -146,3 +146,15 @@
   background-color: #e9ecef;
   color: #495057;
 }
+
+.modo-vendidos-toggle .btn-modo-active {
+  background-color: #c2185b;
+  border-color: #c2185b;
+  color: #fff;
+  font-weight: 600;
+}
+
+.modo-vendidos-toggle .btn-outline-secondary {
+  background-color: #fff;
+  color: #495057;
+}

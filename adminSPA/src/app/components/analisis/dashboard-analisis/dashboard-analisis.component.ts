@@ -15,7 +15,8 @@ import {
   RatiosFinancieros,
   DiagnosticoFinanciero,
   FlujoCajaAnalisis,
-  FlujoCajaSerieMensual
+  FlujoCajaSerieMensual,
+  GastoOperativo
 } from '../../../interfaces/analisis-interface';
 import { formatFechaLocal } from '../../../utils/fecha-local.util';
 declare var iziToast: any;
@@ -51,8 +52,19 @@ export class DashboardAnalisisComponent implements OnInit {
     flujoCaja: false
   };
 
-  public listGastos: { idGasto: string; fecha: string; tipo: string; monto: number; descripcion?: string }[] = [];
-  public nuevoGasto = { fecha: '', tipo: 'ADMINISTRACION', monto: 0, descripcion: '' };
+  public listGastos: GastoOperativo[] = [];
+  public listGastosRecurrentes: GastoOperativo[] = [];
+  public totalGastosPeriodo = 0;
+  public nuevoGasto = {
+    fecha: '',
+    tipo: 'ADMINISTRACION',
+    monto: 0,
+    descripcion: '',
+    esRecurrente: true,
+    fechaFin: '',
+    activo: true
+  };
+  public editandoGastoId: string | null = null;
 
   public filtros = {
     periodo: 'MES_ACTUAL',
@@ -80,6 +92,7 @@ export class DashboardAnalisisComponent implements OnInit {
     const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
     if (!this.filtros.fechaDesde) this.filtros.fechaDesde = `${y}-${m}-01`;
     if (!this.filtros.fechaHasta) this.filtros.fechaHasta = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    if (!this.nuevoGasto.fecha) this.nuevoGasto.fecha = this.filtros.fechaDesde;
     this.empresaService.getEmpresa$().subscribe((emp) => {
       const e = emp as { razon_Social?: string; nombreComercial?: string; nombre?: string; ruc?: string; direccion?: string; telefono?: string; logo?: string };
       if (emp) {
@@ -134,18 +147,85 @@ export class DashboardAnalisisComponent implements OnInit {
     };
   }
 
+  private normalizarGastosRespuesta(data: unknown): {
+    delPeriodo: GastoOperativo[];
+    recurrentes: GastoOperativo[];
+    totalPeriodo: number;
+  } {
+    if (Array.isArray(data)) {
+      const delPeriodo = data as GastoOperativo[];
+      return {
+        delPeriodo,
+        recurrentes: [],
+        totalPeriodo: delPeriodo.reduce((s, g) => s + Number(g.monto || 0), 0)
+      };
+    }
+    const obj = (data || {}) as {
+      delPeriodo?: GastoOperativo[];
+      recurrentes?: GastoOperativo[];
+      totalPeriodo?: number;
+    };
+    return {
+      delPeriodo: Array.isArray(obj.delPeriodo) ? obj.delPeriodo : [],
+      recurrentes: Array.isArray(obj.recurrentes) ? obj.recurrentes : [],
+      totalPeriodo: Number(obj.totalPeriodo || 0)
+    };
+  }
+
+  private resetNuevoGasto() {
+    this.editandoGastoId = null;
+    this.nuevoGasto = {
+      fecha: this.filtros.fechaDesde || '',
+      tipo: 'ADMINISTRACION',
+      monto: 0,
+      descripcion: '',
+      esRecurrente: true,
+      fechaFin: '',
+      activo: true
+    };
+  }
+
+  private refrescarTrasGasto() {
+    this.cargarGastos();
+    this.cargarEstadoResultados();
+    this.cargarDashboard();
+    if (this.vistaActiva === 'flujo-caja') this.cargarFlujoCaja();
+  }
+
   cargarGastos() {
     this.loading.gastos = true;
     this.analisisService.listarGastos(this.filtros.fechaDesde, this.filtros.fechaHasta).subscribe({
       next: (res) => {
-        this.listGastos = Array.isArray(res.data) ? res.data : [];
+        const norm = this.normalizarGastosRespuesta(res.data);
+        this.listGastos = norm.delPeriodo;
+        this.listGastosRecurrentes = norm.recurrentes;
+        this.totalGastosPeriodo = norm.totalPeriodo;
         this.loading.gastos = false;
       },
       error: () => {
         this.listGastos = [];
+        this.listGastosRecurrentes = [];
+        this.totalGastosPeriodo = 0;
         this.loading.gastos = false;
       }
     });
+  }
+
+  editarGastoRecurrente(g: GastoOperativo) {
+    this.editandoGastoId = g.idGasto;
+    this.nuevoGasto = {
+      fecha: g.fecha || '',
+      tipo: g.tipo || 'ADMINISTRACION',
+      monto: Number(g.monto || 0),
+      descripcion: g.descripcion || '',
+      esRecurrente: true,
+      fechaFin: g.fechaFin || '',
+      activo: g.activo !== false
+    };
+  }
+
+  cancelarEdicionGasto() {
+    this.resetNuevoGasto();
   }
 
   registrarGasto() {
@@ -154,22 +234,75 @@ export class DashboardAnalisisComponent implements OnInit {
       iziToast.warning({ title: 'Datos incompletos', message: 'Indique fecha y monto mayor a 0.' });
       return;
     }
+    if (this.nuevoGasto.fechaFin && this.nuevoGasto.fechaFin < this.nuevoGasto.fecha) {
+      iziToast.warning({ title: 'Fechas inválidas', message: 'La fecha fin no puede ser menor que la de inicio.' });
+      return;
+    }
+
+    if (this.editandoGastoId) {
+      this.analisisService.actualizarGasto(this.editandoGastoId, {
+        fecha: this.nuevoGasto.fecha,
+        tipo: this.nuevoGasto.tipo,
+        monto: m,
+        descripcion: this.nuevoGasto.descripcion || undefined,
+        fechaFin: this.nuevoGasto.fechaFin || null,
+        activo: this.nuevoGasto.activo
+      }).subscribe({
+        next: () => {
+          iziToast.success({ title: 'Actualizado', message: 'El costo fijo recurrente se actualizó.' });
+          this.resetNuevoGasto();
+          this.refrescarTrasGasto();
+        },
+        error: (err) => {
+          iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo actualizar.' });
+        }
+      });
+      return;
+    }
+
     this.analisisService.crearGasto({
       fecha: this.nuevoGasto.fecha,
       tipo: this.nuevoGasto.tipo,
       monto: m,
-      descripcion: this.nuevoGasto.descripcion || undefined
+      descripcion: this.nuevoGasto.descripcion || undefined,
+      esRecurrente: !!this.nuevoGasto.esRecurrente,
+      fechaFin: this.nuevoGasto.esRecurrente ? (this.nuevoGasto.fechaFin || null) : null,
+      activo: true
     }).subscribe({
       next: () => {
-        iziToast.success({ title: 'Gasto registrado', message: 'Se usará en el estado de resultados.' });
-        this.nuevoGasto = { fecha: '', tipo: 'ADMINISTRACION', monto: 0, descripcion: '' };
-        this.cargarGastos();
-        this.cargarEstadoResultados();
-        this.cargarDashboard();
-        if (this.vistaActiva === 'flujo-caja') this.cargarFlujoCaja();
+        const msg = this.nuevoGasto.esRecurrente
+          ? 'Quedará activo mes a mes hasta que lo desactives o indiques fecha fin.'
+          : 'Se usará en el estado de resultados del período.';
+        iziToast.success({ title: 'Gasto registrado', message: msg });
+        this.resetNuevoGasto();
+        this.refrescarTrasGasto();
       },
       error: (err) => {
         iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar el gasto.' });
+      }
+    });
+  }
+
+  toggleActivoRecurrente(g: GastoOperativo) {
+    this.analisisService.actualizarGasto(g.idGasto, {
+      fecha: g.fecha,
+      tipo: g.tipo,
+      monto: Number(g.monto || 0),
+      descripcion: g.descripcion || undefined,
+      fechaFin: g.fechaFin || null,
+      activo: !(g.activo !== false)
+    }).subscribe({
+      next: () => {
+        iziToast.success({
+          title: g.activo !== false ? 'Desactivado' : 'Activado',
+          message: g.activo !== false
+            ? 'Ya no se considerará en meses futuros.'
+            : 'Volverá a considerarse mes a mes.'
+        });
+        this.refrescarTrasGasto();
+      },
+      error: (err) => {
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo actualizar.' });
       }
     });
   }
@@ -178,10 +311,8 @@ export class DashboardAnalisisComponent implements OnInit {
     if (!confirm('¿Eliminar este gasto?')) return;
     this.analisisService.eliminarGasto(idGasto).subscribe({
       next: () => {
-        this.cargarGastos();
-        this.cargarEstadoResultados();
-        this.cargarDashboard();
-        if (this.vistaActiva === 'flujo-caja') this.cargarFlujoCaja();
+        if (this.editandoGastoId === idGasto) this.resetNuevoGasto();
+        this.refrescarTrasGasto();
       },
       error: () => iziToast.error({ title: 'Error', message: 'No se pudo eliminar.' })
     });
@@ -478,10 +609,25 @@ export class DashboardAnalisisComponent implements OnInit {
           catchError(() => of(null))
         );
 
-    const gastos$ = this.listGastos.length
-      ? of(this.listGastos)
+    const gastos$ = (this.listGastos.length || this.listGastosRecurrentes.length)
+      ? of([
+          ...this.listGastosRecurrentes.filter((g) => g.activo !== false).map((g) => ({
+            ...g,
+            descripcion: `${g.descripcion || 'Costo fijo'} (recurrente mensual)`
+          })),
+          ...this.listGastos
+        ])
       : this.analisisService.listarGastos(rango.fechaInicio, rango.fechaFin).pipe(
-          map((r) => (Array.isArray(r.data) ? r.data : [])),
+          map((r) => {
+            const norm = this.normalizarGastosRespuesta(r.data);
+            return [
+              ...norm.recurrentes.filter((g) => g.activo !== false).map((g) => ({
+                ...g,
+                descripcion: `${g.descripcion || 'Costo fijo'} (recurrente mensual)`
+              })),
+              ...norm.delPeriodo
+            ];
+          }),
           catchError(() => of([]))
         );
 

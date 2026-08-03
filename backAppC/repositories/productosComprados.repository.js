@@ -9,27 +9,7 @@ const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
   }).join(', ');
 };
 
-/**
- * Líneas de compra (DetalleCompras + Compras + Proveedores).
- * @param {object} opts
- * @param {string[]} opts.idsEmpresa
- * @param {Date|string} opts.fechaDesde
- * @param {Date|string} opts.fechaHasta
- * @param {number|null} opts.idProveedor
- * @param {string|null} opts.proveedorRucLike
- * @param {string|null} opts.proveedorRazonLike
- * @param {number|null} opts.idComprobante
- * @param {string|null} opts.productoLike
- * @param {boolean} opts.agrupar
- * @param {string|null} opts.buscar
- */
-exports.listarProductosComprados = async (pool, opts) => {
-  const ids = (opts.idsEmpresa || []).filter(Boolean);
-  if (ids.length === 0) return { items: [], totales: { cantidad: 0, importe: 0 } };
-
-  const req = pool.request();
-  const inList = bindUniqueIdentifiersIn(req, ids, 'idEmpPc');
-
+function prepararFiltros(req, opts) {
   const desde = opts.fechaDesde ? new Date(opts.fechaDesde) : new Date();
   const hasta = opts.fechaHasta ? new Date(opts.fechaHasta) : new Date();
   if (desde > hasta) {
@@ -65,6 +45,12 @@ exports.listarProductosComprados = async (pool, opts) => {
     req.input('idComprobante', sql.Int, idComprobante);
   }
 
+  const catLike =
+    opts.categoriaLike && String(opts.categoriaLike).trim()
+      ? `%${String(opts.categoriaLike).trim()}%`
+      : null;
+  if (catLike) req.input('catLike', sql.NVarChar(200), catLike);
+
   const prodLike =
     opts.productoLike && String(opts.productoLike).trim()
       ? `%${String(opts.productoLike).trim()}%`
@@ -75,16 +61,51 @@ exports.listarProductosComprados = async (pool, opts) => {
     opts.buscar && String(opts.buscar).trim() ? `%${String(opts.buscar).trim()}%` : null;
   if (buscarLike) req.input('buscarLike', sql.NVarChar(600), buscarLike);
 
-  const whereProvId =
-    idProveedor != null && !Number.isNaN(idProveedor) ? 'AND c.idProveedor = @idProveedor' : '';
-  const whereRuc = rucLike ? 'AND pr.ruc LIKE @rucProvLike' : '';
-  const whereRazon = razonLike ? 'AND pr.rSocial LIKE @razonProvLike' : '';
-  const whereComp =
-    idComprobante != null && !Number.isNaN(idComprobante)
-      ? 'AND c.idComprobante = @idComprobante'
-      : '';
-  const whereProd = prodLike ? 'AND (p.codigo LIKE @prodLike OR p.descripcion LIKE @prodLike)' : '';
-  const whereBuscar = buscarLike
+  return {
+    idProveedor: idProveedor != null && !Number.isNaN(idProveedor) ? idProveedor : null,
+    rucLike,
+    razonLike,
+    idComprobante: idComprobante != null && !Number.isNaN(idComprobante) ? idComprobante : null,
+    catLike,
+    prodLike,
+    buscarLike
+  };
+}
+
+function totalesDeItems(items) {
+  return items.reduce(
+    (acc, r) => {
+      acc.cantidad += Number(r.cantidad) || 0;
+      acc.importe += Number(r.importe) || 0;
+      return acc;
+    },
+    { cantidad: 0, importe: 0 }
+  );
+}
+
+/**
+ * Líneas de compra (DetalleCompras + Compras + Proveedores).
+ * Si opts.soloNoComprados = true, productos activos sin compras en el período.
+ */
+exports.listarProductosComprados = async (pool, opts) => {
+  const ids = (opts.idsEmpresa || []).filter(Boolean);
+  if (ids.length === 0) return { items: [], totales: { cantidad: 0, importe: 0 } };
+
+  if (opts.soloNoComprados) {
+    return listarProductosNoComprados(pool, opts, ids);
+  }
+
+  const req = pool.request();
+  const inList = bindUniqueIdentifiersIn(req, ids, 'idEmpPc');
+  const f = prepararFiltros(req, opts);
+
+  const whereProvId = f.idProveedor != null ? 'AND c.idProveedor = @idProveedor' : '';
+  const whereRuc = f.rucLike ? 'AND pr.ruc LIKE @rucProvLike' : '';
+  const whereRazon = f.razonLike ? 'AND pr.rSocial LIKE @razonProvLike' : '';
+  const whereComp = f.idComprobante != null ? 'AND c.idComprobante = @idComprobante' : '';
+  const whereCat = f.catLike ? 'AND cat.nombre LIKE @catLike' : '';
+  const whereProd = f.prodLike ? 'AND (p.codigo LIKE @prodLike OR p.descripcion LIKE @prodLike)' : '';
+  const whereBuscar = f.buscarLike
     ? `AND (
         p.codigo LIKE @buscarLike OR p.descripcion LIKE @buscarLike
         OR (p.codigo + ' ' + p.descripcion) LIKE @buscarLike
@@ -100,6 +121,7 @@ exports.listarProductosComprados = async (pool, opts) => {
     FROM DetalleCompras dc
     INNER JOIN Compras c ON c.idCompra = dc.idCompra AND c.idEmpresa = dc.idEmpresa
     INNER JOIN Productos p ON p.idProducto = dc.idProducto AND p.idEmpresa = dc.idEmpresa
+    INNER JOIN Categorias cat ON cat.idCategoria = p.idCategoria
     INNER JOIN Proveedores pr ON pr.idProveedor = c.idProveedor AND pr.idEmpresa = c.idEmpresa
     INNER JOIN Empresas e ON e.idEmpresa = c.idEmpresa
     WHERE c.idEmpresa IN (${inList})
@@ -109,6 +131,7 @@ exports.listarProductosComprados = async (pool, opts) => {
       ${whereRuc}
       ${whereRazon}
       ${whereComp}
+      ${whereCat}
       ${whereProd}
       ${whereBuscar}
   `;
@@ -156,15 +179,70 @@ exports.listarProductosComprados = async (pool, opts) => {
 
   const result = await req.query(query);
   const items = result.recordset || [];
-
-  const tot = items.reduce(
-    (acc, r) => {
-      acc.cantidad += Number(r.cantidad) || 0;
-      acc.importe += Number(r.importe) || 0;
-      return acc;
-    },
-    { cantidad: 0, importe: 0 }
-  );
-
-  return { items, totales: tot };
+  return { items, totales: totalesDeItems(items) };
 };
+
+async function listarProductosNoComprados(pool, opts, ids) {
+  const req = pool.request();
+  const inList = bindUniqueIdentifiersIn(req, ids, 'idEmpPc');
+  const f = prepararFiltros(req, opts);
+
+  const whereProvId = f.idProveedor != null ? 'AND c.idProveedor = @idProveedor' : '';
+  const whereRuc = f.rucLike ? 'AND pr.ruc LIKE @rucProvLike' : '';
+  const whereRazon = f.razonLike ? 'AND pr.rSocial LIKE @razonProvLike' : '';
+  const whereComp = f.idComprobante != null ? 'AND c.idComprobante = @idComprobante' : '';
+  const whereCat = f.catLike ? 'AND cat.nombre LIKE @catLike' : '';
+  const whereProd = f.prodLike ? 'AND (p.codigo LIKE @prodLike OR p.descripcion LIKE @prodLike)' : '';
+  const whereBuscar = f.buscarLike
+    ? `AND (
+        p.codigo LIKE @buscarLike OR p.descripcion LIKE @buscarLike
+        OR (p.codigo + ' ' + p.descripcion) LIKE @buscarLike
+      )`
+    : '';
+
+  const joinProveedorEnExiste = f.rucLike || f.razonLike || f.idProveedor != null
+    ? 'INNER JOIN Proveedores pr ON pr.idProveedor = c.idProveedor AND pr.idEmpresa = c.idEmpresa'
+    : '';
+
+  const query = `
+    SELECT
+      p.idEmpresa,
+      p.idProducto,
+      NULL AS idDetalleCompra,
+      NULL AS idCompra,
+      CAST(NULL AS VARCHAR(10)) AS fecha,
+      (p.codigo + ' ' + p.descripcion) AS producto,
+      CAST(NULL AS NVARCHAR(200)) AS proveedor,
+      CAST(0 AS DECIMAL(18, 3)) AS cantidad,
+      CAST(0 AS DECIMAL(18, 6)) AS precio,
+      CAST(0 AS DECIMAL(18, 2)) AS importe,
+      ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
+    FROM Productos p
+    INNER JOIN Categorias cat ON cat.idCategoria = p.idCategoria
+    INNER JOIN Empresas e ON e.idEmpresa = p.idEmpresa
+    WHERE p.idEmpresa IN (${inList})
+      AND p.estado = 1
+      ${whereCat}
+      ${whereProd}
+      ${whereBuscar}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM DetalleCompras dc
+        INNER JOIN Compras c ON c.idCompra = dc.idCompra AND c.idEmpresa = dc.idEmpresa
+        ${joinProveedorEnExiste}
+        WHERE dc.idProducto = p.idProducto
+          AND dc.idEmpresa = p.idEmpresa
+          AND CAST(c.fEmision AS DATE) >= @fechaDesde
+          AND CAST(c.fEmision AS DATE) <= @fechaHasta
+          ${whereProvId}
+          ${whereRuc}
+          ${whereRazon}
+          ${whereComp}
+      )
+    ORDER BY p.descripcion
+  `;
+
+  const result = await req.query(query);
+  const items = result.recordset || [];
+  return { items, totales: totalesDeItems(items) };
+}
