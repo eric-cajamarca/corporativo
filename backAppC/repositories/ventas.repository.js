@@ -237,7 +237,9 @@ async function obtenerConfigPdf(pool, idEmpresa) {
             AND clave IN (
               'PDF_TEMA_COLOR_ACTIVO',
               'PDF_COLOR_PRIMARIO',
-              'VENTAS_USAR_DESCUENTO_EN_TOTAL'
+              'VENTAS_USAR_DESCUENTO_EN_TOTAL',
+              'VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION',
+              'VENTAS_LEYENDA_AMAZONIA'
             )
         `);
       configPdf = configRes.recordset || [];
@@ -1404,6 +1406,14 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     cfgMap.VENTAS_USAR_DESCUENTO_EN_TOTAL || 'true',
     true
   );
+  const incluirMarcaEnDescripcionPdf = interpretarBooleanoConfig(
+    cfgMap.VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION || 'true',
+    true
+  );
+  const incluirLeyendaAmazonia = interpretarBooleanoConfig(
+    cfgMap.VENTAS_LEYENDA_AMAZONIA || 'false',
+    false
+  );
   const detalle = items.recordset || [];
   const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
@@ -1788,10 +1798,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       total: d.total,
       presentacion: d.presentacion != null ? String(d.presentacion).trim() : '',
       presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : '',
-      marca: d.marca != null ? String(d.marca).trim() : ''
+      marca: incluirMarcaEnDescripcionPdf && d.marca != null ? String(d.marca).trim() : ''
     })),
     impuestos,
-    detallePago: detallePagoPdf
+    detallePago: detallePagoPdf,
+    incluirMarcaEnDescripcionPdf,
+    incluirLeyendaAmazonia
   };
 };
 
@@ -3568,6 +3580,14 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     cfgVaMap.VENTAS_USAR_DESCUENTO_EN_TOTAL || 'true',
     true
   );
+  const incluirMarcaEnDescripcionPdfVa = interpretarBooleanoConfig(
+    cfgVaMap.VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION || 'true',
+    true
+  );
+  const incluirLeyendaAmazoniaVa = interpretarBooleanoConfig(
+    cfgVaMap.VENTAS_LEYENDA_AMAZONIA || 'false',
+    false
+  );
   const descVaNum = cab.descuentos != null ? Number(cab.descuentos) : 0;
   const descuentosImpresionVa = usarDescVa ? descVaNum : 0;
 
@@ -3649,9 +3669,11 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       aliasEmpresa: d.aliasEmpresa || '',
       sucursal: d.sucursal || '',
       idEmpresaProducto: d.idEmpresaProducto,
-      marca: d.marca != null ? String(d.marca).trim() : ''
+      marca: incluirMarcaEnDescripcionPdfVa && d.marca != null ? String(d.marca).trim() : ''
     })),
-    impuestos: impuestosVa
+    impuestos: impuestosVa,
+    incluirMarcaEnDescripcionPdf: incluirMarcaEnDescripcionPdfVa,
+    incluirLeyendaAmazonia: incluirLeyendaAmazoniaVa
   };
 };
 

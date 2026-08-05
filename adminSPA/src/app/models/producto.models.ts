@@ -104,6 +104,8 @@ export interface ImportacionProductosValidarData {
   validas: number;
   conError: number;
   errores: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+  /** Marcas nuevas creadas automáticamente al validar/importar. */
+  marcasCreadas?: string[];
   vistaPrevia: Array<{
     fila: number;
     codigo: string;
@@ -124,6 +126,7 @@ export interface ImportacionProductosEjecutarData {
   detalle: Array<{ fila: number; idProducto: string; codigo: string }>;
   erroresValidacion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
   erroresEjecucion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+  marcasCreadas?: string[];
   noImportadosExcel?: {
     fileName: string;
     mimeType: string;

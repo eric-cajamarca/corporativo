@@ -133,7 +133,9 @@ async function generatePdf(req, res) {
           impuestos: Array.isArray(datos.impuestos) ? datos.impuestos : [],
           cantidadLetras: datos.cantidadLetras || '',
           formato: formatoPdf,
-          esCotizacion: datos.esCotizacion === true
+          esCotizacion: datos.esCotizacion === true,
+          incluirMarcaEnDescripcion: datos.incluirMarcaEnDescripcionPdf !== false,
+          incluirLeyendaAmazonia: datos.incluirLeyendaAmazonia === true
         });
         break;
       }

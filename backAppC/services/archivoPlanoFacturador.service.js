@@ -242,12 +242,25 @@ function generarTRI(payload) {
 /**
  * Genera contenido LEY (leyendas). 2 columnas: código | descripción.
  * Formato muestra: 1000|CERO CON 00/100 SOLES para total 0; si no SON X SOLES.
+ * Si VENTAS_LEYENDA_AMAZONIA: agrega 2001|BIENES TRANSFERIDOS EN LA AMAZONIA...
  */
 function generarLEY(payload) {
   const { venta = {} } = payload;
   const total = toNum(venta.total);
   const texto = total > 0 ? `SON ${Math.round(total * 100) / 100} SOLES` : "CERO CON 00/100 SOLES";
-  return `1000|${escPipe(texto)}` + SEP;
+  let out = `1000|${escPipe(texto)}` + SEP;
+  const incluirAmazonia =
+    payload.incluirLeyendaAmazonia === true ||
+    payload.incluirLeyendaAmazonia === 1 ||
+    payload.incluirLeyendaAmazonia === "true" ||
+    payload.incluirLeyendaAmazonia === "1";
+  if (incluirAmazonia) {
+    out +=
+      "2001|" +
+      escPipe("BIENES TRANSFERIDOS EN LA AMAZONIA REGION SELVA PARA SER CONSUMIDOS EN LA MISMA") +
+      SEP;
+  }
+  return out;
 }
 
 /**

@@ -499,6 +499,7 @@ export interface ComprobantePdfData {
     pVenta: number;
     subtotal?: number;
     total: number;
+    marca?: string;
   }>;
   /** Catálogo de impuestos de la empresa para el PDF (SUNAT). */
   impuestos?: Array<{
@@ -511,6 +512,10 @@ export interface ComprobantePdfData {
   }>;
   /** Líneas de DetallePagoVenta (misma forma que al registrar venta). */
   detallePago?: Array<{ idMediosPago: number | null; monto: number }>;
+  /** Si false, el PDF no concatena marca a la descripción (config VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION). */
+  incluirMarcaEnDescripcionPdf?: boolean;
+  /** Si true, PDF/XML incluyen leyenda Amazonía (config VENTAS_LEYENDA_AMAZONIA / cat. 52 código 2001). */
+  incluirLeyendaAmazonia?: boolean;
 }
 
 export interface VentaAgrupadaListado {
@@ -577,6 +582,8 @@ export interface ComprobanteVAPdfData {
     idEmpresaProducto?: string;
     marca?: string;
   }>;
+  /** Si false, el ticket VA no concatena marca a la descripción. */
+  incluirMarcaEnDescripcionPdf?: boolean;
 }
 
 /** Fila del listado de notas de crédito/débito (GET ventas/listar-notas). */

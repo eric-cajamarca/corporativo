@@ -28,7 +28,8 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     .map((it) => {
       const aliasRaw = String(it.aliasEmpresa || '').trim();
       const nombreLinea = escapeHtmlVa(aliasRaw || nombreEmpresaTicket || '—');
-      const marcaRaw = String((it as { marca?: string }).marca || '').trim();
+      const incluirMarca = d.incluirMarcaEnDescripcionPdf !== false;
+      const marcaRaw = incluirMarca ? String((it as { marca?: string }).marca || '').trim() : '';
       const descBase = String(it.descripcion || it.codigo || 'Ítem').trim();
       const descConcat = marcaRaw && descBase ? `${descBase} - ${marcaRaw}` : descBase || marcaRaw || 'Ítem';
       const desc = escapeHtmlVa(descConcat);

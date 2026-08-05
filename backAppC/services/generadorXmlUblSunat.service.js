@@ -63,31 +63,41 @@ function nombreTributoCatalogo05Xml(codigoSunat) {
   return map[c] || "";
 }
 
+/** Texto oficial catálogo 52 código 2001 (leyenda Amazonía / bienes). */
+const LEYENDA_AMAZONIA_2001 =
+  "BIENES TRANSFERIDOS EN LA AMAZONIA REGION SELVA PARA SER CONSUMIDOS EN LA MISMA";
+
 /**
  * Observaciones / OC según guía SUNAT XML factura UBL 2.1 y orden XSD UBL Invoice 2.1:
  * - Todas las cbc:Note (cat. 52, ej. 1000 y 3000) antes de cbc:DocumentCurrencyCode.
  * - cac:OrderReference después de DocumentCurrencyCode (si no, SUNAT 0306: hijo Note inválido).
- * Cat. 52: 1000 = solo monto en letras; 3000 = texto largo; OC corta en OrderReference.
+ * Cat. 52: 1000 = solo monto en letras; 2001 = Amazonía; 3000 = texto largo; OC corta en OrderReference.
  */
-function fragmentosObservacionesUblFactura(obsRaw) {
+function fragmentosObservacionesUblFactura(obsRaw, incluirLeyendaAmazonia = false) {
   const obs = toStr(obsRaw).replace(/\s+/g, " ").trim();
+  let notasAntesMoneda = "";
+  let orderReferenceTrasMoneda = "";
+
+  if (incluirLeyendaAmazonia) {
+    notasAntesMoneda += `
+  <cbc:Note languageLocaleID="2001">${escXml(LEYENDA_AMAZONIA_2001)}</cbc:Note>`;
+  }
+
   if (!obs) {
-    return { notasAntesMoneda: "", orderReferenceTrasMoneda: "" };
+    return { notasAntesMoneda, orderReferenceTrasMoneda };
   }
   if (obs.length <= 20) {
     return {
-      notasAntesMoneda: "",
+      notasAntesMoneda,
       orderReferenceTrasMoneda: `
   <cac:OrderReference>
     <cbc:ID>${escXml(obs)}</cbc:ID>
   </cac:OrderReference>`
     };
   }
-  return {
-    notasAntesMoneda: `
-  <cbc:Note languageLocaleID="3000">${escXml(obs.slice(0, 100))}</cbc:Note>`,
-    orderReferenceTrasMoneda: ""
-  };
+  notasAntesMoneda += `
+  <cbc:Note languageLocaleID="3000">${escXml(obs.slice(0, 100))}</cbc:Note>`;
+  return { notasAntesMoneda, orderReferenceTrasMoneda: "" };
 }
 
 /** Ubigeo PE (SUNAT): 6 dígitos en cbc:CountrySubentityCode del domicilio fiscal. */
@@ -294,7 +304,15 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
 
   const montoEnLetras = numeroALetras(total);
   const observaciones = toStr(venta.observaciones) || toStr(venta.compRelacionado);
-  const { notasAntesMoneda, orderReferenceTrasMoneda } = fragmentosObservacionesUblFactura(observaciones);
+  const incluirLeyendaAmazonia =
+    payload.incluirLeyendaAmazonia === true ||
+    payload.incluirLeyendaAmazonia === 1 ||
+    payload.incluirLeyendaAmazonia === "true" ||
+    payload.incluirLeyendaAmazonia === "1";
+  const { notasAntesMoneda, orderReferenceTrasMoneda } = fragmentosObservacionesUblFactura(
+    observaciones,
+    incluirLeyendaAmazonia
+  );
   const ventaParaPago = {
     ...venta,
     codigoComprobante: toStr(venta.codigoComprobante) || String(tipoComprobante || "01").trim()

@@ -31,10 +31,15 @@ class HtmlBuilderService {
     return s;
   }
 
-  /** Texto de ítem para PDF: descripción + marca si existe (sin HTML). */
-  _descripcionProductoPdfLinea(it) {
+  /**
+   * Texto de ítem para PDF: descripción + marca si existe (sin HTML).
+   * @param {object} it
+   * @param {boolean} [incluirMarca=true] - Si false, no concatena marca (config VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION).
+   */
+  _descripcionProductoPdfLinea(it, incluirMarca = true) {
     const item = it && typeof it === 'object' ? it : {};
     const base = String(item.descripcion ?? item.desc ?? item.productoDescripcion ?? '').trim();
+    if (!incluirMarca) return base;
     const marca = String(item.marca ?? item.nombreMarca ?? item.productoMarca ?? '').trim();
     if (!marca) return base;
     if (!base) return marca;
@@ -651,14 +656,20 @@ class HtmlBuilderService {
     return { bloqueA4, bloqueTicket };
   }
 
-  /** Pie legal SUNAT al final del PDF (hash viene de ComprobantesElectronicos al generar XML). */
-  _htmlPieSunatElectronico(codigoComprobante, resumenHash) {
+  /**
+   * Pie legal SUNAT al final del PDF (hash viene de ComprobantesElectronicos al generar XML).
+   * @param {boolean} [incluirLeyendaAmazonia=false] - Config VENTAS_LEYENDA_AMAZONIA
+   */
+  _htmlPieSunatElectronico(codigoComprobante, resumenHash, incluirLeyendaAmazonia = false) {
     const titulo = this._tituloRepresentacionElectronica(codigoComprobante);
     const hashEsc = (resumenHash && String(resumenHash).trim())
       ? String(resumenHash).trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')
       : '—';
+    const lineaAmazonia = incluirLeyendaAmazonia
+      ? '<div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>'
+      : '';
     return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;margin:0;padding:0;color:#000;">
-      <div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>
+      ${lineaAmazonia}
       <div>* Representación impresa de ${titulo}</div>
       <div>* Generado desde el sistema del contribuyente</div>
       <div>* Resumen código H: ${hashEsc}</div>
@@ -805,8 +816,20 @@ class HtmlBuilderService {
       impuestos = [],
       cantidadLetras = '',
       formato = 'A4',
-      esCotizacion = false
+      esCotizacion = false,
+      incluirMarcaEnDescripcion = true,
+      incluirLeyendaAmazonia = false
     } = safeParams;
+    const incluirMarca =
+      incluirMarcaEnDescripcion !== false &&
+      incluirMarcaEnDescripcion !== 0 &&
+      incluirMarcaEnDescripcion !== 'false' &&
+      incluirMarcaEnDescripcion !== '0';
+    const mostrarLeyendaAmazonia =
+      incluirLeyendaAmazonia === true ||
+      incluirLeyendaAmazonia === 1 ||
+      incluirLeyendaAmazonia === 'true' ||
+      incluirLeyendaAmazonia === '1';
 
     const codigoComp = String(venta.codigoComprobante || '').trim();
     const titulo = this._tituloCabeceraComprobanteVenta(codigoComp, venta.nombreComprobante);
@@ -839,7 +862,9 @@ class HtmlBuilderService {
     const total = Number(venta.total) || 0;
     const mostrarQrPie = this._debeMostrarQrYPieSunat(esCotizacion, codigoComp);
     const resumenHash = mostrarQrPie ? ((venta.resumenHash && String(venta.resumenHash).trim()) || '') : '';
-    const pieSunatHtml = mostrarQrPie ? this._htmlPieSunatElectronico(codigoComp, resumenHash) : '';
+    const pieSunatHtml = mostrarQrPie
+      ? this._htmlPieSunatElectronico(codigoComp, resumenHash, mostrarLeyendaAmazonia)
+      : '';
 
     const logoSrc = await this._resolveLogoToDataUri(empresa.logo);
     let qrDataUri = '';
@@ -864,7 +889,7 @@ class HtmlBuilderService {
       codigoCompUpper === 'NV';
 
     const filasPlanas = (Array.isArray(items) ? items : []).map(it => {
-      const desc = this._descripcionProductoPdfLinea(it);
+      const desc = this._descripcionProductoPdfLinea(it, incluirMarca);
       const cant = Number(it.cantidad) != null ? Number(it.cantidad) : 0;
       const pUnit = Number(it.pVenta) != null ? Number(it.pVenta) : Number(it.pUnit) || 0;
       const importe = Number(it.total) != null ? Number(it.total) : (Number(it.subtotal) || cant * pUnit);

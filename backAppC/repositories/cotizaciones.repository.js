@@ -2,6 +2,7 @@
 const sql = require('mssql');
 const { componerDireccionPdf } = require('../utils/ubigeoNombres.util');
 const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
+const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 
 /** Valida y retorna idSucursal para BD: si es UUID válido se usa; si no, null (el servicio debe proveer uno). */
 function toIdSucursalUniqueIdentifier(value) {
@@ -584,11 +585,30 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
     logo: logoUrl
   } : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
 
+  let incluirMarcaEnDescripcionPdf = true;
+  try {
+    const cfgRes = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT TOP 1 valor
+        FROM ConfiguracionEmpresa
+        WHERE idEmpresa = @idEmpresa AND clave = 'VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION'
+      `);
+    const valorCfg = cfgRes.recordset?.[0]?.valor;
+    incluirMarcaEnDescripcionPdf = interpretarBooleanoConfig(
+      valorCfg != null ? String(valorCfg) : 'true',
+      true
+    );
+  } catch (_) {
+    incluirMarcaEnDescripcionPdf = true;
+  }
+
   const detalle = (items.recordset || []).map((d) => ({
     descripcion: d.descripcion != null ? String(d.descripcion).trim() : '',
     descripcionProducto: d.descripcionProducto != null ? String(d.descripcionProducto).trim() : '',
     codigo: d.codigo != null ? String(d.codigo).trim() : '',
-    marca: d.marca != null ? String(d.marca).trim() : '',
+    marca: incluirMarcaEnDescripcionPdf && d.marca != null ? String(d.marca).trim() : '',
     presentacion: d.presentacion != null ? String(d.presentacion).trim() : '',
     presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : '',
     cantidad: d.cantidad,
@@ -621,6 +641,7 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
       direccion: clienteDireccionPdf,
       tipoDocSunat: tipoDocSunat
     },
-    items: detalle
+    items: detalle,
+    incluirMarcaEnDescripcionPdf
   };
 };

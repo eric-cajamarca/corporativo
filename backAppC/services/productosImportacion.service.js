@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
+const marcaRepository = require('../repositories/marca.repository');
 const { esCodigoPresentacionServicio } = require('../utils/productoInventariable.util');
 const productosMutacionesService = require('./productosMutaciones.service');
 const pdfBackend = require('./pdfBackend.client');
@@ -445,6 +446,74 @@ function resolverMarcaId(index, aliasRaw) {
   return null;
 }
 
+/** Nombre a persistir en Marcas a partir del Excel (máx. 50). */
+function nombreMarcaParaInsertar(aliasRaw, keyNorm) {
+  if (keyNorm === 'SM') return 'SM';
+  const raw = String(aliasRaw || '').trim();
+  if (!raw) return 'SM';
+  return raw.length > 50 ? raw.slice(0, 50) : raw;
+}
+
+/**
+ * Crea (una sola vez por nombre) las marcas del Excel que no existen.
+ * Varias filas con la misma marca → un solo INSERT.
+ * @returns {Promise<{ marcasIndex: object, marcasCreadas: string[] }>}
+ */
+async function asegurarMarcasFaltantesImportacion(pool, idEmpresa, filasParseadas, marcasIndex) {
+  const index = marcasIndex || { byName: new Map(), smId: null };
+  const pendientes = new Map(); // keyNorm → nombreDisplay
+
+  // Siempre garantizar SM (vacío / sin marca).
+  pendientes.set('SM', 'SM');
+
+  for (const f of filasParseadas || []) {
+    const key = normalizarMarcaAlias(f.marcaAlias);
+    if (!key || index.byName.has(key) || (key === 'SM' && index.smId != null)) {
+      continue;
+    }
+    if (!pendientes.has(key)) {
+      pendientes.set(key, nombreMarcaParaInsertar(f.marcaAlias, key));
+    }
+  }
+
+  // Quitar las que ya están en índice (p. ej. SM ya existía).
+  for (const key of [...pendientes.keys()]) {
+    if (index.byName.has(key) || (key === 'SM' && index.smId != null)) {
+      pendientes.delete(key);
+    }
+  }
+
+  const marcasCreadas = [];
+  for (const [key, nombreDisplay] of pendientes.entries()) {
+    try {
+      const res = await marcaRepository.asegurarPorNombre(pool, idEmpresa, nombreDisplay);
+      const idMarca = Number(res.idMarca);
+      if (!Number.isFinite(idMarca)) continue;
+      if (!index.byName.has(key)) {
+        index.byName.set(key, idMarca);
+      }
+      if (key === 'SM' && index.smId == null) {
+        index.smId = idMarca;
+      }
+      // Alias adicionales del nombre guardado
+      const keyGuardado = normalizarMarcaAlias(res.nombre);
+      if (keyGuardado && !index.byName.has(keyGuardado)) {
+        index.byName.set(keyGuardado, idMarca);
+      }
+      if (res.creada) {
+        marcasCreadas.push(res.nombre || nombreDisplay);
+      }
+    } catch (err) {
+      console.error('asegurarMarcasFaltantesImportacion:', err);
+      throw new Error(
+        `No se pudo crear la marca "${nombreDisplay}": ${err.message || 'error desconocido'}`
+      );
+    }
+  }
+
+  return { marcasIndex: index, marcasCreadas };
+}
+
 async function generarNoImportadosBuffer(rowsNoImportados) {
   const headers = ['fila', 'codigo', 'descripcion', 'motivo'];
   const rows = (rowsNoImportados || []).map((r) => [
@@ -492,8 +561,13 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     ]);
   const presentacionesIndex = buildPresentacionesIndex(presentacionesRows);
   const categoriasIndex = buildCategoriasIndex(categoriasRows);
-  const marcasIndex = buildMarcasIndex(marcasRows);
+  let marcasIndex = buildMarcasIndex(marcasRows);
   const ubicacionesIndex = buildUbicacionesIndex(ubicacionesRows);
+
+  // Auto-crear marcas faltantes (idempotente: un nombre = un idMarca).
+  const { marcasIndex: marcasIndexActualizado, marcasCreadas } =
+    await asegurarMarcasFaltantesImportacion(pool, idEmpresa, filasParseadas, marcasIndex);
+  marcasIndex = marcasIndexActualizado;
 
   const vistosCodigo = new Map();
 
@@ -542,7 +616,7 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       idMarca = resolverMarcaId(marcasIndex, f.marcaAlias);
       if (idMarca == null) {
         msgs.push(
-          `Marca no encontrada para "${f.marcaAlias || 'SM'}". Cree una marca "SM" o "Sin marca" o indique el nombre exacto.`
+          `No se pudo resolver la marca "${f.marcaAlias || 'SM'}" (revise el nombre, máx. 50 caracteres).`
         );
       }
     }
@@ -591,18 +665,19 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     });
   }
 
-  return { filasResueltas, errores, idSucursal, listasPrecio };
+  return { filasResueltas, errores, idSucursal, listasPrecio, marcasCreadas };
 }
 
 async function validarArchivoConFilas(pool, user, filas) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
+  const { filasResueltas, errores, marcasCreadas } = await resolverYValidarFilas(pool, idEmpresa, filas);
   return {
     totalLeidas: filas.length,
     validas: filasResueltas.length,
     conError: errores.length,
     errores,
+    marcasCreadas: marcasCreadas || [],
     vistaPrevia: filasResueltas.slice(0, 30).map((r) => ({
       fila: r.numeroFila,
       codigo: r.codigo,
@@ -625,7 +700,7 @@ async function validarArchivo(pool, user, buffer) {
 async function ejecutarImportacionConFilas(pool, user, filas) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
+  const { filasResueltas, errores, marcasCreadas } = await resolverYValidarFilas(pool, idEmpresa, filas);
 
   if (filasResueltas.length === 0) {
     const noImportados = (errores || []).map((e) => ({
@@ -649,6 +724,7 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
       detalle: [],
       erroresValidacion: errores,
       erroresEjecucion: [],
+      marcasCreadas: marcasCreadas || [],
       noImportadosExcel
     };
   }
@@ -771,6 +847,7 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
     detalle: insertados,
     erroresValidacion: errores,
     erroresEjecucion,
+    marcasCreadas: marcasCreadas || [],
     noImportadosExcel
   };
 }

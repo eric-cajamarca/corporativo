@@ -563,6 +563,25 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="pdfIncluirMarcaEnDescripcion" [(ngModel)]="ventas.pdfIncluirMarcaEnDescripcion" name="pdfIncluirMarcaEnDescripcion">
+                      <label class="form-check-label" for="pdfIncluirMarcaEnDescripcion">
+                        En el <strong>PDF / ticket</strong> del comprobante, agregar la <strong>marca</strong> a la descripción del producto
+                        (ej. <em>Producto - Marca</em>). Desactívelo si la marca ya está en la descripción.
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="leyendaAmazonia" [(ngModel)]="ventas.leyendaAmazonia" name="leyendaAmazonia">
+                      <label class="form-check-label" for="leyendaAmazonia">
+                        Incluir leyenda de <strong>Amazonía</strong>:
+                        <em>«Bienes transferidos en la Amazonía para ser consumidos en la misma»</em>
+                        en el <strong>PDF</strong> y en el <strong>XML</strong> SUNAT (código 2001). Actívelo solo si opera en la Amazonía.
+                      </label>
+                    </div>
+                  </div>
                   <div class="col-md-6">
                     <label for="diasCreditoMaximo" class="form-label">Días de crédito máximo</label>
                     <input type="number" class="form-control" id="diasCreditoMaximo" [(ngModel)]="ventas.diasCreditoMaximo" name="diasCreditoMaximo">

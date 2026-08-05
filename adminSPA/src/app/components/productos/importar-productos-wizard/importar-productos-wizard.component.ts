@@ -43,7 +43,7 @@ export class ImportarProductosWizardComponent implements OnInit {
     { col: 'precioCliente', desc: 'Precio lista Cliente (obligatorio)' },
     { col: 'precioMayorista', desc: 'Precio lista Mayorista (obligatorio)' },
     { col: 'categoria', desc: 'Vacío = Varios' },
-    { col: 'marca', desc: 'Vacío = SM (sin marca)' },
+    { col: 'marca', desc: 'Vacío = SM. Si no existe, se crea automáticamente (mismo nombre = una sola marca)' },
     {
       col: 'ubicacion',
       desc: 'Código de la hoja Ubicaciones. Si se indica, cantidadInicial debe ser > 0 y el stock se asigna ahí'
@@ -123,9 +123,14 @@ export class ImportarProductosWizardComponent implements OnInit {
         this.validacion = res.data;
         this.paso = 3;
         if (typeof iziToast !== 'undefined') {
+          const marcas = res.data.marcasCreadas || [];
+          const extraMarcas =
+            marcas.length > 0
+              ? ` Marcas nuevas: ${marcas.slice(0, 8).join(', ')}${marcas.length > 8 ? '…' : ''}.`
+              : '';
           iziToast.info({
             title: 'Validación',
-            message: `${res.data.validas} fila(s) válida(s), ${res.data.conError} con error.`,
+            message: `${res.data.validas} fila(s) válida(s), ${res.data.conError} con error.${extraMarcas}`,
             position: 'topRight'
           });
         }
@@ -151,9 +156,14 @@ export class ImportarProductosWizardComponent implements OnInit {
           this.excelService.descargar(blob, noImport.fileName || 'productos_no_importados.xlsx');
         }
         if (typeof iziToast !== 'undefined') {
+          const marcas = res.data.marcasCreadas || [];
+          const extraMarcas =
+            marcas.length > 0
+              ? ` Marcas nuevas: ${marcas.slice(0, 8).join(', ')}${marcas.length > 8 ? '…' : ''}.`
+              : '';
           iziToast.success({
             title: 'Importación',
-            message: `Se registraron ${res.data.insertados} producto(s).`,
+            message: `Se registraron ${res.data.insertados} producto(s).${extraMarcas}`,
             position: 'topRight'
           });
         }

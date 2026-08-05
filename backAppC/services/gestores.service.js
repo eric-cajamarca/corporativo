@@ -264,6 +264,20 @@ const guardarConfiguracion = async (pool, configuraciones, user) => {
         );
     }
 
+    // Invalidar cache de config usada al armar PDF (descuento, marca en descripción, colores).
+    const tocaPdfConfig = configuraciones.some((c) => {
+      const k = String(c?.clave || '').trim().toUpperCase();
+      return k.startsWith('VENTAS_') || k.startsWith('PDF_');
+    });
+    if (tocaPdfConfig) {
+      try {
+        const cache = require('../cache/redis.client');
+        await cache.del(`pdf:config:${user.empresa}`);
+      } catch (err) {
+        console.error('guardarConfiguracion invalidar pdf:config:', err);
+      }
+    }
+
     return { success: true, count: configuraciones.length };
 };
 

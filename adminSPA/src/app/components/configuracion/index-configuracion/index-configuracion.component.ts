@@ -115,7 +115,11 @@ export class IndexConfiguracionComponent implements OnInit {
     /** Stock por ubicación en buscador de productos y conteo físico por ubicación */
     mostrarStockUbicacionesEnBuscador: false,
     /** En buscador de productos (modo venta): columnas cantidad y ver precios */
-    mostrarCantidadPreciosEnBuscador: false
+    mostrarCantidadPreciosEnBuscador: false,
+    /** En PDF/ticket de comprobante: concatenar "descripción - marca" */
+    pdfIncluirMarcaEnDescripcion: true,
+    /** Leyenda SUNAT Amazonía (PDF + XML cat. 52 código 2001) */
+    leyendaAmazonia: false
   };
   public ventasGuardando = false;
 
@@ -668,6 +672,14 @@ export class IndexConfiguracionComponent implements OnInit {
           getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
           false
         );
+        this.ventas.pdfIncluirMarcaEnDescripcion = interpretarBooleanoConfig(
+          getVal('VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION', 'true'),
+          true
+        );
+        this.ventas.leyendaAmazonia = interpretarBooleanoConfig(
+          getVal('VENTAS_LEYENDA_AMAZONIA', 'false'),
+          false
+        );
       },
       error: () => {}
     });
@@ -876,6 +888,20 @@ export class IndexConfiguracionComponent implements OnInit {
         valor: this.ventas.mostrarCantidadPreciosEnBuscador ? 'true' : 'false',
         descripcion:
           'En el modal de búsqueda de productos (venta), mostrar cantidad a agregar y botón para elegir listas de precio',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_PDF_INCLUIR_MARCA_EN_DESCRIPCION',
+        valor: this.ventas.pdfIncluirMarcaEnDescripcion ? 'true' : 'false',
+        descripcion:
+          'En el PDF/ticket del comprobante, agregar la marca al final de la descripción del producto (descripción - marca)',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_LEYENDA_AMAZONIA',
+        valor: this.ventas.leyendaAmazonia ? 'true' : 'false',
+        descripcion:
+          'Mostrar leyenda de bienes transferidos en la Amazonía en PDF y enviarla en XML SUNAT (catálogo 52, código 2001)',
         tipoDato: 'BOOLEAN'
       }
     ];
