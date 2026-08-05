@@ -687,6 +687,11 @@ export class UpdateEmpresaComponent {
           position: 'topRight',
           message: 'Empresa actualizada correctamente.'
         });
+        // Refrescar rubro en memoria y menú (Historial / opciones grifo dependen de idRubro).
+        this._empresasService.refreshEmpresaFromApi().subscribe({
+          next: () => this._permisosService.cargarNavegacion().subscribe({ error: () => {} }),
+          error: () => this._permisosService.cargarNavegacion().subscribe({ error: () => {} })
+        });
       },
       error => {
         console.error('Error al actualizar la empresa:', error);

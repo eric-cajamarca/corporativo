@@ -9,21 +9,29 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { VentasService, NotaCreditoDebitoListado } from '../../../services/ventas.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
+import { ImpuestoService } from '../../../services/impuesto.service';
+import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
+import { esImpuestoIgv } from '../../../utils/venta-igv.util';
+import {
+  ConfigIgvNota,
+  ItemNotaEditable,
+  ModoEdicionNota,
+  modoEdicionPorMotivo,
+  origenEsGravado,
+  puedeEditarCantidad,
+  puedeEditarPrecio,
+  recalcularItemNota,
+  textoAyudaModoEdicion,
+  totalesNotaDesdeItems
+} from '../../../utils/nota-credito-debito-igv.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
 
-interface ItemEditable {
-  idProducto: string;
-  descripcion?: string;
-  cantidad: number;
-  pVenta: number;
-  subtotal: number;
-  total: number;
-}
+type ItemEditable = ItemNotaEditable;
 
 @Component({
   selector: 'app-notas-credito-debito',
@@ -55,6 +63,9 @@ export class NotasCreditoDebitoComponent implements OnInit {
   guardando = false;
   creado: { idVenta: string; idComprobanteElectronico: string } | null = null;
   enviandoId: string | null = null;
+  /** Impuestos activos de la empresa (para recalcular IGV en descuentos). */
+  private impuestosActivosEmpresa: Impuesto[] = [];
+  configIgvNota: ConfigIgvNota = { tieneIgv: false, porcentaje: 18, precioIncluyeIgv: true };
 
   /** Tabla de notas emitidas */
   notasEmitidas: NotaCreditoDebitoListado[] = [];
@@ -91,10 +102,12 @@ export class NotasCreditoDebitoComponent implements OnInit {
     private _ventasService: VentasService,
     private _pdfService: PdfService,
     private _whatsappService: WhatsappService,
+    private _impuestoService: ImpuestoService,
     private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    this.cargarImpuestosEmpresa();
     this.cargarMotivosNotaCredito();
     this.cargarMotivosNotaDebito();
     this.cargarNotasEmitidas();
@@ -570,6 +583,105 @@ export class NotasCreditoDebitoComponent implements OnInit {
     this.cargarOrigen({ idComprobanteElectronico: item.idComprobanteElectronico });
   }
 
+  private cargarImpuestosEmpresa(): void {
+    this._impuestoService.obtenerTodos().subscribe({
+      next: (res) => {
+        const list: Impuesto[] = res?.data || [];
+        this.impuestosActivosEmpresa = list.filter((i) => this.impuestoEstaActivo(i));
+        this.actualizarConfigIgvNota();
+        if (this.items.length > 0) {
+          this.recalcularTodosLosItems();
+        }
+      },
+      error: () => {
+        this.impuestosActivosEmpresa = [];
+        this.actualizarConfigIgvNota();
+      }
+    });
+  }
+
+  private impuestoEstaActivo(impuesto: Impuesto): boolean {
+    const estado: unknown = (impuesto as { estado?: unknown })?.estado;
+    if (estado === true || estado === 1) return true;
+    if (estado === false || estado === 0 || estado == null) return false;
+    const s = String(estado).trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'activo' || s === 'activa';
+  }
+
+  private actualizarConfigIgvNota(): void {
+    const igvImp = this.impuestosActivosEmpresa.find((i) => esImpuestoIgv(i.descripcion));
+    const itemsOrigen = this.origen?.items || [];
+    const gravadoOrigen = this.origen
+      ? origenEsGravado(this.origen.venta?.igv, itemsOrigen)
+      : false;
+    let precioIncluye = igvImp ? !!igvImp.pIncluyeIGV : true;
+    // Inferir del origen si hay líneas gravadas (más fiable que solo el catálogo).
+    const lineaGravada = itemsOrigen.find(
+      (it) => (Number(it.total) || 0) - (Number(it.subtotal) || 0) > 0.001
+    );
+    if (lineaGravada) {
+      const cant = Number(lineaGravada.cantidad) || 0;
+      const pv = Number(lineaGravada.pVenta) || 0;
+      const brutoLinea = Math.round(cant * pv * 100) / 100;
+      const tot = Number(lineaGravada.total) || 0;
+      const sub = Number(lineaGravada.subtotal) || 0;
+      if (Math.abs(brutoLinea - tot) <= 0.05) {
+        precioIncluye = true;
+      } else if (Math.abs(brutoLinea - sub) <= 0.05) {
+        precioIncluye = false;
+      }
+    }
+    this.configIgvNota = {
+      tieneIgv: !!igvImp || gravadoOrigen,
+      porcentaje: Number(igvImp?.porcentaje) || 18,
+      precioIncluyeIgv: precioIncluye
+    };
+  }
+
+  get codigoMotivoActual(): string {
+    return this.tipoNota === '07'
+      ? this.codigoMotivoNotaCredito || '01'
+      : this.codigoMotivoNotaDebito || '01';
+  }
+
+  get modoEdicion(): ModoEdicionNota {
+    return modoEdicionPorMotivo(this.tipoNota, this.codigoMotivoActual);
+  }
+
+  get permiteEditarCantidad(): boolean {
+    return puedeEditarCantidad(this.modoEdicion);
+  }
+
+  get permiteEditarPrecio(): boolean {
+    return puedeEditarPrecio(this.modoEdicion);
+  }
+
+  get textoAyudaEdicion(): string {
+    return textoAyudaModoEdicion(this.modoEdicion);
+  }
+
+  get totalesNota(): { subtotal: number; igv: number; total: number } {
+    return totalesNotaDesdeItems(this.items);
+  }
+
+  get totalGeneral(): number {
+    return this.totalesNota.total;
+  }
+
+  onTipoNotaChange(): void {
+    if (this.tipoNota === '07' && !this.codigoMotivoNotaCredito) {
+      this.codigoMotivoNotaCredito = '01';
+    }
+    if (this.tipoNota === '08' && !this.codigoMotivoNotaDebito) {
+      this.codigoMotivoNotaDebito = '01';
+    }
+    this.recalcularTodosLosItems();
+  }
+
+  onMotivoChange(): void {
+    this.recalcularTodosLosItems();
+  }
+
   cargarOrigen(params: { idComprobanteElectronico?: string; serie?: string; numero?: string; tipoComprobante?: string }): void {
     this.loadingOrigen = true;
     this.origen = null;
@@ -578,14 +690,26 @@ export class NotasCreditoDebitoComponent implements OnInit {
       next: (res) => {
         this.loadingOrigen = false;
         this.origen = res?.data ?? null;
-        this.items = (this.origen?.items ?? []).map(it => ({
-          idProducto: it.idProducto,
-          descripcion: it.descripcion,
-          cantidad: Number(it.cantidad) || 0,
-          pVenta: Number(it.pVenta) || 0,
-          subtotal: Number(it.subtotal) || 0,
-          total: Number(it.total) || 0
-        }));
+        this.items = (this.origen?.items ?? []).map((it) => {
+          const cantidad = Number(it.cantidad) || 0;
+          const pVenta = Number(it.pVenta) || 0;
+          const subtotal = Number(it.subtotal) || 0;
+          const total = Number(it.total) || 0;
+          return {
+            idProducto: it.idProducto,
+            descripcion: it.descripcion,
+            cantidad,
+            pVenta,
+            subtotal,
+            total,
+            cantidadOrigen: cantidad,
+            pVentaOrigen: pVenta,
+            subtotalOrigen: subtotal,
+            totalOrigen: total
+          };
+        });
+        this.actualizarConfigIgvNota();
+        this.recalcularTodosLosItems();
       },
       error: (err) => {
         this.loadingOrigen = false;
@@ -598,14 +722,14 @@ export class NotasCreditoDebitoComponent implements OnInit {
   }
 
   recalcularItem(item: ItemEditable): void {
-    const cant = Number(item.cantidad) || 0;
-    const pv = Number(item.pVenta) || 0;
-    item.subtotal = Math.round(cant * pv * 100) / 100;
-    item.total = item.subtotal;
+    recalcularItemNota(item, this.modoEdicion, this.configIgvNota);
   }
 
-  get totalGeneral(): number {
-    return this.items.reduce((s, it) => s + (Number(it.total) || 0), 0);
+  private recalcularTodosLosItems(): void {
+    this.actualizarConfigIgvNota();
+    for (const it of this.items) {
+      recalcularItemNota(it, this.modoEdicion, this.configIgvNota);
+    }
   }
 
   crearNota(): void {
@@ -618,6 +742,19 @@ export class NotasCreditoDebitoComponent implements OnInit {
     if (this.items.length === 0 || this.items.every(it => (Number(it.cantidad) || 0) <= 0)) {
       if (typeof iziToast !== 'undefined') {
         iziToast.warning({ title: 'Ítems', message: 'Debe haber al menos un ítem con cantidad mayor a 0.' });
+      }
+      return;
+    }
+    // Asegurar montos fiscales según motivo antes de enviar.
+    this.recalcularTodosLosItems();
+    const tot = this.totalesNota;
+    const gravadoOrigen = origenEsGravado(this.origen?.venta?.igv, this.origen?.items || []);
+    if (gravadoOrigen && tot.total > 0 && tot.igv <= 0) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'IGV',
+          message: 'El comprobante origen es gravado pero la nota quedó sin IGV. Revise cantidades/precios o el motivo SUNAT.'
+        });
       }
       return;
     }
@@ -634,7 +771,8 @@ export class NotasCreditoDebitoComponent implements OnInit {
           cantidad: Number(it.cantidad) || 0,
           pVenta: Number(it.pVenta) || 0,
           subtotal: Number(it.subtotal) || 0,
-          total: Number(it.total) || 0
+          total: Number(it.total) || 0,
+          igv: Number(it.total) - Number(it.subtotal) > 0.001 ? 1 : 0
         }))
     };
     this.guardando = true;

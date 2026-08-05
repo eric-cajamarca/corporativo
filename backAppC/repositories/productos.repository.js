@@ -1153,7 +1153,7 @@ exports.insertarProducto = async (transaction, row) => {
 };
 
 exports.insertarLoteInicial = async (transaction, row) => {
-  return transaction
+  const result = await transaction
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('idProducto', sql.UniqueIdentifier, row.idProducto)
@@ -1162,8 +1162,22 @@ exports.insertarLoteInicial = async (transaction, row) => {
     .input('cantidadIngresada', sql.Decimal(18, 2), row.cantidadIngresada)
     .input('cantidadDisponible', sql.Decimal(18, 2), row.cantidadDisponible)
     .query(
-      'INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible) VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)'
+      `INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible)
+       OUTPUT INSERTED.idLote
+       VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)`
     );
+  const idLote = result.recordset && result.recordset[0] ? result.recordset[0].idLote : null;
+  const idUbicacion = row.idUbicacion != null ? Number(row.idUbicacion) : null;
+  const cant = parseFloat(row.cantidadDisponible) || 0;
+  if (idLote && idUbicacion && !Number.isNaN(idUbicacion) && cant > 0) {
+    await transaction
+      .request()
+      .input('idLote', sql.UniqueIdentifier, idLote)
+      .input('idUbicacion', sql.Int, idUbicacion)
+      .input('cantidad', sql.Decimal(18, 3), cant)
+      .query('INSERT INTO LotesUbicacion (idLote, idUbicacion, cantidad) VALUES (@idLote, @idUbicacion, @cantidad)');
+  }
+  return idLote;
 };
 
 exports.actualizarProductoCompra = async (pool, detalle) => {

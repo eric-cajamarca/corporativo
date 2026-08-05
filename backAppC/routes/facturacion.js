@@ -25,6 +25,7 @@ router.get('/comprobantes/:idComprobanteElectronico/origen-para-nota', facturaci
 router.post('/comprobantes/:idComprobanteElectronico/enviar', facturacionController.enviarComprobanteSunat);
 router.get('/comprobantes/:idComprobanteElectronico/xml', facturacionController.obtenerXmlComprobante);
 router.get('/comprobantes/:idComprobanteElectronico/xml-descarga', facturacionController.obtenerXmlComprobanteDescarga);
+router.post('/comprobantes/por-venta/:idVenta/asegurar-hash', facturacionController.asegurarHashComprobantePorVenta);
 router.get('/comprobantes/:idComprobanteElectronico/cdr', facturacionController.obtenerCdrComprobante);
 router.post('/notas-crecimiento', facturacionController.crearNotaCreditoDebito);
 router.get('/comunicacion-baja/comprobantes', facturacionController.listarComprobantesParaBaja);

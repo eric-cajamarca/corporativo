@@ -108,7 +108,7 @@
         <div class="row mb-3">
           <div class="col-md-3">
             <label class="form-label small">Tipo de nota</label>
-            <select class="form-select form-select-sm" [(ngModel)]="tipoNota">
+            <select class="form-select form-select-sm" [(ngModel)]="tipoNota" (ngModelChange)="onTipoNotaChange()">
               <option value="07">Nota de crédito (07)</option>
               <option value="08">Nota de débito (08)</option>
             </select>
@@ -116,7 +116,7 @@
           @if (tipoNota === '07') {
             <div class="col-md-5">
               <label class="form-label small">Motivo (Catálogo 09)</label>
-              <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaCredito">
+              <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaCredito" (ngModelChange)="onMotivoChange()">
                 @for (m of motivosNotaCredito; track m.codigoSunat) {
                   <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
                 }
@@ -126,7 +126,7 @@
           @if (tipoNota === '08') {
             <div class="col-md-5">
               <label class="form-label small">Motivo (Catálogo 10)</label>
-              <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaDebito">
+              <select class="form-select form-select-sm" [(ngModel)]="codigoMotivoNotaDebito" (ngModelChange)="onMotivoChange()">
                 @for (m of motivosNotaDebito; track m.codigoSunat) {
                   <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
                 }
@@ -135,7 +135,7 @@
           }
         </div>
 
-        <p class="small text-muted mb-2">Edite cantidades y precios si corresponde. Luego pulse "Crear nota".</p>
+        <p class="small text-muted mb-2">{{ textoAyudaEdicion }}</p>
         <div class="table-responsive">
           <table class="table table-sm table-bordered table-notas-items-responsive">
             <thead class="table-light">
@@ -143,8 +143,9 @@
                 <th>Producto</th>
                 <th style="width:100px">Cantidad</th>
                 <th style="width:120px">P. venta</th>
-                <th style="width:120px">Subtotal</th>
-                <th style="width:120px">Total</th>
+                <th style="width:110px">Subtotal</th>
+                <th style="width:100px">IGV</th>
+                <th style="width:110px">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -153,21 +154,37 @@
                   <td data-label="Producto">{{ it.descripcion || it.idProducto }}</td>
                   <td data-label="Cantidad">
                     <input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad"
-                           min="0" step="0.01" (ngModelChange)="recalcularItem(it)">
+                           min="0" [attr.max]="permiteEditarCantidad ? it.cantidadOrigen : null" step="0.01"
+                           [readonly]="!permiteEditarCantidad"
+                           (ngModelChange)="recalcularItem(it)">
                   </td>
                   <td data-label="P. venta">
                     <input type="number" class="form-control form-control-sm" [(ngModel)]="it.pVenta"
-                           min="0" step="0.01" (ngModelChange)="recalcularItem(it)">
+                           min="0" step="0.01"
+                           [readonly]="!permiteEditarPrecio"
+                           (ngModelChange)="recalcularItem(it)">
                   </td>
                   <td data-label="Subtotal">{{ it.subtotal | number:'1.2-2' }}</td>
+                  <td data-label="IGV">{{ (it.total - it.subtotal) | number:'1.2-2' }}</td>
                   <td data-label="Total">{{ it.total | number:'1.2-2' }}</td>
                 </tr>
               }
             </tbody>
             <tfoot>
+              <tr class="table-light">
+                <td colspan="3" class="text-end fw-bold">Subtotal</td>
+                <td class="fw-bold" data-label="Subtotal">{{ totalesNota.subtotal | number:'1.2-2' }}</td>
+                <td colspan="2"></td>
+              </tr>
+              <tr class="table-light">
+                <td colspan="3" class="text-end fw-bold">IGV{{ configIgvNota.tieneIgv ? ' (' + configIgvNota.porcentaje + '%)' : '' }}</td>
+                <td colspan="2" class="fw-bold" data-label="IGV">{{ totalesNota.igv | number:'1.2-2' }}</td>
+                <td></td>
+              </tr>
               <tr class="table-light fila-vacia">
-                <td colspan="4" class="text-end fw-bold">Total</td>
-                <td class="fw-bold" data-label="Total">{{ totalGeneral | number:'1.2-2' }}</td>
+                <td colspan="3" class="text-end fw-bold">Total</td>
+                <td colspan="2"></td>
+                <td class="fw-bold" data-label="Total">{{ totalesNota.total | number:'1.2-2' }}</td>
               </tr>
             </tfoot>
           </table>

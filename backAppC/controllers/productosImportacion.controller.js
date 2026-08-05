@@ -19,7 +19,9 @@ const descargarPlantilla = async (req, res) => {
       }
       throw e;
     }
-    const buf = await productosImportacionService.generarPlantillaBuffer();
+    const buf = await withPool((pool) =>
+      productosImportacionService.generarPlantillaBuffer(pool, req.user.empresa)
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

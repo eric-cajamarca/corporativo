@@ -1,3 +1,14 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+/* Con sesión: sin scroll de documento; el scroll está en .main-content del app-shell. */
+body:has(.app-shell-auth) {
+  overflow: hidden;
+}
+
 /**
  * Modales apilados (p. ej. NgbModal encima de Bootstrap Modal en compras).
  * No usar `.modal.show ~ .modal-backdrop`: en muchos templates el backdrop va *después* del `.modal`
@@ -88,6 +99,7 @@ body > .modal-backdrop.modal-inventario-ngb-backdrop ~ .modal-backdrop.modal-inv
 /* Cinta de avisos bajo el navbar: evita que el contenido quede tapado (altura ~2.75rem + borde) */
 body.app-has-banner-ribbon .main-content {
   margin-top: calc(64px + 2.85rem);
+  height: calc(100% - 64px - 2.85rem);
 }
 
 /**

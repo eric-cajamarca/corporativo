@@ -12,33 +12,30 @@ function columnLetterFromIndex(colIndex) {
   return s;
 }
 
-async function generateExcelFromData(data) {
-  const workbook = new ExcelJS.Workbook();
-  
-  // Crear hoja con nombre personalizado
+function addWorksheetFromData(workbook, data) {
   const worksheetName = data.worksheetName || 'Reporte';
   const worksheet = workbook.addWorksheet(worksheetName);
 
-  const colCount = Math.max(1, (data.columns && data.columns.length) || 1);
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const colCount = Math.max(1, columns.length || 1);
 
-  // Título del reporte (merge solo columnas A..N donde N = número de columnas de datos)
   if (data.title) {
     const lastCol = columnLetterFromIndex(colCount);
     worksheet.mergeCells(`A1:${lastCol}1`);
     const titleCell = worksheet.getCell('A1');
     titleCell.value = data.title;
     titleCell.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleCell.fill = { 
-      type: 'pattern', 
-      pattern: 'solid', 
-      fgColor: { argb: 'FF0056b3' } // Azul corporativo
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF0056b3' }
     };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     titleCell.height = 25;
   }
 
-  // Headers: NO usar row.fill / row.font en el Row (ExcelJS sombrea toda la fila hasta el final de la hoja).
-  const headerRow = worksheet.addRow(data.columns);
+  const headerRow = worksheet.addRow(columns);
   const headerFill = {
     type: 'pattern',
     pattern: 'solid',
@@ -53,15 +50,14 @@ async function generateExcelFromData(data) {
     cell.alignment = headerAlign;
   }
 
-  // Datos: relleno alternado solo en celdas 1..colCount
   const zebraFill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FFF5F5F5' }
   };
-  data.rows.forEach((fila, index) => {
+  rows.forEach((fila, index) => {
     const row = worksheet.addRow(fila);
-    
+
     for (let colIndex = 0; colIndex < colCount; colIndex++) {
       const cell = row.getCell(colIndex + 1);
       const valor = fila[colIndex];
@@ -74,10 +70,9 @@ async function generateExcelFromData(data) {
     }
   });
 
-  // Auto-width solo para columnas de la tabla (1..colCount)
   for (let index = 0; index < colCount; index++) {
     const column = worksheet.getColumn(index + 1);
-    let maxLength = data.columns[index]?.toString().length || 10;
+    let maxLength = columns[index]?.toString().length || 10;
     column.eachCell({ includeEmpty: false }, (cell) => {
       const cellLength = cell.value != null ? cell.value.toString().length : 0;
       maxLength = Math.max(maxLength, cellLength);
@@ -85,57 +80,24 @@ async function generateExcelFromData(data) {
     column.width = maxLength < 10 ? 10 : maxLength + 2;
   }
 
-  // Freeze pane (opcional) - congelar primera fila
-  worksheet.views = [
-    { state: 'frozen', xSplit: 0, ySplit: data.title ? 2 : 1 }
-  ];
+  worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: data.title ? 2 : 1 }];
+}
 
-  return await workbook.xlsx.writeBuffer();
+async function generateExcelFromData(data) {
+  const workbook = new ExcelJS.Workbook();
+
+  if (Array.isArray(data.sheets) && data.sheets.length > 0) {
+    for (const sheet of data.sheets) {
+      if (!sheet || !Array.isArray(sheet.columns)) {
+        throw new Error('EXCEL_SHEET_INVALIDA');
+      }
+      addWorksheetFromData(workbook, sheet);
+    }
+    return workbook.xlsx.writeBuffer();
+  }
+
+  addWorksheetFromData(workbook, data);
+  return workbook.xlsx.writeBuffer();
 }
 
 module.exports = { generateExcelFromData };
-
-
-// const ExcelJS = require('exceljs');
-
-// async function generateExcelFromData(data) {
-//   // Ejemplo: data = { columns: [...], rows: [...], title: 'Reporte' }
-//   const workbook = new ExcelJS.Workbook();
-//   const worksheet = workbook.addWorksheet('Reporte');
-
-//   // Título
-//   if (data.title) {
-//     worksheet.mergeCells('A1:D1');
-//     const titleCell = worksheet.getCell('A1');
-//     titleCell.value = data.title;
-//     titleCell.font = { size: 16, bold: true };
-//     titleCell.alignment = { horizontal: 'center' };
-//   }
-
-//   // Headers
-//   worksheet.addRow([]); // Espacio
-//   const headerRow = worksheet.addRow(data.columns);
-//   headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-//   headerRow.fill = {
-//     type: 'pattern',
-//     pattern: 'solid',
-//     fgColor: { argb: 'FF2C3E50' }
-//   };
-
-//   // Data
-//   data.rows.forEach(row => worksheet.addRow(row));
-
-//   // Auto-width
-//   worksheet.columns.forEach(column => {
-//     let maxLength = 0;
-//     column.eachCell({ includeEmpty: false }, cell => {
-//       const cellLength = cell.value ? cell.value.toString().length : 0;
-//       maxLength = Math.max(maxLength, cellLength);
-//     });
-//     column.width = maxLength < 10 ? 10 : maxLength + 2;
-//   });
-
-//   return await workbook.xlsx.writeBuffer();
-// }
-
-// module.exports = { generateExcelFromData };

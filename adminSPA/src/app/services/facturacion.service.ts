@@ -112,6 +112,38 @@ export class FacturacionService {
     });
   }
 
+  /**
+   * Firma el XML si falta hash (DigestValue) para PDF/QR. No envía a SUNAT.
+   * Notas de venta u otros no electrónicos → data.skipped = true.
+   */
+  asegurarHashPorVenta(idVenta: number): Observable<{
+    data?: {
+      ok?: boolean;
+      skipped?: boolean;
+      reason?: string;
+      firmadoAhora?: boolean;
+      hash?: string;
+      idComprobanteElectronico?: string;
+    };
+    message?: string;
+  }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this._http.post<{
+      data?: {
+        ok?: boolean;
+        skipped?: boolean;
+        reason?: string;
+        firmadoAhora?: boolean;
+        hash?: string;
+        idComprobanteElectronico?: string;
+      };
+      message?: string;
+    }>(this.url + 'facturacion/comprobantes/por-venta/' + idVenta + '/asegurar-hash', {}, {
+      headers,
+      withCredentials: true
+    });
+  }
+
   /** Envío por lotes: envía todos los comprobantes pendientes de la empresa. */
   enviarLoteSunat(): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -411,7 +443,7 @@ export class FacturacionService {
     tipoNota: '07' | '08';
     codigoMotivoNotaCredito?: string;
     codigoMotivoNotaDebito?: string;
-    items: { idProducto: string; cantidad: number; pVenta: number; subtotal: number; total: number }[];
+    items: { idProducto: string; cantidad: number; pVenta: number; subtotal: number; total: number; igv?: number }[];
   }): Observable<{ data: { idVenta: string; idComprobanteElectronico: string } }> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post<{ data: { idVenta: string; idComprobanteElectronico: string } }>(

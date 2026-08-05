@@ -28,6 +28,7 @@
           <h2 class="h5 mb-3">Paso 1 — Descargar plantilla Excel</h2>
           <p class="text-muted small">
             Complete la plantilla con sus productos. Máximo <strong>4000 filas</strong> y <strong>8 MB</strong>.
+            La plantilla incluye la hoja <strong>Ubicaciones</strong> con los códigos registrados; use uno en la columna <code>ubicacion</code> para asignar el stock inicial.
             El stock inicial se registra en la <strong>sucursal principal</strong>.
           </p>
           <div class="table-responsive mb-3">
@@ -132,7 +133,7 @@
                 <thead>
                   <tr>
                     <th>Fila</th><th>Código</th><th>Descripción</th><th>Cant.</th>
-                    <th>Costo</th><th>P. normal</th><th>P. cliente</th><th>P. mayorista</th>
+                    <th>Costo</th><th>P. normal</th><th>P. cliente</th><th>P. mayorista</th><th>Ubicación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,6 +147,7 @@
                       <td>{{ v.precioNormal }}</td>
                       <td>{{ v.precioCliente }}</td>
                       <td>{{ v.precioMayorista }}</td>
+                      <td>{{ v.ubicacion || '—' }}</td>
                     </tr>
                   }
                 </tbody>

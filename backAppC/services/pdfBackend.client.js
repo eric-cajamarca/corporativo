@@ -46,11 +46,14 @@ async function generarPdfComprobanteVenta(datos, formato = 'A4') {
 
 /**
  * Genera un xlsx con tabla simple (headers + filas) vía pdf-backend.
- * @param {{ columns: string[], rows: any[][], title?: string, worksheetName?: string }} data
+ * @param {{ columns?: string[], rows?: any[][], title?: string, worksheetName?: string, sheets?: Array<{ worksheetName?: string, columns: string[], rows: any[][], title?: string }> }} data
  * @returns {Promise<Buffer>}
  */
 async function generarExcel(data) {
-  if (!data || !Array.isArray(data.columns) || !Array.isArray(data.rows)) {
+  const multi =
+    data && Array.isArray(data.sheets) && data.sheets.length > 0 && data.sheets.every((s) => s && Array.isArray(s.columns) && Array.isArray(s.rows));
+  const single = data && Array.isArray(data.columns) && Array.isArray(data.rows);
+  if (!multi && !single) {
     throw new Error('PDF_BACKEND_GENERAR_EXCEL_DATOS_INVALIDOS');
   }
   const res = await axios.post(

@@ -190,6 +190,28 @@ async function obtenerCodigosExistentes(pool, idEmpresa, codigos) {
   return existentes;
 }
 
+/** Ubicaciones registradas de la sucursal (para plantilla e importación). */
+async function obtenerUbicacionesPorSucursal(pool, idEmpresa, idSucursal) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .query(`
+      SELECT
+        up.idUbicacion,
+        up.codigoUbicacion,
+        CONVERT(VARCHAR(36), up.idSucursal) AS idSucursal,
+        RTRIM(LTRIM(ISNULL(s.nombre, ''))) AS nombreSucursal,
+        up.prioridad
+      FROM dbo.UbicacionesPrioridad up
+      INNER JOIN dbo.Sucursal s ON s.idSucursal = up.idSucursal AND s.idEmpresa = @idEmpresa
+      WHERE up.idSucursal = @idSucursal
+        AND RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) <> ''
+      ORDER BY up.prioridad, up.codigoUbicacion
+    `);
+  return r.recordset || [];
+}
+
 module.exports = {
   obtenerIdSucursalPrincipal,
   obtenerIdPresentacionPorCodigo,
@@ -200,5 +222,6 @@ module.exports = {
   obtenerPresentacionesCatalogo,
   obtenerCategoriasCatalogo,
   obtenerMarcasCatalogo,
-  obtenerCodigosExistentes
+  obtenerCodigosExistentes,
+  obtenerUbicacionesPorSucursal
 };

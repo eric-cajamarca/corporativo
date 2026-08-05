@@ -469,6 +469,20 @@ const resolverMontosCabeceraImpuestos = (venta, totalesDet) => {
   const totOk = totCab > EPS_FISCAL && (totOkSinIgvExtra || totOkConIgv);
 
   if (!subOk || !totOk) {
+    // POS puede mandar IGV en cabecera (p. ej. precio incluye IGV) aunque las líneas
+    // no desglosen bien: no descartar el IGV gravado si el total cuadra.
+    if (igvCab > EPS_FISCAL && totCab > EPS_FISCAL && (totOkSinIgvExtra || totOkConIgv)) {
+      const subPreferido =
+        subCab > EPS_FISCAL ? subCab : redondear2(Math.max(0, totCab - igvCab));
+      return {
+        subtotal: subPreferido,
+        igv: igvCab,
+        exonerado: 0,
+        gratuito: gratCab > EPS_FISCAL ? gratCab : gratDet,
+        otrosCargos: otrCab > EPS_FISCAL ? otrCab : otrDet,
+        total: totCab
+      };
+    }
     return {
       subtotal: subDet,
       igv: igvDet,
@@ -479,13 +493,16 @@ const resolverMontosCabeceraImpuestos = (venta, totalesDet) => {
     };
   }
 
-  let igv = igvCab >= 0 ? igvCab : igvDet;
+  // Preferir IGV de cabecera cuando el POS lo informa (comprobante gravado).
+  let igv = igvCab > EPS_FISCAL ? igvCab : igvDet;
   if (igvDet > EPS_FISCAL && igvCab <= EPS_FISCAL) {
     igv = igvDet;
   }
 
   let exonerado = exoCab > EPS_FISCAL ? exoCab : exoDet;
-  if (exoCab <= EPS_FISCAL && redondear2(igv) <= EPS_FISCAL) {
+  if (redondear2(igv) > EPS_FISCAL) {
+    exonerado = 0;
+  } else if (exoCab <= EPS_FISCAL && redondear2(igv) <= EPS_FISCAL) {
     const neto = redondear2(subCab - descCab);
     const esperado = redondear2(neto + gratCab + otrCab);
     if (neto > EPS_FISCAL && Math.abs(totCab - esperado) <= 0.05) {

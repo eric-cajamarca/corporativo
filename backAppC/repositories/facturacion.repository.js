@@ -401,6 +401,43 @@ exports.listarIdsComprobantePendientePorVentaRepo = async (pool, idVenta, idEmpr
   return (r.recordset || []).map((row) => row.idComprobanteElectronico);
 };
 
+/** CE asociado a una venta (para PDF/hash). idEmpresa obligatorio. */
+exports.obtenerComprobanteElectronicoPorVentaRepo = async (pool, idVenta, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input("idVenta", sql.Int, idVenta)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1
+        ce.idComprobanteElectronico,
+        ce.hash,
+        ce.idEstadoSunat,
+        ce.tipoComprobante
+      FROM ComprobantesElectronicos ce
+      WHERE ce.idVenta = @idVenta AND ce.idEmpresa = @idEmpresa
+      ORDER BY ce.fechaEmision DESC
+    `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
+};
+
+/**
+ * Si se edita una venta aún pendiente de SUNAT, invalida el hash previo
+ * para que la próxima impresión/firma regenere DigestValue con los datos actuales.
+ */
+exports.invalidarHashComprobantePendientePorVentaRepo = async (transactionOrPool, idVenta, idEmpresa) => {
+  await transactionOrPool
+    .request()
+    .input("idVenta", sql.Int, idVenta)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE ComprobantesElectronicos
+      SET hash = ''
+      WHERE idVenta = @idVenta
+        AND idEmpresa = @idEmpresa
+        AND idEstadoSunat = 7
+    `);
+};
+
 exports.registrarFalloIntentoEnvioRepo = async (pool, idComprobanteElectronico, idEmpresa) => {
   await pool
     .request()
@@ -954,16 +991,22 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
       const pVenta = Number(it.pVenta) || 0;
       const subtotalItem = Number(it.subtotal) || 0;
       const totalItem = Number(it.total) || 0;
+      const afectaIgv =
+        it.igv === true ||
+        it.igv === 1 ||
+        it.igv === "1" ||
+        Math.round((totalItem - subtotalItem) * 100) / 100 > 0;
       await reqDet
         .input("idVenta", sql.Int, idVenta)
         .input("idProducto", sql.UniqueIdentifier, it.idProducto)
         .input("cantidad", sql.Decimal(18, 3), cantidad)
         .input("pVenta", sql.Decimal(18, 5), pVenta)
         .input("subtotal", sql.Decimal(18, 2), subtotalItem)
+        .input("igv", sql.Bit, afectaIgv ? 1 : 0)
         .input("total", sql.Decimal(18, 2), totalItem)
         .query(`
           INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido, costoUnitario, costoTotal)
-          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, 0, @subtotal, 0, 0, @total, 0, 1, 0, 0)
+          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, 0, @subtotal, @igv, 0, @total, 0, 1, 0, 0)
         `);
     }
 

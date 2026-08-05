@@ -127,10 +127,11 @@ function planPermiteComprasSunatMenu(deploymentMode, planCodeEfectivo) {
   return (orden[p] || 1) >= 3;
 }
 
-/** Rubro Grifo en BD: código `GRF` (tabla Rubros). */
+/** Rubro Grifo en BD: código `GRF` (tabla Rubros). Si hay código de sistema, el texto SUNAT no lo sobrescribe. */
 function esRubroGrifo(ctx) {
   const codigo = String(ctx?.codigoRubro || '').trim().toUpperCase();
   if (codigo === 'GRF' || codigo === 'GRIFO') return true;
+  if (codigo) return false;
   const rubroTexto = String(ctx?.rubro || '').trim().toLowerCase();
   return rubroTexto === 'grifo' || rubroTexto.includes('grifo');
 }
@@ -139,6 +140,7 @@ function esRubroGrifo(ctx) {
 function esRubroHotel(ctx) {
   const codigo = String(ctx?.codigoRubro || '').trim().toUpperCase();
   if (codigo === 'HOTEL' || codigo === 'HTL') return true;
+  if (codigo) return false;
   const rubroTexto = String(ctx?.rubro || '').trim().toLowerCase();
   return rubroTexto === 'hotel' || rubroTexto.includes('hotel');
 }

@@ -96,15 +96,20 @@ async function crearProductoConTransaccion(pool, params) {
         lote.idSucursal &&
         (lote.cantidadIngresada > 0 || lote.costoUnitario != null)
       ) {
-        const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
+        const cantidad = Math.max(0, parseFloat(lote.cantidadIngresada) || 0);
         const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
+        const idUbicacion =
+          lote.idUbicacion != null && lote.idUbicacion !== ''
+            ? Number(lote.idUbicacion)
+            : null;
         await ProductosRepository.insertarLoteInicial(transaction, {
           idEmpresa,
           idProducto: datosProducto.idProducto,
           idSucursal: lote.idSucursal,
           costoUnitario: costoLote,
           cantidadIngresada: cantidad,
-          cantidadDisponible: cantidad
+          cantidadDisponible: cantidad,
+          idUbicacion: idUbicacion && !Number.isNaN(idUbicacion) ? idUbicacion : null
         });
       }
 

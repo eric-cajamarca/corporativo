@@ -59,12 +59,14 @@ export class VentasContainerComponent implements OnInit {
     });
   }
 
-  /** Vista grifo: código GRF o giro SUNAT con combustible/grifo. */
+  /**
+   * Vista grifo solo por código de sistema (GRF).
+   * No inferir por texto SUNAT: GEN se normaliza a null y el giro puede decir
+   * "combustible/grifo" sin ser rubro GRF (p. ej. tras cambiar en Editar empresa).
+   */
   esVistaGrifo(): boolean {
     const codigo = String(this.codigoRubro || '').trim().toUpperCase();
-    if (codigo === 'GRF' || codigo === 'GRIFO') return true;
-    const rubro = String(this.rubroEmpresa || '').trim().toLowerCase();
-    return rubro === 'grifo' || rubro.includes('grifo') || rubro.includes('combustible');
+    return codigo === 'GRF' || codigo === 'GRIFO';
   }
 
   /** Código efectivo para el switch de vistas por rubro. */

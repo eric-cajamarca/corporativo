@@ -3,17 +3,19 @@ const sql = require('mssql');
 const CODIGOS_RUBRO_ACTIVOS = new Set(['GEN', 'GRF', 'HOTEL']);
 const CODIGOS_COMERCIO = new Set(['GEN', 'FERR', 'RETAIL', null, '']);
 
-/** Rubro Grifo en BD: código `GRF`. */
+/** Rubro Grifo en BD: código `GRF`. Si hay código de sistema, el texto SUNAT no lo sobrescribe. */
 function esRubroGrifo(codigoRubro, rubroTexto) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
   if (codigo === 'GRF' || codigo === 'GRIFO') return true;
+  if (codigo) return false;
   const rubro = String(rubroTexto || '').trim().toLowerCase();
   return rubro === 'grifo' || rubro.includes('grifo');
 }
 
 function esRubroHotel(codigoRubro, rubroTexto) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
-  if (codigo === 'HOTEL') return true;
+  if (codigo === 'HOTEL' || codigo === 'HTL') return true;
+  if (codigo) return false;
   const rubro = String(rubroTexto || '').trim().toLowerCase();
   return rubro === 'hotel' || rubro.includes('hotel');
 }

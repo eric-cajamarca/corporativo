@@ -2610,6 +2610,16 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       }
     }
 
+    // Edición pre-SUNAT: el DigestValue previo ya no representa el documento actual.
+    if (!esNotaVentaSinSunat && idEstadoSunat === 7) {
+      const FacturacionRepository = require('./facturacion.repository');
+      await FacturacionRepository.invalidarHashComprobantePendientePorVentaRepo(
+        transaction,
+        idVenta,
+        idEmpresa
+      );
+    }
+
     await transaction.commit();
     return { ok: true };
   } catch (err) {

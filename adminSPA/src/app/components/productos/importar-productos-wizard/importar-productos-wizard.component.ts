@@ -43,7 +43,11 @@ export class ImportarProductosWizardComponent implements OnInit {
     { col: 'precioCliente', desc: 'Precio lista Cliente (obligatorio)' },
     { col: 'precioMayorista', desc: 'Precio lista Mayorista (obligatorio)' },
     { col: 'categoria', desc: 'Vacío = Varios' },
-    { col: 'marca', desc: 'Vacío = SM (sin marca)' }
+    { col: 'marca', desc: 'Vacío = SM (sin marca)' },
+    {
+      col: 'ubicacion',
+      desc: 'Código de la hoja Ubicaciones. Si se indica, cantidadInicial debe ser > 0 y el stock se asigna ahí'
+    }
   ];
 
   constructor(

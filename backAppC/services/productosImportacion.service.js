@@ -133,6 +133,13 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
   ]);
   const categoriaAlias = leerCelda(mapaNorm, ['categoria', 'categoría']);
   const marcaAlias = leerCelda(mapaNorm, ['marca']);
+  const ubicacionCodigo = leerCelda(mapaNorm, [
+    'ubicacion',
+    'ubicación',
+    'codigoubicacion',
+    'codigo ubicacion',
+    'codigoUbicacion'
+  ]);
 
   return {
     numeroFila,
@@ -145,7 +152,8 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
     precioNormalStr,
     precioMayoristaStr,
     categoriaAlias,
-    marcaAlias
+    marcaAlias,
+    ubicacionCodigo
   };
 }
 
@@ -208,7 +216,8 @@ async function parseBufferAObjetos(buffer) {
       !row.precioNormalStr &&
       !row.precioMayoristaStr &&
       !row.categoriaAlias &&
-      !row.marcaAlias;
+      !row.marcaAlias &&
+      !row.ubicacionCodigo;
     if (!vacia) {
       out.push(row);
     }
@@ -216,7 +225,53 @@ async function parseBufferAObjetos(buffer) {
   return out;
 }
 
-async function generarPlantillaBuffer() {
+function buildUbicacionesIndex(rows) {
+  const byCodigo = new Map();
+  for (const row of rows || []) {
+    const key = normalizarCodigoKey(row.codigoUbicacion);
+    if (!key || byCodigo.has(key)) continue;
+    byCodigo.set(key, {
+      idUbicacion: Number(row.idUbicacion),
+      codigoUbicacion: String(row.codigoUbicacion || '').trim()
+    });
+  }
+  return byCodigo;
+}
+
+/**
+ * Reglas de ubicación en importación:
+ * - vacía: OK (lote sin LotesUbicacion, como antes)
+ * - con valor y cantidadInicial <= 0: error
+ * - con valor no registrado: error
+ */
+function resolverUbicacionImportacion(ubicacionCodigoRaw, cantidadInicial, ubicacionesIndex) {
+  const codigo = String(ubicacionCodigoRaw || '').trim();
+  if (!codigo) {
+    return { idUbicacion: null, codigoUbicacion: '', error: null };
+  }
+  if (!(cantidadInicial > 0)) {
+    return {
+      idUbicacion: null,
+      codigoUbicacion: codigo,
+      error: 'ubicacion requiere cantidadInicial > 0'
+    };
+  }
+  const hit = ubicacionesIndex.get(normalizarCodigoKey(codigo));
+  if (!hit) {
+    return {
+      idUbicacion: null,
+      codigoUbicacion: codigo,
+      error: `Ubicación no registrada: "${codigo}". Use un código de la hoja Ubicaciones.`
+    };
+  }
+  return {
+    idUbicacion: hit.idUbicacion,
+    codigoUbicacion: hit.codigoUbicacion,
+    error: null
+  };
+}
+
+async function generarPlantillaBuffer(pool, idEmpresa) {
   const headers = [
     'codigo',
     'descripcion',
@@ -227,13 +282,57 @@ async function generarPlantillaBuffer() {
     'precioCliente',
     'precioMayorista',
     'categoria',
-    'marca'
+    'marca',
+    'ubicacion'
   ];
-  const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 9.9, 8.99, 8.5, 'Varios', 'SM'];
+  const idSucursal = await productosImportacionRepository.obtenerIdSucursalPrincipal(pool, idEmpresa);
+  let ubicaciones = [];
+  if (idSucursal) {
+    ubicaciones = await productosImportacionRepository.obtenerUbicacionesPorSucursal(
+      pool,
+      idEmpresa,
+      idSucursal
+    );
+  }
+  const ejemploUbicacion =
+    ubicaciones.length > 0 ? String(ubicaciones[0].codigoUbicacion || '').trim() : '';
+  const ejemplo = [
+    'EJEMPLO001',
+    'Producto de demostración',
+    'NIU',
+    10,
+    5.5,
+    9.9,
+    8.99,
+    8.5,
+    'Varios',
+    'SM',
+    ejemploUbicacion
+  ];
+  const filasUbicaciones =
+    ubicaciones.length > 0
+      ? ubicaciones.map((u) => [
+          String(u.codigoUbicacion || '').trim(),
+          String(u.nombreSucursal || '').trim(),
+          u.prioridad != null ? Number(u.prioridad) : ''
+        ])
+      : [['(sin ubicaciones registradas)', '', '']];
+
   return pdfBackend.generarExcel({
-    worksheetName: 'Productos',
-    columns: headers,
-    rows: [ejemplo]
+    sheets: [
+      {
+        // Sin title: el parser de importación usa la fila 1 como encabezados.
+        worksheetName: 'Productos',
+        columns: headers,
+        rows: [ejemplo]
+      },
+      {
+        worksheetName: 'Ubicaciones',
+        columns: ['codigoUbicacion', 'sucursal', 'prioridad'],
+        rows: filasUbicaciones,
+        title: 'Ubicaciones registradas (sucursal principal). Copie un codigoUbicacion en la columna ubicacion de Productos'
+      }
+    ]
   });
 }
 
@@ -379,15 +478,22 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
   if (errores.length > 0) {
     return { filasResueltas: [], errores, idSucursal, listasPrecio };
   }
-  const [presentacionesRows, categoriasRows, marcasRows, codigosExistentes] = await Promise.all([
-    productosImportacionRepository.obtenerPresentacionesCatalogo(pool),
-    productosImportacionRepository.obtenerCategoriasCatalogo(pool, idEmpresa),
-    productosImportacionRepository.obtenerMarcasCatalogo(pool, idEmpresa),
-    productosImportacionRepository.obtenerCodigosExistentes(pool, idEmpresa, filasParseadas.map((f) => f.codigo))
-  ]);
+  const [presentacionesRows, categoriasRows, marcasRows, codigosExistentes, ubicacionesRows] =
+    await Promise.all([
+      productosImportacionRepository.obtenerPresentacionesCatalogo(pool),
+      productosImportacionRepository.obtenerCategoriasCatalogo(pool, idEmpresa),
+      productosImportacionRepository.obtenerMarcasCatalogo(pool, idEmpresa),
+      productosImportacionRepository.obtenerCodigosExistentes(
+        pool,
+        idEmpresa,
+        filasParseadas.map((f) => f.codigo)
+      ),
+      productosImportacionRepository.obtenerUbicacionesPorSucursal(pool, idEmpresa, idSucursal)
+    ]);
   const presentacionesIndex = buildPresentacionesIndex(presentacionesRows);
   const categoriasIndex = buildCategoriasIndex(categoriasRows);
   const marcasIndex = buildMarcasIndex(marcasRows);
+  const ubicacionesIndex = buildUbicacionesIndex(ubicacionesRows);
 
   const vistosCodigo = new Map();
 
@@ -447,6 +553,18 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       }
     }
 
+    let idUbicacion = null;
+    let codigoUbicacion = '';
+    if (msgs.length === 0) {
+      const ub = resolverUbicacionImportacion(f.ubicacionCodigo, cantidadInicial, ubicacionesIndex);
+      if (ub.error) {
+        msgs.push(ub.error);
+      } else {
+        idUbicacion = ub.idUbicacion;
+        codigoUbicacion = ub.codigoUbicacion;
+      }
+    }
+
     if (msgs.length > 0) {
       errores.push({ fila: f.numeroFila, codigo: f.codigo || '', mensajes: msgs });
       continue;
@@ -467,6 +585,8 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       precioMayorista,
       cantidadInicial,
       idSucursal,
+      idUbicacion,
+      codigoUbicacion,
       listasPrecio
     });
   }
@@ -491,7 +611,8 @@ async function validarArchivoConFilas(pool, user, filas) {
       costoUnitario: r.cUnitario,
       precioNormal: r.precioNormal,
       precioCliente: r.precioCliente,
-      precioMayorista: r.precioMayorista
+      precioMayorista: r.precioMayorista,
+      ubicacion: r.codigoUbicacion || ''
     }))
   };
 }
@@ -573,7 +694,8 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
         ? {
             idSucursal: r.idSucursal,
             cantidadIngresada: r.cantidadInicial,
-            costoUnitario: r.cUnitario
+            costoUnitario: r.cUnitario,
+            idUbicacion: r.idUbicacion || null
           }
         : null;
 
@@ -666,6 +788,9 @@ module.exports = {
   validarArchivoConFilas,
   ejecutarImportacion,
   ejecutarImportacionConFilas,
+  buildUbicacionesIndex,
+  resolverUbicacionImportacion,
+  resolverYValidarFilas,
   MAX_FILAS,
   MAX_BYTES
 };

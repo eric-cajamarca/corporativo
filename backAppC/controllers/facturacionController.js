@@ -376,6 +376,39 @@ const obtenerXmlComprobante = async (req, res, next) => {
   }
 };
 
+/** Firma el XML si falta hash (para PDF/QR post-venta). No envía a SUNAT. */
+const asegurarHashComprobantePorVenta = async (req, res, next) => {
+  try {
+    const { idVenta } = req.params;
+    const data = await withPool(async (pool) =>
+      FacturacionServices.asegurarHashComprobantePorVentaService(pool, req.user, idVenta)
+    );
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "ID_VENTA_INVALIDO") {
+      return res.status(400).send({ message: "Id de venta inválido", data: undefined });
+    }
+    if (error.message === "VENTA_NO_ENCONTRADA") {
+      return res.status(404).send({ message: "Venta no encontrada", data: undefined });
+    }
+    if (
+      error.message &&
+      (error.message.includes("certificado") ||
+        error.message.includes("Configuración") ||
+        error.message.includes("Código producto SUNAT") ||
+        error.message.includes("firmar") ||
+        error.message.includes("hash"))
+    ) {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
+    console.error("Error asegurar hash comprobante por venta:", error);
+    return next(error);
+  }
+};
+
 // Descargar XML firmado listo para SUNAT (genera + firma y devuelve como archivo)
 const obtenerXmlComprobanteDescarga = async (req, res, next) => {
   try {
@@ -783,7 +816,8 @@ const crearNotaCreditoDebito = async (req, res, next) => {
         cantidad: Number(it.cantidad) || 0,
         pVenta: Number(it.pVenta) || 0,
         subtotal: Number(it.subtotal) || 0,
-        total: Number(it.total) || 0
+        total: Number(it.total) || 0,
+        igv: it.igv === true || it.igv === 1 || it.igv === "1" ? 1 : 0
       }))
     }));
     if (!result) {
@@ -954,6 +988,7 @@ module.exports = {
   validarCredencialesSol,
   obtenerXmlComprobante,
   obtenerXmlComprobanteDescarga,
+  asegurarHashComprobantePorVenta,
   obtenerCdrComprobante,
   listarResumenesDiarios,
   listarGuiasEmitidas,

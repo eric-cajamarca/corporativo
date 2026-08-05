@@ -18,6 +18,12 @@ import { ClienteService } from '../../../services/cliente.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
+import {
+  armarDetallesConIgv,
+  calcularMontoIgv,
+  esImpuestoIgv,
+  redondear2 as redondearIgv2
+} from '../../../utils/venta-igv.util';
 
 export interface ClienteOption {
   idCliente: number;
@@ -241,7 +247,7 @@ export class UpdateVentaComponent implements OnInit {
   }
 
   private redondear2(n: number): number {
-    return Math.round((Number(n) || 0) * 100) / 100;
+    return redondearIgv2(n);
   }
 
   private impuestoEstaActivo(impuesto: Impuesto): boolean {
@@ -267,9 +273,8 @@ export class UpdateVentaComponent implements OnInit {
     subTotal = this.redondear2(subTotal);
     const neto = this.redondear2(subTotal - descuentos);
 
-    const tieneIGV = this.impuestosActivosEmpresa.some((i) =>
-      (i.descripcion || '').toUpperCase().includes('IGV')
-    );
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i) => esImpuestoIgv(i.descripcion));
+    const tieneIGV = !!igvImpuesto;
 
     let exonerado = 0;
     if (tieneIGV) {
@@ -278,18 +283,11 @@ export class UpdateVentaComponent implements OnInit {
       exonerado = neto;
     }
 
-    const igvImpuesto = this.impuestosActivosEmpresa.find((i) =>
-      (i.descripcion || '').toUpperCase().includes('IGV')
-    );
-
+    const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
+    const porcentajeIgv = igvImpuesto ? Number(igvImpuesto.porcentaje) || 0 : 0;
     let igv = 0;
     if (igvImpuesto) {
-      const porcentaje = Number(igvImpuesto.porcentaje) || 0;
-      const igvMontoCalc = this.redondear2(neto * (porcentaje / 100));
-      const pIncluyeIGV = !!igvImpuesto.pIncluyeIGV;
-      if (!pIncluyeIGV) {
-        igv = igvMontoCalc;
-      }
+      igv = calcularMontoIgv(neto, porcentajeIgv, pIncluyeIGV);
     }
 
     const otrosImpuestos = this.impuestosActivosEmpresa.filter((i) => {
@@ -297,7 +295,7 @@ export class UpdateVentaComponent implements OnInit {
       return !d.includes('IGV') && d !== 'EXO';
     });
 
-    let totalImpuestosASumar = igv;
+    let totalImpuestosASumar = pIncluyeIGV ? 0 : igv;
     for (const imp of otrosImpuestos) {
       const porcentaje = Number(imp.porcentaje) || 0;
       const monto = this.redondear2(neto * (porcentaje / 100));
@@ -310,33 +308,28 @@ export class UpdateVentaComponent implements OnInit {
 
     const totalComprobante = this.redondear2(neto + totalImpuestosASumar);
 
-    this.subtotalOperativo = subTotal;
+    this.subtotalOperativo = pIncluyeIGV ? this.redondear2(neto - igv) : subTotal;
     this.montoIgv = igv;
     this.montoExonerado = exonerado;
     this.total = totalComprobante;
 
-    const porcentajeIgv = igvImpuesto ? Number(igvImpuesto.porcentaje) || 0 : 0;
-    const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
-    const afectoIgvPorLinea =
-      !!igvImpuesto && !pIncluyeIGV && porcentajeIgv > 0 && tieneIGV;
+    const afectoIgvPorLinea = !!igvImpuesto && porcentajeIgv > 0 && tieneIGV;
 
     if (afectoIgvPorLinea) {
-      const bases = this.detalles.map((d) => {
-        const cant = Number(d.cantidad) || 0;
-        const p = Number(d.pVenta) || 0;
-        return this.redondear2(cant * p);
-      });
-      const igvLines = bases.map((b) => this.redondear2(b * (porcentajeIgv / 100)));
-      let sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
-      const diff = this.redondear2(igv - sumIgvLines);
-      if (igvLines.length && Math.abs(diff) >= 0.005) {
-        igvLines[igvLines.length - 1] = this.redondear2(igvLines[igvLines.length - 1] + diff);
-      }
-      this.montoIgv = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
+      const montos = armarDetallesConIgv(
+        this.detalles.map((d) => ({
+          cantidad: Number(d.cantidad) || 0,
+          pVenta: Number(d.pVenta) || 0
+        })),
+        porcentajeIgv,
+        pIncluyeIGV,
+        true
+      );
+      this.montoIgv = this.redondear2(
+        montos.reduce((s, m) => s + this.redondear2(m.total - m.subtotal), 0)
+      );
       this.detalles.forEach((d, idx) => {
-        const base = bases[idx];
-        const igvL = igvLines[idx];
-        d.total = this.redondear2(base + igvL);
+        d.total = montos[idx]?.total ?? this.redondear2((Number(d.cantidad) || 0) * (Number(d.pVenta) || 0));
       });
     } else {
       this.detalles.forEach((d) => {
@@ -637,121 +630,78 @@ export class UpdateVentaComponent implements OnInit {
     subTotal = this.redondear2(subTotal);
     const neto = this.redondear2(subTotal - descuentos);
 
-    const tieneIGV = this.impuestosActivosEmpresa.some((i) =>
-      (i.descripcion || '').toUpperCase().includes('IGV')
-    );
-
-    let exonerado = 0;
-    if (tieneIGV) {
-      exonerado = 0;
-    } else {
-      exonerado = neto;
-    }
-
-    const igvImpuesto = this.impuestosActivosEmpresa.find((i) =>
-      (i.descripcion || '').toUpperCase().includes('IGV')
-    );
-
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i) => esImpuestoIgv(i.descripcion));
+    const tieneIGV = !!igvImpuesto;
     const porcentajeIgv = igvImpuesto ? Number(igvImpuesto.porcentaje) || 0 : 0;
     const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
 
-    let igvMonto = 0;
-    if (igvImpuesto && !pIncluyeIGV) {
-      igvMonto = this.redondear2(neto * (porcentajeIgv / 100));
+    let exonerado = 0;
+    if (!tieneIGV) {
+      exonerado = neto;
     }
+
+    const igvMonto = igvImpuesto
+      ? calcularMontoIgv(neto, porcentajeIgv, pIncluyeIGV)
+      : 0;
 
     const otrosImpuestos = this.impuestosActivosEmpresa.filter((i) => {
       const d = (i.descripcion || '').toUpperCase();
       return !d.includes('IGV') && d !== 'EXO';
     });
 
-    let totalImpuestosASumar = igvMonto;
+    let otrosSinIgv = 0;
     for (const imp of otrosImpuestos) {
       const porcentaje = Number(imp.porcentaje) || 0;
       const monto = this.redondear2(neto * (porcentaje / 100));
       const pIncluyeIGVImp = !!imp.pIncluyeIGV;
       const esISC = (imp.descripcion || '').toUpperCase().includes('ISC');
       if (esISC || !pIncluyeIGVImp) {
-        totalImpuestosASumar += monto;
+        otrosSinIgv += monto;
       }
     }
+    otrosSinIgv = this.redondear2(otrosSinIgv);
 
-    const otrosSinIgv = this.redondear2(totalImpuestosASumar - igvMonto);
+    const montosLinea = armarDetallesConIgv(
+      this.detalles.map((d) => ({
+        cantidad: Number(d.cantidad) || 0,
+        pVenta: Number(d.pVenta) || 0
+      })),
+      porcentajeIgv,
+      pIncluyeIGV,
+      tieneIGV
+    );
 
-    const detallesPayload: DetalleVentaEdicionPayload[] = [];
-    const afectoIgvPorLinea =
-      !!igvImpuesto && !pIncluyeIGV && porcentajeIgv > 0 && tieneIGV;
-
-    if (afectoIgvPorLinea) {
-      const bases = this.detalles.map((d) => {
-        const cant = Number(d.cantidad) || 0;
-        const p = Number(d.pVenta) || 0;
-        return this.redondear2(cant * p);
-      });
-      const igvLines = bases.map((b) => this.redondear2(b * (porcentajeIgv / 100)));
-      let sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
-      const diff = this.redondear2(igvMonto - sumIgvLines);
-      if (igvLines.length && Math.abs(diff) >= 0.005) {
-        igvLines[igvLines.length - 1] = this.redondear2(igvLines[igvLines.length - 1] + diff);
-      }
-      sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
-
-      this.detalles.forEach((d, idx) => {
-        const subL = bases[idx];
-        const totL = this.redondear2(subL + igvLines[idx]);
-        detallesPayload.push({
-          idProducto: d.idProducto,
-          cantidad: d.cantidad,
-          pVenta: d.pVenta,
-          descuento: d.descuento,
-          subtotal: subL,
-          total: totL,
-          igv: true,
-          descripcionLinea: this.descripcionLineaEdicion(d)
-        });
-      });
-
-      const totalComprobante = this.redondear2(neto + sumIgvLines + otrosSinIgv);
-
-      const venta: VentaEdicionPayload = {
-        fEmision: this.fEmisionParaGuardarVenta(),
-        idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
-        subtotal: neto,
-        igv: sumIgvLines,
-        exonerado,
-        gratuito: 0,
-        otrosCargos: 0,
-        descuentos,
-        total: totalComprobante
-      };
-
-      return { venta, detalles: detallesPayload };
-    }
-
-    this.detalles.forEach((d) => {
-      const cant = Number(d.cantidad) || 0;
-      const p = Number(d.pVenta) || 0;
-      const subL = this.redondear2(cant * p);
-      detallesPayload.push({
+    const detallesPayload: DetalleVentaEdicionPayload[] = this.detalles.map((d, idx) => {
+      const m = montosLinea[idx];
+      return {
         ...(d.idDetalle != null && d.idDetalle > 0 ? { idDetalle: d.idDetalle } : {}),
         idProducto: d.idProducto,
         cantidad: d.cantidad,
         pVenta: d.pVenta,
         descuento: d.descuento,
-        subtotal: subL,
-        total: subL,
-        igv: false,
+        subtotal: m.subtotal,
+        total: m.total,
+        igv: m.igv,
         descripcionLinea: this.descripcionLineaEdicion(d)
-      });
+      };
     });
 
-    const totalComprobante = this.redondear2(neto + totalImpuestosASumar);
+    const igvPersistido = this.redondear2(
+      montosLinea.reduce((s, m) => s + this.redondear2(m.total - m.subtotal), 0)
+    );
+    const igvFinal = igvPersistido > 0 ? igvPersistido : igvMonto;
+    const baseImponible = pIncluyeIGV
+      ? this.redondear2(neto - igvFinal)
+      : neto;
+    const totalComprobante = pIncluyeIGV
+      ? this.redondear2(neto + otrosSinIgv)
+      : this.redondear2(neto + igvFinal + otrosSinIgv);
 
     const venta: VentaEdicionPayload = {
       fEmision: this.fEmisionParaGuardarVenta(),
       idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
-      subtotal: subTotal,
-      igv: igvMonto,
+      subtotal: baseImponible,
+      igv: igvFinal,
       exonerado,
       gratuito: 0,
       otrosCargos: 0,

@@ -48,6 +48,12 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
+import {
+  armarDetallesConIgv,
+  calcularMontoIgv,
+  esImpuestoIgv,
+  redondear2
+} from '../../../utils/venta-igv.util';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal, fechaHoraClienteAhora } from '../../../utils/fecha-local.util';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
@@ -56,6 +62,9 @@ import { GestoresService } from '../../../services/gestores.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { HotelService } from '../../../services/hotel.service';
 import { PdfService } from '../../../services/pdf.service';
+import { FacturacionService } from '../../../services/facturacion.service';
+import { of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
 import {
@@ -296,6 +305,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private auth: AuthService,
     private rubrosService: RubrosService,
     private pdfService: PdfService,
+    private facturacionService: FacturacionService,
     private whatsappService: WhatsappService,
     private usuarioSucursalService: UsuarioSucursalService,
     private ngZone: NgZone,
@@ -1925,22 +1935,23 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (aplicarDescuentoLinea) {
         const precioPrincipal = this.obtenerPrecioPrincipal(item);
-        const subtotalItem = Math.round(precioPrincipal * cant * 100) / 100;
+        const subtotalItem = redondear2(precioPrincipal * cant);
         this.ventas.subTotal += subtotalItem;
         if (precioPrincipal > pVenta) {
-          this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
+          this.ventas.descuentos += redondear2((precioPrincipal - pVenta) * cant);
         }
       } else {
-        const subtotalItem = Math.round(pVenta * cant * 100) / 100;
+        const subtotalItem = redondear2(pVenta * cant);
         this.ventas.subTotal += subtotalItem;
       }
     });
 
-    this.ventas.subTotal = Math.round(this.ventas.subTotal * 100) / 100;
-    this.ventas.descuentos = Math.round(this.ventas.descuentos * 100) / 100;
-    const neto = Math.round((this.ventas.subTotal - this.ventas.descuentos) * 100) / 100;
+    this.ventas.subTotal = redondear2(this.ventas.subTotal);
+    this.ventas.descuentos = redondear2(this.ventas.descuentos);
+    const neto = redondear2(this.ventas.subTotal - this.ventas.descuentos);
 
-    const tieneIGV = this.impuestosActivosEmpresa.some((i: Impuesto) => (i.descripcion || '').toUpperCase().includes('IGV'));
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i: Impuesto) => esImpuestoIgv(i.descripcion));
+    const tieneIGV = !!igvImpuesto;
     if (tieneIGV) {
       this.ventas.exonerado = 0;
     } else {
@@ -1948,13 +1959,16 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const baseGravada = neto;
 
-    const igvImpuesto = this.impuestosActivosEmpresa.find((i: Impuesto) => (i.descripcion || '').toUpperCase().includes('IGV'));
+    const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
     if (igvImpuesto) {
       this.ventas.igvPorcentaje = Number(igvImpuesto.porcentaje) || 0;
-      this.ventas.igvMonto = Math.round(baseGravada * (this.ventas.igvPorcentaje / 100) * 100) / 100;
-      const pIncluyeIGV = !!igvImpuesto.pIncluyeIGV;
-      if (!pIncluyeIGV) {
-        this.ventas.igv = this.ventas.igvMonto;
+      // Con IGV activo siempre se persiste el monto (incluido o no en el precio).
+      this.ventas.igvMonto = calcularMontoIgv(baseGravada, this.ventas.igvPorcentaje, pIncluyeIGV);
+      this.ventas.igv = this.ventas.igvMonto;
+      if (pIncluyeIGV) {
+        // Subtotal fiscal = base imponible (precio final − IGV).
+        const baseImponible = redondear2(baseGravada - this.ventas.igvMonto);
+        this.ventas.subTotal = redondear2(baseImponible + this.ventas.descuentos);
       }
     }
 
@@ -1962,21 +1976,22 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       const d = (i.descripcion || '').toUpperCase();
       return !d.includes('IGV') && d !== 'EXO';
     });
-    let totalImpuestosASumar = this.ventas.igv;
+    // Si el precio ya incluye IGV, no se suma otra vez al total cobrado.
+    let totalImpuestosASumar = pIncluyeIGV ? 0 : this.ventas.igv;
     this.ventas.impuestosDetalle = otrosImpuestos.map((imp: Impuesto) => {
       const porcentaje = Number(imp.porcentaje) || 0;
-      const monto = Math.round(baseGravada * (porcentaje / 100) * 100) / 100;
-      const pIncluyeIGV = !!imp.pIncluyeIGV;
+      const monto = redondear2(baseGravada * (porcentaje / 100));
+      const pIncluye = !!imp.pIncluyeIGV;
       const esISC = (imp.descripcion || '').toUpperCase().includes('ISC');
-      if (esISC || !pIncluyeIGV) {
+      if (esISC || !pIncluye) {
         totalImpuestosASumar += monto;
       }
-      return { descripcion: imp.descripcion || 'Impuesto', porcentaje, monto, pIncluyeIGV };
+      return { descripcion: imp.descripcion || 'Impuesto', porcentaje, monto, pIncluyeIGV: pIncluye };
     });
     this.ventas.isc = this.ventas.impuestosDetalle
       .filter((i: { descripcion: string }) => (i.descripcion || '').toUpperCase().includes('ISC'))
       .reduce((s: number, i: { monto: number }) => s + i.monto, 0);
-    this.ventas.total = Math.round((baseGravada + totalImpuestosASumar) * 100) / 100;
+    this.ventas.total = redondear2(baseGravada + totalImpuestosASumar);
     this.guardarEstadoProvisional();
   }
 
@@ -3309,19 +3324,29 @@ abrirModalPrecios(item: any) {
 
     const idEstadoPedidoVenta = Number(this.ventas.idEstadoPedido) || 1;
     const esEstadoPendiente = idEstadoPedidoVenta === 1;
-    const detalles = this.carrito.map((item: any) => {
+    const igvImpuestoEnvio = this.impuestosActivosEmpresa.find((i: Impuesto) => esImpuestoIgv(i.descripcion));
+    const montosDetalleIgv = armarDetallesConIgv(
+      this.carrito.map((item: any) => ({
+        cantidad: Number(item.cantidad) || 0,
+        pVenta: Number(item.pVenta) || 0
+      })),
+      Number(igvImpuestoEnvio?.porcentaje) || 0,
+      !!igvImpuestoEnvio?.pIncluyeIGV,
+      !!igvImpuestoEnvio
+    );
+    const detalles = this.carrito.map((item: any, idx: number) => {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
-      const subtotal = cant * pVenta;
+      const montos = montosDetalleIgv[idx] || { subtotal: cant * pVenta, total: cant * pVenta, igv: false };
       return {
         idProducto: item.idProducto,
         cantidad: cant,
         pVenta,
         descuento: 0,
-        subtotal,
-        igv: 0,
+        subtotal: montos.subtotal,
+        igv: montos.igv ? 1 : 0,
         isc: 0,
-        total: subtotal,
+        total: montos.total,
         hVenta: fechaEmisionVentaParaApi(this.ventas.fEmision),
         cantEntregada: esEstadoPendiente ? 0 : cant,
         idEstadoPedido: idEstadoPedidoVenta,
@@ -3442,12 +3467,31 @@ abrirModalPrecios(item: any) {
     }
   }
 
+  /** Firma bajo demanda si falta hash; luego carga datos PDF (boleta/factura). */
+  private cargarComprobantePdfPostVenta$(idVenta: number) {
+    return this.facturacionService.asegurarHashPorVenta(idVenta).pipe(
+      catchError((err) => {
+        const msg =
+          err?.error?.message || err?.message || 'No se pudo obtener el código hash del comprobante.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.warning({
+            title: 'Hash SUNAT',
+            message: msg + ' El PDF se generará sin código H si aún no está disponible.',
+            position: 'topRight'
+          });
+        }
+        return of(null);
+      }),
+      switchMap(() => this.ventasService.getComprobanteParaPdf(idVenta))
+    );
+  }
+
   abrirFormWhatsappPostVenta(): void {
     const id = this.postVentaIdVenta;
     if (id == null) return;
     this.postVentaGenerandoPdf = true;
     this.postVentaWhatsappMensaje = null;
-    this.ventasService.getComprobanteParaPdf(id).subscribe({
+    this.cargarComprobantePdfPostVenta$(id).subscribe({
       next: (res) => {
         const d = res.data;
         this.postVentaGenerandoPdf = false;
@@ -3549,7 +3593,7 @@ abrirModalPrecios(item: any) {
     const id = this.postVentaIdVenta;
     if (id == null) return;
     this.postVentaGenerandoPdf = true;
-    this.ventasService.getComprobanteParaPdf(id).subscribe({
+    this.cargarComprobantePdfPostVenta$(id).subscribe({
       next: (res) => {
         const d = res.data;
         if (!d) {

@@ -221,6 +221,59 @@ exports.obtenerXmlFirmadoParaDescargaService = async (pool, user, idComprobanteE
   return { xml: result.xml, nombreBase: result.nombreBase };
 };
 
+/**
+ * Asegura el código hash (DigestValue) del comprobante electrónico de una venta para PDF/QR.
+ * Si ya hay hash lo devuelve; si no, firma el XML con el certificado y lo persiste.
+ * No envía a SUNAT. Notas de venta / sin CE → skipped.
+ */
+exports.asegurarHashComprobantePorVentaService = async (pool, user, idVenta) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const id = parseInt(String(idVenta), 10);
+  if (!Number.isFinite(id) || id <= 0) throw new Error("ID_VENTA_INVALIDO");
+
+  const existeVenta = await FacturacionRepository.validarVentaEmpresaRepo(pool, id, user.empresa);
+  if (!existeVenta) throw new Error("VENTA_NO_ENCONTRADA");
+
+  const ce = await FacturacionRepository.obtenerComprobanteElectronicoPorVentaRepo(pool, id, user.empresa);
+  if (!ce) {
+    return { ok: true, skipped: true, reason: "NO_ELECTRONICO", hash: "" };
+  }
+
+  const hashActual = ce.hash != null ? String(ce.hash).trim() : "";
+  if (hashActual) {
+    return {
+      ok: true,
+      skipped: false,
+      firmadoAhora: false,
+      hash: hashActual,
+      idComprobanteElectronico: ce.idComprobanteElectronico
+    };
+  }
+
+  const signed = await FacturacionRepository.generarYFirmarXmlComprobanteRepo(
+    pool,
+    user,
+    ce.idComprobanteElectronico
+  );
+  if (signed && signed.ok === false) {
+    throw new Error(signed.mensaje || "No se pudo firmar el comprobante para obtener el hash");
+  }
+
+  const ce2 = await FacturacionRepository.obtenerComprobanteElectronicoPorVentaRepo(pool, id, user.empresa);
+  const hash = ce2 && ce2.hash != null ? String(ce2.hash).trim() : "";
+  if (!hash) {
+    throw new Error("No se pudo extraer el código hash del XML firmado");
+  }
+
+  return {
+    ok: true,
+    skipped: false,
+    firmadoAhora: true,
+    hash,
+    idComprobanteElectronico: ce.idComprobanteElectronico
+  };
+};
+
 exports.obtenerCdrComprobanteService = async (pool, user, idComprobanteElectronico) => {
   if (!user) throw new Error("NO_ACCESS");
   const result = await FacturacionRepository.obtenerCdrComprobanteRepo(pool, idComprobanteElectronico, user.empresa);

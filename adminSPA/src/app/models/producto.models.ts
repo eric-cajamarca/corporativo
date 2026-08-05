@@ -113,6 +113,7 @@ export interface ImportacionProductosValidarData {
     precioNormal: number;
     precioCliente: number;
     precioMayorista: number;
+    ubicacion?: string;
   }>;
 }
 

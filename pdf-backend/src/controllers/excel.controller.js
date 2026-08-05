@@ -18,7 +18,7 @@ async function generateExcel(req, res) {
       excelBuffer = await generateExcelVentasDetallado(data);
     } else if (data.tipo === 'kardex-13.1') {
       excelBuffer = await generateExcelKardex131(data);
-    } else if (data.rows && data.columns) {
+    } else if ((data.rows && data.columns) || (Array.isArray(data.sheets) && data.sheets.length > 0)) {
       excelBuffer = await generateExcelFromData(data);
     }
 
