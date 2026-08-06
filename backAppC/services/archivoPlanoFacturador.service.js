@@ -175,8 +175,16 @@ function generarLineasDET(items, venta, tributoPrincipal) {
   for (let i = 0; i < detalle.length; i++) {
     const d = detalle[i];
     const cantidad = toNum(d.cantidad);
-    const pVenta = toNum(d.pVenta);
+    // pVenta del catálogo puede ser CON o SIN IGV; SUNAT usa montos ya normalizados:
+    // subtotal = base, total = con IGV (armarDetallesConIgv / Impuestos.pIncluyeIGV)
     const subtotalItem = toNum(d.subtotal);
+    const totalItem = toNum(d.total) || (subtotalItem + igvPorItem[i]);
+    const valorUnitario = cantidad > 0
+      ? Math.round((subtotalItem / cantidad) * 100000) / 100000
+      : 0;
+    const precioUnitario = cantidad > 0
+      ? Math.round((totalItem / cantidad) * 100000) / 100000
+      : 0;
     const igvItem = igvPorItem[i];
     const desc = escPipe(d.descripcion) || "Item";
     const codProducto = d.codigo || String(i + 1);
@@ -188,7 +196,7 @@ function generarLineasDET(items, venta, tributoPrincipal) {
       codProducto,                        // 3
       codSunat,                           // 4 código SUNAT
       desc,                               // 5
-      valor5(pVenta),                     // 6 valor unitario 5 decimales
+      valor5(valorUnitario),              // 6 valor unitario SIN IGV (5 decimales)
       monto2(igvItem),                    // 7 sumatoria tributos ítem
       trib.codigoSunat,                   // 8 código tributo
       esExonerado ? "0.00" : monto2(igvItem),  // 9 monto
@@ -201,7 +209,7 @@ function generarLineasDET(items, venta, tributoPrincipal) {
       "ISC", "EXC", "01", "2.00", "-", "", "", "",  // 18-25
       "0.00", "-",                        // 26-27
       "", "", "", "", "", "",             // 28-33
-      valor5(pVenta),                     // 34 precio venta unitario
+      valor5(precioUnitario),             // 34 precio venta unitario CON IGV
       monto2(subtotalItem),              // 35 valor venta ítem
       "0.00"                              // 36 valor referencial
     ];

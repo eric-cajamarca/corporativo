@@ -57,18 +57,20 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
 
   const itemsMap = (Array.isArray(items) ? items : []).map((d, i) => {
     const cantidad = toNum(d.cantidad);
-    const pVenta = toNum(d.pVenta);
     const subtotal = toNum(d.subtotal);
     const totalItem = toNum(d.total);
     const igvItem = totalItem - subtotal;
+    // No usar pVenta crudo: puede incluir o no IGV según Impuestos.pIncluyeIGV
+    const valorUnitario = cantidad > 0 ? Math.round((subtotal / cantidad) * 100000) / 100000 : 0;
+    const precioUnitario = cantidad > 0 ? Math.round((totalItem / cantidad) * 100000) / 100000 : 0;
     return {
       numeroOrden: i + 1,
       codigo: "",
       descripcion: toStr(d.descripcion) || "Item",
       unidad: "NIU",
       cantidad,
-      valorUnitario: pVenta,
-      precioUnitario: pVenta,
+      valorUnitario,
+      precioUnitario,
       subtotal,
       tipoIgv: "10",
       igv: igvItem,

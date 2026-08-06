@@ -27,6 +27,24 @@ function toNum(v) {
   return isNaN(n) ? 0 : n;
 }
 
+/**
+ * Precios unitarios SUNAT a partir de montos ya normalizados del ítem.
+ * No usa pVenta crudo: en catálogo puede venir CON o SIN IGV (Impuestos.pIncluyeIGV).
+ * El frontend ya deja: subtotal = base sin IGV, total = importe con IGV.
+ * - valorUnitario → cac:Price (sin IGV); SUNAT 3271: cantidad × valor ≈ LineExtensionAmount
+ * - precioUnitario → PricingReference cat.16=01 (con IGV)
+ */
+function preciosUnitariosSunat(subtotal, total, cantidad) {
+  const cant = toNum(cantidad);
+  if (cant <= 0) return { valorUnitario: 0, precioUnitario: 0 };
+  const base = toNum(subtotal);
+  const bruto = toNum(total);
+  return {
+    valorUnitario: Math.round((base / cant) * 100000) / 100000,
+    precioUnitario: Math.round((bruto / cant) * 100000) / 100000
+  };
+}
+
 function toStr(v) {
   return v != null ? String(v).trim() : "";
 }
@@ -331,9 +349,10 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   let idx = 1;
   for (const it of items) {
     const cant = toNum(it.cantidad);
-    const pUnit = toNum(it.pVenta);
     const lineExt = toNum(it.subtotal);
-    const taxAmount = toNum(it.total) - lineExt;
+    const totalLinea = toNum(it.total);
+    const { valorUnitario: vUnit, precioUnitario: pUnit } = preciosUnitariosSunat(lineExt, totalLinea, cant);
+    const taxAmount = totalLinea - lineExt;
     const desc = escXml(it.descripcion || "Item");
     const codProducto = escXml(it.codigo || String(idx));
     const codSunat = codigoProductoSunatParaXml(it);
@@ -372,7 +391,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
         </cac:SellersItemIdentification>${commodityXml}
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(5)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="PEN">${vUnit.toFixed(5)}</cbc:PriceAmount>
       </cac:Price>
     </cac:InvoiceLine>`);
     idx++;
@@ -528,9 +547,10 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
   let idx = 1;
   for (const it of items) {
     const cant = toNum(it.cantidad);
-    const pUnit = toNum(it.pVenta);
     const lineExt = toNum(it.subtotal);
-    const taxAmount = toNum(it.total) - lineExt;
+    const totalLinea = toNum(it.total);
+    const { valorUnitario: vUnit, precioUnitario: pUnit } = preciosUnitariosSunat(lineExt, totalLinea, cant);
+    const taxAmount = totalLinea - lineExt;
     const desc = escXml(it.descripcion || "Item");
     const commodityXmlNc = fragmentoCommodityClassificationXml(codigoProductoSunatParaXml(it));
     lineas.push(`
@@ -540,7 +560,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
       <cbc:LineExtensionAmount currencyID="PEN">${lineExt.toFixed(2)}</cbc:LineExtensionAmount>
       <cac:PricingReference>
         <cac:AlternativeConditionPrice>
-          <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>
+          <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(5)}</cbc:PriceAmount>
           <cbc:PriceTypeCode listName="Tipo de Precio" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo16">01</cbc:PriceTypeCode>
         </cac:AlternativeConditionPrice>
       </cac:PricingReference>
@@ -569,7 +589,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
         </cac:SellersItemIdentification>${commodityXmlNc}
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="PEN">${vUnit.toFixed(5)}</cbc:PriceAmount>
       </cac:Price>
     </cac:CreditNoteLine>`);
     idx++;
@@ -733,9 +753,10 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
   let idx = 1;
   for (const it of items) {
     const cant = toNum(it.cantidad);
-    const pUnit = toNum(it.pVenta);
     const lineExt = toNum(it.subtotal);
-    const taxAmount = toNum(it.total) - lineExt;
+    const totalLinea = toNum(it.total);
+    const { valorUnitario: vUnit, precioUnitario: pUnit } = preciosUnitariosSunat(lineExt, totalLinea, cant);
+    const taxAmount = totalLinea - lineExt;
     const desc = escXml(it.descripcion || "Item");
     const commodityXmlNd = fragmentoCommodityClassificationXml(codigoProductoSunatParaXml(it));
     lineas.push(`
@@ -745,7 +766,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
       <cbc:LineExtensionAmount currencyID="PEN">${lineExt.toFixed(2)}</cbc:LineExtensionAmount>
       <cac:PricingReference>
         <cac:AlternativeConditionPrice>
-          <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>
+          <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(5)}</cbc:PriceAmount>
           <cbc:PriceTypeCode listName="Tipo de Precio" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo16">01</cbc:PriceTypeCode>
         </cac:AlternativeConditionPrice>
       </cac:PricingReference>
@@ -774,7 +795,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
         </cac:SellersItemIdentification>${commodityXmlNd}
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="PEN">${vUnit.toFixed(5)}</cbc:PriceAmount>
       </cac:Price>
     </cac:DebitNoteLine>`);
     idx++;
