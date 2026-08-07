@@ -87,9 +87,10 @@ const LEYENDA_AMAZONIA_2001 =
 
 /**
  * Observaciones / OC según guía SUNAT XML factura UBL 2.1 y orden XSD UBL Invoice 2.1:
- * - Todas las cbc:Note (cat. 52, ej. 1000 y 3000) antes de cbc:DocumentCurrencyCode.
+ * - Todas las cbc:Note (cat. 52: 1000, 2001, etc.) antes de cbc:DocumentCurrencyCode.
  * - cac:OrderReference después de DocumentCurrencyCode (si no, SUNAT 0306: hijo Note inválido).
- * Cat. 52: 1000 = solo monto en letras; 2001 = Amazonía; 3000 = texto largo; OC corta en OrderReference.
+ * Cat. 52 NO tiene código 3000 → SUNAT 3027 si se usa languageLocaleID="3000".
+ * Texto libre (observaciones): cbc:Note sin languageLocaleID; OC corta en OrderReference.
  */
 function fragmentosObservacionesUblFactura(obsRaw, incluirLeyendaAmazonia = false) {
   const obs = toStr(obsRaw).replace(/\s+/g, " ").trim();
@@ -113,8 +114,9 @@ function fragmentosObservacionesUblFactura(obsRaw, incluirLeyendaAmazonia = fals
   </cac:OrderReference>`
     };
   }
+  // Observación libre: sin languageLocaleID (cat. 52 solo aplica a leyendas oficiales)
   notasAntesMoneda += `
-  <cbc:Note languageLocaleID="3000">${escXml(obs.slice(0, 100))}</cbc:Note>`;
+  <cbc:Note>${escXml(obs.slice(0, 250))}</cbc:Note>`;
   return { notasAntesMoneda, orderReferenceTrasMoneda: "" };
 }
 
