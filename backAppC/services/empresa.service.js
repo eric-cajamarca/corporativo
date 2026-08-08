@@ -1492,6 +1492,17 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             // Columna puede no existir aún si no se ejecutó la migración
         }
 
+        // GRE transportista (31): solo si la empresa tiene al menos un vehículo registrado
+        let puedeEmitirGuiaTransportista = false;
+        try {
+            const veh = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT COUNT(*) AS total FROM Vehiculos WHERE idEmpresa = @idEmpresa');
+            puedeEmitirGuiaTransportista = (veh.recordset?.[0]?.total || 0) > 0;
+        } catch (_) {
+            puedeEmitirGuiaTransportista = false;
+        }
+
         let permitirVentaMultiSucursal = false;
         try {
             const pe = await pool.request()
@@ -1594,6 +1605,7 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             tieneLogo,
             empresaCompleta,
             habilitarGuiasElectronicas,
+            puedeEmitirGuiaTransportista: habilitarGuiasElectronicas && puedeEmitirGuiaTransportista,
             permitirVentaMultiSucursal,
             pasosOnboarding,
             onboardingProgreso: pasosRequeridos > 0 ? Math.round((pasosCompletados / pasosRequeridos) * 100) : 100,

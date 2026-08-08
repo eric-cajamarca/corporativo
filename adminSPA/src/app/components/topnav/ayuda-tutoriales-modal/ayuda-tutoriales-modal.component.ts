@@ -29,6 +29,13 @@ export class AyudaTutorialesModalComponent {
       icono: 'bi-sliders'
     },
     {
+      id: 'config-facturacion-sunat',
+      titulo: 'Facturación y envío a SUNAT',
+      descripcion: 'URL BillService, usuario secundario SOL, certificado .pfx y modos de envío.',
+      pdfUrl: 'assets/manuales/Manual_Configuracion_Facturacion_Sunat.pdf',
+      icono: 'bi-cloud-upload'
+    },
+    {
       id: 'ventas',
       titulo: 'Ventas',
       descripcion: 'Venta rápida, nueva venta, historial, crédito/cuotas y caja abierta.',
@@ -55,6 +62,20 @@ export class AyudaTutorialesModalComponent {
       descripcion: 'Entregas, envíos programados y vista del chofer.',
       pdfUrl: 'assets/manuales/Manual_Despachos_Envios.pdf',
       icono: 'bi-truck'
+    },
+    {
+      id: 'guias-remision',
+      titulo: 'Guía de remisión',
+      descripcion: 'Emisión GRE remitente (09), envío a SUNAT, PDF y configuración API.',
+      pdfUrl: 'assets/manuales/Manual_Guia_Remision.pdf',
+      icono: 'bi-file-earmark-ruled'
+    },
+    {
+      id: 'guias-transportista',
+      titulo: 'Guía transportista',
+      descripcion: 'GRE tipo 31 (requiere vehículos registrados), documento relacionado, MTC y SUNAT.',
+      pdfUrl: 'assets/manuales/Manual_Guia_Transportista.pdf',
+      icono: 'bi-truck-front'
     },
     {
       id: 'completo',

@@ -169,6 +169,11 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
     const claveApiGuiasVal = datos.hasOwnProperty("claveApiGuias")
       ? claveApiGuiasGuardar(datos.claveApiGuias, existente.claveApiGuias)
       : existente.claveApiGuias;
+    // Conservar PFX si el PUT no trae uno nuevo (el certificado se sube por POST /certificado).
+    const certificadoDigitalVal =
+      datos.certificadoDigital != null && String(datos.certificadoDigital).trim() !== ""
+        ? String(datos.certificadoDigital).trim()
+        : (existente.certificadoDigital ?? null);
     if (claveSunatVal && claveSunatVal.length > 20) {
       try {
         await pool.request().query(`
@@ -189,7 +194,7 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
     await pool
       .request()
       .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
-      .input("certificadoDigital", sql.VarChar, datos.certificadoDigital || null)
+      .input("certificadoDigital", sql.VarChar(8001), certificadoDigitalVal)
       .input("claveCertificado", sql.VarChar(256), claveVal)
       .input("usuarioSunat", sql.VarChar, datos.usuarioSunat || null)
       .input("claveSunat", sql.VarChar(256), claveSunatVal)

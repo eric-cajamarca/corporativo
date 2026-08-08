@@ -26,9 +26,20 @@ const axios   = require("axios");
 const qs      = require("querystring");
 const guiaRepo            = require("../repositories/guiaElectronica.repository");
 const facturacionRepo     = require("../repositories/facturacion.repository");
+const vehiculosRepo       = require("../repositories/vehiculos.repository");
 const { descifrar }       = require("../utils/cifradoClaveCertificado.util");
 const { normalizarRucSunatGre } = require("../utils/rucSunatGre.util");
 const firmaXmlSunat       = require("./firmaXmlSunat.service");
+
+const MSG_GRE31_SIN_VEHICULOS =
+  "Para emitir guías transportista debe registrar al menos un vehículo en su empresa (Mi perfil → Consultar placa).";
+
+async function asegurarEmpresaPuedeEmitirGreTransportista(pool, idEmpresa) {
+  const total = await vehiculosRepo.contarVehiculosEmpresaRepo(pool, idEmpresa);
+  if (total < 1) {
+    throw new Error(MSG_GRE31_SIN_VEHICULOS);
+  }
+}
 
 const SUNAT_OAUTH_BASE    = "https://api-seguridad.sunat.gob.pe";
 const SUNAT_OAUTH_TIMEOUT = 10000;
@@ -1140,6 +1151,10 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
   const serie = String(guia.serie || "").trim();
   const numStr = String(guia.numero || "").trim();
 
+  if (tipoDoc === "31" || tipoGuia === "TRANSPORTISTA") {
+    await asegurarEmpresaPuedeEmitirGreTransportista(pool, idEmpresa);
+  }
+
   // GRE remitente (09) exige motivo; GRE transportista (31) no lo usa (SIN HandlingCode en XML SUNAT).
   if (tipoDoc !== "31" && !datos.motivoTraslado) {
     throw new Error("El motivo de traslado es requerido.");
@@ -1264,6 +1279,9 @@ exports.registrarGuiaService = async (pool, user, datos) => {
 
   const tipoGuia    = datos.tipoGuia === "TRANSPORTISTA" ? "TRANSPORTISTA" : "REMITENTE";
   const tipoDoc     = tipoGuia === "TRANSPORTISTA" ? "31" : "09";
+  if (tipoDoc === "31") {
+    await asegurarEmpresaPuedeEmitirGreTransportista(pool, idEmpresa);
+  }
   // GRE remitente (09) exige motivo; GRE transportista (31) no lo usa.
   if (tipoDoc !== "31" && !datos.motivoTraslado) {
     throw new Error("El motivo de traslado es requerido.");

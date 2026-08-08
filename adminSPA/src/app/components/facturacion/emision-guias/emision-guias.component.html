@@ -11,9 +11,11 @@
         <a class="btn btn-success btn-sm" routerLink="/facturacion/guias-remision">
           <i class="bi bi-plus-lg me-1"></i> Guía remitente
         </a>
-        <a class="btn btn-outline-success btn-sm" routerLink="/facturacion/guias-transportista">
-          <i class="bi bi-truck me-1"></i> Guía transportista
-        </a>
+        @if (puedeEmitirGuiaTransportista) {
+          <a class="btn btn-outline-success btn-sm" routerLink="/facturacion/guias-transportista">
+            <i class="bi bi-truck me-1"></i> Guía transportista
+          </a>
+        }
         <a class="btn btn-outline-primary btn-sm" routerLink="/facturacion/guias/configuracion">
           <i class="bi bi-gear me-1"></i> Configuración
         </a>

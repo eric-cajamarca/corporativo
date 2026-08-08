@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import {
   FacturacionService,
   GuiaDetalle,
@@ -31,6 +32,7 @@ import {
   ProveedorGreListado,
   SeleccionarProveedorGreModalComponent
 } from '../seleccionar-proveedor-gre-modal/seleccionar-proveedor-gre-modal.component';
+import { ConsultarPlacaModalOpenerService } from '../../../services/consultar-placa-modal-opener.service';
 
 declare const iziToast: any;
 
@@ -192,9 +194,10 @@ const PAGADORES_FLETE_GRE = [
   templateUrl: './guias-transportista.component.html',
   styleUrl: './guias-transportista.component.css'
 })
-export class GuiasTransportistaComponent implements OnInit {
+export class GuiasTransportistaComponent implements OnInit, OnDestroy {
 
   public sidebarState = inject(SidebarStateService);
+  private placaModalCerradoSub?: Subscription;
 
   private facturacionService = inject(FacturacionService);
   private empresaService = inject(EmpresaService);
@@ -206,6 +209,7 @@ export class GuiasTransportistaComponent implements OnInit {
   private pdfService = inject(PdfService);
   private modalService = inject(NgbModal);
   private router = inject(Router);
+  private consultarPlacaOpener = inject(ConsultarPlacaModalOpenerService);
 
   @ViewChild('modalFormatoGrePdf') modalFormatoGrePdfTpl!: TemplateRef<unknown>;
   private route = inject(ActivatedRoute);
@@ -217,6 +221,8 @@ export class GuiasTransportistaComponent implements OnInit {
 
   /** Si la empresa no tiene habilitada la emisión de guías, se bloquea el uso. */
   autorizado = true;
+  /** GRE 31 exige al menos un vehículo registrado en la empresa. */
+  tieneVehiculosRegistrados = false;
 
   /** Ya no se usa en GRE transportista (tipo 31); se mantiene por compatibilidad de edición. */
   motivosTraslado: { codigoSunat: string; descripcion: string }[] = [];
@@ -325,9 +331,23 @@ export class GuiasTransportistaComponent implements OnInit {
   cargandoEdicion = false;
 
   ngOnInit(): void {
+    this.placaModalCerradoSub = this.consultarPlacaOpener.cerrado$.subscribe(() => {
+      if (this.autorizado && !this.tieneVehiculosRegistrados) {
+        this.recargarTrasRegistroVehiculo();
+      }
+    });
+    this.cargarAutorizacionYFormulario();
+  }
+
+  ngOnDestroy(): void {
+    this.placaModalCerradoSub?.unsubscribe();
+  }
+
+  private cargarAutorizacionYFormulario(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res: any) => {
         this.autorizado = res?.data?.habilitarGuiasElectronicas === true;
+        this.tieneVehiculosRegistrados = res?.data?.puedeEmitirGuiaTransportista === true;
         if (!this.autorizado) {
           iziToast.warning({
             title: 'No autorizado',
@@ -336,51 +356,86 @@ export class GuiasTransportistaComponent implements OnInit {
           });
           return;
         }
-        forkJoin({
-          dir: this.empresaService.getDireccionEmpresa_id().pipe(catchError(() => of({ data: [] }))),
-          veh: this.vehiculosService.listarVehiculos().pipe(catchError(() => of({ data: [] }))),
-          cfg: this.facturacionService.obtenerConfiguracion().pipe(catchError(() => of({ data: null })))
-        }).subscribe({
-          next: ({ dir, veh, cfg }) => {
-            this.direccionesEmpresa = dir?.data || [];
-            this.vehiculosEmpresa = veh?.data || [];
-            const c = cfg?.data;
-            if (c) {
-              const rucCfg = String(c.rucEmpresa || '')
-                .replace(/\D/g, '')
-                .slice(0, 11);
-              if (rucCfg.length === 11) {
-                this.compraSunat.rucMiEmpresa = rucCfg;
-              }
-              if (c.usuarioSunat) {
-                this.compraSunat.usuarioSol = String(c.usuarioSunat).trim();
-              }
-            }
-            const emp = this.empresaService.getEmpresaActual();
-            const rucEmp = String(emp?.ruc || '')
-              .replace(/\D/g, '')
-              .slice(0, 11);
-            if (rucEmp.length === 11 && !this.guia.rucEmisorDocumentoRelacionado) {
-              this.guia.rucEmisorDocumentoRelacionado = rucEmp;
-            }
-            this.tryCargarEdicionDesdeQuery();
-          },
-          error: () => {
-            this.direccionesEmpresa = [];
-            this.vehiculosEmpresa = [];
-            iziToast.error({
-              title: 'Error',
-              message: 'No se pudieron cargar datos auxiliares del formulario.',
-              position: 'topRight'
-            });
-            this.tryCargarEdicionDesdeQuery();
-          }
-        });
+        if (!this.tieneVehiculosRegistrados) {
+          return;
+        }
+        this.cargarDatosFormulario();
       },
       error: () => {
         this.autorizado = false;
+        this.tieneVehiculosRegistrados = false;
       }
     });
+  }
+
+  private cargarDatosFormulario(): void {
+    forkJoin({
+      dir: this.empresaService.getDireccionEmpresa_id().pipe(catchError(() => of({ data: [] }))),
+      veh: this.vehiculosService.listarVehiculos().pipe(catchError(() => of({ data: [] }))),
+      cfg: this.facturacionService.obtenerConfiguracion().pipe(catchError(() => of({ data: null })))
+    }).subscribe({
+      next: ({ dir, veh, cfg }) => {
+        this.direccionesEmpresa = dir?.data || [];
+        this.vehiculosEmpresa = veh?.data || [];
+        this.tieneVehiculosRegistrados = this.vehiculosEmpresa.length > 0;
+        if (!this.tieneVehiculosRegistrados) {
+          return;
+        }
+        const c = cfg?.data;
+        if (c) {
+          const rucCfg = String(c.rucEmpresa || '')
+            .replace(/\D/g, '')
+            .slice(0, 11);
+          if (rucCfg.length === 11) {
+            this.compraSunat.rucMiEmpresa = rucCfg;
+          }
+          if (c.usuarioSunat) {
+            this.compraSunat.usuarioSol = String(c.usuarioSunat).trim();
+          }
+        }
+        const emp = this.empresaService.getEmpresaActual();
+        const rucEmp = String(emp?.ruc || '')
+          .replace(/\D/g, '')
+          .slice(0, 11);
+        if (rucEmp.length === 11 && !this.guia.rucEmisorDocumentoRelacionado) {
+          this.guia.rucEmisorDocumentoRelacionado = rucEmp;
+        }
+        this.tryCargarEdicionDesdeQuery();
+      },
+      error: () => {
+        this.direccionesEmpresa = [];
+        this.vehiculosEmpresa = [];
+        this.tieneVehiculosRegistrados = false;
+        iziToast.error({
+          title: 'Error',
+          message: 'No se pudieron cargar datos auxiliares del formulario.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  private recargarTrasRegistroVehiculo(): void {
+    this.vehiculosService.listarVehiculos().subscribe({
+      next: (veh) => {
+        this.vehiculosEmpresa = veh?.data || [];
+        if (this.vehiculosEmpresa.length === 0) {
+          return;
+        }
+        this.tieneVehiculosRegistrados = true;
+        iziToast.success({
+          title: 'Vehículo registrado',
+          message: 'Ya puede emitir guías transportista.',
+          position: 'topRight'
+        });
+        this.cargarDatosFormulario();
+      },
+      error: () => {}
+    });
+  }
+
+  abrirRegistroVehiculo(): void {
+    this.consultarPlacaOpener.solicitarAbrir();
   }
 
   private motivosTrasladoFallback(): { codigoSunat: string; descripcion: string }[] {

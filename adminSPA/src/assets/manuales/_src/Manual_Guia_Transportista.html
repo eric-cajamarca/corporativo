@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manual de Usuario — Guía transportista</title>
+  <style>
+    @page { margin: 18mm 16mm 18mm 16mm; size: A4; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #222;
+      margin: 0;
+    }
+    h1 {
+      font-size: 18pt;
+      margin: 0 0 4px;
+      color: #0d3b66;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #555;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #0d6efd;
+      padding-bottom: 10px;
+    }
+    .objetivo {
+      background: #f0f6ff;
+      border-left: 4px solid #0d6efd;
+      padding: 10px 12px;
+      margin: 0 0 16px;
+      font-size: 10.5pt;
+    }
+    h2 {
+      font-size: 13pt;
+      color: #0d3b66;
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px; }
+    ol, ul { margin: 0 0 10px; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .paso {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 0 0 10px;
+      page-break-inside: avoid;
+    }
+    .paso strong.num {
+      display: inline-block;
+      min-width: 1.6em;
+      color: #0d6efd;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #ced4da;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e9f2ff; color: #0d3b66; }
+    .nota {
+      background: #fff8e6;
+      border-left: 4px solid #f0ad4e;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    .ok {
+      background: #e8f5e9;
+      border-left: 4px solid #28a745;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+  <h1>Manual de Usuario — Guía transportista</h1>
+  <div class="meta">
+    EFAFERP · Dominio Facturación electrónica · Plataforma: businesssoft.net · Actualizado: agosto 2026
+  </div>
+
+  <div class="objetivo">
+    <strong>Objetivo:</strong> Elaborar una Guía de Remisión Electrónica <strong>transportista (tipo 31)</strong>
+    cuando su empresa actúa como transportista: documento relacionado, remitente, destinatario,
+    direcciones, vehículo/conductor, guardar, enviar a SUNAT e imprimir PDF.
+  </div>
+
+  <h2>1. ¿Quién puede usar la guía transportista?</h2>
+  <div class="nota">
+    <strong>Requisito obligatorio:</strong> solo las empresas con
+    <strong>al menos un vehículo registrado</strong> pueden emitir guías transportista.
+    La <strong>guía de remisión (remitente)</strong> permanece disponible para todas las empresas
+    que tengan habilitada la emisión de guías electrónicas.
+  </div>
+  <p>Cómo registrar un vehículo:</p>
+  <ol>
+    <li>Abra <strong>Mi perfil → Consultar placa</strong>.</li>
+    <li>Consulte y registre la placa del vehículo (queda guardado en su empresa).</li>
+    <li>Vuelva a <strong>Facturación → Emisión de guías</strong>: aparecerá el botón
+      <strong>Guía transportista</strong> y la opción en el menú.</li>
+  </ol>
+  <p>
+    Si intenta emitir sin vehículos, el sistema bloqueará el guardado y mostrará un aviso
+    para registrar una placa primero.
+  </p>
+
+  <h2>2. ¿Qué es la guía transportista?</h2>
+  <p>
+    Es la GRE SUNAT tipo <strong>31</strong>. La emite quien transporta la carga.
+    <strong>No se informa motivo de traslado</strong> (a diferencia de la guía remitente 09).
+  </p>
+  <table>
+    <thead>
+      <tr><th>Aspecto</th><th>En el sistema</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tipo SUNAT</td><td>31 — GRE Transportista</td></tr>
+      <tr><td>Disponible si</td><td>Guías electrónicas ON + al menos 1 vehículo registrado</td></tr>
+      <tr><td>Menú</td><td>Facturación → Emisión de guías → <strong>Guía transportista</strong></td></tr>
+      <tr><td>Documento relacionado</td><td>Factura (01), Boleta (03) o Guía remitente (09)</td></tr>
+      <tr><td>Partes obligatorias</td><td>Remitente (quien envía) y destinatario (quien recibe)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Antes de empezar</h2>
+  <ol>
+    <li>
+      En <strong>Configuración → Facturación</strong>, active
+      <strong>«Habilitar emisión de guías electrónicas (remitente / transportista)»</strong> y guarde.
+    </li>
+    <li>
+      <strong>Registre al menos un vehículo</strong> desde Mi perfil → Consultar placa
+      (sin esto no verá ni podrá usar Guía transportista).
+    </li>
+    <li>
+      Configure la serie del comprobante tipo <strong>31</strong> en series y correlativos, si aún no existe.
+    </li>
+    <li>
+      En <strong>Emisión de guías → Configuración</strong>, registre las credenciales de la API REST GRE
+      (URL base, ID y CLAVE de la app SUNAT).
+    </li>
+  </ol>
+
+  <h2>4. Acceder al formulario</h2>
+  <p>
+    Vaya a <strong>Facturación → Emisión de guías</strong> y pulse el botón
+    <strong>Guía transportista</strong>. Se abre la pantalla
+    <em>Guía de remisión transportista</em>.
+  </p>
+
+  <h2>5. Elaborar la guía (paso a paso)</h2>
+
+  <div class="paso">
+    <p><strong class="num">1.</strong> <strong>Documento relacionado al transporte</strong></p>
+    <p>Elija el tipo de documento relacionado (catálogo SUNAT 61):</p>
+    <ul>
+      <li><strong>Factura (01)</strong> o <strong>Boleta (03)</strong></li>
+      <li><strong>Guía remisión remitente (09)</strong> — caso más habitual cuando ya existe una GR del dueño de la mercadería</li>
+    </ul>
+    <p><strong>Si eligió guía remitente (09):</strong></p>
+    <ul>
+      <li>Indique el <strong>RUC emisor</strong> de esa guía, serie y número (ej. T011-00000478).</li>
+      <li>No se busca en sus comprobantes internos. Al guardar, el ítem se envía como «SEGUN DOCUMENTOS RELACIONADOS» (unidad ZZ).</li>
+    </ul>
+    <p><strong>Si eligió factura o boleta:</strong> indique cómo cargar los bienes (solo ayuda a armar el formulario; no es motivo de traslado):</p>
+    <ul>
+      <li><strong>Desde venta / comprobante interno:</strong> serie y número → <em>Buscar comprobante</em>.</li>
+      <li><strong>Desde compra (consulta SUNAT):</strong> clave SOL, RUC proveedor, serie y número → <em>Consultar en SUNAT</em>.</li>
+      <li><strong>Carga manual de ítems:</strong> agregue líneas (descripción y cantidad obligatorias). Serie/número son opcionales; si los informa, complete también el RUC emisor.</li>
+    </ul>
+    <p>También puede alternar entre <em>Desde comprobante</em> y <em>Carga manual de ítems</em> para el detalle de bienes.</p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">2.</strong> <strong>Direcciones de origen y destino</strong></p>
+    <ul>
+      <li>Seleccione establecimiento de la lista, o use <em>Buscar anexos RUC</em>.</li>
+      <li>Si los bienes vienen de una compra, el origen suele ser el proveedor y el destino su almacén; en caso contrario, origen su almacén y destino el cliente.</li>
+    </ul>
+    <div class="nota">
+      Origen y destino deben tener <strong>ubigeo de 6 dígitos</strong>. SUNAT rechaza la guía si el ubigeo va vacío.
+    </div>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">3.</strong> <strong>Destinatario</strong></p>
+    <p>
+      Complete tipo de documento, número y razón social o nombre.
+      Use <em>Consultar</em> para buscar en clientes o SUNAT; si hay dirección, se sugiere como destino en el paso 2.
+    </p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">4.</strong> <strong>Remitente de la mercadería</strong></p>
+    <p>
+      En la guía transportista SUNAT exige el <strong>remitente</strong> (quien envía la carga).
+      Consulte RUC/DNI: el sistema busca en proveedores, luego clientes y, si no encuentra, en SUNAT.
+      Si hay dirección, se sugiere como origen.
+    </p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">5.</strong> <strong>Datos de traslado</strong></p>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Detalle</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Vehículo de la empresa</td><td>Puede elegir uno registrado o ingresar la placa manualmente.</td></tr>
+        <tr><td>Fecha / hora inicio</td><td>Inicio del traslado.</td></tr>
+        <tr><td>Peso total</td><td>Kilogramo o tonelada, más la cantidad.</td></tr>
+        <tr><td>Vehículo M1/L</td><td>Si marca esta opción, no se exigen conductor ni placa como en un vehículo de carga convencional.</td></tr>
+        <tr><td>Pagador del flete</td><td>Opcional: remitente, destinatario o transportista.</td></tr>
+        <tr><td>Inscripción MTC</td><td>Número MTC del transportista y, si aplica, registro MTC del vehículo.</td></tr>
+        <tr><td>Placa y conductor</td><td>Placa principal (obligatoria si no es M1/L), placa secundaria opcional, DNI/pasaporte, nombre y licencia.</td></tr>
+        <tr><td>Observaciones</td><td>Texto libre opcional.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">6.</strong> <strong>Guardar e imprimir</strong></p>
+    <p>
+      Pulse <strong>Guardar guía</strong>. Queda registrada pendiente de envío a SUNAT.
+      Luego puede usar <strong>Imprimir PDF</strong> (A4 o ticket 80&nbsp;mm).
+    </p>
+  </div>
+
+  <h2>6. Enviar a SUNAT</h2>
+  <ol>
+    <li>Abra <strong>Facturación → Emisión de guías</strong>.</li>
+    <li>Localice la guía transportista en el listado.</li>
+    <li>En <em>Más acciones</em> (⋯), pulse <strong>Enviar a SUNAT</strong>.</li>
+    <li>Si fue aceptada, el estado se actualiza. Si hay rechazo, edite (si aún es editable), guarde y vuelva a enviar.</li>
+  </ol>
+  <div class="ok">
+    Al editar, el correlativo no cambia. Tras guardar los cambios debe enviar de nuevo a SUNAT desde Emisión de guías.
+  </div>
+
+  <h2>7. Ejemplo — Guía transportista referenciando GR remitente</h2>
+  <table>
+    <thead>
+      <tr><th>Campo</th><th>Valor de ejemplo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Documento relacionado</td><td>Guía remisión remitente (09) — T011-00000478</td></tr>
+      <tr><td>RUC emisor GR 09</td><td>20123456789 (empresa dueña de la mercadería)</td></tr>
+      <tr><td>Remitente</td><td>Misma empresa dueña — RUC 20123456789</td></tr>
+      <tr><td>Destinatario</td><td>COMERCIAL ANDINA S.A.C. — RUC 20601234567</td></tr>
+      <tr><td>Placa / conductor</td><td>ABC-123 — DNI 45678901</td></tr>
+      <tr><td>Peso</td><td>1200 KGM</td></tr>
+      <tr><td>Pagador del flete</td><td>Remitente</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8. Buenas prácticas</h2>
+  <ul>
+    <li>Mantenga al menos un vehículo registrado; si elimina todos, dejará de ver Guía transportista.</li>
+    <li>Cuando transporte mercadería ajena con GR remitente ya emitida, use tipo relacionado <strong>09</strong> con su serie, número y RUC emisor.</li>
+    <li>Complete siempre remitente y destinatario; SUNAT los exige en el tipo 31.</li>
+    <li>Verifique ubigeo en origen y destino antes de guardar.</li>
+    <li>Registre MTC e indicador de pagador de flete si su operación o SUNAT lo requieren.</li>
+    <li>Conserve el PDF aceptado para el conductor durante el traslado.</li>
+  </ul>
+</body>
+</html>

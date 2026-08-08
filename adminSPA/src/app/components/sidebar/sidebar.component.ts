@@ -261,12 +261,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
       };
       base = idxCom >= 0 ? [...base.slice(0, idxCom + 1), emisionItem, ...base.slice(idxCom + 1)] : [...base, emisionItem];
     }
-    const guiasItems: SubMenuItem[] = estado?.habilitarGuiasElectronicas
-      ? [
-          { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
-          { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
-        ]
-      : [];
+    const guiasItems: SubMenuItem[] = [];
+    if (estado?.habilitarGuiasElectronicas) {
+      guiasItems.push({ nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true });
+      if (estado?.puedeEmitirGuiaTransportista) {
+        guiasItems.push({ nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true });
+      }
+    }
     return [...base, ...guiasItems];
   }
 
@@ -408,10 +409,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
     ];
     if (estado?.habilitarGuiasElectronicas) {
       base.push(
-        //{ nombre: 'Configuración de guías electrónicas', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
-        { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
-        { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+        { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true }
       );
+      if (estado?.puedeEmitirGuiaTransportista) {
+        base.push(
+          { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+        );
+      }
     }
     return base;
   }
@@ -497,8 +501,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
       { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true },
       { nombre: 'Emisión de guías', ruta: '/facturacion/emision-guias', permiso: '', visible: true },
-      { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
-      { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+      { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true }
     ];
     const navegacionDefecto: MenuItem[] = [
       { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },

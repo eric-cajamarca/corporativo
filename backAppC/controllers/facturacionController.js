@@ -25,8 +25,6 @@ const obtenerConfiguracionFacturacion = async (req, res, next) => {
 const actualizarConfiguracionFacturacion = async (req, res, next) => {
   try {
     const {
-      certificadoDigital,
-      claveCertificado,
       usuarioSunat,
       claveSunat,
       urlEnvio,
@@ -36,6 +34,7 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       urlBaseApiGuias,
       idApiGuias,
       claveApiGuias,
+      rucApiGuias,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -51,9 +50,8 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       horaEnvioSunat
     } = req.body;
 
-    const result = await withPool(async (pool) => FacturacionServices.actualizarConfiguracionFacturacionService(pool, req.user, {
-      certificadoDigital,
-      claveCertificado,
+    // Certificado/clave solo si vienen en el body (si no, el repo conserva los existentes).
+    const datosConfig = {
       usuarioSunat,
       claveSunat,
       urlEnvio,
@@ -63,6 +61,7 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       urlBaseApiGuias,
       idApiGuias,
       claveApiGuias,
+      rucApiGuias,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -76,7 +75,15 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       programacionEnvioLotes,
       modoEnvioSunat,
       horaEnvioSunat
-    }));
+    };
+    if (Object.prototype.hasOwnProperty.call(req.body, 'certificadoDigital')) {
+      datosConfig.certificadoDigital = req.body.certificadoDigital;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'claveCertificado')) {
+      datosConfig.claveCertificado = req.body.claveCertificado;
+    }
+
+    const result = await withPool(async (pool) => FacturacionServices.actualizarConfiguracionFacturacionService(pool, req.user, datosConfig));
 
     res.status(200).send({
       message: "Configuración de facturación actualizada exitosamente",
@@ -643,6 +650,15 @@ const registrarGuia = async (req, res, next) => {
         message: "Ejecute la migración create_guias_electronicas_emitidas.sql antes de usar esta función.",
         data: null
       });
+    }
+    // Validaciones de negocio (vehículos GRE 31, campos obligatorios, etc.)
+    if (
+      /vehículo/i.test(msg) ||
+      /requerid/i.test(msg) ||
+      /inválid/i.test(msg) ||
+      /no encontrada/i.test(msg)
+    ) {
+      return res.status(400).send({ message: msg, data: null });
     }
     console.error("Error registrar guía electrónica:", error);
     return next(error);

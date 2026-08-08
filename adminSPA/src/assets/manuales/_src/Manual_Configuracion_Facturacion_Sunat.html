@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manual de Usuario — Configuración de facturación y envío a SUNAT</title>
+  <style>
+    @page { margin: 18mm 16mm 18mm 16mm; size: A4; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #222;
+      margin: 0;
+    }
+    h1 {
+      font-size: 18pt;
+      margin: 0 0 4px;
+      color: #0d3b66;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #555;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #0d6efd;
+      padding-bottom: 10px;
+    }
+    .objetivo {
+      background: #f0f6ff;
+      border-left: 4px solid #0d6efd;
+      padding: 10px 12px;
+      margin: 0 0 16px;
+      font-size: 10.5pt;
+    }
+    h2 {
+      font-size: 13pt;
+      color: #0d3b66;
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px; }
+    ol, ul { margin: 0 0 10px; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .paso {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 0 0 10px;
+      page-break-inside: avoid;
+    }
+    .paso strong.num {
+      display: inline-block;
+      min-width: 1.6em;
+      color: #0d6efd;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #ced4da;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e9f2ff; color: #0d3b66; }
+    .nota {
+      background: #fff8e6;
+      border-left: 4px solid #f0ad4e;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    .ok {
+      background: #e8f5e9;
+      border-left: 4px solid #28a745;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    .alerta {
+      background: #fdecea;
+      border-left: 4px solid #dc3545;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+  <h1>Manual de Usuario — Configuración de facturación y envío a SUNAT</h1>
+  <div class="meta">
+    EFAFERP · Dominio Facturación electrónica · Plataforma: businesssoft.net · Actualizado: agosto 2026
+  </div>
+
+  <div class="objetivo">
+    <strong>Objetivo:</strong> Configurar la facturación electrónica con
+    <strong>envío directo a SUNAT</strong> (usuario secundario + certificado digital),
+    definir cómo se envían las boletas y elegir el modo de envío automático o inmediato.
+  </div>
+
+  <div class="nota">
+    Este tutorial describe únicamente el <strong>envío directo a SUNAT</strong>.
+    No cubre el Facturador SUNAT por archivos planos. Deje desmarcada la opción
+    «Usar facturador» si trabaja solo con envío directo.
+  </div>
+
+  <h2>1. Dónde configurar</h2>
+  <p>Vaya a <strong>Configuración</strong> y use estas pestañas:</p>
+  <table>
+    <thead>
+      <tr><th>Pestaña</th><th>Para qué sirve</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Facturación</strong></td>
+        <td>Envío directo, certificado, boletas, series, guías electrónicas.</td>
+      </tr>
+      <tr>
+        <td><strong>Envío a SUNAT</strong> (o modos de envío)</td>
+        <td>Modo 1 / 2 / 3 (inmediato, cada N minutos o una vez al día).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Requisitos previos</h2>
+  <ul>
+    <li>Empresa activa con RUC correcto.</li>
+    <li>Usuario <strong>secundario</strong> de la Clave SOL creado en SUNAT (ver sección 3).</li>
+    <li>Certificado digital <strong>.pfx</strong> y su clave (para firmar el XML UBL).</li>
+    <li>Series de factura, boleta y notas configuradas (o crearlas desde el botón de series).</li>
+  </ul>
+
+  <h2>3. ¿De dónde sale el usuario secundario?</h2>
+  <p>
+    El usuario y la clave que pide EFAFERP <strong>no los inventa el sistema</strong>: los crea usted (o su contador)
+    en <strong>SUNAT Operaciones en Línea (SOL)</strong>, con la Clave SOL del titular del RUC.
+  </p>
+  <div class="paso">
+    <p><strong>Cómo crearlo en SUNAT:</strong></p>
+    <ol>
+      <li>Ingrese a <strong>SUNAT Operaciones en Línea</strong> con el RUC y la Clave SOL del titular.</li>
+      <li>Abra <strong>Administración de usuarios</strong> (o Administración de usuarios secundarios).</li>
+      <li>Pulse <strong>Crear usuario</strong>.</li>
+      <li>Registre documento de identidad de la persona autorizada, y defina un
+        <strong>nombre de usuario</strong> y una <strong>contraseña</strong> (esas son las que usará EFAFERP).</li>
+      <li>Asigne perfiles / opciones relacionadas con <strong>comprobantes de pago</strong> y
+        <strong>facturación electrónica</strong>, según lo que permita SUNAT.</li>
+      <li>Guarde (Grabar). Anote el usuario y la clave en un lugar seguro.</li>
+    </ol>
+  </div>
+  <div class="nota">
+    <strong>Importante:</strong> no use la Clave SOL del titular para el envío automático desde el sistema.
+    SUNAT recomienda un usuario secundario dedicado al envío de comprobantes electrónicos.
+    En pruebas BETA suele usarse el usuario de ejemplo <strong>MODDATOS</strong> (con la clave de pruebas que indique SUNAT).
+    En producción use el usuario secundario real que usted creó.
+  </div>
+  <p>
+    Formato habitual al autenticar ante BillService: el sistema combina su RUC con el usuario secundario
+    (según lo que configure en el campo «Usuario secundario»). Si el campo pide solo el usuario
+    (ej. <em>MODDATOS</em> o el nombre que creó), ingrese ese valor; si su instalación pide
+    <em>RUC + usuario</em>, use ese formato.
+  </p>
+
+  <h2>4. Establecer la ruta (URL) de envío, usuario y clave</h2>
+  <div class="paso">
+    <p><strong class="num">1.</strong> Abra <strong>Configuración → Facturación</strong>.</p>
+    <p><strong class="num">2.</strong> En <strong>Envío directo a SUNAT (usuario secundario)</strong>, marque
+      <strong>«Usar envío directo (SOAP BillService)»</strong>.</p>
+    <p><strong class="num">3.</strong> Complete obligatoriamente estos tres campos:</p>
+    <table>
+      <thead>
+        <tr><th>Campo en EFAFERP</th><th>Qué poner</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>URL BillService SUNAT</strong><br>(ruta de envío)</td>
+          <td>
+            Es la dirección SOAP donde se envían los comprobantes firmados.<br><br>
+            <strong>Pruebas (BETA):</strong><br>
+            <code style="font-size:8.5pt;word-break:break-all;">https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService</code><br><br>
+            <strong>Producción:</strong><br>
+            <code style="font-size:8.5pt;word-break:break-all;">https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Usuario secundario</strong></td>
+          <td>
+            El <strong>nombre de usuario</strong> que creó en SOL (sección 3), por ejemplo
+            <em>MODDATOS</em> en beta, o el usuario que usted definió en producción.
+            No es el RUC solo; es el usuario secundario asociado a su RUC.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Contraseña del usuario secundario</strong></td>
+          <td>
+            La <strong>clave</strong> que asignó a ese usuario en SUNAT al crearlo.
+            Si deja el campo vacío al guardar de nuevo, EFAFERP conserva la contraseña ya guardada.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong class="num">4.</strong> Deje <strong>desmarcado</strong> «Usar facturador» si solo usará envío directo.</p>
+    <p><strong class="num">5.</strong> Pulse <strong>Guardar cambios</strong>.</p>
+  </div>
+  <div class="ok">
+    Sin URL de envío + usuario secundario + contraseña correctos, el sistema no podrá autenticarse
+    ante SUNAT aunque el certificado .pfx esté bien.
+  </div>
+
+  <h2>5. Subir el certificado digital</h2>
+  <p>
+    En la misma pestaña Facturación, sección <strong>Certificado digital para firma de XML</strong>:
+  </p>
+  <ol>
+    <li>Seleccione el archivo <strong>.pfx</strong>.</li>
+    <li>Ingrese la <strong>clave del certificado</strong>.</li>
+    <li>Pulse <strong>Subir certificado</strong>.</li>
+  </ol>
+  <div class="ok">
+    Cuando aparece «Certificado cargado», el sistema puede firmar los comprobantes antes de enviarlos a SUNAT.
+    Guardar otros datos de facturación <strong>no debe borrar</strong> el certificado ya cargado.
+  </div>
+  <div class="alerta">
+    Sin certificado válido, el XML puede generarse sin firma y SUNAT rechazará el envío directo.
+  </div>
+
+  <h2>6. Envío de boletas</h2>
+  <p>Elija una opción (requiere envío directo activo):</p>
+  <table>
+    <thead>
+      <tr><th>Opción</th><th>Comportamiento</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Resumen diario (RC)</strong></td>
+        <td>
+          Las boletas del día se agrupan en un resumen. Debe generar y enviar el resumen desde
+          <strong>Facturación → Resumen diario</strong>.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Envío individual (sendBill)</strong></td>
+        <td>Cada boleta se envía por separado (manual o en el lote automático).</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Las facturas siempre se envían de forma individual (no van en el resumen diario).</p>
+
+  <h2>7. Opciones útiles en Facturación</h2>
+  <ul>
+    <li>
+      <strong>Habilitar emisión de guías electrónicas:</strong> activa guías de remisión (y transportista si tiene vehículos).
+      La API GRE se configura aparte en Emisión de guías → Configuración.
+    </li>
+    <li>
+      <strong>Series y correlativos:</strong> use el botón <em>Configurar series y correlativos</em>
+      para factura, boleta, notas, etc.
+    </li>
+    <li>
+      <strong>Envío automático en segundo plano:</strong> necesario si usará modos 2 o 3 (ver siguiente sección).
+    </li>
+    <li>
+      <strong>Envío manual:</strong> desde el historial de ventas, botón <em>SUNAT</em> en cada fila.
+    </li>
+  </ul>
+
+  <h2>8. Modos de envío a SUNAT</h2>
+  <p>
+    Abra la pestaña <strong>Modos de envío a SUNAT</strong> (zona horaria del modo diario:
+    <strong>America/Lima</strong>).
+  </p>
+  <table>
+    <thead>
+      <tr><th>Modo</th><th>Cuándo se envía</th><th>Requisito</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1 — Inmediato</strong></td>
+        <td>Al confirmar el cobro de la venta.</td>
+        <td>Envío directo + certificado + usuario SOL.</td>
+      </tr>
+      <tr>
+        <td><strong>2 — Cada N minutos</strong></td>
+        <td>Cola en base de datos; se envía tras esperar los minutos configurados.</td>
+        <td>Activar «Envío automático en segundo plano» y definir los minutos.</td>
+      </tr>
+      <tr>
+        <td><strong>3 — Una vez al día</strong></td>
+        <td>Una ola diaria a la hora indicada (hora Lima).</td>
+        <td>Activar envío automático en segundo plano y definir la hora.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="paso">
+    <p>Pasos recomendados:</p>
+    <ol>
+      <li>Elija el modo (1, 2 o 3).</li>
+      <li>Si usa modo 2 o 3, marque <strong>Envío automático en segundo plano</strong>.</li>
+      <li>Modo 2: indique minutos de espera tras el cobro.</li>
+      <li>Modo 3: indique la hora diaria (Lima).</li>
+      <li>Pulse <strong>Guardar modos de envío</strong>.</li>
+    </ol>
+  </div>
+
+  <h2>9. Checklist rápido (envío directo)</h2>
+  <ol>
+    <li>☐ Usuario secundario creado en SUNAT SOL (Administración de usuarios).</li>
+    <li>☐ «Usar envío directo» marcado.</li>
+    <li>☐ «Usar facturador» desmarcado (si solo usa envío directo).</li>
+    <li>☐ <strong>URL BillService</strong> pegada (beta o producción).</li>
+    <li>☐ <strong>Usuario secundario</strong> y <strong>contraseña</strong> guardados (los de SOL, no la Clave del titular).</li>
+    <li>☐ Certificado .pfx cargado (mensaje «Certificado cargado»).</li>
+    <li>☐ Series de factura/boleta configuradas.</li>
+    <li>☐ Modo de boletas elegido (resumen diario o individual).</li>
+    <li>☐ Modo de envío 1 / 2 / 3 guardado (y automático ON si aplica).</li>
+  </ol>
+
+  <h2>10. Buenas prácticas</h2>
+  <ul>
+    <li>Pruebe primero en <strong>BETA</strong> con la URL de pruebas y el usuario de prueba (ej. MODDATOS) antes de producción.</li>
+    <li>No use la Clave SOL del titular en EFAFERP; use siempre el usuario secundario dedicado.</li>
+    <li>Si cambia la clave del usuario en SUNAT, actualícela también en Configuración → Facturación.</li>
+    <li>Conserve una copia segura del .pfx y su clave fuera del sistema.</li>
+    <li>Si un comprobante falla, revise el mensaje en el historial de ventas y reenvíe con el botón SUNAT.</li>
+    <li>Con resumen diario activo, no olvide generar y enviar el RC del día desde Resumen diario.</li>
+  </ul>
+</body>
+</html>

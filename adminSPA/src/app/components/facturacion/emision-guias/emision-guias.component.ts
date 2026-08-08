@@ -39,6 +39,8 @@ export class EmisionGuiasComponent implements OnInit {
   private guiaImpresionPendiente: GuiaEmitidaListItem | null = null;
 
   autorizado = true;
+  /** GRE 31: solo si la empresa tiene vehículos registrados. */
+  puedeEmitirGuiaTransportista = false;
   loading    = false;
   items: GuiaEmitidaListItem[] = [];
   total    = 0;
@@ -60,14 +62,18 @@ export class EmisionGuiasComponent implements OnInit {
 
   ngOnInit(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
-      next: (res: { data?: { habilitarGuiasElectronicas?: boolean } }) => {
+      next: (res: { data?: { habilitarGuiasElectronicas?: boolean; puedeEmitirGuiaTransportista?: boolean } }) => {
         this.autorizado = res?.data?.habilitarGuiasElectronicas === true;
+        this.puedeEmitirGuiaTransportista = res?.data?.puedeEmitirGuiaTransportista === true;
         if (!this.autorizado) {
           iziToast.warning({ title: 'Guías', message: 'Active la emisión de guías en Configuración → Facturación.', position: 'topRight' });
         }
         if (this.autorizado) this.cargar();
       },
-      error: () => { this.autorizado = false; }
+      error: () => {
+        this.autorizado = false;
+        this.puedeEmitirGuiaTransportista = false;
+      }
     });
   }
 

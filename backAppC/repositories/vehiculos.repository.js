@@ -70,6 +70,18 @@ exports.guardarVehiculoYSoatRepo = async (pool, idEmpresa, { vehiculo, soat }) =
   return { idVehiculo, placa };
 };
 
+/** Cantidad de vehículos registrados de la empresa (idEmpresa del token). */
+exports.contarVehiculosEmpresaRepo = async (pool, idEmpresa) => {
+  const result = await pool.request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT COUNT(*) AS total
+      FROM Vehiculos
+      WHERE idEmpresa = @idEmpresa
+    `);
+  return Number(result.recordset?.[0]?.total || 0);
+};
+
 /**
  * Lista vehículos de la empresa con el estado del último SOAT.
  */

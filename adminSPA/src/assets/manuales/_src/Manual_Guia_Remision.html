@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manual de Usuario — Guía de remisión</title>
+  <style>
+    @page { margin: 18mm 16mm 18mm 16mm; size: A4; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #222;
+      margin: 0;
+    }
+    h1 {
+      font-size: 18pt;
+      margin: 0 0 4px;
+      color: #0d3b66;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #555;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #0d6efd;
+      padding-bottom: 10px;
+    }
+    .objetivo {
+      background: #f0f6ff;
+      border-left: 4px solid #0d6efd;
+      padding: 10px 12px;
+      margin: 0 0 16px;
+      font-size: 10.5pt;
+    }
+    h2 {
+      font-size: 13pt;
+      color: #0d3b66;
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 11.5pt;
+      color: #1a4a7a;
+      margin: 12px 0 6px;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px; }
+    ol, ul { margin: 0 0 10px; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .paso {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 0 0 10px;
+      page-break-inside: avoid;
+    }
+    .paso strong.num {
+      display: inline-block;
+      min-width: 1.6em;
+      color: #0d6efd;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #ced4da;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e9f2ff; color: #0d3b66; }
+    .nota {
+      background: #fff8e6;
+      border-left: 4px solid #f0ad4e;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    .alerta {
+      background: #fdecea;
+      border-left: 4px solid #dc3545;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    .ok {
+      background: #e8f5e9;
+      border-left: 4px solid #28a745;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 10pt;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+      background: #f1f3f5;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .footer-note {
+      margin-top: 22px;
+      font-size: 9pt;
+      color: #666;
+      border-top: 1px solid #dee2e6;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Manual de Usuario — Guía de remisión</h1>
+  <div class="meta">
+    EFAFERP · Dominio Facturación electrónica · Plataforma: businesssoft.net · Actualizado: agosto 2026
+  </div>
+
+  <div class="objetivo">
+    <strong>Objetivo:</strong> Elaborar una Guía de Remisión Electrónica (GRE) tipo <strong>09 Remitente</strong>,
+    enviarla a SUNAT y descargar el PDF. También se indica cómo configurar las credenciales API y emitir
+    la guía transportista (tipo <strong>31</strong>) cuando corresponda.
+  </div>
+
+  <h2>1. ¿Qué es la Guía de Remisión Electrónica?</h2>
+  <p>
+    Es el comprobante que respalda el traslado de bienes ante SUNAT. En EFAFERP existen dos tipos:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Quién la emite</th>
+        <th>Ruta en el sistema</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>09</strong> — GRE Remitente</td>
+        <td>El dueño de la mercadería (su empresa)</td>
+        <td>Facturación → Guías de remisión</td>
+      </tr>
+      <tr>
+        <td><strong>31</strong> — GRE Transportista</td>
+        <td>La empresa de transporte</td>
+        <td>Facturación → Guías transportista</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Este tutorial se centra en la <strong>guía remitente (09)</strong>, el caso más habitual al despachar
+    mercadería de una venta o de una compra.
+  </p>
+
+  <h2>2. Requisitos previos (configuración)</h2>
+  <ol>
+    <li>
+      Vaya a <strong>Configuración → Facturación</strong> y active
+      <strong>«Habilitar emisión de guías electrónicas (remitente / transportista)»</strong>. Guarde los cambios.
+    </li>
+    <li>
+      Configure la serie del comprobante de guía (código SUNAT <code>09</code>) en
+      <strong>Configuración → Series y correlativos</strong>, si aún no existe.
+    </li>
+    <li>
+      En <strong>Facturación → Emisión de guías → Configuración</strong>
+      (<code>/facturacion/guias/configuracion</code>) registre las credenciales de la
+      <strong>Nueva Plataforma GRE (API REST)</strong>:
+      <ul>
+        <li><strong>URL base:</strong> <code>https://api-cpe.sunat.gob.pe</code> (producción) o <code>https://e-beta.sunat.gob.pe</code> (pruebas).</li>
+        <li><strong>ID</strong> y <strong>CLAVE</strong> de la app creada en <code>api-seguridad.sunat.gob.pe</code>.</li>
+        <li>RUC de la API solo si es distinto al RUC de la empresa.</li>
+      </ul>
+    </li>
+  </ol>
+  <div class="alerta">
+    <strong>Importante:</strong> No use la URL SOAP antigua
+    (<code>e-guiaremision.sunat.gob.pe/.../billService?wsdl</code>). EFAFERP trabaja con la API REST GRE.
+  </div>
+
+  <h2>3. Acceder al módulo</h2>
+  <p>Menú lateral: <strong>Facturación → Emisión de guías</strong> (<code>/facturacion/emision-guias</code>).</p>
+  <ul>
+    <li>Botón verde <strong>Guía remitente</strong> → formulario de emisión (tipo 09).</li>
+    <li>Botón <strong>Guía transportista</strong> → formulario tipo 31.</li>
+    <li>Botón <strong>Configuración</strong> → credenciales API GRE.</li>
+  </ul>
+  <p>También puede ir directo a <strong>Facturación → Guías de remisión</strong> (<code>/facturacion/guias-remision</code>).</p>
+
+  <h2>4. Elaborar una guía remitente (paso a paso)</h2>
+
+  <div class="paso">
+    <p><strong class="num">1.</strong> <strong>Motivo de traslado</strong></p>
+    <p>
+      Seleccione el motivo del catálogo SUNAT (obligatorio). Ejemplos frecuentes:
+    </p>
+    <ul>
+      <li><strong>01 Venta:</strong> busca comprobantes de venta emitidos por su empresa.</li>
+      <li><strong>02 Compra:</strong> consulta el comprobante del proveedor en SUNAT (Factiliza) con su clave SOL.</li>
+      <li>Otros motivos usan la búsqueda de ventas como referencia del documento relacionado.</li>
+    </ul>
+    <p>Puede completar una descripción adicional del motivo (opcional).</p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">2.</strong> <strong>Comprobante de origen</strong></p>
+    <p>Elija una de estas opciones:</p>
+    <ul>
+      <li>
+        <strong>Buscar comprobante existente:</strong> indique serie y número (ej. F001-00012345) y pulse
+        <em>Buscar comprobante</em>. Se cargan cliente, ítems y datos del documento.
+      </li>
+      <li>
+        <strong>Ingresar manualmente:</strong> registre tipo, serie, número, RUC emisor e ítems a trasladar.
+      </li>
+    </ul>
+    <p>
+      Con motivo <strong>Compra (02)</strong> complete RUC/usuario/clave SOL, RUC del proveedor, tipo de documento,
+      serie y número; luego pulse <em>Consultar en SUNAT</em>.
+    </p>
+    <p>
+      Revise el detalle de productos: puede ajustar cantidades, descripciones o agregar/quitar líneas antes de guardar.
+      Unidad SUNAT típica: <code>NIU</code> (unidad), <code>KGM</code> (kilogramo), <code>BX</code> (caja).
+    </p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">3.</strong> <strong>Direcciones de origen y destino</strong></p>
+    <ul>
+      <li><strong>Venta:</strong> origen = su almacén; destino = dirección del cliente.</li>
+      <li><strong>Compra:</strong> origen = proveedor; destino = su almacén.</li>
+    </ul>
+    <p>
+      Seleccione un establecimiento de la lista o use <em>Buscar anexos RUC</em> para traer locales SUNAT.
+      También puede agregar una dirección manual (calle, ubigeo de 6 dígitos, código de local).
+    </p>
+    <div class="nota">
+      SUNAT rechaza la GRE si el <strong>ubigeo</strong> de origen o destino está vacío. Prefiera anexos SUNAT con ubigeo INEI.
+    </div>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">4.</strong> <strong>Destinatario</strong></p>
+    <p>
+      Indique tipo de documento (RUC/DNI), número y razón social o nombre.
+      Use <em>Consultar</em> para buscar en su base de clientes o en SUNAT (Factiliza) y precargar la dirección de destino.
+    </p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">5.</strong> <strong>Datos de traslado (obligatorios)</strong></p>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Detalle</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fecha / hora inicio</td><td>Inicio del traslado de los bienes.</td></tr>
+        <tr><td>Peso total</td><td>Unidad (kilogramo o tonelada) y cantidad.</td></tr>
+        <tr>
+          <td>Modalidad</td>
+          <td>
+            <strong>01 Público:</strong> RUC y razón social del transportista (y placa).<br>
+            <strong>02 Privado:</strong> placa del vehículo, DNI/pasaporte, nombre y licencia del conductor.
+          </td>
+        </tr>
+        <tr><td>Observaciones</td><td>Texto libre opcional (Note GRE).</td></tr>
+      </tbody>
+    </table>
+    <p>
+      En transporte privado puede consultar el DNI del conductor. En transporte público puede elegir un
+      transportista frecuente del catálogo o ingresar el RUC manualmente.
+    </p>
+  </div>
+
+  <div class="paso">
+    <p><strong class="num">6.</strong> <strong>Guardar la guía</strong></p>
+    <p>
+      Pulse <strong>Guardar guía</strong>. El sistema asigna serie y correlativo. La guía queda registrada
+      en estado pendiente de envío a SUNAT.
+    </p>
+    <p>
+      Tras guardar puede usar <strong>Imprimir PDF</strong> (formato A4 o ticket 80&nbsp;mm). El PDF también
+      está disponible desde el listado de Emisión de guías.
+    </p>
+  </div>
+
+  <h2>5. Enviar a SUNAT</h2>
+  <ol>
+    <li>Vaya a <strong>Facturación → Emisión de guías</strong>.</li>
+    <li>Localice la guía (filtros por fecha, serie, estado, etc.).</li>
+    <li>En el menú <em>Más acciones</em> (⋯) de la fila, pulse <strong>Enviar a SUNAT</strong>.</li>
+    <li>
+      Si SUNAT acepta, el estado pasa a aceptado. Si hay observación o rechazo, revise el mensaje,
+      edite la guía (si aún es editable) y vuelva a enviar.
+    </li>
+  </ol>
+  <div class="ok">
+    Otras acciones útiles en el listado: <strong>Ver detalle</strong>, <strong>Editar</strong> (mientras no esté aceptada),
+    <strong>Sincronizar con SUNAT (SOL)</strong>, <strong>Imprimir PDF</strong> y <strong>Eliminar</strong> (si no está aceptada).
+  </div>
+  <div class="nota">
+    Al editar una guía existente el correlativo no cambia. Después de guardar los cambios debe
+    <strong>enviar de nuevo a SUNAT</strong> desde Emisión de guías.
+  </div>
+
+  <h2>6. Ejemplo rápido — Guía por venta (motivo 01)</h2>
+  <table>
+    <thead>
+      <tr><th>Campo</th><th>Valor de ejemplo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Motivo</td><td>01 — Venta</td></tr>
+      <tr><td>Comprobante origen</td><td>Factura F001-00004567</td></tr>
+      <tr><td>Destinatario</td><td>COMERCIAL ANDINA S.A.C. — RUC 20601234567</td></tr>
+      <tr><td>Origen</td><td>Av. Industrial 120, Lima (local 0000)</td></tr>
+      <tr><td>Destino</td><td>Jr. Comercio 450, Arequipa</td></tr>
+      <tr><td>Modalidad</td><td>02 Privado — Placa ABC-123 — Conductor DNI 45678901</td></tr>
+      <tr><td>Peso</td><td>85.50 KGM</td></tr>
+    </tbody>
+  </table>
+
+  <h2>7. Guía transportista (tipo 31) — resumen</h2>
+  <p>
+    Si su empresa actúa como transportista, use <strong>Facturación → Guías transportista</strong>.
+    En ese formulario no se informa motivo de traslado; se registran remitente, destinatario,
+    direcciones, bienes, vehículo/conductor y datos del flete según SUNAT.
+  </p>
+
+  <h2>8. Buenas prácticas y errores frecuentes</h2>
+  <ul>
+    <li>Complete primero el motivo: el resto del formulario se habilita a partir de esa elección.</li>
+    <li>Verifique ubigeo de 6 dígitos en origen y destino antes de guardar.</li>
+    <li>En transporte privado, placa y datos del conductor son obligatorios; en público, RUC del transportista.</li>
+    <li>No reutilice credenciales SOAP; solo API REST GRE.</li>
+    <li>Si el envío falla por token/credenciales, revise ID, CLAVE y URL base en Configuración de guías.</li>
+    <li>Conserve el PDF aceptado para el chofer o el cliente al momento del traslado.</li>
+  </ul>
+
+</body>
+</html>
