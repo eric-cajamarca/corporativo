@@ -7,7 +7,7 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { VentasService } from '../../../services/ventas.service';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -18,12 +18,13 @@ import { PermisosService } from '../../../services/permisos.service';
 import { planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../../../config/saas-plan-reglas.util';
 import { CuentasBancariasService } from '../../../services/cuentas-bancarias.service';
 import { CuentaBancaria } from '../../../models/cuenta-bancaria.model';
+import { AyudaFacturacionSunatComponent } from '../../shared/ayuda-facturacion-sunat/ayuda-facturacion-sunat.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-index-configuracion',
-  imports: [FormsModule, CommonModule, RouterModule],
+  imports: [FormsModule, CommonModule, RouterModule, AyudaFacturacionSunatComponent],
   templateUrl: './index-configuracion.component.html',
   styleUrl: './index-configuracion.component.css'
 })
@@ -209,6 +210,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _gestoresService: GestoresService,
     private _cuentasBancariasService: CuentasBancariasService,
     private _router: Router,
+    private route: ActivatedRoute,
     public sidebarState: SidebarStateService,
     private permisos: PermisosService
   ) {}
@@ -229,6 +231,16 @@ export class IndexConfiguracionComponent implements OnInit {
       this.permisos.cargarPermisosUsuario().subscribe({ error: () => {} });
     }
     this.cargarConfiguracion();
+    this.activarTabDesdeQuery();
+  }
+
+  private activarTabDesdeQuery(): void {
+    this.route.queryParamMap.subscribe((params) => {
+      if (params.get('tab') !== 'facturacion') return;
+      setTimeout(() => {
+        document.getElementById('nav-facturacion-tab')?.click();
+      }, 0);
+    });
   }
 
   cargarVentasDefaults(): void {

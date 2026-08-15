@@ -56,6 +56,15 @@
         [storageKey]="onboardingStorageKey"
         (refrescar)="cargarEstadoOnboarding(false)"
       ></app-onboarding-wizard>
+      @if (mostrarAyudaFacturacion) {
+        <div class="mb-4">
+          <app-ayuda-facturacion-sunat
+            [mostrarIrAConfigurar]="true"
+            [dismissible]="true"
+            (ocultado)="ocultarAyudaFacturacion()"
+          ></app-ayuda-facturacion-sunat>
+        </div>
+      }
     </div>
   }
 

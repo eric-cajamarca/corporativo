@@ -403,6 +403,17 @@
                       maxlength="60"
                       placeholder="Código de operación Yape, Plin o BCP" />
 
+                    @if (!emailListo()) {
+                      <p class="pago-culqi-hint text-danger mb-2">
+                        Complete el <strong>correo del pagador</strong> arriba para registrar el pago.
+                      </p>
+                    }
+                    @if (!aceptoPoliticas) {
+                      <p class="pago-culqi-hint text-danger mb-2">
+                        Acepte los términos y políticas para continuar.
+                      </p>
+                    }
+
                     <button
                       type="button"
                       class="btn btn-checkout-wa w-100"

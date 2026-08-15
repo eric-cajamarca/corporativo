@@ -12,11 +12,16 @@
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" routerLink="/planes">Ver planes</a>
             <a class="btn btn-outline-light btn-lg" routerLink="/login-empresa">Iniciar sesión</a>
+            <a class="btn btn-whatsapp-hero btn-lg" [href]="whatsappUrl" target="_blank" rel="noopener">
+              <i class="bi bi-whatsapp" aria-hidden="true"></i> Soporte WhatsApp
+            </a>
           </div>
           <div class="hero-meta">
-            <span><i class="fas fa-shield-alt"></i> Datos seguros</span>
-            <span><i class="fas fa-cloud"></i> Acceso desde cualquier lugar</span>
-            <span><i class="fas fa-headset"></i> Soporte por WhatsApp</span>
+            <span><i class="bi bi-shield-check"></i> Datos seguros</span>
+            <span><i class="bi bi-cloud-check"></i> Acceso desde cualquier lugar</span>
+            <a class="hero-meta-link" [href]="whatsappUrl" target="_blank" rel="noopener">
+              <i class="bi bi-whatsapp"></i> WhatsApp {{ whatsappDisplay }}
+            </a>
           </div>
         </div>
         <div class="col-lg-6">
@@ -216,6 +221,60 @@
     </div>
   </section>
 
+  <section class="section section-support">
+    <div class="container">
+      <div class="support-panel">
+        <div class="row g-4 g-lg-5 align-items-center">
+          <div class="col-lg-5">
+            <span class="support-eyebrow"><i class="bi bi-whatsapp" aria-hidden="true"></i> Acompañamiento incluido</span>
+            <h2>Te dejamos listo para facturar con SUNAT</h2>
+            <p class="support-lead">
+              Al contratar EFAFERP, un asesor te guía por WhatsApp. No necesitas ser experto en SUNAT:
+              te acompañamos en la configuración tributaria hasta que emitas tu primer comprobante.
+            </p>
+            <a class="btn btn-whatsapp btn-lg" [href]="whatsappUrl" target="_blank" rel="noopener">
+              <i class="bi bi-whatsapp" aria-hidden="true"></i>
+              Escribir al {{ whatsappDisplay }}
+            </a>
+            <p class="support-hours">Lunes a viernes, 9:00 a 18:00 · hora de Perú</p>
+          </div>
+          <div class="col-lg-7">
+            <ul class="support-list">
+              <li>
+                <span class="support-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
+                <div>
+                  <h4>Usuario secundario SUNAT</h4>
+                  <p>Te guiamos para crear el usuario SOL secundario y habilitar la facturación electrónica de tu RUC.</p>
+                </div>
+              </li>
+              <li>
+                <span class="support-icon"><i class="bi bi-file-earmark-lock" aria-hidden="true"></i></span>
+                <div>
+                  <h4>Certificado digital tributario</h4>
+                  <p>Te asistimos en la carga segura del certificado (.pfx) en el sistema para firmar tus comprobantes.</p>
+                </div>
+              </li>
+              <li>
+                <span class="support-icon"><i class="bi bi-percent" aria-hidden="true"></i></span>
+                <div>
+                  <h4>Impuestos y series</h4>
+                  <p>Configuramos IGV, series de boletas y facturas, y los parámetros fiscales de tu empresa.</p>
+                </div>
+              </li>
+              <li>
+                <span class="support-icon"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></span>
+                <div>
+                  <h4>Puesta en marcha</h4>
+                  <p>Resolvemos dudas de uso para que emitas tu primera boleta o factura con confianza.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="section">
     <div class="container">
       <div class="row g-4 align-items-center">
@@ -243,10 +302,15 @@
       <div class="row g-4 align-items-start">
         <div class="col-lg-6">
           <div class="contact-card">
-            <p><i class="fas fa-building"></i> BUSINESS SOFT COMPANY S.A.C. · RUC 20614636930</p>
-            <p><i class="fas fa-phone-alt"></i> +51 993 289 440</p>
-            <p><i class="fas fa-envelope"></i> businesssoftperu@gmail.com</p>
-            <p><i class="fas fa-map-marker-alt"></i> PJ. LOS OLIVOS NRO. S/N URB. LOS OLIVOS, CAJAMARCA - JAÉN - JAÉN, Perú</p>
+            <p><i class="bi bi-building"></i> BUSINESS SOFT COMPANY S.A.C. · RUC 20614636930</p>
+            <p>
+              <i class="bi bi-whatsapp"></i>
+              <a class="contact-wa" [href]="whatsappUrl" target="_blank" rel="noopener">
+                WhatsApp +51 {{ whatsappDisplay }}
+              </a>
+            </p>
+            <p><i class="bi bi-envelope"></i> businesssoftperu@gmail.com</p>
+            <p><i class="bi bi-geo-alt"></i> PJ. LOS OLIVOS NRO. S/N URB. LOS OLIVOS, CAJAMARCA - JAÉN - JAÉN, Perú</p>
             <div class="social-links">
               <a href="https://www.facebook.com/businesssoftperu/" target="_blank" rel="noopener">
                 <i class="bi bi-facebook"></i> Facebook
@@ -275,7 +339,18 @@
       </div>
     </div>
   </section>
-
+<!--
+  <a
+    class="wa-float"
+    [href]="whatsappUrl"
+    target="_blank"
+    rel="noopener"
+    title="Soporte por WhatsApp"
+    [attr.aria-label]="'Escribir por WhatsApp al ' + whatsappDisplay">
+    <i class="bi bi-whatsapp" aria-hidden="true"></i>
+    <span>WhatsApp</span>
+  </a>
+-->
   <a
     class="lr-float"
     routerLink="/politicas/libro-reclamaciones"

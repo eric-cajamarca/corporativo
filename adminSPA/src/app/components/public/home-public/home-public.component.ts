@@ -99,6 +99,13 @@ export class HomePublicComponent implements OnInit {
 
   readonly resumirLimitesPlan = resumirLimitesPlan;
 
+  readonly whatsappDisplay = '993 289 440';
+  readonly whatsappUrl =
+    'https://wa.me/51993289440?text=' +
+    encodeURIComponent(
+      'Hola, quiero información sobre EFAFERP y el acompañamiento para configurar SUNAT.'
+    );
+
   constructor(
     private sanitizer: DomSanitizer,
     private saasPublic: SaasPublicService

@@ -9,14 +9,16 @@ import { DashboardService, ResumenDashboard, ResumenDiario } from '../../service
 import { EmpresaService } from '../../services/empresa.service';
 import { SaasSubscriptionService } from '../../services/saas-subscription.service';
 import { OnboardingWizardComponent } from '../onboarding/onboarding-wizard/onboarding-wizard.component';
+import { AyudaFacturacionSunatComponent } from '../shared/ayuda-facturacion-sunat/ayuda-facturacion-sunat.component';
 import { PasoOnboarding } from '../../interfaces/onboarding.interface';
+import { FacturacionService } from '../../services/facturacion.service';
 import { Chart } from 'chart.js/auto';
 import { filter, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [FormsModule, CommonModule, RouterModule, OnboardingWizardComponent],
+  imports: [FormsModule, CommonModule, RouterModule, OnboardingWizardComponent, AyudaFacturacionSunatComponent],
   templateUrl: './inicio.component.html',
   styleUrl: './inicio.component.css'
 })
@@ -79,6 +81,10 @@ export class InicioComponent implements OnInit, OnDestroy {
   /** SaaS: aviso si falta completar pago / vincular suscripción */
   public mostrarAlertaSuscripcion = false;
 
+  /** Recuadro de ayuda SUNAT en Inicio (se oculta si ya está configurada o el usuario la cerró). */
+  public mostrarAyudaFacturacion = false;
+  private ayudaFacturacionStorageKey = 'ayuda_facturacion_oculto';
+
   constructor(
     private router: Router,
     public authService: AuthService,
@@ -86,6 +92,7 @@ export class InicioComponent implements OnInit, OnDestroy {
     private dashboardService: DashboardService,
     private empresaService: EmpresaService,
     private saasSubscriptionService: SaasSubscriptionService,
+    private facturacionService: FacturacionService,
     public sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario
@@ -99,7 +106,9 @@ export class InicioComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.onboardingStorageKey = `onboarding_oculto_${this.authService.userData()?.idEmpresa ?? 'empresa'}`;
+    const idEmpresa = this.authService.userData()?.idEmpresa ?? 'empresa';
+    this.onboardingStorageKey = `onboarding_oculto_${idEmpresa}`;
+    this.ayudaFacturacionStorageKey = `ayuda_facturacion_oculto_${idEmpresa}`;
 
     this.saasSubscriptionService.getMiEstado().subscribe({
       next: (r) => {
@@ -111,6 +120,7 @@ export class InicioComponent implements OnInit, OnDestroy {
     });
 
     this.cargarEstadoOnboarding();
+    this.cargarAyudaFacturacion();
 
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
@@ -123,6 +133,29 @@ export class InicioComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routerSub?.unsubscribe();
+  }
+
+  cargarAyudaFacturacion(): void {
+    if (localStorage.getItem(this.ayudaFacturacionStorageKey) === '1') {
+      this.mostrarAyudaFacturacion = false;
+      return;
+    }
+    this.facturacionService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const c = res?.data;
+        const usuario = c?.usuarioSunat != null ? String(c.usuarioSunat).trim() : '';
+        const listo = c?.tieneCertificado === true && usuario.length > 0;
+        this.mostrarAyudaFacturacion = !listo;
+      },
+      error: () => {
+        this.mostrarAyudaFacturacion = true;
+      }
+    });
+  }
+
+  ocultarAyudaFacturacion(): void {
+    localStorage.setItem(this.ayudaFacturacionStorageKey, '1');
+    this.mostrarAyudaFacturacion = false;
   }
 
   cargarEstadoOnboarding(refrescarDashboard = true): void {
