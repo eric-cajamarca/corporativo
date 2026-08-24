@@ -53,6 +53,9 @@ export class BuscadorProductosModalService {
     if (opts.venta) {
       component.ventaOpciones = opts.venta;
     }
+    if (typeof opts.mostrarStockUbicacionesEnBuscador === 'boolean') {
+      component.mostrarStockUbicacionesEnBuscador = opts.mostrarStockUbicacionesEnBuscador;
+    }
 
     modalRef.shown.pipe(take(1)).subscribe(() => {
       if (conservarBusqueda && this.estadoBusquedaVentaPersistida) {

@@ -35,6 +35,7 @@ import {
   cerrarModalCotizacionSiCorresponde,
   mapearCotizacionACarrito,
   notificarCotizacionCargada,
+  snapshotDescripcionLineaVenta,
   validarCotizacionParaCarrito
 } from '../../../utils/venta-cotizacion.util';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
@@ -2188,30 +2189,9 @@ abrirModalPrecios(item: any) {
   private descripcionLineaParaDetalle(item: {
     permiteDescripcionEnVenta?: boolean;
     descripcion?: string;
-    descripcionOriginal?: string;
+    producto?: { descripcion?: string };
   }): string | undefined {
-    if (!item.permiteDescripcionEnVenta) return undefined;
-    const cur = (item.descripcion ?? '').toString().trim();
-    const orig = (item.descripcionOriginal ?? '').toString().trim();
-    if (!cur || cur === orig) return undefined;
-    return cur.length > 500 ? cur.slice(0, 500) : cur;
-  }
-
-  actualizaDescripcion(item: any, el: any) {
-    if (!item.permiteDescripcionEnVenta) {
-      return;
-    }
-    // Obtener el texto editado y normalizar
-    const texto = ((el.target as HTMLElement)?.innerText ?? '').trim();
-
-    // Asignar la descripción al objeto correcto:
-    // si el item tiene la propiedad 'producto', actualizar producto.descripcion,
-    // si no, guardar en item.descripcion (por compatibilidad).
-    if (item.producto) {
-      item.producto.descripcion = texto;
-    } else {
-      item.descripcion = texto;
-    }
+    return snapshotDescripcionLineaVenta(item);
   }
   
 

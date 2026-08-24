@@ -287,6 +287,25 @@
   outline: 2px solid #20c997;
 }
 
+.create-ventas-desc-input {
+  width: 100%;
+  min-width: 12rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.15rem 0.35rem;
+}
+.create-ventas-desc-input:not([readonly]) {
+  background-color: #f1fffa;
+}
+.create-ventas-desc-input:not([readonly]):focus {
+  background-color: #d4f5e0;
+  border-color: #20c997;
+  box-shadow: none;
+}
+.create-ventas-desc-input[readonly] {
+  pointer-events: none;
+}
+
 /* ---------- ELIMINAR PADDING/MÁRGENES INTERNOS ---------- */
 .table-detalle tbody tr td,
 .table-detalle tbody tr th {

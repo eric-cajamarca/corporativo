@@ -106,8 +106,15 @@
           </div>
           <div class="col-6 col-md-3">
             <div class="resumen-kpi">
-              <span class="resumen-kpi-label">Utilidad del día</span>
-              <span class="resumen-kpi-value text-success">{{ resumenDiario.utilidadDia | currency:'PEN':'S/ ':'1.2-2' }}</span>
+              <span
+                class="resumen-kpi-label"
+                title="Ventas menos costo de ventas y gastos del día (los gastos recurrentes mensuales se prorratean por día)."
+              >Utilidad del día</span>
+              <span
+                class="resumen-kpi-value"
+                [class.text-success]="resumenDiario.utilidadDia >= 0"
+                [class.text-danger]="resumenDiario.utilidadDia < 0"
+              >{{ resumenDiario.utilidadDia | currency:'PEN':'S/ ':'1.2-2' }}</span>
             </div>
           </div>
           <div class="col-6 col-md-3">

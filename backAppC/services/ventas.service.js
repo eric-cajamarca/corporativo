@@ -990,6 +990,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
 
     // --- Insertar DetalleVentaAgrupada (todos los items para el comprobante VA) ---
     for (const det of detalles) {
+      const descVa = String(det.descripcionLinea || det.descripcionVenta || det.descripcion || '').trim();
       await ventasRepository.insertarDetalleVentaAgrupada(transaction, {
         idVentaAgrupada,
         idProducto: det.idProducto,
@@ -1002,7 +1003,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         subtotal: det.subtotal || (Number(det.cantidad) || 0) * (Number(det.pVenta) || 0),
         igv: det.igv ? 1 : 0,
         total: det.total || (Number(det.cantidad) || 0) * (Number(det.pVenta) || 0),
-        descripcionProducto: det.descripcion || null,
+        descripcionProducto: descVa ? descVa.slice(0, 200) : null,
         codigoProducto: det.codigo || null
       });
     }

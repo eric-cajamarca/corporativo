@@ -19,6 +19,8 @@ export interface BuscadorProductosVentaOpciones {
   estaEnDetalle?: (row: ProductoSeleccionado) => boolean;
   /** Config ventas: cantidad + ver precios en el buscador (la empresa del JWT). */
   mostrarCantidadPreciosEnBuscador?: boolean;
+  /** Config ventas: ver stock por ubicación en el buscador (también en empresa no gestora). */
+  mostrarStockUbicacionesEnBuscador?: boolean;
 }
 
 export interface BuscadorProductosModalOpciones {
@@ -29,4 +31,6 @@ export interface BuscadorProductosModalOpciones {
   etiquetaPrecio?: string;
   /** Al cerrar, conserva término y resultados para la próxima apertura (p. ej. venta completa). */
   conservarUltimaBusqueda?: boolean;
+  /** Si se informa, el modal no espera la config asíncrona para mostrar la columna Ubic. */
+  mostrarStockUbicacionesEnBuscador?: boolean;
 }

@@ -121,17 +121,33 @@ export class MiSuscripcionComponent implements OnInit {
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   }
 
-  claseBarraUso(actual: number, maximo: number, excede?: boolean): string {
-    if (excede) return 'bg-danger';
+  claseBarraUso(actual: number, maximo: number): string {
     if (!maximo || maximo <= 0) return 'bg-primary';
-    const pct = (100 * actual) / maximo;
-    if (pct >= 80) return 'bg-warning';
+    if (actual > maximo) return 'bg-danger';
     return 'bg-primary';
   }
 
-  avisoUso80(actual: number, maximo: number): boolean {
-    if (!maximo || maximo <= 0) return false;
-    return actual / maximo >= 0.8 && actual < maximo;
+  claseBarraSunat(actual: number, maximo: number): string {
+    if (!maximo || maximo <= 0) return 'bg-primary';
+    if (actual >= maximo) return 'bg-danger';
+    if (actual / maximo >= 0.9) return 'bg-warning';
+    return 'bg-primary';
+  }
+
+  avisoComprobantes90(lim: LimitesUsoSuscripcion | null | undefined): boolean {
+    const max = this.maxComprobantesSunat(lim);
+    const usado = this.usadoComprobantesSunat(lim);
+    if (max <= 0) return false;
+    return usado / max >= 0.9 && usado < max;
+  }
+
+  agotadosComprobantesSunat(lim: LimitesUsoSuscripcion | null | undefined): boolean {
+    const max = this.maxComprobantesSunat(lim);
+    return max > 0 && this.usadoComprobantesSunat(lim) >= max;
+  }
+
+  restantesComprobantesSunat(lim: LimitesUsoSuscripcion | null | undefined): number {
+    return Math.max(0, this.maxComprobantesSunat(lim) - this.usadoComprobantesSunat(lim));
   }
 
   vincular(): void {

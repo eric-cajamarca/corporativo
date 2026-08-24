@@ -56,6 +56,48 @@ function rangoDeMes(periodo) {
   return { fechaInicio: inicio, fechaFin: fin };
 }
 
+function aYmd(valor) {
+  if (!valor) return '';
+  if (valor instanceof Date) {
+    const y = valor.getFullYear();
+    const m = String(valor.getMonth() + 1).padStart(2, '0');
+    const d = String(valor.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(valor).slice(0, 10);
+}
+
+function ymdEnMs(ymd) {
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  if (!y || !m || !d) return NaN;
+  return Date.UTC(y, m - 1, d);
+}
+
+function diasInclusive(desde, hasta) {
+  const a = ymdEnMs(desde);
+  const b = ymdEnMs(hasta);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return 0;
+  return Math.round((b - a) / 86400000) + 1;
+}
+
+/**
+ * Parte del mes que cubre el rango consultado: 1 si el mes está completo,
+ * 1/31 si se pide un solo día. Evita cargar el gasto mensual entero a un día.
+ */
+function proporcionMesEnRango(mesInicio, mesFin, rangoInicio, rangoFin) {
+  const diasMes = diasInclusive(mesInicio, mesFin);
+  if (!diasMes) return 0;
+  const desde = rangoInicio && rangoInicio > mesInicio ? rangoInicio : mesInicio;
+  const hasta = rangoFin && rangoFin < mesFin ? rangoFin : mesFin;
+  const dias = diasInclusive(desde, hasta);
+  if (!dias) return 0;
+  return dias >= diasMes ? 1 : dias / diasMes;
+}
+
+function redondear2(valor) {
+  return Math.round((Number(valor) || 0) * 100) / 100;
+}
+
 function mapGastoRow(row) {
   return {
     idGasto: row.idGasto,
@@ -186,14 +228,20 @@ exports.obtenerTotalGastosPeriodo = async (pool, idEmpresa, fechaInicio, fechaFi
   }
 
   const recurrentes = await listarRecurrentesActivos(pool, idEmpresa);
+  const desde = aYmd(fechaInicio);
+  const hasta = aYmd(fechaFin);
   let totalRecurrente = 0;
   for (const mes of mesesEnRango(fechaInicio, fechaFin)) {
     const { fechaInicio: mi, fechaFin: mf } = rangoDeMes(mes);
+    const proporcion = proporcionMesEnRango(mi, mf, desde, hasta);
+    if (!proporcion) continue;
     for (const g of recurrentes) {
-      if (recurrenteAplicaEnMes(g, mi, mf)) totalRecurrente += Number(g.monto || 0);
+      if (recurrenteAplicaEnMes(g, mi, mf)) {
+        totalRecurrente += Number(g.monto || 0) * proporcion;
+      }
     }
   }
-  return totalOneShot + totalRecurrente;
+  return redondear2(totalOneShot + totalRecurrente);
 };
 
 exports.obtenerGastosAgrupadosPorMes = async (pool, idEmpresa, fechaInicio, fechaFin) => {
@@ -223,14 +271,17 @@ exports.obtenerGastosAgrupadosPorMes = async (pool, idEmpresa, fechaInicio, fech
   }
 
   const recurrentes = await listarRecurrentesActivos(pool, idEmpresa);
+  const desde = aYmd(fechaInicio);
+  const hasta = aYmd(fechaFin);
   for (const mes of mesesEnRango(fechaInicio, fechaFin)) {
     const { fechaInicio: mi, fechaFin: mf } = rangoDeMes(mes);
+    const proporcion = proporcionMesEnRango(mi, mf, desde, hasta);
     let extra = 0;
     for (const g of recurrentes) {
-      if (recurrenteAplicaEnMes(g, mi, mf)) extra += Number(g.monto || 0);
+      if (recurrenteAplicaEnMes(g, mi, mf)) extra += Number(g.monto || 0) * proporcion;
     }
     if (extra > 0) {
-      gastosPorPeriodo[mes] = Number(gastosPorPeriodo[mes] || 0) + extra;
+      gastosPorPeriodo[mes] = redondear2(Number(gastosPorPeriodo[mes] || 0) + extra);
     } else if (gastosPorPeriodo[mes] == null) {
       // mantener meses solo con one-shot; no forzar ceros
     }

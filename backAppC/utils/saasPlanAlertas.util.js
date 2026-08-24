@@ -1,7 +1,8 @@
 /**
- * Alertas de uso de plan (aviso >= 80 %, crítico >= 100 %).
+ * Alertas de uso de plan. Solo comprobantes SUNAT (aviso >= 90 %, crítico >= 100 %).
+ * El resto de límites no genera avisos para no saturar la UI.
  */
-function buildAlertaUso(clave, etiqueta, usado, maximo) {
+function buildAlertaUso(clave, etiqueta, usado, maximo, umbralAviso = 0.9) {
   const max = Number(maximo);
   const u = Number(usado);
   if (!Number.isFinite(max) || max <= 0 || !Number.isFinite(u) || u < 0) return null;
@@ -9,7 +10,7 @@ function buildAlertaUso(clave, etiqueta, usado, maximo) {
   if (u >= max) {
     return { clave, etiqueta, usado: u, maximo: max, porcentaje: 100, nivel: 'critico' };
   }
-  if (u / max >= 0.8) {
+  if (u / max >= umbralAviso) {
     return { clave, etiqueta, usado: u, maximo: max, porcentaje, nivel: 'aviso' };
   }
   return null;
@@ -17,16 +18,7 @@ function buildAlertaUso(clave, etiqueta, usado, maximo) {
 
 function construirAlertasPlan(uso) {
   const items = [
-    buildAlertaUso('sunat', 'Comprobantes SUNAT', uso.comprobantesSunat, uso.maxComprobantesSunat),
-    buildAlertaUso('usuarios', 'Usuarios', uso.usuariosOcupados, uso.maxUsuarios),
-    buildAlertaUso('sucursales', 'Sucursales', uso.sucursales, uso.maxSucursales),
-    buildAlertaUso('productos', 'Productos activos', uso.productosActivos, uso.maxProductos),
-    buildAlertaUso(
-      'bot_conversaciones',
-      'Conversaciones bot simultáneas',
-      uso.botConversacionesActivas,
-      uso.maxBotConversaciones
-    )
+    buildAlertaUso('sunat', 'Comprobantes SUNAT', uso.comprobantesSunat, uso.maxComprobantesSunat, 0.9)
   ];
   return items.filter(Boolean);
 }

@@ -2236,7 +2236,12 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
 
       let costoUnitario = Number(d.costoUnitario) || 0;
       let costoTotal = Number(d.costoTotal) || 0;
-      const rawLinea = d.descripcionLinea != null ? d.descripcionLinea : d.descripcionVenta;
+      const rawLinea =
+        d.descripcionLinea != null
+          ? d.descripcionLinea
+          : d.descripcionVenta != null
+            ? d.descripcionVenta
+            : d.descripcion;
       let descripcionLineaIns = null;
       if (rawLinea != null) {
         const t = String(rawLinea).trim();
@@ -2936,7 +2941,7 @@ async function recalcularVentaAgrupadaDesdeHijas(transaction, idVentaAgrupada) {
         NULL,
         ISNULL(LTRIM(RTRIM(s.nombre)), ''),
         dv.cantidad, dv.pVenta, ISNULL(dv.descuento, 0), dv.subtotal, dv.igv, dv.total,
-        p.descripcion,
+        LEFT(ISNULL(NULLIF(LTRIM(RTRIM(dv.descripcionLinea)), ''), p.descripcion), 200),
         p.codigo
       FROM VentaEmpresa ve
       INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa

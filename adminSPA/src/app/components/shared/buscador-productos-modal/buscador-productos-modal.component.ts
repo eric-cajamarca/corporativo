@@ -84,7 +84,7 @@ export class BuscadorProductosModalComponent implements OnInit {
   mostrarStockUbicacionesEnBuscador = false;
   /** Opción en Ventas: cantidad + ver precios en el buscador (solo modo venta) */
   mostrarCantidadPreciosEnBuscador = false;
-  /** Desde estado configuración: empresa gestora → mostrar columna Ubic. aunque la config ventas esté en false */
+  /** Empresa gestora: columna Ubic. aunque la config de ventas esté en false */
   esEmpresaGestoraPorEstado = false;
   modalStockUbicacionesAbierto = false;
   stockUbCargando = false;
@@ -150,7 +150,10 @@ export class BuscadorProductosModalComponent implements OnInit {
           itemUb && (itemUb as { valor?: string; Valor?: string }).valor !== undefined
             ? (itemUb as { valor?: string; Valor?: string }).valor
             : (itemUb as { valor?: string; Valor?: string })?.Valor;
-        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(valUb, false);
+        this.mostrarStockUbicacionesEnBuscador =
+          this.ventaOpciones?.mostrarStockUbicacionesEnBuscador !== undefined
+            ? !!this.ventaOpciones.mostrarStockUbicacionesEnBuscador
+            : interpretarBooleanoConfig(valUb, false);
         const itemCantPrec = lista.find(
           (c: { clave?: string; Clave?: string }) =>
             normClave(c) === 'VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR'
@@ -700,10 +703,14 @@ export class BuscadorProductosModalComponent implements OnInit {
   }
 
   mostrarColumnaUbicacionesBuscador(): boolean {
+    const porConfig =
+      this.ventaOpciones?.mostrarStockUbicacionesEnBuscador !== undefined
+        ? !!this.ventaOpciones.mostrarStockUbicacionesEnBuscador
+        : this.mostrarStockUbicacionesEnBuscador;
     if (this.modo === 'venta') {
-      return this.mostrarStockUbicacionesEnBuscador || !!this.ventaOpciones?.esGestora;
+      return porConfig || !!this.ventaOpciones?.esGestora;
     }
-    return this.mostrarStockUbicacionesEnBuscador || this.esEmpresaGestoraPorEstado;
+    return porConfig || this.esEmpresaGestoraPorEstado;
   }
 
   abrirStockUbicaciones(p: ProductoSeleccionado, ev: Event): void {

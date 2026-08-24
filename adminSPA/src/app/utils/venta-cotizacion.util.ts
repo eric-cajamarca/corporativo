@@ -104,6 +104,18 @@ export function cerrarModalCotizacionSiCorresponde(cerrarModal: boolean): void {
   bootstrapRef?.Modal?.getInstance(modalEl)?.hide();
 }
 
+const MAX_DESCRIPCION_LINEA = 500;
+
+/** Snapshot de lo mostrado en el carrito; se persiste en DetalleVenta.descripcionLinea. */
+export function snapshotDescripcionLineaVenta(item: {
+  descripcion?: string;
+  producto?: { descripcion?: string };
+}): string | undefined {
+  const cur = String(item.descripcion ?? item.producto?.descripcion ?? '').trim();
+  if (!cur) return undefined;
+  return cur.length > MAX_DESCRIPCION_LINEA ? cur.slice(0, MAX_DESCRIPCION_LINEA) : cur;
+}
+
 export function notificarCotizacionCargada(cerrarModal: boolean): void {
   if (!cerrarModal || typeof iziToast === 'undefined') return;
   iziToast.success({ title: 'Éxito', message: 'Cotización cargada en la venta.' });

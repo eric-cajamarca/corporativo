@@ -8,6 +8,14 @@ function normalizarDescripcionLinea(v) {
   return s.length > 500 ? s.slice(0, 500) : s;
 }
 
+function primerTextoDescripcionLinea(...valores) {
+  for (const v of valores) {
+    const n = normalizarDescripcionLinea(v);
+    if (n) return n;
+  }
+  return null;
+}
+
 exports.insertar = async (transaction, detalleData) => {
   const {
     idVenta,
@@ -31,8 +39,10 @@ exports.insertar = async (transaction, detalleData) => {
   const costoUnitVal = costoUnitario != null ? Number(costoUnitario) : 0;
   const costoTotalVal =
     costoTotal != null ? Number(costoTotal) : (costoUnitVal * cantidadNum);
-  const descripcionLineaVal = normalizarDescripcionLinea(
-    descripcionLinea != null ? descripcionLinea : detalleData.descripcionVenta
+  const descripcionLineaVal = primerTextoDescripcionLinea(
+    descripcionLinea,
+    detalleData.descripcionVenta,
+    detalleData.descripcion
   );
 
   const result = await transaction

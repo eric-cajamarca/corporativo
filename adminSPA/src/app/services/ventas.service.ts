@@ -434,7 +434,9 @@ export interface DetalleVentaEdicionPayload {
   total: number;
   igv?: boolean;
   isc?: boolean;
-  /** Texto distinto al catálogo; se guarda en DetalleVenta.descripcionLinea */
+  /** Texto mostrado en la línea (fallback si no llega descripcionLinea). */
+  descripcion?: string | null;
+  /** Snapshot de la descripción vendida; se guarda en DetalleVenta.descripcionLinea */
   descripcionLinea?: string | null;
 }
 

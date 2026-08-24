@@ -37,6 +37,7 @@ import {
   cerrarModalCotizacionSiCorresponde,
   mapearCotizacionACarrito,
   notificarCotizacionCargada,
+  snapshotDescripcionLineaVenta,
   validarCotizacionParaCarrito
 } from '../../../utils/venta-cotizacion.util';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
@@ -209,6 +210,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   mostrarModalPdfTrasRegistrarVenta = true;
   /** Config ventas: cantidad + ver precios en buscador de productos */
   mostrarCantidadPreciosEnBuscador = false;
+  /** Config ventas: stock por ubicación en buscador (empresa no gestora). */
+  mostrarStockUbicacionesEnBuscador = false;
 
   /** Modal comprobante PDF tras registrar venta */
   postVentaIdVenta: number | null = null;
@@ -385,6 +388,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
         this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(
           getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
+          false
+        );
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR', 'false'),
           false
         );
         const itemPermNeg = lista.find(
@@ -1399,15 +1406,22 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           String(c?.clave ?? c?.Clave ?? '')
             .trim()
             .toUpperCase();
-        const item = lista.find(
-          (c: { clave?: string; Clave?: string }) =>
-            normClave(c) === 'VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR'
+        const getVal = (clave: string, def = 'false') => {
+          const found = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === clave);
+          const raw =
+            found && (found as { valor?: string; Valor?: string }).valor !== undefined
+              ? (found as { valor?: string; Valor?: string }).valor
+              : (found as { valor?: string; Valor?: string })?.Valor;
+          return raw != null ? String(raw) : def;
+        };
+        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR'),
+          false
         );
-        const raw =
-          item && (item as { valor?: string; Valor?: string }).valor !== undefined
-            ? (item as { valor?: string; Valor?: string }).valor
-            : (item as { valor?: string; Valor?: string })?.Valor;
-        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(raw, false);
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'),
+          false
+        );
         this.abrirBuscadorProductosModal();
       },
       error: () => this.abrirBuscadorProductosModal()
@@ -1419,6 +1433,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       modo: 'venta',
       conservarUltimaBusqueda: true,
       idSucursal: String(this.ventas.idSucursal || ''),
+      mostrarStockUbicacionesEnBuscador: this.mostrarStockUbicacionesEnBuscador,
       venta: {
         idSucursalApi: this.idSucursalParaBusquedaApi(),
         esGestora: this.esGestora,
@@ -1427,7 +1442,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
         onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano(),
         estaEnDetalle: (p) => this.productoYaEnCarrito(p),
-        mostrarCantidadPreciosEnBuscador: this.mostrarCantidadPreciosEnBuscador
+        mostrarCantidadPreciosEnBuscador: this.mostrarCantidadPreciosEnBuscador,
+        mostrarStockUbicacionesEnBuscador: this.mostrarStockUbicacionesEnBuscador
       }
     }).then((prod) => {
       if (!prod) {
@@ -2146,30 +2162,9 @@ abrirModalPrecios(item: any) {
   private descripcionLineaParaDetalle(item: {
     permiteDescripcionEnVenta?: boolean;
     descripcion?: string;
-    descripcionOriginal?: string;
+    producto?: { descripcion?: string };
   }): string | undefined {
-    if (!item.permiteDescripcionEnVenta) return undefined;
-    const cur = (item.descripcion ?? '').toString().trim();
-    const orig = (item.descripcionOriginal ?? '').toString().trim();
-    if (!cur || cur === orig) return undefined;
-    return cur.length > 500 ? cur.slice(0, 500) : cur;
-  }
-
-  actualizaDescripcion(item: any, el: any) {
-    if (!item.permiteDescripcionEnVenta) {
-      return;
-    }
-    // Obtener el texto editado y normalizar
-    const texto = ((el.target as HTMLElement)?.innerText ?? '').trim();
-
-    // Asignar la descripción al objeto correcto:
-    // si el item tiene la propiedad 'producto', actualizar producto.descripcion,
-    // si no, guardar en item.descripcion (por compatibilidad).
-    if (item.producto) {
-      item.producto.descripcion = texto;
-    } else {
-      item.descripcion = texto;
-    }
+    return snapshotDescripcionLineaVenta(item);
   }
   
 

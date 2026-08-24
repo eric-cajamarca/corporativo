@@ -24,6 +24,7 @@ import {
   esImpuestoIgv,
   redondear2 as redondearIgv2
 } from '../../../utils/venta-igv.util';
+import { snapshotDescripcionLineaVenta } from '../../../utils/venta-cotizacion.util';
 
 export interface ClienteOption {
   idCliente: number;
@@ -549,11 +550,7 @@ export class UpdateVentaComponent implements OnInit {
   }
 
   private descripcionLineaEdicion(d: DetalleEdicion): string | undefined {
-    if (!d.permiteDescripcionEnVenta) return undefined;
-    const cur = (d.descripcion ?? '').trim();
-    const orig = (d.descripcionProducto ?? '').trim();
-    if (!cur || cur === orig) return undefined;
-    return cur.length > 500 ? cur.slice(0, 500) : cur;
+    return snapshotDescripcionLineaVenta(d);
   }
 
   agregarProductos(): void {
@@ -682,6 +679,7 @@ export class UpdateVentaComponent implements OnInit {
         subtotal: m.subtotal,
         total: m.total,
         igv: m.igv,
+        descripcion: (d.descripcion ?? '').toString().trim() || undefined,
         descripcionLinea: this.descripcionLineaEdicion(d)
       };
     });

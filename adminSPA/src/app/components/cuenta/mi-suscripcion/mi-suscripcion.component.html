@@ -52,16 +52,11 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [ngClass]="claseBarraUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios, lim.excedeUsuarios)"
+                    [ngClass]="claseBarraUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)"
                   ></div>
                 </div>
-                @if (lim.excedeUsuarios) {
-                  <div class="text-danger small mt-1">Supera el límite de usuarios del plan.</div>
-                } @else if (avisoUso80(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)) {
-                  <div class="text-warning small mt-1">Ha consumido más del 80% de usuarios del plan.</div>
-                }
               </div>
               <div class="mb-3">
                 <div class="d-flex justify-content-between small">
@@ -71,16 +66,11 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [ngClass]="claseBarraUso(lim.sucursales, lim.maxSucursales, lim.excedeSucursales)"
+                    [ngClass]="claseBarraUso(lim.sucursales, lim.maxSucursales)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.sucursales, lim.maxSucursales)"
                   ></div>
                 </div>
-                @if (lim.excedeSucursales) {
-                  <div class="text-danger small mt-1">Supera el límite de sucursales del plan.</div>
-                } @else if (avisoUso80(lim.sucursales, lim.maxSucursales)) {
-                  <div class="text-warning small mt-1">Ha consumido más del 80% de sucursales del plan.</div>
-                }
               </div>
               @if (maxProductos(lim) > 0) {
                 <div class="mb-3">
@@ -91,16 +81,11 @@
                   <div class="progress" style="height: 8px">
                     <div
                       class="progress-bar"
-                      [ngClass]="claseBarraUso(usadoProductos(lim), maxProductos(lim), lim.excedeProductos)"
+                      [ngClass]="claseBarraUso(usadoProductos(lim), maxProductos(lim))"
                       role="progressbar"
                       [style.width.%]="pctUso(usadoProductos(lim), maxProductos(lim))"
                     ></div>
                   </div>
-                  @if (lim.excedeProductos) {
-                    <div class="text-danger small mt-1">Supera el límite de productos del plan.</div>
-                  } @else if (avisoUso80(usadoProductos(lim), maxProductos(lim))) {
-                    <div class="text-warning small mt-1">Ha consumido más del 80% del catálogo de productos.</div>
-                  }
                 </div>
               }
               <div>
@@ -111,14 +96,11 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [ngClass]="claseBarraUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales, lim.excedeDirecciones)"
+                    [ngClass]="claseBarraUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales)"
                   ></div>
                 </div>
-                @if (lim.excedeDirecciones) {
-                  <div class="text-danger small mt-1">Supera el límite de direcciones permitido por el plan.</div>
-                }
               </div>
               @if (e.deploymentMode === 'saas') {
                 <div class="pt-3 mt-2 border-top">
@@ -137,7 +119,7 @@
                     <div class="progress mt-1" style="height: 8px">
                       <div
                         class="progress-bar"
-                        [ngClass]="claseBarraUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim), lim.excedeComprobantesSunat)"
+                        [ngClass]="claseBarraSunat(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))"
                         role="progressbar"
                         [style.width.%]="pctUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))"
                       ></div>
@@ -151,11 +133,16 @@
                       <span class="text-danger"> bloqueadas por tope SUNAT</span>
                     }
                   </div>
-                  @if (lim.excedeComprobantesSunat) {
-                    <div class="text-danger small mb-0">Supera el tope de comprobantes SUNAT del plan.</div>
-                  } @else if (avisoUso80(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))) {
-                    <div class="text-warning small mb-0">
-                      Ha consumido más del 80% de comprobantes SUNAT ({{ usadoComprobantesSunat(lim) }}/{{ maxComprobantesSunat(lim) }}).
+                  @if (agotadosComprobantesSunat(lim)) {
+                    <div class="alert alert-danger py-2 px-3 small mb-0 mt-1">
+                      Ya usó los comprobantes SUNAT de su plan. Renueve o cambie de plan para seguir emitiendo.
+                      <a routerLink="/planes" class="alert-link">Ver planes</a>
+                    </div>
+                  } @else if (avisoComprobantes90(lim)) {
+                    <div class="alert alert-warning py-2 px-3 small mb-0 mt-1">
+                      Ha usado el {{ pctUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim)) }}% de
+                      comprobantes SUNAT ({{ usadoComprobantesSunat(lim) }}/{{ maxComprobantesSunat(lim) }}).
+                      Le quedan {{ restantesComprobantesSunat(lim) }}.
                     </div>
                   }
                 </div>

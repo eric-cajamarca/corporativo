@@ -74,13 +74,13 @@ export class AppBannerService {
         });
       }
 
-      const alertas = estado?.limitesUso?.alertasPlan ?? [];
+      const alertas = (estado?.limitesUso?.alertasPlan ?? []).filter((a) => a.clave === 'sunat');
       for (const a of alertas) {
         if (a.nivel !== 'aviso') continue;
         auto.push({
           id: `plan-aviso-${a.clave}`,
           severity: 'warning',
-          message: `Ha consumido el ${a.porcentaje}% de ${a.etiqueta} (${a.usado}/${a.maximo}). Considere actualizar su plan.`,
+          message: `Ha usado el ${a.porcentaje}% de comprobantes SUNAT (${a.usado}/${a.maximo}). Considere renovar o ampliar el plan.`,
           link: '/cuenta/suscripcion',
           linkLabel: 'Ver uso',
           dismissible: true,
