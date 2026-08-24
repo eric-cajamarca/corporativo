@@ -14,14 +14,15 @@ export const routes: Routes = [
     {
       path: 'publico',
       loadComponent: loadHomePublic,
-      title: 'Página principal'
+      title: 'EFAFERP | Facturación SUNAT e inventario para ferreterías'
     },
 
     {
       path: '',
       pathMatch: 'full',
       loadComponent: () =>
-        import('./components/public/root-redirect/root-redirect.component').then((m) => m.RootRedirectComponent)
+        import('./components/public/root-redirect/root-redirect.component').then((m) => m.RootRedirectComponent),
+      title: 'EFAFERP | Facturación SUNAT e inventario para ferreterías'
     },
 
     {
@@ -59,13 +60,13 @@ export const routes: Routes = [
     {
       path: 'planes',
       loadComponent: () => import('./components/public/planes-public/planes-public.component').then((m) => m.PlanesPublicComponent),
-      title: 'Planes y precios'
+      title: 'Planes y precios | EFAFERP'
     },
 
     {
       path: 'suscribirse/:planCode',
       loadComponent: () => import('./components/public/checkout-suscripcion/checkout-suscripcion.component').then((m) => m.CheckoutSuscripcionComponent),
-      title: 'Contratar plan'
+      title: 'Contratar plan | EFAFERP'
     },
 
     { path: 'recuperar-password',
@@ -76,7 +77,7 @@ export const routes: Routes = [
      {
         path:'crear-empresa',
         loadComponent: () => import('./components/empresa/create-empresa/create-empresa.component').then((m) => m.CreateEmpresaComponent),
-        title: 'Crear Empresa',
+        title: 'Crear empresa | EFAFERP',
      },
 
      {

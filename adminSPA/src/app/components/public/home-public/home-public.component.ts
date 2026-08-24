@@ -1,10 +1,15 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, Meta, SafeResourceUrl, Title } from '@angular/platform-browser';
 import { SaasPublicService } from '../../../services/saas-public.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
+
+const SEO_TITLE = 'EFAFERP | Facturación SUNAT e inventario para ferreterías';
+const SEO_DESCRIPTION =
+  'Sistema para ferreterías, minimarkets y abarrotes: facturación electrónica SUNAT, inventario y cobranzas. Te configuramos SUNAT. Jaén y todo el Perú.';
+const SEO_URL = 'https://businesssoft.net/';
 
 interface PublicVideo {
   id: string;
@@ -108,10 +113,13 @@ export class HomePublicComponent implements OnInit {
 
   constructor(
     private sanitizer: DomSanitizer,
-    private saasPublic: SaasPublicService
+    private saasPublic: SaasPublicService,
+    private title: Title,
+    private meta: Meta
   ) {}
 
   ngOnInit(): void {
+    this.aplicarSeoPublico();
     this.videos = [
       this.crearVideo('pNDpE6WNHko', 'Presentación y Crear cuenta'),
       this.crearVideo('RsibE0r07Bk', 'Pasos iniciales de configuración'),
@@ -130,6 +138,22 @@ export class HomePublicComponent implements OnInit {
       `https://www.youtube.com/embed/${video.id}?autoplay=1&start=0&rel=0`
     );
     video.reproduciendo = true;
+  }
+
+  private aplicarSeoPublico(): void {
+    this.title.setTitle(SEO_TITLE);
+    this.meta.updateTag({ name: 'description', content: SEO_DESCRIPTION });
+    this.meta.updateTag({ name: 'robots', content: 'index, follow' });
+    this.meta.updateTag({ property: 'og:type', content: 'website' });
+    this.meta.updateTag({ property: 'og:locale', content: 'es_PE' });
+    this.meta.updateTag({ property: 'og:site_name', content: 'EFAFERP' });
+    this.meta.updateTag({ property: 'og:url', content: SEO_URL });
+    this.meta.updateTag({ property: 'og:title', content: SEO_TITLE });
+    this.meta.updateTag({ property: 'og:description', content: SEO_DESCRIPTION });
+    this.meta.updateTag({ property: 'og:image', content: `${SEO_URL}assets/img/logo-efaferp.png` });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
+    this.meta.updateTag({ name: 'twitter:title', content: SEO_TITLE });
+    this.meta.updateTag({ name: 'twitter:description', content: SEO_DESCRIPTION });
   }
 
   private crearVideo(id: string, titulo: string): PublicVideo {
