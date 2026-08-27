@@ -45,7 +45,12 @@ function idEmpresaClienteDesdeSesion(authUser) {
   return s || null;
 }
 
-async function iniciarCheckout(pool, body, authUser) {
+/**
+ * Valida el plan y calcula monto, clave Culqi y medios de pago manual.
+ * No persiste nada: lo comparten el resumen que pinta el checkout y la creación
+ * de la orden, para no depender de dos lógicas de precio distintas.
+ */
+async function prepararCheckout(pool, body, authUser) {
   if (!isSaas()) throw new Error('MODO_NO_SAAS');
   const planCode = (body?.planCode || '').toString().toLowerCase();
   const billingCycle = (body?.billingCycle || 'monthly').toString().toLowerCase();
@@ -67,72 +72,113 @@ async function iniciarCheckout(pool, body, authUser) {
     }
   }
 
+  const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
+  if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
+
   if (planCode === 'demo') {
-    const monto = 0;
-    const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
-    if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
-    const orderNumber = construirOrderNumberCheckout();
-    const idCheckout = uuidv4();
-    await suscripcionCheckoutRepository.insertar(pool, {
-      idCheckout,
-      orderNumber,
+    return {
       planCode,
       billingCycle: 'none',
-      monto,
-      moneda: 'PEN',
-      estado: 'PENDIENTE',
+      montoSoles: 0,
+      montoCulqiCentimos: 0,
+      culqiPublicKey: null,
+      esDemo: true,
       idEmpresaPrincipal,
       emailContacto,
       idEmpresaCliente
-    });
-    return {
-      orderNumber,
-      montoSoles: monto,
-      montoCulqiCentimos: 0,
-      planCode,
-      billingCycle: 'none',
-      culqiPublicKey: null,
-      esDemo: true
     };
   }
 
   const montoSoles = await saasPlanesService.montoSolesAsync(pool, planCode, billingCycle);
   const montoCulqiCentimos = await saasPlanesService.montoCulqiCentimosAsync(pool, planCode, billingCycle);
 
-  const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
-  if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
-
   let culqiPublicKey = null;
   try {
     const credenciales = await integracionesService.obtenerCredencialesProveedor(pool, idEmpresaPrincipal, 'culqi');
     culqiPublicKey = credenciales.publicKey || credenciales.public_key || null;
   } catch (error) {
-    console.error('iniciarCheckout: Culqi opcional no disponible:', error?.message || error);
+    console.error('prepararCheckout: Culqi opcional no disponible:', error?.message || error);
   }
 
-  const orderNumber = construirOrderNumberCheckout();
-  const idCheckout = uuidv4();
-  await suscripcionCheckoutRepository.insertar(pool, {
-    idCheckout,
-    orderNumber,
+  return {
     planCode,
     billingCycle,
-    monto: montoSoles,
-    moneda: 'PEN',
-    estado: 'PENDIENTE',
+    montoSoles,
+    montoCulqiCentimos,
+    culqiPublicKey,
+    esDemo: false,
     idEmpresaPrincipal,
     emailContacto,
     idEmpresaCliente
+  };
+}
+
+/**
+ * Datos para pintar el checkout sin generar número de orden.
+ * La orden se crea recién cuando el cliente confirma el pago, para no dejar
+ * filas PENDIENTE por cada visita o recarga de la página.
+ */
+async function resumenCheckout(pool, body, authUser) {
+  const prep = await prepararCheckout(pool, body, authUser);
+  if (prep.esDemo) {
+    return {
+      planCode: prep.planCode,
+      billingCycle: 'none',
+      montoSoles: 0,
+      montoCulqiCentimos: 0,
+      culqiPublicKey: null,
+      esDemo: true
+    };
+  }
+  return {
+    planCode: prep.planCode,
+    billingCycle: prep.billingCycle,
+    montoSoles: prep.montoSoles,
+    montoCulqiCentimos: prep.montoCulqiCentimos,
+    culqiPublicKey: prep.culqiPublicKey,
+    culqiDisponible: Boolean(prep.culqiPublicKey),
+    esDemo: false,
+    pagoManual: await getPagoManualSuscripcionConfig(pool)
+  };
+}
+
+async function iniciarCheckout(pool, body, authUser) {
+  const prep = await prepararCheckout(pool, body, authUser);
+  const orderNumber = construirOrderNumberCheckout();
+
+  await suscripcionCheckoutRepository.insertar(pool, {
+    idCheckout: uuidv4(),
+    orderNumber,
+    planCode: prep.planCode,
+    billingCycle: prep.billingCycle,
+    monto: prep.montoSoles,
+    moneda: 'PEN',
+    estado: 'PENDIENTE',
+    idEmpresaPrincipal: prep.idEmpresaPrincipal,
+    emailContacto: prep.emailContacto,
+    idEmpresaCliente: prep.idEmpresaCliente
   });
+
+  if (prep.esDemo) {
+    return {
+      orderNumber,
+      montoSoles: 0,
+      montoCulqiCentimos: 0,
+      planCode: prep.planCode,
+      billingCycle: 'none',
+      culqiPublicKey: null,
+      esDemo: true
+    };
+  }
 
   return {
     orderNumber,
-    montoSoles,
-    montoCulqiCentimos,
-    planCode,
-    billingCycle,
-    culqiPublicKey,
-    culqiDisponible: Boolean(culqiPublicKey),
+    montoSoles: prep.montoSoles,
+    montoCulqiCentimos: prep.montoCulqiCentimos,
+    planCode: prep.planCode,
+    billingCycle: prep.billingCycle,
+    culqiPublicKey: prep.culqiPublicKey,
+    culqiDisponible: Boolean(prep.culqiPublicKey),
     esDemo: false,
     pagoManual: await getPagoManualSuscripcionConfig(pool)
   };
@@ -283,6 +329,7 @@ async function estadoCheckout(pool, orderNumber) {
 }
 
 module.exports = {
+  resumenCheckout,
   iniciarCheckout,
   confirmarDemoCheckout,
   confirmarCulqiCheckout,

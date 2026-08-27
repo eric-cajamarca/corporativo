@@ -3,7 +3,12 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { CheckoutIniciado, CheckoutPagoManualReportado, PlanCatalogoItem } from '../models/saas-public.model';
+import {
+  CheckoutIniciado,
+  CheckoutPagoManualReportado,
+  CheckoutResumen,
+  PlanCatalogoItem
+} from '../models/saas-public.model';
 
 @Injectable({ providedIn: 'root' })
 export class SaasPublicService {
@@ -19,6 +24,17 @@ export class SaasPublicService {
         withCredentials: false
       })
       .pipe(map((r) => r.data || []));
+  }
+
+  /** Monto y medios de pago sin crear la orden (la orden se crea al confirmar el pago). */
+  resumenCheckout(body: { planCode: string; billingCycle: string }): Observable<CheckoutResumen> {
+    return this.http
+      .post<{ data: CheckoutResumen }>(`${this.baseUrl}public/suscripcion/resumen-checkout`, JSON.stringify(body), {
+        headers: this.headers,
+        /** Cookie de sesión: el backend valida downgrade contra la suscripción vigente. */
+        withCredentials: true
+      })
+      .pipe(map((r) => r.data));
   }
 
   iniciarCheckout(body: {

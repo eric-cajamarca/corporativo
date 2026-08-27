@@ -21,6 +21,7 @@ const limiterCulqi = rateLimit({
 
 api.get('/public/config/deployment', limiterSuave, deploymentPublicController.getDeploymentConfig);
 api.get('/public/planes', limiterSuave, suscripcionPublicController.listarPlanes);
+api.post('/public/suscripcion/resumen-checkout', limiterSuave, suscripcionPublicController.resumenCheckout);
 api.post('/public/suscripcion/iniciar-checkout', limiterSuave, suscripcionPublicController.iniciarCheckout);
 api.post('/public/suscripcion/confirmar-demo', limiterSuave, suscripcionPublicController.confirmarDemo);
 api.post('/public/suscripcion/confirmar-culqi', limiterCulqi, suscripcionPublicController.confirmarCulqi);

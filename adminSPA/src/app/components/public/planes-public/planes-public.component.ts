@@ -183,6 +183,29 @@ export class PlanesPublicComponent implements OnInit {
     return String(s.planCode || '').toLowerCase() === planCode.toLowerCase();
   }
 
+  /** Mismo criterio que suscripcionVigenteParaDowngrade en el backend. */
+  suscripcionVigente(): boolean {
+    const s = this.miEstado()?.suscripcion;
+    if (!s) return false;
+    const st = String(s.estado || '').trim().toUpperCase();
+    if (st !== 'ACTIVA' && st !== 'DEMO') return false;
+    if (!s.fechaFin) return st === 'ACTIVA';
+    const fin = new Date(String(s.fechaFin).replace(' ', 'T'));
+    return !Number.isNaN(fin.getTime()) && fin > new Date();
+  }
+
+  /**
+   * Solo se bloquea el plan contratado mientras siga vigente. Si venció o quedó
+   * pendiente de pago hay que poder volver a pagarlo sin cambiar de plan.
+   */
+  esPlanActualBloqueado(planCode: string): boolean {
+    return this.esPlanActual(planCode) && this.suscripcionVigente();
+  }
+
+  puedeRenovarPlanActual(planCode: string): boolean {
+    return this.esPlanActual(planCode) && !this.suscripcionVigente();
+  }
+
   esPlanPendiente(planCode: string): boolean {
     const p = this.miEstado()?.suscripcion?.planCodePendiente || this.miEstado()?.planPendiente?.planCode;
     if (!p) return false;
@@ -190,6 +213,7 @@ export class PlanesPublicComponent implements OnInit {
   }
 
   etiquetaBotonPlan(planCode: string): string {
+    if (this.puedeRenovarPlanActual(planCode)) return 'Renovar y pagar';
     if (this.esPlanActual(planCode)) return 'Plan actual';
     if (this.esPlanPendiente(planCode)) return 'Programado';
     return 'Elegir';
@@ -199,6 +223,11 @@ export class PlanesPublicComponent implements OnInit {
     this.errorMsg.set(null);
     this.avisoMsg.set(null);
     if (!this.auth.isAuthenticated()) {
+      this.irCheckout(planCode);
+      return;
+    }
+    // Sin suscripción vigente no hay downgrade que programar: toca pagar.
+    if (!this.suscripcionVigente()) {
       this.irCheckout(planCode);
       return;
     }

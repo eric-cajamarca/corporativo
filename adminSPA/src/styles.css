@@ -4,8 +4,13 @@ body {
   margin: 0;
 }
 
-/* Con sesión: sin scroll de documento; el scroll está en .main-content del app-shell. */
-body:has(.app-shell-auth) {
+/**
+ * Layout con sidebar montado: sin scroll de documento, el scroll está en
+ * .main-content del app-shell. Se ata a app-layout-shell y no a la sesión:
+ * con sesión abierta, /planes y /suscribirse se renderizan fuera del layout
+ * y necesitan el scroll del documento.
+ */
+body:has(app-layout-shell) {
   overflow: hidden;
 }
 

@@ -16,6 +16,49 @@ const listarPlanes = async (req, res) => {
   }
 };
 
+/** Errores comunes al resumen y a la creación de la orden. true si ya respondió. */
+const respondioErrorCheckout = (res, error) => {
+  if (error.message === 'MODO_NO_SAAS') {
+    res.status(404).json({ message: 'No disponible en modo enterprise' });
+    return true;
+  }
+  if (error.message === 'PLAN_INVALIDO' || error.message === 'CICLO_FACTURACION_INVALIDO') {
+    res.status(400).json({ message: error.message });
+    return true;
+  }
+  if (error.message === 'NO_PRINCIPAL') {
+    res.status(503).json({ message: 'El pago en línea no está disponible en este momento. Intente más tarde o use otro medio de pago.' });
+    return true;
+  }
+  if (error.message === 'CULQI_NO_CONFIGURADO') {
+    res.status(503).json({ message: 'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.' });
+    return true;
+  }
+  if (error.message === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
+    res.status(409).json({
+      message: 'DOWNGRADE_PROGRAMADO_REQUERIDO',
+      detail:
+        'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
+    });
+    return true;
+  }
+  return false;
+};
+
+/** Solo consulta: monto, ciclo y medios de pago, sin crear la orden. */
+const resumenCheckout = async (req, res) => {
+  try {
+    const data = await withPool((pool) =>
+      suscripcionPublicService.resumenCheckout(pool, req.body || {}, req.user)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    if (respondioErrorCheckout(res, error)) return;
+    console.error('resumenCheckout:', error);
+    res.status(500).json({ message: 'Error al preparar el checkout' });
+  }
+};
+
 const iniciarCheckout = async (req, res) => {
   try {
     const data = await withPool((pool) =>
@@ -23,25 +66,7 @@ const iniciarCheckout = async (req, res) => {
     );
     res.status(201).json({ data, message: 'Checkout iniciado' });
   } catch (error) {
-    if (error.message === 'MODO_NO_SAAS') {
-      return res.status(404).json({ message: 'No disponible en modo enterprise' });
-    }
-    if (error.message === 'PLAN_INVALIDO' || error.message === 'CICLO_FACTURACION_INVALIDO') {
-      return res.status(400).json({ message: error.message });
-    }
-    if (error.message === 'NO_PRINCIPAL') {
-      return res.status(503).json({ message: 'El pago en línea no está disponible en este momento. Intente más tarde o use otro medio de pago.' });
-    }
-    if (error.message === 'CULQI_NO_CONFIGURADO') {
-      return res.status(503).json({ message: 'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.' });
-    }
-    if (error.message === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
-      return res.status(409).json({
-        message: 'DOWNGRADE_PROGRAMADO_REQUERIDO',
-        detail:
-          'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
-      });
-    }
+    if (respondioErrorCheckout(res, error)) return;
     console.error('iniciarCheckout:', error);
     res.status(500).json({ message: 'Error al iniciar checkout' });
   }
@@ -156,6 +181,7 @@ const reportarPagoManual = async (req, res) => {
 
 module.exports = {
   listarPlanes,
+  resumenCheckout,
   iniciarCheckout,
   confirmarDemo,
   confirmarCulqi,

@@ -7,7 +7,7 @@
     @if (modoEnterprise()) {
       <div class="alert alert-secondary">Modo enterprise: el checkout público no está disponible.</div>
     } @else {
-      @if (procesando() && !checkout()) {
+      @if (procesando() && !resumen()) {
         <p class="text-muted text-center py-5">Preparando checkout…</p>
       }
 
@@ -19,7 +19,7 @@
         <div class="alert alert-success">{{ mensaje() }}</div>
       }
 
-      @if (checkout(); as c) {
+      @if (resumen(); as c) {
         <div class="checkout-card">
           <header class="checkout-hero">
             <p class="checkout-hero-kicker mb-1">Suscripción Business Soft</p>
@@ -45,9 +45,15 @@
                 }
               </div>
             </div>
-            <p class="checkout-order mb-0">
-              Orden <code>{{ c.orderNumber }}</code>
-            </p>
+            @if (orderNumber()) {
+              <p class="checkout-order mb-0">
+                Orden <code>{{ orderNumber() }}</code>
+              </p>
+            } @else {
+              <p class="checkout-order mb-0">
+                El número de orden se genera al confirmar el pago.
+              </p>
+            }
           </header>
 
           <div class="checkout-body">
@@ -82,7 +88,7 @@
                     </span>
                   </label>
                 </div>
-                <p class="checkout-hint">Al cambiar el ciclo se genera un nuevo número de orden.</p>
+                <p class="checkout-hint">Al cambiar el ciclo se recalcula el monto a pagar.</p>
               </section>
             }
 
@@ -381,13 +387,13 @@
                               }
                             } @else {
                               Por ahora no hay cuentas bancarias disponibles.
-                              Solicite los datos por WhatsApp indicando la orden
-                              <code>{{ c.orderNumber }}</code>.
+                              Solicite los datos por WhatsApp indicando el plan
+                              <strong>{{ c.planCode }}</strong> y el monto.
                             }
                           } @else {
                             Por ahora no hay cuentas bancarias disponibles.
-                            Solicite los datos por WhatsApp indicando la orden
-                            <code>{{ c.orderNumber }}</code>.
+                            Solicite los datos por WhatsApp indicando el plan
+                            <strong>{{ c.planCode }}</strong> y el monto.
                           }
                         </p>
                       }

@@ -13,8 +13,13 @@
   --sidebar-width-collapsed: 70px;
 }
 
-/* Sesión autenticada: viewport fijo; el scroll vive solo en el contenido (no sobre topnav/footer). */
-.app-shell.app-shell-auth {
+/**
+ * Viewport fijo solo cuando el layout con sidebar/topnav está montado: ahí el
+ * scroll vive en .main-content. Se condiciona a app-layout-shell (no a la
+ * sesión) porque con sesión abierta también se renderizan rutas de nivel raíz
+ * (planes, checkout, políticas) que dependen del scroll del documento.
+ */
+.app-shell:has(app-layout-shell) {
   height: 100%;
   max-height: 100%;
   min-height: 0;
@@ -26,13 +31,13 @@
   min-height: 0;
 }
 
-.app-shell.app-shell-auth .app-content {
+.app-shell:has(app-layout-shell) .app-content {
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.app-shell.app-shell-auth .app-content > app-layout-shell {
+.app-content > app-layout-shell {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
@@ -71,17 +76,18 @@
   color: #475569;
 }
 
-.app-shell.app-shell-auth .app-footer {
+/* El footer se corre por el sidebar solo si el sidebar existe en pantalla. */
+.app-shell:has(app-layout-shell) .app-footer {
   padding-left: calc(20px + var(--sidebar-width));
 }
 
-.app-shell.app-shell-auth.app-shell-collapsed .app-footer {
+.app-shell.app-shell-collapsed:has(app-layout-shell) .app-footer {
   padding-left: calc(20px + var(--sidebar-width-collapsed));
 }
 
 @media (max-width: 991.98px) {
-  .app-shell.app-shell-auth .app-footer,
-  .app-shell.app-shell-auth.app-shell-collapsed .app-footer {
+  .app-shell:has(app-layout-shell) .app-footer,
+  .app-shell.app-shell-collapsed:has(app-layout-shell) .app-footer {
     padding-left: 20px;
   }
 }

@@ -58,7 +58,9 @@
                 [class.border-primary]="p.planCode === 'emprendedor' || esPlanActual(p.planCode)"
                 [class.border-success]="esPlanPendiente(p.planCode)">
                 <div class="card-body d-flex flex-column">
-                  @if (esPlanActual(p.planCode)) {
+                  @if (puedeRenovarPlanActual(p.planCode)) {
+                    <span class="badge bg-danger align-self-start mb-2">Su plan · por renovar</span>
+                  } @else if (esPlanActual(p.planCode)) {
                     <span class="badge bg-primary align-self-start mb-2">Plan actual</span>
                   } @else if (esPlanPendiente(p.planCode)) {
                     <span class="badge bg-success align-self-start mb-2">Desde próxima renovación</span>
@@ -151,7 +153,7 @@
                     <button
                       type="button"
                       class="btn btn-primary w-100"
-                      [disabled]="programando() || esPlanActual(p.planCode)"
+                      [disabled]="programando() || esPlanActualBloqueado(p.planCode)"
                       (click)="elegirPlan(p.planCode)">
                       {{ etiquetaBotonPlan(p.planCode) }}
                     </button>

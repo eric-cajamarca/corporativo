@@ -39,8 +39,8 @@ export interface PagoManualInfo {
   instruccionVoucher: string;
 }
 
-export interface CheckoutIniciado {
-  orderNumber: string;
+/** Datos para pintar el checkout; no implica que exista una orden en BD. */
+export interface CheckoutResumen {
   montoSoles: number;
   montoCulqiCentimos: number;
   planCode: string;
@@ -49,6 +49,11 @@ export interface CheckoutIniciado {
   culqiDisponible?: boolean;
   esDemo: boolean;
   pagoManual?: PagoManualInfo | null;
+}
+
+/** Resumen + orden ya creada (CHK-…) al confirmar el pago. */
+export interface CheckoutIniciado extends CheckoutResumen {
+  orderNumber: string;
 }
 
 export interface CheckoutPagoManualReportado {

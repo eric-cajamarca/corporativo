@@ -90,6 +90,22 @@ async function aplicarSuscripcionNuevaEmpresa(pool, idEmpresa, options) {
 }
 
 /**
+ * Inicio del nuevo período de vigencia.
+ * Renovar el mismo plan antes del vencimiento no debe perder los días que aún
+ * quedan: el mes o el año contratado se cuenta desde la fechaFin vigente.
+ * Un cambio de plan sí entra en vigor de inmediato, así que parte de la fecha de pago.
+ */
+function baseNuevaVigencia(existente, planCodePagado, ahora) {
+  if (!existente || !existente.fechaFin) return ahora;
+  const actual = String(existente.planCode || '').trim().toLowerCase();
+  const pagado = String(planCodePagado || '').trim().toLowerCase();
+  if (!actual || actual !== pagado) return ahora;
+  const fin = new Date(String(existente.fechaFin).replace(' ', 'T'));
+  if (Number.isNaN(fin.getTime()) || fin <= ahora) return ahora;
+  return fin;
+}
+
+/**
  * Vincula un pago Culqi ya confirmado (checkout PAGADO) con la empresa del usuario logueado.
  */
 async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
@@ -103,7 +119,12 @@ async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
   await suscripcionCheckoutRepository.vincularEmpresaCliente(pool, orderNumber, idEmpresa);
 
   const existente = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
-  const fechaFin = saasPlanesService.fechaFinDesdePlan(chk.planCode, chk.billingCycle, new Date());
+  const ahora = new Date();
+  const fechaFin = saasPlanesService.fechaFinDesdePlan(
+    chk.planCode,
+    chk.billingCycle,
+    baseNuevaVigencia(existente, chk.planCode, ahora)
+  );
   if (!existente) {
     await empresaSuscripcionRepository.insertar(pool, {
       idSuscripcion: uuidv4(),
@@ -111,7 +132,7 @@ async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
       planCode: chk.planCode,
       billingCycle: chk.billingCycle,
       estado: 'ACTIVA',
-      fechaInicio: new Date(),
+      fechaInicio: ahora,
       fechaFin,
       idCheckoutOrigen: chk.idCheckout,
       migracionDemoPendiente: false

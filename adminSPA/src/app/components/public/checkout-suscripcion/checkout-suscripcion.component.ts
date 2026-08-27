@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { SaasPublicService } from '../../../services/saas-public.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { AuthService } from '../../../services/auth.service';
-import { CheckoutIniciado } from '../../../models/saas-public.model';
+import { CheckoutResumen } from '../../../models/saas-public.model';
 
 type MedioPagoManual = 'yape' | 'plin' | 'bcp';
 /** Canal principal: Culqi (tarjeta) o transferencia / Yape / Plin. */
@@ -28,7 +28,10 @@ const LS_CHECKOUT_PENDIENTE = 'efaf_checkout_pendiente';
 export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   planCode = signal('');
   billingCycle = signal<string>('monthly');
-  checkout = signal<CheckoutIniciado | null>(null);
+  /** Monto y medios de pago; se carga al entrar y no crea nada en BD. */
+  resumen = signal<CheckoutResumen | null>(null);
+  /** CHK-… recién existe cuando el cliente confirma el pago. */
+  orderNumber = signal('');
   emailPago = '';
   /** Último token generado por Culqi Checkout (solo en memoria hasta enviar el cargo). */
   tokenCulqi = '';
@@ -73,7 +76,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.planCode.set(plan);
       const billing = (this.route.snapshot.queryParamMap.get('billing') || 'monthly').toLowerCase();
       this.billingCycle.set(billing === 'none' || billing === 'yearly' || billing === 'monthly' ? billing : 'monthly');
-      this.iniciar();
+      this.cargarResumen();
     });
   }
 
@@ -82,20 +85,20 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     window.Culqi3DS?.reset?.();
   }
 
-  iniciar(): void {
+  /** Solo consulta el monto y los medios de pago; no genera número de orden. */
+  cargarResumen(): void {
     this.procesando.set(true);
     this.errorMsg.set(null);
     this.mensaje.set(null);
     this.tokenCulqi = '';
     this.saasPublic
-      .iniciarCheckout({
+      .resumenCheckout({
         planCode: this.planCode(),
-        billingCycle: this.billingCycle(),
-        emailContacto: (this.emailPago || '').trim() || undefined
+        billingCycle: this.billingCycle()
       })
       .subscribe({
         next: (data) => {
-          this.checkout.set(data);
+          this.resumen.set(data);
           this.billingCycle.set(
             data.billingCycle === 'none' || data.billingCycle === 'yearly' || data.billingCycle === 'monthly'
               ? data.billingCycle
@@ -105,27 +108,55 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           this.viaPago = data.culqiPublicKey || data.culqiDisponible ? 'culqi' : 'manual';
           this.procesando.set(false);
           if (data.esDemo) {
-            this.mensaje.set('Checkout demo listo. Confirme para obtener el número de orden y registrar su empresa.');
+            this.mensaje.set('Checkout demo listo. Al confirmar se genera el número de orden para registrar su empresa.');
           }
         },
         error: (err) => {
           this.procesando.set(false);
-          const code = err?.error?.message;
-          if (code === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
-            this.errorMsg.set(
-              err?.error?.detail ||
-                'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
-            );
-            return;
-          }
-          this.errorMsg.set(err?.error?.message || 'No se pudo iniciar el pago.');
+          this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo preparar el pago.'));
         }
       });
   }
 
-  /** Cambia mensual/anual y recrea la orden (monto Culqi debe coincidir con el catálogo). */
+  /**
+   * Crea la orden CHK-… en el primer intento de pago y la reutiliza si el cliente
+   * repite la acción. Antes se creaba al abrir la página, así que cada visita o
+   * recarga dejaba una orden PENDIENTE sin uso.
+   */
+  private async asegurarOrden(): Promise<string> {
+    const existente = this.orderNumber();
+    if (existente) return existente;
+    const data = await firstValueFrom(
+      this.saasPublic.iniciarCheckout({
+        planCode: this.planCode(),
+        billingCycle: this.billingCycle(),
+        emailContacto: (this.emailPago || '').trim() || undefined
+      })
+    );
+    this.ngZone.run(() => {
+      this.orderNumber.set(data.orderNumber);
+      // La orden creada es la fuente de verdad del monto que cobrará Culqi.
+      const previo = this.resumen();
+      this.resumen.set({ ...data, pagoManual: data.pagoManual ?? previo?.pagoManual ?? null });
+    });
+    return data.orderNumber;
+  }
+
+  private mensajeErrorCheckout(err: unknown, porDefecto: string): string {
+    const cuerpo = err instanceof HttpErrorResponse ? err.error : (err as { error?: unknown })?.error;
+    const datos = cuerpo as { message?: string; detail?: string } | undefined;
+    if (datos?.message === 'DOWNGRADE_PROGRAMADO_REQUERIDO') {
+      return (
+        datos.detail ||
+        'Para bajar de plan no se cobra ahora. Programe el cambio desde Planes; se aplicará en su próxima renovación.'
+      );
+    }
+    return datos?.message || porDefecto;
+  }
+
+  /** Cambia mensual/anual y recalcula el monto (la orden se crea recién al pagar). */
   cambiarCiclo(ciclo: 'monthly' | 'yearly'): void {
-    const c = this.checkout();
+    const c = this.resumen();
     if (c?.esDemo || this.procesando() || this.pagoManualReportado()) return;
     if (this.billingCycle() === ciclo) return;
     this.billingCycle.set(ciclo);
@@ -135,21 +166,32 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       queryParamsHandling: 'merge',
       replaceUrl: true
     });
-    this.checkout.set(null);
+    this.resumen.set(null);
+    this.orderNumber.set('');
     this.pagoManualReportado.set(false);
-    this.iniciar();
+    this.cargarResumen();
   }
 
-  reportarPagoManual(): void {
+  async reportarPagoManual(): Promise<void> {
     if (!this.validarAceptacionLegal()) return;
     if (!this.validarEmailPago()) return;
-    const c = this.checkout();
+    const c = this.resumen();
     if (!c || c.esDemo) return;
     this.procesando.set(true);
     this.errorMsg.set(null);
+
+    let order = '';
+    try {
+      order = await this.asegurarOrden();
+    } catch (err) {
+      this.procesando.set(false);
+      this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo generar la orden de pago.'));
+      return;
+    }
+
     this.saasPublic
       .reportarPagoManual({
-        orderNumber: c.orderNumber,
+        orderNumber: order,
         medioPago: this.medioPagoManual,
         email: (this.emailPago || '').trim(),
         referencia: (this.referenciaPago || '').trim() || undefined
@@ -158,8 +200,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
         next: (data) => {
           this.procesando.set(false);
           this.pagoManualReportado.set(true);
-          if (data?.pagoManual && this.checkout()) {
-            this.checkout.set({ ...this.checkout()!, pagoManual: data.pagoManual });
+          if (data?.pagoManual && this.resumen()) {
+            this.resumen.set({ ...this.resumen()!, pagoManual: data.pagoManual });
           }
           this.mensaje.set(
             'Orden registrada. Abriremos WhatsApp para el voucher y lo llevaremos al siguiente paso.'
@@ -167,7 +209,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           try {
             window.localStorage.setItem(
               LS_CHECKOUT_PENDIENTE,
-              JSON.stringify({ orderNumber: c.orderNumber, savedAt: Date.now() })
+              JSON.stringify({ orderNumber: order, savedAt: Date.now() })
             );
           } catch {
             /* ignore */
@@ -187,7 +229,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
 
   /** Abre WhatsApp con el texto del voucher / orden. */
   abrirWhatsAppVoucher(): void {
-    const c = this.checkout();
+    const c = this.resumen();
     if (!c) return;
     const pm = c.pagoManual;
     const wa = pm?.whatsappE164 || '';
@@ -197,7 +239,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.medioPagoManual === 'yape' ? 'Yape' : this.medioPagoManual === 'plin' ? 'Plin' : 'Depósito BCP';
     const texto = [
       'Hola, envié el voucher de pago de suscripción Business Soft.',
-      `Orden: ${c.orderNumber}`,
+      `Orden: ${this.orderNumber()}`,
       `Plan: ${c.planCode}`,
       `Ciclo: ${ciclo}`,
       `Monto: S/ ${Number(c.montoSoles).toFixed(2)}`,
@@ -214,7 +256,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   }
 
   culqiDisponible(): boolean {
-    const c = this.checkout();
+    const c = this.resumen();
     return Boolean(c?.culqiPublicKey || c?.culqiDisponible);
   }
 
@@ -235,12 +277,22 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  confirmarDemo(): void {
+  async confirmarDemo(): Promise<void> {
     if (!this.validarAceptacionLegal()) return;
-    const c = this.checkout();
-    if (!c?.orderNumber) return;
+    if (!this.resumen()) return;
     this.procesando.set(true);
-    this.saasPublic.confirmarDemo(c.orderNumber).subscribe({
+    this.errorMsg.set(null);
+
+    let order = '';
+    try {
+      order = await this.asegurarOrden();
+    } catch (err) {
+      this.procesando.set(false);
+      this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo generar la orden de la demo.'));
+      return;
+    }
+
+    this.saasPublic.confirmarDemo(order).subscribe({
       next: async () => {
         try {
           await this.redirigirPostCheckoutPagado();
@@ -265,10 +317,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.enfocarCorreoPagador();
       return;
     }
-    const c = this.checkout();
+    const c = this.resumen();
     if (!c || c.esDemo) return;
-    const pk = (c.culqiPublicKey || '').trim();
-    if (!pk) {
+    if (!c.culqiPublicKey && !c.culqiDisponible) {
       this.errorMsg.set(
         'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.'
       );
@@ -276,6 +327,28 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     }
     const email = (this.emailPago || '').trim();
     this.errorMsg.set(null);
+
+    // La orden se crea aquí: el cliente ya decidió pagar con tarjeta.
+    this.procesando.set(true);
+    let order = '';
+    try {
+      order = await this.asegurarOrden();
+    } catch (err) {
+      this.procesando.set(false);
+      this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo generar la orden de pago.'));
+      return;
+    }
+    this.procesando.set(false);
+
+    const orden = this.resumen() ?? c;
+    const pk = (orden.culqiPublicKey || '').trim();
+    if (!pk) {
+      this.errorMsg.set(
+        'El pago con tarjeta no está disponible en este momento. Use Yape o depósito, o intente más tarde.'
+      );
+      return;
+    }
+
     try {
       await this.cargarScriptCulqi();
     } catch {
@@ -304,13 +377,13 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const cicloLabel = this.etiquetaCiclo(c.billingCycle);
+    const cicloLabel = this.etiquetaCiclo(orden.billingCycle);
     Culqi.publicKey = pk;
     Culqi.settings({
       title: 'Suscripción Business Soft',
       currency: 'PEN',
-      description: `Plan ${c.planCode} (${cicloLabel}) — ${c.orderNumber}`,
-      amount: Math.max(0, Math.round(Number(c.montoCulqiCentimos) || 0))
+      description: `Plan ${orden.planCode} (${cicloLabel}) — ${order}`,
+      amount: Math.max(0, Math.round(Number(orden.montoCulqiCentimos) || 0))
     });
     Culqi.options({
       lang: 'es',
@@ -404,8 +477,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
    * @see https://github.com/culqi/culqi-php-demo-jsv4-culqi3ds/blob/master/js/main.js
    */
   private async procesarConfirmacionCulqi(): Promise<void> {
-    const c = this.checkout();
-    if (!c?.orderNumber || !this.tokenCulqi.trim()) {
+    const c = this.resumen();
+    const order = this.orderNumber();
+    if (!c || !order || !this.tokenCulqi.trim()) {
       this.errorMsg.set('Complete el pago en el formulario de Culqi (token no recibido).');
       return;
     }
@@ -419,7 +493,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     this.errorMsg.set(null);
 
     const payloadBase = {
-      orderNumber: c.orderNumber,
+      orderNumber: order,
       tokenId,
       email,
       deviceFingerPrintId: this.deviceFingerPrintId || undefined
@@ -494,7 +568,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
    * El número de orden queda en BD y en query (?checkout=); localStorage como respaldo.
    */
   private async redirigirPostCheckoutPagado(): Promise<void> {
-    const order = (this.checkout()?.orderNumber || '').trim();
+    const order = this.orderNumber().trim();
     let autenticado = false;
     try {
       autenticado = await firstValueFrom(this.auth.verifyToken());
@@ -601,11 +675,23 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     }
   }
 
-  irCrearEmpresa(): void {
+  /** Registrar la empresa antes de pagar: necesita la orden para vincularla después. */
+  async irCrearEmpresa(): Promise<void> {
     if (!this.validarAceptacionLegal()) return;
-    const c = this.checkout();
-    const q = c?.orderNumber ? { checkout: c.orderNumber } : {};
-    void this.router.navigate(['/crear-empresa'], { queryParams: q });
+    let order = this.orderNumber();
+    if (!order) {
+      this.procesando.set(true);
+      this.errorMsg.set(null);
+      try {
+        order = await this.asegurarOrden();
+      } catch (err) {
+        this.procesando.set(false);
+        this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo generar la orden de pago.'));
+        return;
+      }
+      this.procesando.set(false);
+    }
+    void this.router.navigate(['/crear-empresa'], { queryParams: { checkout: order } });
   }
 
   volverPlanes(): void {
