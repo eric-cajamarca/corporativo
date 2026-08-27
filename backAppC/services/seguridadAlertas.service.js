@@ -393,6 +393,12 @@ async function enviarTextoPlataforma(pool, numeroDestino, texto) {
 }
 
 /**
+ * Canal WhatsApp de plataforma reutilizable (avisos de suscripción, etc.).
+ * No lanza: devuelve { ok, canal } u { ok: false, skipped, reason }.
+ */
+exports.enviarWhatsAppPlataforma = enviarTextoPlataforma;
+
+/**
  * Envoltorio para llamadas fire-and-forget (`void seguridadAlertasService.notificarXxx(...)`).
  * Garantiza que cualquier rejection quede como log JSON estructurado en lugar de
  * romper el process en `unhandledRejection`.

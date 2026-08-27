@@ -27,7 +27,7 @@ function toNum(v) {
 
 /**
  * Genera el XML SummaryDocuments (resumen diario RC) sin firma.
- * @param {object} datos - { rucEmisor, razonSocialEmisor, fechaResumen (YYYYMMDD), correlativo, lineas }
+ * @param {object} datos - { rucEmisor, razonSocialEmisor, fechaResumen (YYYYMMDD emisión comprobantes), fechaGeneracion (YYYYMMDD generación RC), correlativo, lineas }
  * @param {Array} lineas - Array de { tipoComprobante, serie, numero, fechaEmision, tipoDocReceptor, numeroDocReceptor, totalGravada, totalIgv, total, documentoReferencia?, serieReferencia? } (documentoReferencia para NC/ND)
  * @returns {string} XML
  */
@@ -35,6 +35,7 @@ function generarXmlResumenDiario(datos, lineas) {
   const ruc = String(datos.rucEmisor || "").replace(/\D/g, "").padStart(11, "0");
   const razon = escXml(datos.razonSocialEmisor || "");
   const fechaResumen = String(datos.fechaResumen || "").replace(/\D/g, "").slice(0, 8);
+  const fechaGeneracion = String(datos.fechaGeneracion || datos.fechaResumen || "").replace(/\D/g, "").slice(0, 8);
   const correlativo = String(datos.correlativo || "1").slice(0, 5);
   const idDoc = `RC-${fechaResumen}-${correlativo}`;
 
@@ -106,7 +107,8 @@ function generarXmlResumenDiario(datos, lineas) {
     idx++;
   }
 
-  const issueDate = fechaResumen.slice(0, 4) + "-" + fechaResumen.slice(4, 6) + "-" + fechaResumen.slice(6, 8);
+  const referenceDate = fechaResumen.slice(0, 4) + "-" + fechaResumen.slice(4, 6) + "-" + fechaResumen.slice(6, 8);
+  const issueDate = fechaGeneracion.slice(0, 4) + "-" + fechaGeneracion.slice(4, 6) + "-" + fechaGeneracion.slice(6, 8);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <SummaryDocuments xmlns="${NS_SUMMARY}" xmlns:sac="${NS_SAC_AGG}" xmlns:cac="${NS_CAC}" xmlns:cbc="${NS_CBC}" xmlns:ext="${NS_EXT}">
@@ -118,7 +120,7 @@ function generarXmlResumenDiario(datos, lineas) {
   <cbc:UBLVersionID>2.0</cbc:UBLVersionID>
   <cbc:CustomizationID>1.1</cbc:CustomizationID>
   <cbc:ID>${escXml(idDoc)}</cbc:ID>
-  <cbc:ReferenceDate>${issueDate}</cbc:ReferenceDate>
+  <cbc:ReferenceDate>${referenceDate}</cbc:ReferenceDate>
   <cbc:IssueDate>${issueDate}</cbc:IssueDate>
   <cac:Signature>
     <cbc:ID>${escXml(ruc)}</cbc:ID>

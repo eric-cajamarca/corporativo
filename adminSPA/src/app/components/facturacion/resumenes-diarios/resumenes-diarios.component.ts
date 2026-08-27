@@ -3,9 +3,25 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { WhatsappService } from '../../../services/whatsapp.service';
+import { formatFechaLocal, formatFechaApiParaMostrar, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
+declare var bootstrap: any;
+
+export interface ResumenDiarioListItem {
+  idResumenDiarioSunat: string;
+  fechaResumen: string;
+  numeroCorrelativo: string;
+  ticketSunat?: string;
+  idEstadoSunat?: number | null;
+  fechaEnvio?: string;
+  fechaRespuesta?: string;
+  codigoRespuesta?: string;
+  descripcionRespuesta?: string;
+  descripcionEstadoSunat?: string;
+  tieneCdr?: boolean | number;
+}
 
 @Component({
   selector: 'app-resumenes-diarios',
@@ -17,7 +33,7 @@ declare var iziToast: any;
 export class ResumenesDiariosComponent implements OnInit {
 
   public sidebarState: SidebarStateService = inject(SidebarStateService);
-  items: any[] = [];
+  items: ResumenDiarioListItem[] = [];
   total = 0;
   loading = false;
   fechaDesde = '';
@@ -29,13 +45,20 @@ export class ResumenesDiariosComponent implements OnInit {
   fechaResumenEnviar = '';
   enviando = false;
   consultandoId: string | null = null;
+  abriendoArchivoId: string | null = null;
 
   /** Boletas/notas pendientes por fecha en el rango (para mostrar aviso). */
   boletasPendientesPorFecha: { fechaResumen: string; cantidad: number }[] = [];
 
+  resumenSeleccionadoWa: ResumenDiarioListItem | null = null;
+  whatsappResumenNumber = '';
+  whatsappResumenCaption = '';
+  whatsappResumenMensaje: string | null = null;
+  enviandoWhatsappResumen = false;
+
   constructor(
     private _facturacionService: FacturacionService,
-    //private sidebarState: SidebarStateService
+    private _whatsappService: WhatsappService
   ) {}
 
   ngOnInit(): void {
@@ -119,15 +142,16 @@ export class ResumenesDiariosComponent implements OnInit {
     });
   }
 
-  consultarEstado(item: any): void {
+  consultarEstado(item: ResumenDiarioListItem): void {
     const id = item?.idResumenDiarioSunat;
     if (!id) return;
     this.consultandoId = id;
     this._facturacionService.consultarEstadoResumenDiario(id).subscribe({
       next: (res) => {
         this.consultandoId = null;
-        if (res?.mensaje && typeof iziToast !== 'undefined') {
-          iziToast.info({ title: 'Estado', message: res.mensaje });
+        const msg = res?.data?.mensaje || res?.mensaje;
+        if (msg && typeof iziToast !== 'undefined') {
+          iziToast.info({ title: 'Estado', message: msg });
         }
         this.cargar();
       },
@@ -142,13 +166,189 @@ export class ResumenesDiariosComponent implements OnInit {
     });
   }
 
-  descripcionEstado(item: any): string {
+  tieneCdr(item: ResumenDiarioListItem): boolean {
+    return item?.tieneCdr === 1 || item?.tieneCdr === true;
+  }
+
+  nombreArchivoCdr(item: ResumenDiarioListItem): string {
+    const fecha = (item.fechaResumen || '').replace(/\D/g, '').slice(0, 8);
+    const corr = item.numeroCorrelativo || '1';
+    return fecha ? `cdr-rc-${fecha}-${corr}.xml` : `cdr-rc-${item.idResumenDiarioSunat}.xml`;
+  }
+
+  verCdrSunat(item: ResumenDiarioListItem): void {
+    const id = item?.idResumenDiarioSunat;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-cdr';
+    this._facturacionService.obtenerCdrResumenDiario(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        this.abrirContenidoXmlEnPestana(content, this.nombreArchivoCdr(item));
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo cargar el CDR.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'CDR', message: msg });
+        }
+      }
+    });
+  }
+
+  descargarCdr(item: ResumenDiarioListItem): void {
+    const id = item?.idResumenDiarioSunat;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-cdr-dl';
+    this._facturacionService.obtenerCdrResumenDiario(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        if (!content) return;
+        this.descargarComoArchivo(content, this.nombreArchivoCdr(item));
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo descargar el CDR.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'CDR', message: msg });
+        }
+      }
+    });
+  }
+
+  abrirModalWhatsappResumen(item: ResumenDiarioListItem): void {
+    this.resumenSeleccionadoWa = item;
+    this.whatsappResumenNumber = '';
+    this.whatsappResumenCaption = `Resumen diario RC ${this.mostrarFecha(item.fechaResumen)} · Corr. ${item.numeroCorrelativo || ''}`.trim();
+    this.whatsappResumenMensaje = this.tieneCdr(item)
+      ? null
+      : 'No hay CDR guardado. Consulte el estado en SUNAT primero.';
+    this.enviandoWhatsappResumen = false;
+    setTimeout(() => {
+      const el = document.getElementById('whatsappResumenModal');
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  enviarWhatsappResumen(): void {
+    const item = this.resumenSeleccionadoWa;
+    if (!item) return;
+    if (!this.whatsappResumenNumber.trim()) {
+      this.whatsappResumenMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    if (!this.tieneCdr(item)) {
+      this.whatsappResumenMensaje = 'No hay CDR disponible. Consulte el estado en SUNAT primero.';
+      return;
+    }
+    this.enviandoWhatsappResumen = true;
+    this.whatsappResumenMensaje = null;
+    this._facturacionService.obtenerCdrResumenDiario(item.idResumenDiarioSunat).subscribe({
+      next: (res) => {
+        const content = res?.data?.content ?? '';
+        if (!content) {
+          this.enviandoWhatsappResumen = false;
+          this.whatsappResumenMensaje = 'No hay contenido CDR disponible.';
+          return;
+        }
+        const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+        this.enviarBlobPorWhatsapp(blob, this.nombreArchivoCdr(item));
+      },
+      error: (err) => {
+        this.enviandoWhatsappResumen = false;
+        this.whatsappResumenMensaje = err?.error?.message || err?.message || 'Error al obtener el CDR.';
+      }
+    });
+  }
+
+  cerrarModalWhatsappResumen(): void {
+    const el = document.getElementById('whatsappResumenModal');
+    if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+    this.resumenSeleccionadoWa = null;
+    this.whatsappResumenNumber = '';
+    this.whatsappResumenCaption = '';
+    this.whatsappResumenMensaje = null;
+    this.enviandoWhatsappResumen = false;
+  }
+
+  private enviarBlobPorWhatsapp(blob: Blob, nombreArchivo: string): void {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+      this._whatsappService
+        .enviarArchivo(
+          this.whatsappResumenNumber.trim(),
+          base64,
+          nombreArchivo,
+          'document',
+          this.whatsappResumenCaption.trim() || undefined
+        )
+        .subscribe({
+          next: (res) => {
+            this.enviandoWhatsappResumen = false;
+            this.whatsappResumenMensaje = res.message;
+            if (res.success) {
+              setTimeout(() => this.cerrarModalWhatsappResumen(), 2000);
+            }
+          },
+          error: (err) => {
+            this.enviandoWhatsappResumen = false;
+            this.whatsappResumenMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+          }
+        });
+    };
+    reader.readAsDataURL(blob);
+  }
+
+  private abrirContenidoXmlEnPestana(content: string, nombreDescarga: string): void {
+    if (!content) return;
+    const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombreDescarga;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  }
+
+  private descargarComoArchivo(content: string, nombreArchivo: string): void {
+    const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  descripcionEstado(item: ResumenDiarioListItem): string {
     if (item?.descripcionEstadoSunat) return item.descripcionEstadoSunat;
     if (item?.idEstadoSunat == null) return 'Pendiente de consulta';
     return 'Estado ' + item.idEstadoSunat;
   }
 
+  previewDescripcion(valor: string | null | undefined): string {
+    const t = (valor || '').trim();
+    if (!t) return '—';
+    return t.length > 80 ? t.slice(0, 80) + '…' : t;
+  }
+
   onSidebarToggle(collapsed: boolean): void {
     this.sidebarState.setCollapsed(collapsed);
+  }
+
+  mostrarFecha(valor: string | null | undefined): string {
+    return formatFechaApiParaMostrar(valor);
   }
 }

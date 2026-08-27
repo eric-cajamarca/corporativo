@@ -52,6 +52,16 @@ export function fechaHoraOperacionParaApi(fechaForm?: string | null): string {
   return fechaEmisionVentaParaApi(fechaForm);
 }
 
+/** Formatea YYYY-MM-DD (API) a dd/MM/yyyy sin desfase UTC del pipe date. */
+export function formatFechaApiParaMostrar(valor: string | null | undefined): string {
+  const v = valor != null ? String(valor).trim() : '';
+  if (!v) return '';
+  const iso = v.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return v;
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 /** Igual que fechaVentaParaApi pero permite null (p. ej. fVencimiento opcional). */
 export function fechaVentaOpcionalParaApi(valor: string | null | undefined): string | null {
   const v = valor != null ? String(valor).trim() : '';

@@ -297,6 +297,14 @@ exports.obtenerCdrComunicacionBajaService = async (pool, user, idComunicacionBaj
   return row.cdr;
 };
 
+/** CDR / ApplicationResponse del resumen diario tras consultar getStatus. */
+exports.obtenerCdrResumenDiarioService = async (pool, user, idResumenDiarioSunat) => {
+  if (!user?.empresa) throw new Error("NO_ACCESS");
+  const row = await FacturacionRepository.obtenerResumenDiarioPorIdRepo(pool, user.empresa, idResumenDiarioSunat);
+  if (!row || !row.cdr) throw new Error("CDR_RESUMEN_DIARIO_NO_DISPONIBLE");
+  return row.cdr;
+};
+
 exports.obtenerEstadisticasFacturacionService = async (pool, user, periodo) => {
   if (!user) {
     throw new Error("NO_ACCESS");

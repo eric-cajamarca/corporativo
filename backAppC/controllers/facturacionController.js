@@ -744,6 +744,21 @@ const consultarEstadoResumenDiario = async (req, res, next) => {
   }
 };
 
+const obtenerCdrResumenDiario = async (req, res, next) => {
+  try {
+    const { idResumenDiarioSunat } = req.params;
+    const contenido = await withPool(async (pool) => FacturacionServices.obtenerCdrResumenDiarioService(pool, req.user, idResumenDiarioSunat));
+    res.status(200).send({ data: { content: contenido } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "CDR_RESUMEN_DIARIO_NO_DISPONIBLE") {
+      return res.status(404).send({ message: "CDR no disponible. Consulte el estado en SUNAT primero.", data: undefined });
+    }
+    console.error("Error obtener CDR resumen diario:", error);
+    return next(error);
+  }
+};
+
 // Obtener comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Params: idComprobanteElectronico. Query: serie, numero, tipoComprobante (01/03).
 // Comprobante por serie/numero para origen de guía (incluye cliente e items; no exige aceptado SUNAT)
 const obtenerOrigenParaGuia = async (req, res, next) => {
@@ -1011,6 +1026,7 @@ module.exports = {
   obtenerBoletasPendientesResumen,
   enviarResumenDiario,
   consultarEstadoResumenDiario,
+  obtenerCdrResumenDiario,
   obtenerOrigenParaGuia,
   obtenerOrigenParaNota,
   listarComprobantesOrigenPorCliente,

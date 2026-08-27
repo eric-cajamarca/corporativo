@@ -77,6 +77,25 @@ async function contarEventoReciente(pool, idEmpresa, tipoEvento, horas) {
   return Number(r.recordset[0]?.total || 0);
 }
 
+/** Igual que contarEventoReciente pero aislando el canal (WHATSAPP y EMAIL no se bloquean entre sí). */
+async function contarEventoRecientePorCanal(pool, idEmpresa, tipoEvento, canal, horas) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('tipoEvento', sql.VarChar(40), tipoEvento)
+    .input('canal', sql.VarChar(20), canal)
+    .input('horas', sql.Int, horas)
+    .query(`
+      SELECT COUNT(1) AS total
+      FROM dbo.OnboardingAutomationLog
+      WHERE idEmpresa = @idEmpresa
+        AND tipoEvento = @tipoEvento
+        AND canal = @canal
+        AND fechaEnvio >= DATEADD(HOUR, -@horas, GETDATE())
+    `);
+  return Number(r.recordset[0]?.total || 0);
+}
+
 async function registrarEvento(pool, row) {
   await pool
     .request()
@@ -99,6 +118,7 @@ async function registrarEvento(pool, row) {
 module.exports = {
   listarEmpresasParaOnboarding,
   contarEventoReciente,
+  contarEventoRecientePorCanal,
   registrarEvento
 };
 

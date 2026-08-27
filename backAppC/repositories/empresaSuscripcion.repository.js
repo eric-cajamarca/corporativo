@@ -158,8 +158,95 @@ async function actualizarContadorSunatSiInferior(pool, idEmpresa, valor) {
   }
 }
 
+/**
+ * Suscripciones que requieren aviso: por vencer dentro de @diasPreaviso o ya vencidas.
+ * El filtro va en SQL para no traer toda la cartera de empresas al proceso.
+ * @returns {Promise<Array<{tipoAviso: 'POR_VENCER'|'VENCIDA'}>>}
+ */
+async function listarParaAvisoVencimiento(pool, diasPreaviso) {
+  const dias = Number.isFinite(Number(diasPreaviso)) ? Math.max(0, Math.floor(Number(diasPreaviso))) : 1;
+  const r = await pool
+    .request()
+    .input('diasPreaviso', sql.Int, dias)
+    .query(`
+      SELECT
+        s.idEmpresa,
+        s.planCode,
+        s.billingCycle,
+        s.estado AS estadoSuscripcion,
+        CONVERT(VARCHAR(19), s.fechaFin, 120) AS fechaFin,
+        DATEDIFF(DAY, CAST(GETDATE() AS DATE), CAST(s.fechaFin AS DATE)) AS diasRestantes,
+        CASE
+          WHEN s.estado IN ('DEMO', 'ACTIVA') THEN 'POR_VENCER'
+          ELSE 'VENCIDA'
+        END AS tipoAviso,
+        e.razon_Social AS razonSocial,
+        e.correo AS correoEmpresa,
+        e.celular AS celularEmpresa,
+        ISNULL((
+          SELECT TOP 1 u.email
+          FROM dbo.UsuarioWeb u
+          WHERE u.idEmpresa = s.idEmpresa
+            AND ISNULL(u.estado, 1) = 1
+            AND ISNULL(LTRIM(RTRIM(u.email)), '') <> ''
+          ORDER BY u.fRegistro ASC
+        ), '') AS correoUsuario
+      FROM EmpresaSuscripcion s
+      INNER JOIN Empresas e ON e.idEmpresa = s.idEmpresa
+      WHERE s.fechaFin IS NOT NULL
+        AND (
+          (
+            s.estado IN ('DEMO', 'ACTIVA')
+            AND DATEDIFF(DAY, CAST(GETDATE() AS DATE), CAST(s.fechaFin AS DATE)) BETWEEN 0 AND @diasPreaviso
+          )
+          OR (
+            s.estado IN ('VENCIDA', 'PENDIENTE_PAGO')
+            AND s.fechaFin < GETDATE()
+          )
+        )
+      ORDER BY s.fechaFin ASC
+    `);
+  return r.recordset || [];
+}
+
+/**
+ * Mismos campos que listarParaAvisoVencimiento para una empresa puntual
+ * (avisos disparados por evento, p. ej. confirmación de pago).
+ */
+async function obtenerDatosAvisoPorEmpresa(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1
+        s.idEmpresa,
+        s.planCode,
+        s.billingCycle,
+        s.estado AS estadoSuscripcion,
+        CONVERT(VARCHAR(19), s.fechaFin, 120) AS fechaFin,
+        DATEDIFF(DAY, CAST(GETDATE() AS DATE), CAST(s.fechaFin AS DATE)) AS diasRestantes,
+        e.razon_Social AS razonSocial,
+        e.correo AS correoEmpresa,
+        e.celular AS celularEmpresa,
+        ISNULL((
+          SELECT TOP 1 u.email
+          FROM dbo.UsuarioWeb u
+          WHERE u.idEmpresa = s.idEmpresa
+            AND ISNULL(u.estado, 1) = 1
+            AND ISNULL(LTRIM(RTRIM(u.email)), '') <> ''
+          ORDER BY u.fRegistro ASC
+        ), '') AS correoUsuario
+      FROM EmpresaSuscripcion s
+      INNER JOIN Empresas e ON e.idEmpresa = s.idEmpresa
+      WHERE s.idEmpresa = @idEmpresa
+    `);
+  return r.recordset[0] || null;
+}
+
 module.exports = {
   obtenerPorEmpresa,
+  listarParaAvisoVencimiento,
+  obtenerDatosAvisoPorEmpresa,
   insertar,
   actualizarEstadoYPlan,
   aplicarPlanesPendientesAlVencer,

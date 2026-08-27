@@ -1,6 +1,8 @@
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 const empresaSuscripcionBootstrap = require('./empresaSuscripcionBootstrap.service');
+const suscripcionAvisosService = require('./suscripcionAvisos.service');
+const seguridadAlertasService = require('./seguridadAlertas.service');
 
 /** Debe caber en SuscripcionCheckoutPendiente.estado VARCHAR(20). */
 const ESTADO_PENDIENTE_VALIDACION = 'PENDIENTE_VALIDACION';
@@ -33,6 +35,28 @@ async function listarPagosManualesPendientes(pool, user, filtros = {}) {
 }
 
 /**
+ * Aviso de pago confirmado al cliente (WhatsApp + correo) sin bloquear la
+ * respuesta al admin; el servicio de avisos nunca lanza.
+ */
+function avisarPagoConfirmado(pool, fila) {
+  const idEmpresa = fila && fila.idEmpresaCliente ? String(fila.idEmpresaCliente).trim() : '';
+  if (!idEmpresa) return;
+  seguridadAlertasService.runSafeAlert(
+    () =>
+      suscripcionAvisosService.notificarPagoConfirmado(pool, {
+        idEmpresa,
+        orderNumber: fila.orderNumber,
+        planCode: fila.planCode,
+        billingCycle: fila.billingCycle,
+        monto: fila.monto,
+        moneda: fila.moneda,
+        emailContacto: fila.emailContacto
+      }),
+    'suscripcion_pago_confirmado'
+  );
+}
+
+/**
  * Admin de plataforma confirma voucher recibido por WhatsApp → PAGADO + aplica plan.
  */
 async function confirmarPagoManualAdmin(pool, user, orderNumber) {
@@ -50,7 +74,9 @@ async function confirmarPagoManualAdmin(pool, user, orderNumber) {
     if (resultado && resultado.aplicado === false && resultado.motivo === 'SIN_EMPRESA') {
       throw new Error('CHECKOUT_SIN_EMPRESA');
     }
-    return suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
+    const filaReaplicada = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
+    avisarPagoConfirmado(pool, filaReaplicada);
+    return filaReaplicada;
   }
   if (row.estado !== ESTADO_PENDIENTE_VALIDACION && row.estado !== 'PENDIENTE') {
     throw new Error('CHECKOUT_NO_PERMITE_CONFIRMAR');
@@ -67,7 +93,9 @@ async function confirmarPagoManualAdmin(pool, user, orderNumber) {
     // Queda PAGADO; el admin puede vincular después o el cliente crear empresa
     console.error('contexto: confirmarPagoManualAdmin PAGADO pero sin empresa vinculada', on);
   }
-  return suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
+  const filaFinal = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
+  avisarPagoConfirmado(pool, filaFinal);
+  return filaFinal;
 }
 
 /**

@@ -297,6 +297,14 @@ export class FacturacionService {
     );
   }
 
+  obtenerCdrResumenDiario(idResumenDiarioSunat: string): Observable<{ data: { content: string } }> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<{ data: { content: string } }>(
+      this.url + 'facturacion/resumenes-diarios/' + encodeURIComponent(idResumenDiarioSunat) + '/cdr',
+      { headers, withCredentials: true }
+    );
+  }
+
   /** Lista comprobantes Factura/Boleta aceptados por RUC o razón social del cliente (elegir uno). */
   listarComprobantesOrigenPorCliente(params: {
     rucCliente?: string;

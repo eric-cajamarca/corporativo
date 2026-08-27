@@ -9,6 +9,7 @@ const generadorXmlResumenDiario = require("./generadorXmlResumenDiarioSunat.serv
 const firmaXmlSunat = require("./firmaXmlSunat.service");
 const envioDirectoSunat = require("./envioDirectoSunat.service");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
+const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
 
 /**
  * Arma lineas para el XML de resumen a partir de comprobantes pendientes (con datos venta/cliente).
@@ -69,6 +70,7 @@ async function enviarResumenDiarioService(pool, user, fechaResumen) {
   const correlativo = await FacturacionRepository.obtenerSiguienteCorrelativoResumenRepo(pool, user.empresa, fechaResumen);
   const fechaRef = typeof fechaResumen === "string" ? fechaResumen.slice(0, 10).replace(/\D/g, "") : "";
   const fechaRefStr = fechaRef.length >= 8 ? `${fechaRef.slice(0, 4)}${fechaRef.slice(4, 6)}${fechaRef.slice(6, 8)}` : "";
+  const fechaGenStr = getFechaHoyLocal().replace(/\D/g, "").slice(0, 8);
 
   const lineas = await armarLineasResumen(pool, user.empresa, comprobantes);
   const empresaResult = await pool.request()
@@ -79,6 +81,7 @@ async function enviarResumenDiarioService(pool, user, fechaResumen) {
     rucEmisor: emp.ruc,
     razonSocialEmisor: emp.razon_Social,
     fechaResumen: fechaRefStr,
+    fechaGeneracion: fechaGenStr,
     correlativo
   };
 

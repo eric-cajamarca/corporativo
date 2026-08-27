@@ -55,6 +55,7 @@ router.delete('/guias/:id', facturacionController.eliminarGuia);
 router.get('/resumenes-diarios', facturacionController.listarResumenesDiarios);
 router.get('/resumenes-diarios/boletas-pendientes', facturacionController.obtenerBoletasPendientesResumen);
 router.post('/resumenes-diarios/enviar', facturacionController.enviarResumenDiario);
+router.get('/resumenes-diarios/:idResumenDiarioSunat/cdr', facturacionController.obtenerCdrResumenDiario);
 router.post('/resumenes-diarios/:idResumenDiarioSunat/consultar-estado', facturacionController.consultarEstadoResumenDiario);
 
 // Rutas para estadísticas y reportes

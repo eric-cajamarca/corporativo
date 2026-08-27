@@ -1617,8 +1617,11 @@ exports.listarResumenesDiariosRepo = async (pool, idEmpresa, filtros = {}) => {
   if (inputs.idEstadoSunat != null) reqList.input("idEstadoSunat", sql.Int, inputs.idEstadoSunat);
   reqList.input("offset", sql.Int, offset).input("porPagina", sql.Int, limit);
   const listResult = await reqList.query(`
-    SELECT r.idResumenDiarioSunat, r.idEmpresa, r.fechaResumen, r.numeroCorrelativo, r.ticketSunat,
+    SELECT r.idResumenDiarioSunat, r.idEmpresa,
+           CONVERT(VARCHAR(10), r.fechaResumen, 120) AS fechaResumen,
+           r.numeroCorrelativo, r.ticketSunat,
            r.idEstadoSunat, r.fechaEnvio, r.fechaRespuesta, r.codigoRespuesta, r.descripcionRespuesta,
+           CASE WHEN r.cdr IS NOT NULL AND LEN(r.cdr) > 0 THEN 1 ELSE 0 END AS tieneCdr,
            es.codigo AS codigoEstadoSunat, es.descripcion AS descripcionEstadoSunat
     FROM ResumenesDiariosSunat r
     LEFT JOIN EstadosSunat es ON es.idEstadoSunat = r.idEstadoSunat
@@ -1628,6 +1631,23 @@ exports.listarResumenesDiariosRepo = async (pool, idEmpresa, filtros = {}) => {
   `);
 
   return { items: listResult.recordset || [], total };
+};
+
+/** Obtiene resumen diario por id (empresa filtrada). */
+exports.obtenerResumenDiarioPorIdRepo = async (pool, idEmpresa, idResumenDiarioSunat) => {
+  const r = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("idResumenDiarioSunat", sql.UniqueIdentifier, idResumenDiarioSunat)
+    .query(`
+      SELECT idResumenDiarioSunat, idEmpresa,
+             CONVERT(VARCHAR(10), fechaResumen, 120) AS fechaResumen,
+             numeroCorrelativo, ticketSunat, idEstadoSunat, cdr,
+             codigoRespuesta, descripcionRespuesta
+      FROM ResumenesDiariosSunat
+      WHERE idEmpresa = @idEmpresa AND idResumenDiarioSunat = @idResumenDiarioSunat
+    `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
 };
 
 /**

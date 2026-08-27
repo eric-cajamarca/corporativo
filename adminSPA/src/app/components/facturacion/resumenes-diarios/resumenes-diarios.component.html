@@ -47,12 +47,12 @@
           <strong>Boletas/notas pendientes de envío:</strong> en este rango hay fechas con comprobantes que aún no se han enviado a SUNAT en un resumen diario.
           <ul class="mb-0 mt-1 small">
             <li *ngFor="let p of boletasPendientesPorFecha">
-              {{ p.fechaResumen | date:'dd/MM/yyyy' }}: {{ p.cantidad }} comprobante(s). Use "Enviar resumen" con esa fecha para incluirlos en un resumen diario (RC).
+              {{ mostrarFecha(p.fechaResumen) }}: {{ p.cantidad }} comprobante(s). Use "Enviar resumen" con esa fecha para incluirlos en un resumen diario (RC).
             </li>
           </ul>
         </div>
 
-        <p class="text-muted small mb-2">Total: {{ total }} resumen(es). Las boletas/notas del día se envían en un solo XML (RC) a SUNAT; el resultado se obtiene consultando el estado.</p>
+        <p class="text-muted small mb-2">Total: {{ total }} resumen(es). La columna «Fecha comprobantes» es la fecha de emisión de las boletas/notas incluidas (ReferenceDate SUNAT), no la fecha de envío del resumen.</p>
 
         <ng-container *ngIf="loading">
           <p class="text-muted mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
@@ -66,32 +66,123 @@
           <table class="table table-sm table-hover mb-0">
             <thead class="table-dark">
               <tr>
-                <th>Fecha resumen</th>
+                <th>Fecha comprobantes</th>
                 <th>Correlativo</th>
                 <th>Ticket SUNAT</th>
                 <th>Estado</th>
+                <th>Respuesta SUNAT</th>
                 <th>F. envío</th>
                 <th>F. respuesta</th>
-                <th></th>
+                <th class="text-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let r of items">
-                <td>{{ r.fechaResumen | date:'shortDate' }}</td>
+                <td>{{ mostrarFecha(r.fechaResumen) }}</td>
                 <td>{{ r.numeroCorrelativo }}</td>
                 <td><code class="small">{{ r.ticketSunat || '-' }}</code></td>
                 <td>{{ descripcionEstado(r) }}</td>
+                <td class="small">
+                  <span *ngIf="r.codigoRespuesta" class="badge bg-secondary me-1">{{ r.codigoRespuesta }}</span>
+                  {{ previewDescripcion(r.descripcionRespuesta) }}
+                </td>
                 <td>{{ r.fechaEnvio || '-' }}</td>
                 <td>{{ r.fechaRespuesta || '-' }}</td>
                 <td>
-                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="consultarEstado(r)" [disabled]="consultandoId === r.idResumenDiarioSunat" title="Consultar estado en SUNAT">
-                    {{ consultandoId === r.idResumenDiarioSunat ? '...' : 'Consultar estado' }}
-                  </button>
+                  <div class="d-flex flex-wrap gap-1 align-items-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            (click)="consultarEstado(r)"
+                            [disabled]="consultandoId === r.idResumenDiarioSunat"
+                            title="Consultar estado en SUNAT">
+                      {{ consultandoId === r.idResumenDiarioSunat ? '...' : 'Consultar' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-success"
+                            (click)="abrirModalWhatsappResumen(r)"
+                            [disabled]="!tieneCdr(r)"
+                            title="Enviar CDR por WhatsApp">
+                      <i class="bi bi-whatsapp"></i>
+                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                              data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li *ngIf="tieneCdr(r)">
+                          <button type="button" class="dropdown-item"
+                                  (click)="verCdrSunat(r)"
+                                  [disabled]="abriendoArchivoId === r.idResumenDiarioSunat + '-cdr'">
+                            <i class="bi bi-eye me-2 text-info"></i> Ver CDR
+                          </button>
+                        </li>
+                        <li *ngIf="tieneCdr(r)">
+                          <button type="button" class="dropdown-item"
+                                  (click)="descargarCdr(r)"
+                                  [disabled]="abriendoArchivoId === r.idResumenDiarioSunat + '-cdr-dl'">
+                            <i class="bi bi-download me-2 text-info"></i> Descargar CDR
+                          </button>
+                        </li>
+                        <li *ngIf="tieneCdr(r)"><hr class="dropdown-divider"></li>
+                        <li>
+                          <button type="button" class="dropdown-item"
+                                  (click)="abrirModalWhatsappResumen(r)"
+                                  [disabled]="!tieneCdr(r)">
+                            <i class="bi bi-whatsapp me-2 text-success"></i> Enviar CDR por WhatsApp
+                          </button>
+                        </li>
+                        <li *ngIf="!tieneCdr(r)">
+                          <span class="dropdown-item-text small text-muted">CDR no disponible. Consulte estado en SUNAT.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Envío por WhatsApp del CDR del resumen diario -->
+<div class="modal fade" id="whatsappResumenModal" tabindex="-1" aria-labelledby="whatsappResumenModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="whatsappResumenModalLabel">
+          <i class="bi bi-whatsapp"></i> Enviar CDR del resumen por WhatsApp
+        </h5>
+        <button type="button" class="btn-close btn-close-white" aria-label="Cerrar"
+                (click)="cerrarModalWhatsappResumen()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" *ngIf="resumenSeleccionadoWa">
+          Fecha comprobantes: <strong>{{ mostrarFecha(resumenSeleccionadoWa.fechaResumen) }}</strong>
+          · Correlativo: <strong>{{ resumenSeleccionadoWa.numeroCorrelativo || '—' }}</strong>
+          · Estado: {{ descripcionEstado(resumenSeleccionadoWa) }}
+        </p>
+        <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+        <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappResumenNumber" placeholder="51999999999" />
+        <label class="form-label small">Mensaje opcional (caption)</label>
+        <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappResumenCaption" placeholder="Opcional" />
+        <p class="small text-muted mb-0">Se enviará el archivo XML del CDR (respuesta SUNAT).</p>
+        <p class="small mb-0 mt-2" *ngIf="whatsappResumenMensaje"
+           [class.text-success]="whatsappResumenMensaje && whatsappResumenNumber && !enviandoWhatsappResumen"
+           [class.text-danger]="whatsappResumenMensaje && (!whatsappResumenNumber || enviandoWhatsappResumen)">
+          {{ whatsappResumenMensaje }}
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsappResumen"
+                (click)="cerrarModalWhatsappResumen()">Cancelar</button>
+        <button type="button" class="btn btn-success btn-sm"
+                [disabled]="enviandoWhatsappResumen || !resumenSeleccionadoWa || !tieneCdr(resumenSeleccionadoWa!)"
+                (click)="enviarWhatsappResumen()">
+          <span *ngIf="enviandoWhatsappResumen"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+          <span *ngIf="!enviandoWhatsappResumen"><i class="bi bi-send"></i> Enviar CDR</span>
+        </button>
       </div>
     </div>
   </div>
