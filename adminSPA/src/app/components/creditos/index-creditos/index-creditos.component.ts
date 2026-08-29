@@ -107,6 +107,9 @@ export class IndexCreditosComponent implements OnInit {
 
   empresasOperacion: EmpresaCajaOperacion[] = [];
   idEmpresaOperacionSel = '';
+  saldosFavor: Array<{ idCliente: number; cliente: string; saldo: number }> = [];
+  loadingSaldoFavor = false;
+  huerfanosMsg = '';
 
   constructor(
     private creditosService: CreditosService,
@@ -125,6 +128,7 @@ export class IndexCreditosComponent implements OnInit {
         this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
         this.cargarResumenCreditos();
         this.cargarCreditos();
+        this.cargarSaldosFavor();
         this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
           next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
           error: () => {}
@@ -133,6 +137,7 @@ export class IndexCreditosComponent implements OnInit {
       error: () => {
         this.cargarResumenCreditos();
         this.cargarCreditos();
+        this.cargarSaldosFavor();
         this.cajaService.obtenerCajas().subscribe({
           next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
           error: () => {}
@@ -173,9 +178,98 @@ export class IndexCreditosComponent implements OnInit {
     this.idEmpresaOperacionSel = id;
     this.cargarResumenCreditos();
     this.cargarCreditos();
+    this.cargarSaldosFavor();
     this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
       next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
       error: () => {}
+    });
+  }
+
+  cargarSaldosFavor(): void {
+    this.loadingSaldoFavor = true;
+    this.creditosService.listarSaldosFavorEmpresa(this.idEmpresaOpRegistro()).subscribe({
+      next: (r) => {
+        this.saldosFavor = (r.data || []).map((x) => ({
+          idCliente: Number(x.idCliente),
+          cliente: String(x.cliente || ''),
+          saldo: Number(x.saldo) || 0
+        }));
+        this.loadingSaldoFavor = false;
+      },
+      error: () => {
+        this.saldosFavor = [];
+        this.loadingSaldoFavor = false;
+      }
+    });
+  }
+
+  verMovimientosSaldo(s: { idCliente: number; cliente: string; saldo: number }): void {
+    this.creditosService.listarMovimientosSaldoFavor(s.idCliente, 30, this.idEmpresaOpRegistro()).subscribe({
+      next: (r) => {
+        const rows = (r.data || []) as Array<{ tipo?: string; monto?: number; fecha?: string; motivo?: string }>;
+        if (!rows.length) {
+          iziToast.info({ title: 'Saldo a favor', message: 'Sin movimientos.', position: 'topRight' });
+          return;
+        }
+        const texto = rows
+          .slice(0, 12)
+          .map((m) => `${m.fecha || ''} · ${m.tipo || ''} · S/ ${Number(m.monto || 0).toFixed(2)}${m.motivo ? ' · ' + m.motivo : ''}`)
+          .join('\n');
+        iziToast.info({
+          title: `Movimientos · ${s.cliente || s.idCliente}`,
+          message: texto,
+          position: 'topRight',
+          timeout: 12000,
+          displayMode: 2
+        });
+      },
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar los movimientos.', position: 'topRight' });
+      }
+    });
+  }
+
+  diagnosticarHuerfanos(): void {
+    this.loadingSaldoFavor = true;
+    this.creditosService.diagnosticarCreditosHuerfanos(this.idEmpresaOpRegistro()).subscribe({
+      next: (r) => {
+        const n = (r.data || []).length;
+        this.huerfanosMsg =
+          n === 0
+            ? 'No hay créditos huérfanos (deudas de comprobantes anulados).'
+            : `Hay ${n} crédito(s) huérfano(s). Use «Sanear huérfanos» para anular la deuda y generar saldo a favor si hubo cobros.`;
+        this.loadingSaldoFavor = false;
+      },
+      error: () => {
+        this.huerfanosMsg = 'No se pudo diagnosticar.';
+        this.loadingSaldoFavor = false;
+      }
+    });
+  }
+
+  sanearHuerfanos(): void {
+    if (!confirm('¿Sanear créditos de comprobantes anulados? Se anulará la deuda pendiente y los cobros previos pasarán a saldo a favor del cliente.')) {
+      return;
+    }
+    this.loadingSaldoFavor = true;
+    this.creditosService.sanearCreditosHuerfanos(this.idEmpresaOpRegistro()).subscribe({
+      next: (r) => {
+        const d = r.data || { candidatos: 0, procesados: 0, saldoAcreditado: 0 };
+        this.huerfanosMsg = `Saneados: ${d.procesados}/${d.candidatos}. Saldo a favor generado: S/ ${Number(d.saldoAcreditado || 0).toFixed(2)}.`;
+        this.loadingSaldoFavor = false;
+        this.cargarCreditos();
+        this.cargarResumenCreditos();
+        this.cargarSaldosFavor();
+        iziToast.success({ title: 'Saneamiento', message: this.huerfanosMsg, position: 'topRight' });
+      },
+      error: (err) => {
+        this.loadingSaldoFavor = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo sanear.',
+          position: 'topRight'
+        });
+      }
     });
   }
 

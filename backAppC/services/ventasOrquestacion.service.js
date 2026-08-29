@@ -350,7 +350,8 @@ exports.postCobrarVentaAgrupada = async (pool, user, idVentaAgrupada, body) => {
         compVenta: v.compVenta,
         total: v.total,
         idSucursal: v.idSucursal,
-        fEmision: v.fEmision
+        fEmision: v.fEmision,
+        idCliente: v.idCliente
       })),
       detallePago,
       idEmpresaCobradora: user.empresa,
@@ -436,7 +437,25 @@ exports.postCobrarVenta = async (pool, user, idVenta, body) => {
     }
     const esCotizacion = (venta.codigoComprobante || '').trim().toUpperCase() === 'CT';
     const idsCredito = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
-    const detalleCaja = detalleNorm.filter((p) => !idsCredito.has(Number(p.idMediosPago)));
+    const saldoFavorClienteService = require('./saldoFavorCliente.service');
+    const idsSaf = await saldoFavorClienteService.idsMediosPagoSaldoFavor(transaction);
+    if (idsSaf.size > 0 && venta.idCliente != null) {
+      await saldoFavorClienteService.aplicarSaldoFavorDesdeDetallePago(transaction, {
+        ventasEmpresa: [
+          {
+            idEmpresa: user.empresa,
+            idVenta,
+            idCliente: venta.idCliente,
+            compVenta: venta.compVenta,
+            total: Number(venta.total) || 0
+          }
+        ],
+        detallePago: detalleNorm,
+        userSub: user.sub
+      });
+    }
+    const idsSinCaja = new Set([...idsCredito, ...idsSaf]);
+    const detalleCaja = detalleNorm.filter((p) => !idsSinCaja.has(Number(p.idMediosPago)));
     if (idAperturaActual && !esCotizacion && detalleCaja.length > 0) {
       await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
         idApertura: idAperturaActual,

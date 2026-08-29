@@ -14,7 +14,7 @@ export const routes: Routes = [
     {
       path: 'publico',
       loadComponent: loadHomePublic,
-      title: 'EFAFERP | Facturación SUNAT e inventario para ferreterías'
+      title: 'EFAFERP | Controla ventas, stock y créditos de tu negocio'
     },
 
     {
@@ -22,7 +22,7 @@ export const routes: Routes = [
       pathMatch: 'full',
       loadComponent: () =>
         import('./components/public/root-redirect/root-redirect.component').then((m) => m.RootRedirectComponent),
-      title: 'EFAFERP | Facturación SUNAT e inventario para ferreterías'
+      title: 'EFAFERP | Controla ventas, stock y créditos de tu negocio'
     },
 
     {

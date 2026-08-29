@@ -86,6 +86,29 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
   const reparto = repartirDetallePagoEntreComprobantes(lineasVenta, detalleNorm);
 
   const idsCredito = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+  const saldoFavorClienteService = require('./saldoFavorCliente.service');
+  const idsSaf = await saldoFavorClienteService.idsMediosPagoSaldoFavor(transaction);
+  const idsSinCaja = new Set([...idsCredito, ...idsSaf]);
+
+  // Descontar ledger de saldo a favor antes de caja (misma transacción).
+  if (idsSaf.size > 0) {
+    const ventasConCliente = lineasVenta
+      .map((l) => ({
+        idEmpresa: l.idEmpresa,
+        idVenta: l.idVenta,
+        idCliente: l.idCliente,
+        compVenta: l.compVenta,
+        total: l.total
+      }))
+      .filter((v) => v.idCliente != null);
+    if (ventasConCliente.length) {
+      await saldoFavorClienteService.aplicarSaldoFavorDesdeDetallePago(transaction, {
+        ventasEmpresa: ventasConCliente,
+        detallePago: detalleNorm,
+        userSub: idUsuario
+      });
+    }
+  }
 
   const conceptoBase = compVentaVA && String(compVentaVA).trim() ? String(compVentaVA).trim() : 'S/N';
   const conceptoVa = `Cobro VA ${conceptoBase}`;
@@ -93,7 +116,7 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
   for (const linea of reparto) {
     await ventasRepository.insertarDetallePagoVenta(transaction, linea.idVenta, linea.detallePago);
 
-    const detalleCaja = (linea.detallePago || []).filter((p) => !idsCredito.has(Number(p.idMediosPago)));
+    const detalleCaja = (linea.detallePago || []).filter((p) => !idsSinCaja.has(Number(p.idMediosPago)));
     const montoCaja = round2(detalleCaja.reduce((s, p) => s + (Number(p.monto) || 0), 0));
     if (montoCaja <= 0.001) {
       continue;
@@ -108,7 +131,7 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
     if (!apInfo || !apInfo.idApertura) {
       throw new Error(
         `No hay caja abierta para registrar cobros al contado del comprobante ${linea.compVenta || linea.idVenta}. ` +
-          'El importe en crédito no ingresa a caja; abra caja si la venta incluye efectivo u otros medios.'
+          'El importe en crédito o saldo a favor no ingresa a caja; abra caja si la venta incluye efectivo u otros medios.'
       );
     }
 

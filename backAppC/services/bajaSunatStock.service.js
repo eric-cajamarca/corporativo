@@ -102,6 +102,29 @@ exports.aplicarStockPorComunicacionBajaAceptadaSiCorresponde = async (
         });
       }
     }
+
+    // CxC del comprobante dado de baja: anular deuda; cobros → saldo a favor.
+    try {
+      const saldoFavorClienteService = require("./saldoFavorCliente.service");
+      await saldoFavorClienteService.cerrarCreditosDeVenta(transaction, {
+        idEmpresa: cab.idEmpresa,
+        idVenta: cab.idVenta,
+        origen: "BAJA",
+        compVenta: cab.compVenta,
+        idUsuario: cab.idUsuario || idUsuarioEjecutor
+      });
+      await transaction
+        .request()
+        .input("idVenta", sql.Int, cab.idVenta)
+        .input("idEmpresa", sql.UniqueIdentifier, cab.idEmpresa)
+        .query(`
+          UPDATE Ventas SET eliminado = 1
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND ISNULL(eliminado, 0) = 0
+        `);
+    } catch (errBajaCred) {
+      console.error("contexto: bajaSunatStock cierre créditos/saldo a favor", errBajaCred.message || errBajaCred);
+      throw errBajaCred;
+    }
     return;
   }
 

@@ -2706,6 +2706,7 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
         ), 0)
       ) AS saldoPendiente,
       v.idEstadoPago,
+      v.idCliente,
       cl.rSocial AS clienteRazonSocial,
       cl.ruc AS clienteRuc
     FROM Ventas v
@@ -2809,6 +2810,22 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecut
         UPDATE Ventas SET eliminado = 1 WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
       `);
 
+    // CxC: anular deuda; cobros previos → saldo a favor del cliente.
+    let cierreCredito = { cerrados: 0, saldoAcreditado: 0, detalles: [] };
+    try {
+      const saldoFavorClienteService = require('../services/saldoFavorCliente.service');
+      cierreCredito = await saldoFavorClienteService.cerrarCreditosDeVenta(transaction, {
+        idEmpresa,
+        idVenta,
+        origen: 'ANULACION',
+        compVenta: venta.compVenta,
+        idUsuario: idUsuarioEjecutor || venta.idUsuario
+      });
+    } catch (errCred) {
+      console.error('contexto: anularVentaRepo cierre créditos/saldo a favor', errCred.message || errCred);
+      throw errCred;
+    }
+
     const idVentaAgrupada = venta.idVentaAgrupada;
     if (idVentaAgrupada) {
       await transaction
@@ -2837,7 +2854,15 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecut
     }
 
     await transaction.commit();
-    return { ok: true, compVenta: venta.compVenta || null, idVentaAgrupada: idVentaAgrupada || null };
+    return {
+      ok: true,
+      compVenta: venta.compVenta || null,
+      idVentaAgrupada: idVentaAgrupada || null,
+      credito: {
+        cerrados: cierreCredito.cerrados || 0,
+        saldoAcreditado: cierreCredito.saldoAcreditado || 0
+      }
+    };
   } catch (err) {
     await transaction.rollback();
     throw err;
@@ -3369,6 +3394,7 @@ exports.listarPendientesPagoAgrupado = async (pool, idEmpresaCobradora, filtros 
       CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
       va.total,
       va.idEstadoPago,
+      va.idCliente,
       cl.rSocial AS clienteRazonSocial,
       cl.ruc AS clienteRuc,
       va.compVenta,

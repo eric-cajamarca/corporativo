@@ -685,7 +685,19 @@ const anularVenta = async (req, res) => {
       return res.status(400).json({ error: result.error || 'No se pudo anular' });
     }
     auditoriaOperaciones.auditarVenta(req, 'ANULAR', idVenta, result.compVenta || null);
-    res.json({ message: 'Comprobante anulado correctamente. El stock ha sido restaurado.' });
+    const credito = result.credito || {};
+    const cerrados = Number(credito.cerrados) || 0;
+    const saldoAcred = Number(credito.saldoAcreditado) || 0;
+    let message = 'Comprobante anulado correctamente. El stock ha sido restaurado.';
+    if (cerrados > 0 && saldoAcred > 0.009) {
+      message += ` Se anuló la deuda a crédito y se generó saldo a favor por S/ ${saldoAcred.toFixed(2)}.`;
+    } else if (cerrados > 0) {
+      message += ' Se anuló la cuenta por cobrar asociada (sin cobros previos).';
+    }
+    res.json({
+      message,
+      credito: { cerrados, saldoAcreditado: saldoAcred }
+    });
   } catch (error) {
     console.error('Error anularVenta:', error);
     res.status(500).json({ error: error.message || 'Error al anular la venta' });

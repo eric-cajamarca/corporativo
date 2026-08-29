@@ -108,7 +108,7 @@ async function obtenerCreditoPorVenta(ctx, idEmpresa, idVenta) {
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("idVenta", sql.Int, idVenta)
     .query(`
-      SELECT TOP 1 idCredito, montoTotal, estado
+      SELECT TOP 1 idCredito, idCliente, montoTotal, estado
       FROM CreditosClientes
       WHERE idEmpresa = @idEmpresa AND idVenta = @idVenta AND estado = 'ACTIVO'
       ORDER BY fechaCredito DESC
@@ -344,7 +344,57 @@ exports.aplicarCobranzaPorNotaCreditoSiCorresponde = async (
   const fechaPagoSql = resolveFechaHoraClienteSql(cab.fEmision);
 
   if (credito) {
+    const saldoFavorClienteService = require("./saldoFavorCliente.service");
+    const saldoFavorRepo = require("../repositories/saldoFavorCliente.repository");
+    const resumenPre = await saldoFavorRepo.resumenCobrosCredito(ctx, idEmpresa, credito.idCredito);
+    const cobradoRealAntes = resumenPre.totalPagado;
+
     const { abonado } = await abonarCuotasCredito(ctx, idEmpresa, credito.idCredito, montoNc, fechaPagoSql);
+
+    // Exceso de NC sobre cuotas pendientes → saldo a favor.
+    const exceso = await saldoFavorClienteService.acreditarExcesoNotaCredito(ctx, {
+      idEmpresa,
+      idCliente: credito.idCliente != null ? credito.idCliente : null,
+      idVentaOrigen: origen.idVenta,
+      idCredito: credito.idCredito,
+      montoNc,
+      montoAbonadoCuotas: abonado,
+      compNc: cab.compVenta,
+      idUsuario: cab.idUsuario || idUsuarioEjecutor
+    });
+
+    // Si ya no queda saldo pendiente: cerrar crédito y pasar cobros reales a saldo a favor.
+    const resumenPost = await saldoFavorRepo.resumenCobrosCredito(ctx, idEmpresa, credito.idCredito);
+    let saldoCobradoAFavor = 0;
+    if (resumenPost.saldoPendiente <= 0.02 && cobradoRealAntes > 0.009) {
+      // Obtener idCliente del crédito
+      const crRow = await ctx
+        .request()
+        .input("idCredito", sql.UniqueIdentifier, credito.idCredito)
+        .query(`SELECT idCliente FROM CreditosClientes WHERE idCredito = @idCredito`);
+      const idClienteCr = (crRow.recordset[0] || {}).idCliente;
+      if (idClienteCr != null) {
+        const acred = await saldoFavorRepo.acreditar(ctx, {
+          idEmpresa,
+          idCliente: idClienteCr,
+          monto: cobradoRealAntes,
+          tipo: "ABONO_NC",
+          referencia: `NC-COB-${String(cab.compVenta || "").slice(0, 35)}`,
+          idVenta: origen.idVenta,
+          idCreditoOrigen: credito.idCredito,
+          motivo: `Cobros previos del crédito trasladados por NC ${cab.compVenta || ""}`,
+          idUsuario: cab.idUsuario || idUsuarioEjecutor
+        });
+        saldoCobradoAFavor = acred.ok && !acred.idempotente ? acred.monto : 0;
+      }
+      await saldoFavorRepo.anularCreditoYCuotasPendientes(
+        ctx,
+        idEmpresa,
+        credito.idCredito,
+        `[NC] ${cab.compVenta || ""}`
+      );
+    }
+
     if (Number(origen.idEstadoPago) === 1) {
       const parcial = await aplicarReduccionPendienteOrigen(
         ctx,
@@ -354,9 +404,20 @@ exports.aplicarCobranzaPorNotaCreditoSiCorresponde = async (
         round2(montoNc - abonado),
         cab.idVenta
       );
-      resultado = { tipo: "CREDITO", abonado, parcial };
+      resultado = {
+        tipo: "CREDITO",
+        abonado,
+        parcial,
+        excesoSaldoFavor: exceso.acreditado || 0,
+        cobrosASaldoFavor: saldoCobradoAFavor
+      };
     } else {
-      resultado = { tipo: "CREDITO", abonado };
+      resultado = {
+        tipo: "CREDITO",
+        abonado,
+        excesoSaldoFavor: exceso.acreditado || 0,
+        cobrosASaldoFavor: saldoCobradoAFavor
+      };
     }
   } else if (Number(origen.idEstadoPago) === 1) {
     resultado = await aplicarReduccionPendienteOrigen(ctx, idEmpresa, origen, compRel, montoNc, cab.idVenta);

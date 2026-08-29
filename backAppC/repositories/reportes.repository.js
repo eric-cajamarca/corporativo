@@ -103,7 +103,11 @@ async function obtenerClientesRentabilidad(pool, idEmpresa, fechaInicio, fechaFi
           ISNULL(SUM(cu.saldoPendiente), 0) AS deudaPendiente
         FROM CreditosClientes cc
         INNER JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
+        LEFT JOIN Ventas v ON v.idVenta = cc.idVenta AND v.idEmpresa = cc.idEmpresa
         WHERE cc.idEmpresa = @idEmpresa
+          AND ISNULL(cc.estado, '') = 'ACTIVO'
+          AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+          AND (cc.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
         GROUP BY cc.idCliente
       `);
   } catch (err) {

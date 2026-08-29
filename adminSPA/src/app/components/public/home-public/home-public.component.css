@@ -71,6 +71,185 @@
   color: #fff;
 }
 
+.hero-login-link {
+  display: inline-block;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hero-login-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.btn-hero-primary {
+  background: #fff;
+  color: #1f3b73;
+  font-weight: 700;
+  border: 1px solid #fff;
+}
+
+.btn-hero-primary:hover,
+.btn-hero-primary:focus {
+  background: #e8eefc;
+  color: #1f3b73;
+  border-color: #e8eefc;
+}
+
+.trust-strip {
+  margin-top: -28px;
+  position: relative;
+  z-index: 2;
+  padding: 0 0 8px;
+}
+
+.trust-inner {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+}
+
+.trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 18px;
+  border-right: 1px solid #eef2f7;
+}
+
+.trust-item:last-child {
+  border-right: none;
+}
+
+.trust-item i {
+  color: #4f7cff;
+  font-size: 1.25rem;
+  margin-top: 2px;
+}
+
+.trust-item strong {
+  display: block;
+  font-size: 0.92rem;
+  color: #1f2633;
+}
+
+.trust-item span {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.rubros-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.rubro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(79, 124, 255, 0.1);
+  color: #1f3b73;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.client-logo-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px 14px 16px;
+  text-align: center;
+  min-height: 176px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.client-logo-frame {
+  height: 84px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.client-logo {
+  max-width: 92%;
+  max-height: 80px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.client-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #1f3b73, #4f7cff);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.04em;
+}
+
+.client-logo-card strong {
+  display: block;
+  color: #1f2633;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.client-logo-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+.client-logo-card--dark {
+  background: #111827;
+  border-color: #111827;
+}
+
+.client-logo-card--dark strong {
+  color: #f8fafc;
+}
+
+.client-logo-card--dark span {
+  color: #94a3b8;
+}
+
+.clients-note {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 22px 0 0;
+}
+
 .hero-card {
   background: #fff;
   color: #1f2633;
@@ -190,11 +369,6 @@
   text-decoration: none;
 }
 
-.recurso-card--fiestas:hover {
-  border-color: #dc2626;
-  box-shadow: 0 16px 36px rgba(220, 38, 38, 0.12);
-}
-
 .recurso-tag {
   display: inline-block;
   font-size: 0.72rem;
@@ -209,11 +383,6 @@
   width: fit-content;
 }
 
-.recurso-tag--fiestas {
-  color: #b91c1c;
-  background: rgba(220, 38, 38, 0.1);
-}
-
 .recurso-card h4 {
   font-size: 1.1rem;
   margin-bottom: 8px;
@@ -225,13 +394,6 @@
   line-height: 1.5;
   flex: 1;
   margin-bottom: 0;
-}
-
-@media (min-width: 1200px) {
-  .col-xl {
-    flex: 1 1 0;
-    max-width: 20%;
-  }
 }
 
 /* Miniatura propia (sin iframe idle de YouTube, que deforma el preview) */
@@ -609,6 +771,23 @@
     font-size: 2.1rem;
   }
 
+  .trust-inner {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .trust-item:nth-child(2) {
+    border-right: none;
+  }
+
+  .trust-item:nth-child(1),
+  .trust-item:nth-child(2) {
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .clients-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .support-panel {
     padding: 28px 20px;
   }
@@ -625,5 +804,26 @@
 
   .hero-meta {
     flex-direction: column;
+  }
+
+  .trust-strip {
+    margin-top: -16px;
+  }
+
+  .trust-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-item {
+    border-right: none;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .trust-item:last-child {
+    border-bottom: none;
+  }
+
+  .clients-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }

@@ -3,25 +3,26 @@
     <div class="container">
       <div class="row align-items-center g-4">
         <div class="col-lg-6">
-         
-          <h1>Descubre dónde se va tu dinero y controla tu negocio en días, no en meses</h1>
+          <p class="eyebrow">EFAFERP · para dueños de negocio</p>
+          <h1>Controla tu negocio. No dejes que tu negocio te controle.</h1>
           <p class="lead">
-            <strong>EFAFERP</strong> ayuda a ferreterías, minimarkets y abarrotes a saber si están ganando,
-            cobrar a tiempo, cumplir con SUNAT y dejar de perder plata por inventario desordenado.
+            Ventas, inventario, créditos y facturación electrónica SUNAT en un solo sistema.
+            Para ferreterías, repuestos, pinturas, ropa deportiva y librerías que necesitan
+            saber qué venden, cuánto tienen y cuánto les deben.
           </p>
           <div class="hero-actions">
-            <a class="btn btn-primary btn-lg" routerLink="/planes">Ver planes</a>
-            <a class="btn btn-outline-light btn-lg" routerLink="/login-empresa">Iniciar sesión</a>
+            <a class="btn btn-hero-primary btn-lg" routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">
+              Probar 14 días gratis
+            </a>
             <a class="btn btn-whatsapp-hero btn-lg" [href]="whatsappUrl" target="_blank" rel="noopener">
-              <i class="bi bi-whatsapp" aria-hidden="true"></i> Soporte WhatsApp
+              <i class="bi bi-whatsapp" aria-hidden="true"></i> Hablar por WhatsApp
             </a>
           </div>
+          <a class="hero-login-link" routerLink="/login-empresa">Ya tengo cuenta · Iniciar sesión</a>
           <div class="hero-meta">
+            <span><i class="bi bi-credit-card-2-front"></i> Sin tarjeta para empezar</span>
             <span><i class="bi bi-shield-check"></i> Datos seguros</span>
             <span><i class="bi bi-cloud-check"></i> Acceso desde cualquier lugar</span>
-            <a class="hero-meta-link" [href]="whatsappUrl" target="_blank" rel="noopener">
-              <i class="bi bi-whatsapp"></i> WhatsApp {{ whatsappDisplay }}
-            </a>
           </div>
         </div>
         <div class="col-lg-6">
@@ -30,7 +31,7 @@
             <ul>
               <li><i class="fas fa-check-circle"></i> Saber si tu negocio está ganando dinero hoy</li>
               <li><i class="fas fa-check-circle"></i> Controlar inventario y detectar pérdidas</li>
-              <li><i class="fas fa-check-circle"></i> Facturar electrónicamente sin complicarte con SUNAT</li>
+              <li><i class="fas fa-check-circle"></i> Facturar electrónicamente, con SUNAT incluida</li>
               <li><i class="fas fa-check-circle"></i> Conocer cuánto te deben y cobrar más rápido</li>
               <li><i class="fas fa-check-circle"></i> Tomar decisiones con información real, desde el celular</li>
             </ul>
@@ -40,7 +41,83 @@
     </div>
   </section>
 
+  <section class="trust-strip">
+    <div class="container">
+      <div class="trust-inner">
+        <div class="trust-item">
+          <i class="bi bi-shop"></i>
+          <div>
+            <strong>Hecho para tu rubro</strong>
+            <span>Ferreterías, repuestos, pinturas, ropa y librerías</span>
+          </div>
+        </div>
+        <div class="trust-item">
+          <i class="bi bi-calendar-check"></i>
+          <div>
+            <strong>14 días gratis</strong>
+            <span>Sin tarjeta para empezar</span>
+          </div>
+        </div>
+        <div class="trust-item">
+          <i class="bi bi-whatsapp"></i>
+          <div>
+            <strong>Te configuramos SUNAT</strong>
+            <span>Acompañamiento por WhatsApp</span>
+          </div>
+        </div>
+        <div class="trust-item">
+          <i class="bi bi-building"></i>
+          <div>
+            <strong>Empresa real</strong>
+            <span>RUC 20614636930 · Jaén, Perú</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="section section-light">
+    <div class="container">
+      <div class="section-header">
+        <h2>Negocios que ya controlan con EFAFERP</h2>
+        <p>Ferreterías, repuestos y agroferretería que ya controlan su negocio con EFAFERP.</p>
+      </div>
+      <div class="rubros-row">
+        @for (rubro of rubros; track rubro.nombre) {
+          <span class="rubro-chip">
+            <i [class]="rubro.icono" aria-hidden="true"></i>
+            {{ rubro.nombre }}
+          </span>
+        }
+      </div>
+      <div class="clients-grid">
+        @for (cli of clientes; track cli.nombre) {
+          @if (logoClienteVisible(cli)) {
+            <article class="client-logo-card" [class.client-logo-card--dark]="cli.fondoOscuro">
+              <div class="client-logo-frame">
+                @if (cli.logo) {
+                  <img
+                    class="client-logo"
+                    [src]="cli.logo"
+                    [alt]="'Logo de ' + cli.nombre"
+                    (error)="ocultarClienteSinLogo(cli)" />
+                } @else {
+                  <span class="client-mark" aria-hidden="true">{{ cli.iniciales }}</span>
+                }
+              </div>
+              <strong>{{ cli.nombre }}</strong>
+              <span>{{ cli.rubro }}</span>
+            </article>
+          }
+        }
+      </div>
+      <p class="clients-note">
+        Estos son algunos de los negocios que ya usan EFAFERP. También pinturas, librerías y ropa deportiva.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
     <div class="container">
       <div class="section-header">
         <h2>Los problemas que resolvemos</h2>
@@ -93,22 +170,21 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section-light">
     <div class="container">
       <div class="section-header">
         <h2>Guías gratuitas para tu negocio</h2>
-        <p>Consejos prácticos para dueños de ferreterías, minimarkets y abarrotes. EFAFERP aparece como herramienta, no como protagonista.</p>
+        <p>Consejos prácticos para dueños de ferreterías, repuestos, pinturas, ropa deportiva y librerías.</p>
       </div>
       <div class="row g-4">
         @for (recurso of recursos; track recurso.slug) {
-          <div class="col-md-6 col-lg-4 col-xl">
+          <div class="col-md-6 col-lg-3">
             <a
               class="recurso-card"
-              [class.recurso-card--fiestas]="recurso.slug === 'fiestas-patrias'"
               [href]="recurso.url"
               target="_blank"
               rel="noopener">
-              <span class="recurso-tag" [class.recurso-tag--fiestas]="recurso.slug === 'fiestas-patrias'">{{ recurso.tag }}</span>
+              <span class="recurso-tag">{{ recurso.tag }}</span>
               <h4>{{ recurso.titulo }}</h4>
               <p>{{ recurso.descripcion }}</p>
             </a>
@@ -118,7 +194,7 @@
     </div>
   </section>
 
-  <section class="section section-light">
+  <section class="section">
     <div class="container">
       <div class="section-header">
         <h2>Planes disponibles</h2>
@@ -171,7 +247,7 @@
             <div class="testimonial-card">
               <p class="testimonial-quote">“{{ ref.comentario }}”</p>
               <p class="testimonial-name">{{ ref.nombre }}</p>
-              <span class="testimonial-business">{{ ref.negocio }}</span>
+              <span class="testimonial-business">{{ ref.negocio }} · {{ ref.rubro }}</span>
             </div>
           </div>
         }
@@ -281,13 +357,15 @@
         <div class="col-lg-8">
           <h2 class="mb-3">Herramientas de nivel empresarial para pequeños negocios</h2>
           <p class="text-muted mb-0">
-            En <strong>BUSINESS SOFT COMPANY S.A.C.</strong> creemos que cualquier pequeño negocio merece
-            herramientas de nivel empresarial. <strong>EFAFERP</strong> es nuestro producto para ayudarte a
-            vender más, controlar mejor y tomar decisiones con información real, sin pagar una fortuna.
+            En <strong>BUSINESS SOFT COMPANY S.A.C.</strong> creemos que ferreterías, repuestos, pinturas,
+            ropa deportiva y librerías merecen herramientas de nivel empresarial. <strong>EFAFERP</strong>
+            te ayuda a vender más, controlar mejor y decidir con información real, sin pagar una fortuna.
           </p>
         </div>
         <div class="col-lg-4 text-lg-end">
-          <a class="btn btn-primary btn-lg" routerLink="/planes">Empezar ahora</a>
+          <a class="btn btn-primary btn-lg" routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">
+            Probar 14 días gratis
+          </a>
         </div>
       </div>
     </div>
@@ -344,8 +422,8 @@
     [href]="whatsappUrl"
     target="_blank"
     rel="noopener"
-    title="Soporte por WhatsApp"
-    [attr.aria-label]="'Escribir por WhatsApp al ' + whatsappDisplay">
+    title="Hablar por WhatsApp"
+    [attr.aria-label]="'Hablar por WhatsApp al ' + whatsappDisplay">
     <i class="bi bi-whatsapp" aria-hidden="true"></i>
     <span>WhatsApp</span>
   </a>

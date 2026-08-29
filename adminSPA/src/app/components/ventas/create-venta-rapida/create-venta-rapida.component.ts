@@ -18,6 +18,7 @@ import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { Documento } from '../../../interfaces/documento-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
+import { esFormaOMedioSaldoFavor, filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
@@ -1271,7 +1272,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   private cargarDatosAuxiliaresVenta(): void {
   this._documentosService.getFormasPago().subscribe({
     next: (response) => {
-      this.formasPago = response.data || [];
+      this.formasPago = filtrarSinSaldoFavor(response.data || []);
       const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
       if (efectivo) {
         this.formaPagoSeleccionada = { ...efectivo };
@@ -1328,7 +1329,11 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
     this._tablasSunatService.obtener_medios_pago().subscribe(
       (response) => {
-        this.mediosPago = response.data || [];
+        const todos = response.data || [];
+        const saf = todos.find((m: { codigo?: string; descripcion?: string }) => esFormaOMedioSaldoFavor(m));
+        this.idMediosPagoSaldoFavor =
+          saf?.idMediosPago != null ? Number(saf.idMediosPago) : null;
+        this.mediosPago = filtrarSinSaldoFavor(todos);
         if (this.mediosPago.length && !this.ventas.idMediosPago) {
           const contado = this.mediosPago.find((m: any) => (m.codigo || '').toString().trim() === '009');
           this.ventas.idMediosPago = contado ? String(contado.idMediosPago) : String(this.mediosPago[0].idMediosPago);
@@ -2258,6 +2263,7 @@ abrirModalPrecios(item: any) {
             },
             error: () => { this.clienteBuscando = false; }
           });
+          this.cargarSaldoFavorCliente();
           iziToast.success({ title: 'OK', message: 'Cliente encontrado en base de datos.', position: 'topRight' });
         } else {
           this.consultarDocumentoApi(numero, idDoc);
@@ -2326,8 +2332,91 @@ abrirModalPrecios(item: any) {
         },
         error: () => {}
       });
+      this.cargarSaldoFavorCliente();
+    } else {
+      this.saldoFavorCliente = 0;
     }
     this.guardarEstadoProvisional();
+  }
+
+  /** Saldo a favor disponible del cliente seleccionado (ledger AnticiposCliente). */
+  saldoFavorCliente = 0;
+  /** idMediosPago SAF (no se lista en selects; solo para el botón Usar saldo a favor). */
+  private idMediosPagoSaldoFavor: number | null = null;
+
+  private cargarSaldoFavorCliente(): void {
+    const id = this.cliente?.idCliente;
+    if (id == null || id === '' || id === 0) {
+      this.saldoFavorCliente = 0;
+      return;
+    }
+    this.creditosService.obtenerSaldoFavorCliente(id).subscribe({
+      next: (r) => {
+        this.saldoFavorCliente = Math.round((Number(r?.data?.saldo) || 0) * 100) / 100;
+      },
+      error: () => {
+        this.saldoFavorCliente = 0;
+      }
+    });
+  }
+
+  /**
+   * Agrega al detalle de pago el saldo a favor (hasta el pendiente).
+   * No usa el select de formas de pago: va directo con MediosPago SAF.
+   */
+  aplicarSaldoFavorEnPago(): void {
+    const disponible = Math.round((Number(this.saldoFavorCliente) || 0) * 100) / 100;
+    if (disponible <= 0.009) {
+      iziToast.warning({ title: 'Aviso', message: 'El cliente no tiene saldo a favor.', position: 'topRight' });
+      return;
+    }
+    const totalVenta = Math.round((Number(this.ventas.total) || 0) * 100) / 100;
+    const idMedios = this.idMediosPagoSaldoFavor;
+    if (idMedios == null || !Number.isFinite(idMedios)) {
+      iziToast.error({
+        title: 'Error',
+        message: 'No está configurado el medio «Saldo a favor» (código SAF). Ejecute la migración saldo_favor_cliente.sql.',
+        position: 'topRight'
+      });
+      return;
+    }
+    const esFilaSaf = (d: any) =>
+      Number(d.idMediosPago) === idMedios ||
+      String(d.descripcion || '').toLowerCase().includes('saldo a favor');
+    const monto = Math.min(disponible, totalVenta);
+    const existente = this.detallePago.find((d: any) => esFilaSaf(d));
+    if (existente) {
+      existente.monto = monto;
+      existente.idMediosPago = idMedios;
+    } else {
+      this.detallePago.push({
+        item: this.detallePago.length + 1,
+        idFormaPago: null,
+        idMediosPago: idMedios,
+        descripcion: 'Saldo a favor',
+        monto,
+        referencia: 'Saldo a favor'
+      });
+    }
+    const resto = Math.round((totalVenta - monto) * 100) / 100;
+    const otros = this.detallePago.filter((d: any) => !esFilaSaf(d));
+    const saf = this.detallePago.filter((d: any) => esFilaSaf(d));
+    if (resto <= 0.009) {
+      this.detallePago = saf;
+    } else if (otros.length > 0) {
+      otros[0].monto = resto;
+      this.detallePago = [...saf, otros[0]];
+    }
+    this.detallePago.forEach((item: { item: number }, idx: number) => {
+      item.item = idx + 1;
+    });
+    this.actualizarMontoSaldo();
+    this.guardarEstadoProvisional();
+    iziToast.success({
+      title: 'Saldo a favor',
+      message: `Se aplicaron S/ ${monto.toFixed(2)} de saldo a favor.`,
+      position: 'topRight'
+    });
   }
 
   /**
@@ -2393,6 +2482,7 @@ abrirModalPrecios(item: any) {
       },
       error: () => {}
     });
+    this.cargarSaldoFavorCliente();
     this.guardarEstadoProvisional();
   }
 
@@ -2682,6 +2772,7 @@ abrirModalPrecios(item: any) {
 
   /** Al abrir el modal Forma de pago: selecciona Efectivo, fila por defecto con el total (si aplica) y sincroniza resumen. */
   abrirModalPago(): void {
+    this.cargarSaldoFavorCliente();
     const efectivo = this.formasPago.find(
       (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
     );
@@ -3212,7 +3303,9 @@ abrirModalPrecios(item: any) {
   /**
    * PENDIENTE + condición CRÉDITO corriente + sin líneas: envía una línea fiado por el total (CreditosClientes/CuotasCredito).
    */
-  private completarDetallePagoCreditoPendiente(detallePago: { idMediosPago: number; monto: number }[]): void {
+  private completarDetallePagoCreditoPendiente(
+    detallePago: { idMediosPago?: number; idFormaPago?: number; monto: number }[]
+  ): void {
     const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
     if (idEstadoPago !== 1) return;
     if (!this.cabeceraEsCreditoFinanciacion()) return;
@@ -3361,10 +3454,12 @@ abrirModalPrecios(item: any) {
       };
     });
 
-    const detallePago: { idMediosPago: number; monto: number }[] = this.detallePago
+    const detallePago = this.detallePago
       .filter((d: any) => d.monto > 0 && (d.idFormaPago != null || d.idMediosPago != null))
       .map((d: any) => ({
-        idMediosPago: Number(d.idMediosPago ?? d.idFormaPago),
+        idMediosPago: d.idMediosPago != null && d.idMediosPago !== '' ? Number(d.idMediosPago) : undefined,
+        idFormaPago: d.idFormaPago != null && d.idFormaPago !== '' ? Number(d.idFormaPago) : undefined,
+        descripcion: d.descripcion != null ? String(d.descripcion) : undefined,
         monto: Number(d.monto)
       }));
 
@@ -3801,6 +3896,7 @@ abrirModalPrecios(item: any) {
     this.cuotasCreditoPlano = [];
     this.pagaCon = 0;
     this.vuelto = 0;
+    this.saldoFavorCliente = 0;
 
     // Reset modal comprobante (estado pedido y pago según configuración)
     this.ventas = {

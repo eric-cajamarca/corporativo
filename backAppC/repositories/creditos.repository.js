@@ -51,6 +51,8 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
       LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
       LEFT JOIN UsuarioWeb uw ON cc.idUsuarioCredito = uw.idUsuario
       WHERE ${inEmpresa}${condicionCliente}
+        AND ISNULL(cc.estado, '') NOT IN ('ANULADO', 'CANCELADO')
+        AND (v.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
       GROUP BY cc.idEmpresa, cc.idCredito, cc.idCliente, c.rSocial, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
                cc.tasaInteres, cc.estado, cc.observaciones, v.idVenta,
                v.serie, v.numero, uw.nombres, uw.apellidos

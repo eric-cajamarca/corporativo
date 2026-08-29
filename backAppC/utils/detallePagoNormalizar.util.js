@@ -21,6 +21,24 @@ function esDescripcionCreditoCorriente(desc) {
   return d.includes("credito") || d.includes("crédito");
 }
 
+function esDescripcionSaldoFavor(desc) {
+  const d = normDesc(desc);
+  return d.includes("saldo a favor") || d === "saf";
+}
+
+function esMedioSaldoFavor(mp) {
+  if (!mp) return false;
+  const c = String(mp.codigo || "").trim().toUpperCase();
+  return c === "SAF" || esDescripcionSaldoFavor(mp.descripcion);
+}
+
+function idMedioSaldoFavor(mpList) {
+  for (const mp of mpList) {
+    if (esMedioSaldoFavor(mp)) return Number(mp.idMediosPago);
+  }
+  return null;
+}
+
 /**
  * @param {import('mssql').Transaction|import('mssql').ConnectionPool} conn
  * @param {Array<{ idMediosPago?: number, monto: number }>} detallePago
@@ -37,15 +55,9 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
   );
   let rFp;
   try {
-    rFp = await conn.request().query(
-      "SELECT idFormaPago, descripcion FROM FormasPago WHERE ISNULL(activo, 1) = 1"
-    );
+    rFp = await conn.request().query("SELECT idFormaPago, descripcion FROM FormasPago");
   } catch (_) {
-    try {
-      rFp = await conn.request().query("SELECT idFormaPago, descripcion FROM FormasPago");
-    } catch (__) {
-      rFp = { recordset: [] };
-    }
+    rFp = { recordset: [] };
   }
   const fpById = new Map(
     (rFp.recordset || [])
@@ -66,6 +78,10 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
     for (const mp of mpList) {
       if (normDesc(mp.descripcion) === nd) return Number(mp.idMediosPago);
     }
+    if (esDescripcionSaldoFavor(fp.descripcion)) {
+      const safId = idMedioSaldoFavor(mpList);
+      if (safId != null) return safId;
+    }
     if (esDescripcionCreditoCorriente(fp.descripcion)) {
       for (const mp of mpList) {
         const c = String(mp.codigo || "").trim();
@@ -76,26 +92,52 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
     return null;
   };
 
+  const resolverId = (p) => {
+    const rawMp = p.idMediosPago != null && p.idMediosPago !== "" ? Number(p.idMediosPago) : NaN;
+    const rawFp = p.idFormaPago != null && p.idFormaPago !== "" ? Number(p.idFormaPago) : NaN;
+    const descSaf = esDescripcionSaldoFavor(p.descripcion);
+    const mp = Number.isFinite(rawMp) && mpById.has(rawMp) ? mpById.get(rawMp) : null;
+    const fpExpl = Number.isFinite(rawFp) && fpById.has(rawFp) ? fpById.get(rawFp) : null;
+    const fpEnSlotMp = Number.isFinite(rawMp) && fpById.has(rawMp) ? fpById.get(rawMp) : null;
+
+    // Botón «Usar saldo a favor»: no confundir con FormasPago que comparten el mismo ID.
+    if (descSaf) {
+      const safId = idMedioSaldoFavor(mpList);
+      if (safId != null) return safId;
+      if (mp && esMedioSaldoFavor(mp)) return rawMp;
+    }
+
+    // El POS envía idFormaPago (Crédito, Efectivo…). Mapear siempre a MediosPago.
+    if (fpExpl && !esDescripcionSaldoFavor(fpExpl.descripcion)) {
+      const mapped = findMpForForma(fpExpl);
+      if (mapped != null) return mapped;
+    }
+
+    // Legacy: un solo campo idMediosPago que en realidad es idFormaPago.
+    // Si ese número también es el medio SAF, NO tratar la venta a crédito como saldo a favor.
+    if (fpEnSlotMp && mp && esMedioSaldoFavor(mp) && !esDescripcionSaldoFavor(fpEnSlotMp.descripcion) && !descSaf) {
+      const mapped = findMpForForma(fpEnSlotMp);
+      if (mapped != null) return mapped;
+    }
+
+    if (mp) return rawMp;
+
+    if (fpEnSlotMp) {
+      const mapped = findMpForForma(fpEnSlotMp);
+      if (mapped != null) return mapped;
+    }
+    if (fpExpl) {
+      const mapped = findMpForForma(fpExpl);
+      if (mapped != null) return mapped;
+    }
+    return defaultId;
+  };
+
   const out = [];
   for (const p of detallePago || []) {
     const monto = round2(Number(p.monto) || 0);
     if (monto <= 0) continue;
-    const raw = p.idMediosPago != null ? Number(p.idMediosPago) : NaN;
-    let idMediosPago = Number.isFinite(raw) ? raw : null;
-
-    if (idMediosPago != null && mpById.has(idMediosPago)) {
-      out.push({ idMediosPago, monto });
-      continue;
-    }
-    const fp = idMediosPago != null ? fpById.get(idMediosPago) : null;
-    if (fp) {
-      const mapped = findMpForForma(fp);
-      if (mapped != null) {
-        out.push({ idMediosPago: mapped, monto });
-        continue;
-      }
-    }
-    out.push({ idMediosPago: defaultId, monto });
+    out.push({ idMediosPago: resolverId(p), monto });
   }
   return out;
 }
@@ -108,4 +150,5 @@ module.exports = {
   normalizarDetallePagoIdMediosPago,
   normDesc,
   esDescripcionCreditoCorriente,
+  esDescripcionSaldoFavor,
 };

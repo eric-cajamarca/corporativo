@@ -4,6 +4,14 @@ import { global } from './global';
 import { Observable } from 'rxjs';
 import type { ReporteVentasDetalladoData } from '../models/reporte-ventas-detallado.model';
 
+/** Línea de cobro: el POS puede enviar idFormaPago y/o idMediosPago (crédito vs saldo a favor). */
+export interface DetallePagoApiLinea {
+  idMediosPago?: number;
+  idFormaPago?: number;
+  descripcion?: string;
+  monto: number;
+}
+
 export interface VentaCompletaPayload {
   venta: {
     idSucursal: string;
@@ -49,7 +57,7 @@ export interface VentaCompletaPayload {
     descripcion?: string;
     codigo?: string;
   }>;
-  detallePago?: Array<{ idMediosPago: number; monto: number }>;
+  detallePago?: DetallePagoApiLinea[];
   /** Plan de cuotas (factura/boleta a crédito); la suma de montos debe coincidir con el total al crédito en detallePago. */
   cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
   idApertura?: string;
@@ -243,7 +251,7 @@ export class VentasService {
     payload: {
       venta: VentaEdicionPayload;
       detalles: DetalleVentaEdicionPayload[];
-      detallePago?: Array<{ idMediosPago: number; monto: number }>;
+      detallePago?: DetallePagoApiLinea[];
     }
   ): Observable<{ message?: string }> {
     return this._http.put<{ message?: string }>(
@@ -314,7 +322,7 @@ export class VentasService {
   cobrarVentaAgrupada(
     idVentaAgrupada: string,
     body: {
-      detallePago: Array<{ idMediosPago: number; monto: number }>;
+      detallePago: DetallePagoApiLinea[];
       idApertura?: string;
       /** Obligatorio si el cobro incluye factura/boleta con parte al crédito y el backend exige plan de cuotas. */
       cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
@@ -331,7 +339,7 @@ export class VentasService {
   cobrarVenta(
     idVenta: number,
     body: {
-      detallePago: Array<{ idMediosPago: number; monto: number }>;
+      detallePago: DetallePagoApiLinea[];
       idApertura?: string;
       cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
     }
@@ -379,6 +387,7 @@ export interface VentaPendientePagoAgrupada {
   fEmision: string;
   total: number;
   idEstadoPago: number;
+  idCliente?: number | null;
   clienteRazonSocial: string;
   clienteRuc: string;
   compVenta?: string;
@@ -395,6 +404,7 @@ export interface VentaPendientePago {
   fEmision: string;
   total: number;
   idEstadoPago: number;
+  idCliente?: number | null;
   clienteRazonSocial: string;
   clienteRuc: string;
 }

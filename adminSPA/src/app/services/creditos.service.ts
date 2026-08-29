@@ -141,4 +141,49 @@ export class CreditosService {
       params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
+
+  /** Saldo a favor disponible del cliente. */
+  obtenerSaldoFavorCliente(idCliente: string | number, idEmpresaOperacion?: string | null): Observable<{ data: { idCliente: number; saldo: number } }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ data: { idCliente: number; saldo: number } }>(
+      this.url + 'creditos/saldo-favor/cliente/' + encodeURIComponent(String(idCliente).trim()),
+      { headers, withCredentials: true, params: this.paramsConEmpresaOp(idEmpresaOperacion) }
+    );
+  }
+
+  listarMovimientosSaldoFavor(idCliente: string | number, limite = 50, idEmpresaOperacion?: string | null): Observable<{ data: unknown[] }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let params = this.paramsConEmpresaOp(idEmpresaOperacion);
+    params = params.set('limite', String(limite));
+    return this._http.get<{ data: unknown[] }>(
+      this.url + 'creditos/saldo-favor/cliente/' + encodeURIComponent(String(idCliente).trim()) + '/movimientos',
+      { headers, withCredentials: true, params }
+    );
+  }
+
+  listarSaldosFavorEmpresa(idEmpresaOperacion?: string | null): Observable<{ data: Array<{ idCliente: number; cliente: string; saldo: number }> }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ data: Array<{ idCliente: number; cliente: string; saldo: number }> }>(
+      this.url + 'creditos/saldo-favor',
+      { headers, withCredentials: true, params: this.paramsConEmpresaOp(idEmpresaOperacion) }
+    );
+  }
+
+  diagnosticarCreditosHuerfanos(idEmpresaOperacion?: string | null): Observable<{ data: unknown[] }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ data: unknown[] }>(this.url + 'creditos/saldo-favor/huerfanos', {
+      headers,
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
+    });
+  }
+
+  sanearCreditosHuerfanos(idEmpresaOperacion?: string | null): Observable<{ data: { candidatos: number; procesados: number; saldoAcreditado: number }; message?: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.post<{ data: { candidatos: number; procesados: number; saldoAcreditado: number }; message?: string }>(
+      this.url + 'creditos/saldo-favor/huerfanos/sanear',
+      {},
+      { headers, withCredentials: true, params: this.paramsConEmpresaOp(idEmpresaOperacion) }
+    );
+  }
 }

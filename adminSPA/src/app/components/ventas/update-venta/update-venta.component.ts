@@ -504,10 +504,11 @@ export class UpdateVentaComponent implements OnInit {
 
     const detallePagoApi = this.detallePago
       .map((d) => ({
-        idMediosPago: Number(d.idFormaPago),
+        idFormaPago: d.idFormaPago != null ? Number(d.idFormaPago) : undefined,
+        descripcion: d.descripcion != null ? String(d.descripcion) : undefined,
         monto: this.redondear2(Number(d.monto) || 0)
       }))
-      .filter((x) => x.idMediosPago > 0 && x.monto > 0);
+      .filter((x) => (Number(x.idFormaPago) || 0) > 0 && x.monto > 0);
 
     if (detallePagoApi.length === 0) {
       iziToast.warning({

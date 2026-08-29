@@ -6,9 +6,9 @@ import { SaasPublicService } from '../../../services/saas-public.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
 
-const SEO_TITLE = 'EFAFERP | Facturación SUNAT e inventario para ferreterías';
+const SEO_TITLE = 'EFAFERP | Controla ventas, stock y créditos de tu negocio';
 const SEO_DESCRIPTION =
-  'Sistema para ferreterías, minimarkets y abarrotes: facturación electrónica SUNAT, inventario y cobranzas. Te configuramos SUNAT. Jaén y todo el Perú.';
+  'Controla ventas, inventario y créditos en ferreterías, repuestos, pinturas, ropa deportiva y librerías. Facturación electrónica SUNAT incluida. Prueba 14 días gratis.';
 const SEO_URL = 'https://businesssoft.net/';
 
 interface PublicVideo {
@@ -21,7 +21,21 @@ interface PublicVideo {
 interface PublicReferido {
   nombre: string;
   negocio: string;
+  rubro: string;
   comentario: string;
+}
+
+interface ClientePublico {
+  nombre: string;
+  rubro: string;
+  iniciales: string;
+  logo: string | null;
+  fondoOscuro?: boolean;
+}
+
+interface RubroPublico {
+  nombre: string;
+  icono: string;
 }
 
 interface PublicRecurso {
@@ -45,6 +59,8 @@ export class HomePublicComponent implements OnInit {
   readonly errorPlanes = signal<string | null>(null);
 
   videos: PublicVideo[] = [];
+  /** Si el JPEG no carga (archivo borrado), se oculta la tarjeta. */
+  readonly logosOcultos = signal<ReadonlySet<string>>(new Set());
 
   readonly recursos: PublicRecurso[] = [
     {
@@ -74,13 +90,66 @@ export class HomePublicComponent implements OnInit {
       descripcion: 'Reglas simples para cobrar a tiempo y no quedarte sin capital.',
       tag: 'Créditos',
       url: '/flayers/cobranzas.html'
+    }
+  ];
+
+  readonly rubros: RubroPublico[] = [
+    { nombre: 'Ferreterías', icono: 'bi bi-tools' },
+    { nombre: 'Repuestos de motos y carros', icono: 'bi bi-gear-wide-connected' },
+    { nombre: 'Tiendas de pintura', icono: 'bi bi-palette' },
+    { nombre: 'Zapatillas y ropa deportiva', icono: 'bi bi-bag-check' },
+    { nombre: 'Librerías', icono: 'bi bi-book' }
+  ];
+
+  readonly clientes: ClientePublico[] = [
+    {
+      nombre: 'Ferretería Itzel',
+      rubro: 'Ferretería',
+      iniciales: 'FI',
+      logo: 'assets/img/clientes/itzel-ferreteria.jpeg'
     },
     {
-      slug: 'fiestas-patrias',
-      titulo: 'Fiestas Patrias',
-      descripcion: 'Celebra el 28 de julio controlando tu negocio como corresponde.',
-      tag: 'Perú',
-      url: '/flayers/fiestas-patrias.html'
+      nombre: 'Mejia Racing Oil',
+      rubro: 'Repuestos y lubricantes',
+      iniciales: 'MR',
+      logo: 'assets/img/clientes/mejia-racing-repuestos.jpeg'
+    },
+    {
+      nombre: 'Drakko Nutrition',
+      rubro: 'Nutrición',
+      iniciales: 'DN',
+      logo: 'assets/img/clientes/drako-nutrition.jpeg',
+      fondoOscuro: true
+    },
+    {
+      nombre: 'ACU E.I.R.L.',
+      rubro: 'Repuestos de carros',
+      iniciales: 'AC',
+      logo: 'assets/img/clientes/acu-eirl-repuestos.jpeg'
+    },
+    {
+      nombre: 'Ave Fenix San Juan Bautista',
+      rubro: 'Ferretería',
+      iniciales: 'AF',
+      logo: 'assets/img/clientes/san-juan-bautista-ferreteria.jpeg'
+    },
+    {
+      nombre: 'Ocupa Agroferretería',
+      rubro: 'Agroferretería',
+      iniciales: 'OA',
+      logo: 'assets/img/clientes/ocupa-agroferreteria.jpeg'
+    },
+    {
+      nombre: 'Comercializadora Perales',
+      rubro: 'Ferretería',
+      iniciales: 'CP',
+      logo: 'assets/img/clientes/perales-ferreteria.jpeg'
+    },
+    {
+      nombre: 'Shisel & Aron',
+      rubro: 'Ferretería',
+      iniciales: 'SA',
+      logo: 'assets/img/clientes/shisel-y-aron-ferreteria.jpeg'
     }
   ];
 
@@ -88,16 +157,19 @@ export class HomePublicComponent implements OnInit {
     {
       nombre: 'Nelver Q.',
       negocio: 'Ferretería Itzel',
+      rubro: 'Ferretería',
       comentario: 'En una semana ya teníamos todo el stock ordenado y ventas claras.'
     },
     {
       nombre: 'Lucila T.',
-      negocio: 'Ferretería San Juan',
+      negocio: 'Ave Fenix San Juan Bautista',
+      rubro: 'Ferretería',
       comentario: 'El control por sucursal nos ayudó a reducir pérdidas y tiempos.'
     },
     {
       nombre: 'Yeisi F.',
       negocio: 'Minimarket Fernandez',
+      rubro: 'Minimarket',
       comentario: 'El sistema es simple de usar y el soporte responde rápido.'
     }
   ];
@@ -108,7 +180,7 @@ export class HomePublicComponent implements OnInit {
   readonly whatsappUrl =
     'https://wa.me/51993289440?text=' +
     encodeURIComponent(
-      'Hola, quiero información sobre EFAFERP y el acompañamiento para configurar SUNAT.'
+      'Hola, quiero ver si EFAFERP me sirve. Tengo un negocio (ferretería, repuestos, pinturas, ropa deportiva o librería).'
     );
 
   constructor(
@@ -126,6 +198,14 @@ export class HomePublicComponent implements OnInit {
       this.crearVideo('vNkwHwWK3Hw', 'Gestión de cajas')
     ];
     this.cargarPlanes();
+  }
+
+  logoClienteVisible(cli: ClientePublico): boolean {
+    return !this.logosOcultos().has(cli.nombre);
+  }
+
+  ocultarClienteSinLogo(cli: ClientePublico): void {
+    this.logosOcultos.update((prev) => new Set(prev).add(cli.nombre));
   }
 
   miniaturaUrl(videoId: string): string {
@@ -151,7 +231,7 @@ export class HomePublicComponent implements OnInit {
     this.meta.updateTag({ property: 'og:title', content: SEO_TITLE });
     this.meta.updateTag({ property: 'og:description', content: SEO_DESCRIPTION });
     this.meta.updateTag({ property: 'og:image', content: `${SEO_URL}assets/img/logo-efaferp.png` });
-    this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
     this.meta.updateTag({ name: 'twitter:title', content: SEO_TITLE });
     this.meta.updateTag({ name: 'twitter:description', content: SEO_DESCRIPTION });
   }

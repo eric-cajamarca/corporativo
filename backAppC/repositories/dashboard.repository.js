@@ -273,6 +273,8 @@ exports.obtenerResumenDashboardRepo = async (
       WHERE cu.idEmpresa = @idEmpresa
         AND cu.estado IN ('PENDIENTE', 'VENCIDO')
         AND cu.saldoPendiente > 0
+        AND ISNULL(cc.estado, '') = 'ACTIVO'
+        AND (v.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
       ORDER BY cu.fechaVencimiento ASC
     `);
   } catch (err) {

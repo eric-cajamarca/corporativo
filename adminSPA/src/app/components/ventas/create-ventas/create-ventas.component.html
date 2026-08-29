@@ -623,6 +623,17 @@
           <i class="bi bi-list-check me-2"></i>Detalle de pago
         </h6>
 
+        @if (saldoFavorCliente > 0.009) {
+          <div class="alert alert-info py-2 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <span class="small mb-0">
+              Saldo a favor del cliente: <strong>S/ {{ saldoFavorCliente | number:'1.2-2' }}</strong>
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="aplicarSaldoFavorEnPago()">
+              Usar saldo a favor
+            </button>
+          </div>
+        }
+
         <div class="row g-2 mb-4 align-items-end">
           <div class="col-md-4">
             <label class="form-label small">

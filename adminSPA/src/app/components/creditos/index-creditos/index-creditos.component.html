@@ -38,6 +38,45 @@
           </div>
         </div>
 
+        <div class="border rounded p-2 mb-3 bg-light">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <strong class="small mb-0">Saldos a favor de clientes</strong>
+            <div class="d-flex gap-1 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cargarSaldosFavor()" [disabled]="loadingSaldoFavor">
+                Actualizar
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-warning" (click)="diagnosticarHuerfanos()" [disabled]="loadingSaldoFavor" title="Créditos de comprobantes anulados que aún figuran">
+                Ver huérfanos
+              </button>
+              <button type="button" class="btn btn-sm btn-warning" (click)="sanearHuerfanos()" [disabled]="loadingSaldoFavor" title="Anula deudas huérfanas y pasa cobros a saldo a favor">
+                Sanear huérfanos
+              </button>
+            </div>
+          </div>
+          <p class="small text-muted mb-2 mb-0" *ngIf="!saldosFavor.length && !loadingSaldoFavor">No hay clientes con saldo a favor.</p>
+          <div class="table-responsive" *ngIf="saldosFavor.length">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th class="text-end">Saldo a favor</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let s of saldosFavor">
+                  <td>{{ s.cliente || ('#' + s.idCliente) }}</td>
+                  <td class="text-end">S/ {{ s.saldo | number:'1.2-2' }}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-link btn-sm py-0" (click)="verMovimientosSaldo(s)">Movimientos</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="small text-muted mt-2" *ngIf="huerfanosMsg">{{ huerfanosMsg }}</div>
+        </div>
+
         <!-- Móvil: el + vive en thead (oculto en cards); se muestra aquí -->
         <div class="d-lg-none d-flex align-items-center gap-2 mb-2">
           <button
