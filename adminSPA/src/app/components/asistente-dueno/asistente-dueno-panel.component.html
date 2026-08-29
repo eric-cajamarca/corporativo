@@ -1,0 +1,50 @@
+@if (ui.abierto()) {
+  <aside class="asistente-panel" role="dialog" aria-label="Asistente EFAFERP">
+    <header class="asistente-head">
+      <div>
+        <strong>Asistente EFAFERP</strong>
+        <span>Te guío paso a paso</span>
+      </div>
+      <button type="button" class="asistente-close" (click)="ui.cerrar()" aria-label="Cerrar asistente">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    @if (!configurado) {
+      <p class="asistente-aviso">
+        El servidor no tiene <code>GEMINI_API_KEY</code>. Péguela en el <code>.env</code> del backend y reinicie la API.
+      </p>
+    }
+
+    <div class="asistente-msgs" #listaMensajes>
+      @for (m of mensajes; track $index) {
+        <div class="asistente-burbuja" [class.asistente-burbuja--user]="m.role === 'user'">
+          <p>{{ textoVisible(m.text) }}</p>
+          @if (m.role === 'model') {
+            <div class="asistente-links">
+              @for (en of extraerEnlaces(m.text); track en.ruta) {
+                <button type="button" class="asistente-link" (click)="irA(en.ruta)">{{ en.etiqueta }}</button>
+              }
+            </div>
+          }
+        </div>
+      }
+      @if (enviando) {
+        <p class="asistente-typing">Escribiendo…</p>
+      }
+      @if (error) {
+        <p class="asistente-error">{{ error }}</p>
+      }
+    </div>
+
+    <form class="asistente-form" [formGroup]="form" (ngSubmit)="enviar()">
+      <input
+        type="text"
+        formControlName="mensaje"
+        maxlength="2000"
+        placeholder="Ej. Cómo cargo el certificado SUNAT"
+        autocomplete="off" />
+      <button type="submit" [disabled]="enviando || form.invalid">Enviar</button>
+    </form>
+  </aside>
+}

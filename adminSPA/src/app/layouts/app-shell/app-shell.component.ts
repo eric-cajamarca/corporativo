@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SidebarComponent } from '../../components/sidebar/sidebar.component';
 import { TopnavComponent } from '../../components/topnav/topnav.component';
+import { AsistenteDuenoPanelComponent } from '../../components/asistente-dueno/asistente-dueno-panel.component';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 
 /**
@@ -11,7 +12,7 @@ import { SidebarStateService } from '../../services/sidebar-state.service';
 @Component({
   selector: 'app-layout-shell',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent, TopnavComponent],
+  imports: [RouterOutlet, SidebarComponent, TopnavComponent, AsistenteDuenoPanelComponent],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.css'
 })

@@ -135,6 +135,15 @@
   color: #212529;
 }
 
+.topnav-btn-asistente {
+  color: #4f7cff;
+}
+
+.topnav-btn-asistente:hover {
+  background: #eef2ff;
+  color: #1f3b73;
+}
+
 .topnav-btn-ayuda {
   color: #4f7cff;
 }

@@ -23,6 +23,7 @@ import { NotificacionesService } from '../../services/notificaciones.service';
 import { NotificacionItem } from '../../models/notificacion.model';
 import { EmpresaService } from '../../services/empresa.service';
 import { AyudaTutorialesModalComponent } from './ayuda-tutoriales-modal/ayuda-tutoriales-modal.component';
+import { AsistenteDuenoUiService } from '../../services/asistente-dueno-ui.service';
 
 declare const iziToast: any;
 
@@ -96,7 +97,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
     private consultarPlacaOpener: ConsultarPlacaModalOpenerService,
     private sidebarState: SidebarStateService,
     public notificacionesService: NotificacionesService,
-    private empresaService: EmpresaService
+    private empresaService: EmpresaService,
+    private asistenteUi: AsistenteDuenoUiService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -310,6 +312,10 @@ export class TopnavComponent implements OnInit, OnDestroy {
 
   abrirModalAyuda(): void {
     this.mostrarModalAyuda = true;
+  }
+
+  abrirAsistente(): void {
+    this.asistenteUi.toggle();
   }
 
   /**

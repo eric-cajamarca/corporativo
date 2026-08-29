@@ -1,0 +1,144 @@
+.asistente-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(380px, calc(100vw - 24px));
+  height: min(560px, calc(100vh - 88px));
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  z-index: 1080;
+  overflow: hidden;
+}
+
+.asistente-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 12px;
+  background: linear-gradient(135deg, #1f3b73, #4f7cff);
+  color: #fff;
+}
+
+.asistente-head strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.asistente-head span {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.asistente-close {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.1rem;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.asistente-aviso {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.asistente-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.asistente-burbuja {
+  max-width: 92%;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px 12px 12px 4px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
+.asistente-burbuja--user {
+  margin-left: auto;
+  background: #1f3b73;
+  color: #fff;
+  border-color: #1f3b73;
+  border-radius: 12px 12px 4px 12px;
+}
+
+.asistente-burbuja p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.asistente-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.asistente-link {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.asistente-typing,
+.asistente-error {
+  font-size: 0.8rem;
+  margin: 0 0 8px;
+}
+
+.asistente-error {
+  color: #b91c1c;
+}
+
+.asistente-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.asistente-form input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+}
+
+.asistente-form button {
+  border: 0;
+  border-radius: 10px;
+  background: #1f3b73;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.asistente-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

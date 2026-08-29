@@ -47,6 +47,7 @@ const factilizaRoutes = require('./routes/factiliza');
 const vehiculosRoutes = require('./routes/vehiculos');
 const whatsappRoutes = require('./routes/whatsapp');
 const whatsappBotRoutes = require('./routes/whatsappBot');
+const asistenteDuenoRoutes = require('./routes/asistenteDueno');
 const productoCompuestoRoutes = require('./routes/productoCompuesto');
 const productoVarianteRoutes = require('./routes/productoVariante');
 const tranferenciaRoutes = require('./routes/transferencia');
@@ -231,6 +232,7 @@ app.use(cors(corsOptions));
 
 // Bot WhatsApp entrante (webhook gateway -> backend, sin JWT; antes de /api/whatsapp)
 app.use('/api/whatsapp-bot', whatsappBotRoutes);
+app.use('/api/asistente-dueno', asistenteDuenoRoutes);
 console.error('context:', JSON.stringify({ level: 'info', message: 'whatsapp_bot_inbound_ready', path: '/api/whatsapp-bot/inbound', port: process.env.PORT || 3000 }));
 
 // Webhooks de pasarelas (sin JWT; firma HMAC / API Culqi). Antes de routers /api con auth global.
