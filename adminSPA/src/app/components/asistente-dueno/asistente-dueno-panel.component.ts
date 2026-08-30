@@ -26,7 +26,7 @@ export class AsistenteDuenoPanelComponent {
   mensajes: AsistenteMensaje[] = [
     {
       role: 'model',
-      text: 'Soy el asistente de EFAFERP. Pregúntame cómo configurar SUNAT, agregar productos o qué te está faltando. Te guiaré paso a paso.'
+      text: 'Soy el asistente de la plataforma. Pregúntame cómo configurar SUNAT, agregar productos o qué te está faltando. Te guiaré paso a paso.'
     }
   ];
   enviando = false;

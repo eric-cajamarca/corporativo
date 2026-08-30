@@ -1,9 +1,9 @@
 @if (ui.abierto()) {
-  <aside class="asistente-panel" role="dialog" aria-label="Asistente EFAFERP">
+  <aside class="asistente-panel" role="dialog" aria-label="Asistente de la plataforma">
     <header class="asistente-head">
       <div>
-        <strong>Asistente EFAFERP</strong>
-        <span>Te guío paso a paso</span>
+        <strong>Asistente de la plataforma</strong>
+        <span>Te guío paso a paso en EFAFERP</span>
       </div>
       <button type="button" class="asistente-close" (click)="ui.cerrar()" aria-label="Cerrar asistente">
         <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -30,7 +30,7 @@
         </div>
       }
       @if (enviando) {
-        <p class="asistente-typing">Escribiendo…</p>
+        <p class="asistente-typing">Pensando…</p>
       }
       @if (error) {
         <p class="asistente-error">{{ error }}</p>

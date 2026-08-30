@@ -9,22 +9,31 @@ const whatsappBotCotizacion = require('./whatsappBotCotizacion.service');
 const whatsappBotPedidos = require('./whatsappBotPedidos.service');
 const whatsappBotIdentidad = require('./whatsappBotIdentidad.service');
 const whatsappBotEscalamiento = require('./whatsappBotEscalamiento.service');
+const whatsappBotComercial = require('./whatsappBotComercial.service');
 const whatsappBotLogRepository = require('../repositories/whatsappBotLog.repository');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
+const { trace } = require('../utils/whatsappBotTrace.util');
 
 const TEXTO_MENU_BASE = [
   '*Menú*',
   '1. Mis pedidos',
   '2. Mi deuda',
   '3. Buscar producto',
-  '4. Cotizar (por texto y recibir PDF)',
+  '4. Hacer un pedido',
   '',
-  'También puedes escribir el nombre del producto o *COTIZAR*.',
+  'También puedes escribir el nombre del producto, *COTIZAR* o *CONFIRMAR* para pedir.',
   'Pregúntame: *QUIÉN ERES* | *QUÉ VENDES* | *QUÉ PRODUCTOS VENDES* | *DIRECCIÓN* | *CONTACTO*'
 ].join('\n');
 
 const TEXTO_PING = '¡Aquí estoy! Todo en orden. ¿En qué te puedo ayudar?';
+
+function textoMenu(esPrincipal) {
+  if (esPrincipal) {
+    return whatsappBotComercial.textoMenu(TEXTO_MENU_BASE);
+  }
+  return TEXTO_MENU_BASE;
+}
 
 function formatearProducto(p, idx) {
   const n = idx != null ? `${idx}. ` : '';
@@ -142,22 +151,8 @@ async function buscarYResponder(idEmpresa, terminos, intencion) {
   };
 }
 
-function requiereCliente(config, resCliente) {
-  if (resCliente.encontrado) return null;
-  if (resCliente.ambiguo) {
-    return 'Encontramos más de un cliente con tu número. Por favor contacta a la empresa para actualizar tus datos.';
-  }
-  return config.mensajeNoRegistrado || 'No encontramos tu número registrado.';
-}
-
-/** Bloquea catálogo/precios/stock si el celular no está en Clientes de la empresa. */
-function respuestaSiClienteNoRegistrado(config, resCliente, conv) {
-  const msg = requiereCliente(config, resCliente);
-  if (!msg) return null;
-  return {
-    respuesta: msg,
-    conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] }
-  };
+function clienteIdentificado(resCliente) {
+  return Boolean(resCliente?.encontrado && resCliente?.cliente?.idCliente);
 }
 
 /**
@@ -212,6 +207,18 @@ async function procesarTurno(ctx, precarga = null) {
     precarga?.resCliente ?? (await whatsappBotCliente.resolverCliente(idEmpresa, ctx.digitosCelular));
   const nombreClienteCorto = copy.nombreCorto(resCliente?.cliente?.rSocial);
   const reaccion = copy.reaccionPorIntencion(nlu.intencion);
+  const esPrincipal = await whatsappBotComercial.esEmpresaPrincipal(idEmpresa);
+  trace('2.NLU_BACKEND', {
+    intencion: nlu.intencion,
+    estado: conv.estado,
+    esPrincipal,
+    cliente: resCliente?.encontrado ? 'registrado' : 'no_registrado'
+  });
+  trace('3.CONSULTA_BACKEND', {
+    empresaPrincipal: esPrincipal,
+    convEstado: conv.estado,
+    slotsComercial: Boolean(conv.slots?.comercial)
+  });
 
   // -----------------------------------------------------------------------
   // Fase 3: si la conversacion esta escalada a un humano, el bot guarda
@@ -230,7 +237,7 @@ async function procesarTurno(ctx, precarga = null) {
       } else {
         burbujas.push(copy.pick(copy.VARIANTES.escalamiento.desescaladoManual));
       }
-      burbujas.push(TEXTO_MENU_BASE);
+      burbujas.push(textoMenu(esPrincipal));
       return {
         respuesta: burbujas.filter(Boolean),
         conv: desesc,
@@ -294,15 +301,28 @@ async function procesarTurno(ctx, precarga = null) {
     return cotizacionTurno;
   }
 
+  const comercialTurno = await whatsappBotComercial.intentarProcesar(idEmpresa, conv, nlu, textoEntrada, ctx);
+  if (comercialTurno) {
+    if (!comercialTurno.reaccion && reaccion) comercialTurno.reaccion = reaccion;
+    return comercialTurno;
+  }
+  if (whatsappBotComercial.INTENCIONES.has(nlu.intencion) && !esPrincipal) {
+    return {
+      respuesta: textoMenu(esPrincipal),
+      conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
+      reaccion
+    };
+  }
+
   if (whatsappBotIdentidad.INTENCIONES_IDENTIDAD.has(nlu.intencion)) {
-    if (nlu.intencion === 'productos_destacados') {
-      const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
-      if (bloqueo) {
-        bloqueo.reaccion = reaccion;
-        return bloqueo;
-      }
-    }
     const respuesta = await whatsappBotIdentidad.getRespuesta(idEmpresa, nlu.intencion);
+    if (esPrincipal && nlu.intencion === 'que_vendes') {
+      return {
+        respuesta: [whatsappBotComercial.textoQueVendesPrincipal, respuesta],
+        conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
+        reaccion
+      };
+    }
     return {
       respuesta,
       conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
@@ -320,13 +340,16 @@ async function procesarTurno(ctx, precarga = null) {
   if (nlu.intencion === 'menu' || nlu.intencion === 'hola') {
     if (nlu.intencion === 'hola') {
       const burbujas = [];
-      const saludo = copy.saludoPersonalizado(resCliente?.cliente?.rSocial);
-      burbujas.push(saludo);
+      const nombreEmpresa = await whatsappBotIdentidad.obtenerNombreEmpresa(idEmpresa);
+      burbujas.push(copy.presentacionVendedor(nombreEmpresa, resCliente?.cliente?.rSocial));
       const bienvenida = config.mensajeBienvenida && config.mensajeBienvenida.trim();
-      if (bienvenida && !/menú|menu/i.test(bienvenida)) {
+      if (bienvenida && !/menú|menu/i.test(bienvenida) && !/asistente de ventas/i.test(bienvenida)) {
         burbujas.push(bienvenida);
       }
-      burbujas.push(TEXTO_MENU_BASE);
+      if (esPrincipal) {
+        burbujas.push(whatsappBotComercial.textoHolaExtra);
+      }
+      burbujas.push(textoMenu(esPrincipal));
       return {
         respuesta: burbujas,
         conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
@@ -334,15 +357,13 @@ async function procesarTurno(ctx, precarga = null) {
       };
     }
     return {
-      respuesta: TEXTO_MENU_BASE,
+      respuesta: textoMenu(esPrincipal),
       conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
       reaccion
     };
   }
 
   if (conv.estado === 'eligiendo_candidato' && nlu.intencion === 'seleccion_numero') {
-    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
-    if (bloqueo) return bloqueo;
     const idx = Number(nlu.entidades.numero) - 1;
     const candidatos = conv.candidatos || [];
     if (idx >= 0 && idx < candidatos.length) {
@@ -357,8 +378,13 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (nlu.intencion === 'deuda') {
-    const msg = requiereCliente(config, resCliente);
-    if (msg) return { respuesta: msg, conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    if (!clienteIdentificado(resCliente)) {
+      return {
+        respuesta: ['*Tu deuda*', 'No tienes pedidos pendientes de pago ni créditos activos. ✅'].join('\n'),
+        conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
+        reaccion
+      };
+    }
     const respuesta = await resumenDeuda(idEmpresa, resCliente.cliente.idCliente);
     return {
       respuesta,
@@ -370,11 +396,6 @@ async function procesarTurno(ctx, precarga = null) {
   // aclarar_producto: si hay memoria de la ultima busqueda, reusarla en lugar
   // de pedir al usuario que repita. "¿y el precio?" tras "taladro" funciona.
   if (nlu.intencion === 'aclarar_producto') {
-    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
-    if (bloqueo) {
-      bloqueo.reaccion = '🔍';
-      return bloqueo;
-    }
     const ult = conv.slots?.ultimaBusqueda;
     if (ult && Array.isArray(ult.candidatos) && ult.candidatos.length > 0) {
       const r = await buscarYResponder(idEmpresa, ult.terminos, nlu.intencion === 'aclarar_producto' ? 'precio' : nlu.intencion);
@@ -396,11 +417,6 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (['producto', 'precio', 'stock'].includes(nlu.intencion) && nlu.terminosBusqueda.length > 0) {
-    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
-    if (bloqueo) {
-      bloqueo.reaccion = '🔍';
-      return bloqueo;
-    }
     const r = await buscarYResponder(idEmpresa, nlu.terminosBusqueda, nlu.intencion);
     const slots = conservarMemoria(conv.slots, r.estado, { ultimaBusqueda: r.ultimaBusqueda });
     return {
@@ -411,11 +427,6 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (conv.estado === 'buscando_producto' && nlu.terminosBusqueda.length > 0) {
-    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
-    if (bloqueo) {
-      bloqueo.reaccion = '🔍';
-      return bloqueo;
-    }
     const r = await buscarYResponder(idEmpresa, nlu.terminosBusqueda, 'producto');
     const slots = conservarMemoria(conv.slots, r.estado, { ultimaBusqueda: r.ultimaBusqueda });
     return {

@@ -36,6 +36,11 @@ async function chat(req, res) {
       return res.status(429).json({ message: err.message });
     }
     const msg = err.message || 'No se pudo consultar el asistente.';
+    if (/high demand|try again later|unavailable|429/i.test(msg)) {
+      return res.status(503).json({
+        message: 'Gemini está saturado en este momento. Espere unos segundos e intente de nuevo.'
+      });
+    }
     const status = /Gemini|fetch|network|ECONN/i.test(msg) ? 502 : 400;
     return res.status(status).json({ message: msg });
   }

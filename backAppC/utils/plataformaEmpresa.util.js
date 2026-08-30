@@ -25,3 +25,5 @@ exports.puedeAccesoListadoPlataformaEmpresas = (req) => {
 
   return true;
 };
+
+exports.normalizarGuid = normalizarGuid;

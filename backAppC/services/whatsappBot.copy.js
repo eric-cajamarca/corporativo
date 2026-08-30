@@ -161,14 +161,14 @@ const VARIANTES = {
   carritoVacioAviso: [
     'Tu carrito está vacío.\n\nEscribe el nombre de un producto para agregarlo, o *MENÚ* para volver.',
     'Aún no tienes productos en el carrito. Escribe el nombre de uno para empezar.',
-    'No hay nada en tu carrito todavía. Escribe el producto que quieras cotizar.'
+    'No hay nada en tu carrito todavía. Escribe el producto que quieras pedir.'
   ],
 
-  // Confirmacion final cotizacion (sin numero, lo agrega el caller).
+  // Confirmacion final del pedido (sin numero, lo agrega el caller).
   cotizConfirmacion: [
-    'Listo, registramos tu cotización.',
-    '¡Cotización guardada!',
-    'Perfecto, tu cotización quedó registrada.'
+    'Listo, registramos tu pedido.',
+    '¡Pedido registrado!',
+    'Perfecto, tu pedido quedó registrado.'
   ],
 
   // Cancelacion suave.
@@ -249,6 +249,32 @@ function saludoPersonalizado(rSocial) {
   return nombre
     ? `¡${saludo}, ${nombre}! ${pregunta}`
     : `¡${saludo}! ${pregunta}`;
+}
+
+/**
+ * Primera vez que escribe el cliente: se presenta como vendedor de la empresa.
+ */
+function presentacionVendedor(nombreEmpresa, rSocial) {
+  const saludo = saludoPorHora();
+  const nombre = nombreCorto(rSocial);
+  const hi = nombre ? `¡${saludo}, ${nombre}!` : `¡${saludo}!`;
+  const marca = String(nombreEmpresa || '').trim() || 'la empresa';
+  return [
+    `${hi} Soy el asistente de ventas de *${marca}*.`,
+    'Te ayudo a ver precios, stock y a armar tu pedido por aquí, como si hablaras con la tienda.'
+  ].join('\n');
+}
+
+function respuestaTienePresentacion(respuesta) {
+  const first = Array.isArray(respuesta) ? String(respuesta[0] || '') : String(respuesta || '');
+  return /asistente de ventas/i.test(first);
+}
+
+function prependPresentacion(respuesta, intro) {
+  if (!intro || respuestaTienePresentacion(respuesta)) return respuesta;
+  if (Array.isArray(respuesta)) return [intro, ...respuesta.filter(Boolean)];
+  if (respuesta) return [intro, respuesta];
+  return intro;
 }
 
 /**
@@ -368,6 +394,11 @@ function reaccionPorIntencion(intencion) {
       return '🔍';
     case 'confirmar_cotizacion':
       return '✅';
+    case 'info_sistema':
+    case 'planes_saas':
+    case 'flayer_comercial':
+    case 'soporte_asistente':
+      return '✨';
     case 'identidad':
     case 'que_vendes':
     case 'productos_destacados':
@@ -415,6 +446,8 @@ module.exports = {
   delaySegunLargo,
   delayEntreBurbujas,
   saludoPersonalizado,
+  presentacionVendedor,
+  prependPresentacion,
   adjuntarCierre,
   aplicarTono,
   quitarEmojis,

@@ -111,6 +111,12 @@ async function statusCatalogo(idEmpresa) {
   return withPool((pool) => whatsappBotCatalogoRepository.contarPorEmpresa(pool, idEmpresa));
 }
 
+async function stockPorProductos(idEmpresa, idsProducto) {
+  return withPool((pool) =>
+    whatsappBotCatalogoRepository.obtenerStockPorProductos(pool, idEmpresa, idsProducto)
+  );
+}
+
 function coincideMultipalabra(producto, tokens) {
   const lista = (tokens || []).map((t) => normalizarTexto(t)).filter((t) => t.length >= 1);
   if (!lista.length) return true;
@@ -236,5 +242,6 @@ module.exports = {
   buscar,
   buscarMejorCoincidencia,
   statusCatalogo,
+  stockPorProductos,
   LIMITE_OPCIONES_CHAT
 };

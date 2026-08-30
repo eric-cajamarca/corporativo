@@ -33,14 +33,6 @@ function registrarPdfPedido(idEmpresa, telefonoLog) {
   pdfPedidosPorDia.set(key, (pdfPedidosPorDia.get(key) || 0) + 1);
 }
 
-function requiereCliente(config, resCliente) {
-  if (resCliente.encontrado) return null;
-  if (resCliente.ambiguo) {
-    return 'Encontramos más de un cliente con tu número. Por favor contacta a la empresa para actualizar tus datos.';
-  }
-  return config.mensajeNoRegistrado || 'No encontramos tu número registrado.';
-}
-
 function marcaPago(idEstadoPago) {
   if (idEstadoPago === 1) return 'PENDIENTE PAGO';
   if (idEstadoPago === 3) return 'VENCIDO';
@@ -168,9 +160,11 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   const slots = { ...(conv.slots || {}) };
 
   if (nlu.intencion === 'pedido' && !esEstadoPedido(estado)) {
-    const msg = requiereCliente(config, resCliente);
-    if (msg) {
-      return { respuesta: msg, conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    if (!resCliente?.encontrado || !resCliente?.cliente?.idCliente) {
+      return {
+        respuesta: 'No encontré pedidos recientes a tu nombre.',
+        conv: { estado: 'menu', slots: {}, candidatos: [] }
+      };
     }
     const pedidos = await listarPedidos(idEmpresa, resCliente.cliente.idCliente);
     if (!pedidos.length) {

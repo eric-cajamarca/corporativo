@@ -1,10 +1,11 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { DomSanitizer, Meta, SafeResourceUrl, Title } from '@angular/platform-browser';
 import { SaasPublicService } from '../../../services/saas-public.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
+import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 
 const SEO_TITLE = 'EFAFERP | Controla ventas, stock y créditos de tu negocio';
 const SEO_DESCRIPTION =
@@ -177,11 +178,7 @@ export class HomePublicComponent implements OnInit {
   readonly resumirLimitesPlan = resumirLimitesPlan;
 
   readonly whatsappDisplay = '993 289 440';
-  readonly whatsappUrl =
-    'https://wa.me/51993289440?text=' +
-    encodeURIComponent(
-      'Hola, quiero ver si EFAFERP me sirve. Tengo un negocio (ferretería, repuestos, pinturas, ropa deportiva o librería).'
-    );
+  readonly chatUi = inject(ChatComercialPublicoUiService);
 
   constructor(
     private sanitizer: DomSanitizer,

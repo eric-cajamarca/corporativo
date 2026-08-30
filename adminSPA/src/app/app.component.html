@@ -6,6 +6,7 @@
   <main class="app-content">
     <router-outlet></router-outlet>
   </main>
+  <app-chat-comercial-publico *ngIf="shouldShowPublicChat()" />
   <footer class="app-footer" *ngIf="!shouldHideFooter()">
     <span>Business Soft Company © 2026 - Todos los derechos reservados</span>
     <span class="app-footer-meta">

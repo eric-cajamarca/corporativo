@@ -113,6 +113,29 @@ async function buscarPorTerminos(pool, idEmpresa, terminos, limite = 20) {
   return { totalEncontrados: all.length, items: all.slice(0, limite) };
 }
 
+async function obtenerStockPorProductos(pool, idEmpresa, idsProducto) {
+  const ids = [...new Set((idsProducto || []).filter(Boolean))];
+  const map = new Map();
+  if (!ids.length) return map;
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const placeholders = ids.map((id, i) => {
+    const p = `p${i}`;
+    req.input(p, sql.UniqueIdentifier, id);
+    return `@${p}`;
+  });
+  const r = await req.query(`
+    SELECT l.idProducto,
+           SUM(CONVERT(DECIMAL(18,6), ISNULL(l.cantidadDisponible, 0))) AS stockTotal
+    FROM Lotes l
+    WHERE l.idEmpresa = @idEmpresa AND l.idProducto IN (${placeholders.join(',')})
+    GROUP BY l.idProducto
+  `);
+  for (const row of r.recordset || []) {
+    map.set(String(row.idProducto).toLowerCase(), Number(row.stockTotal) || 0);
+  }
+  return map;
+}
+
 async function listarTodos(pool, idEmpresa) {
   try {
     const r = await pool.request()
@@ -133,5 +156,6 @@ module.exports = {
   reemplazarCatalogo,
   obtenerFilasSync,
   buscarPorTerminos,
+  obtenerStockPorProductos,
   listarTodos
 };

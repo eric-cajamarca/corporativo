@@ -45,7 +45,9 @@ async function diagnosticarEmpresa(pool, idEmpresa) {
     tieneSerieFactura: false,
     tieneSerieBoleta: false,
     modoPrueba: null,
-    envioDirectoSunat: false
+    envioDirectoSunat: false,
+    urlEnvio: '',
+    urlEsBeta: false
   };
   try {
     const r = await pool
@@ -57,21 +59,24 @@ async function diagnosticarEmpresa(pool, idEmpresa) {
           CASE WHEN LTRIM(RTRIM(ISNULL(usuarioSunat, ''))) <> '' THEN 1 ELSE 0 END AS tieneUsuarioSunat,
           CASE WHEN LTRIM(RTRIM(ISNULL(serieFactura, ''))) <> '' THEN 1 ELSE 0 END AS tieneSerieFactura,
           CASE WHEN LTRIM(RTRIM(ISNULL(serieBoleta, ''))) <> '' THEN 1 ELSE 0 END AS tieneSerieBoleta,
-          ISNULL(modoPrueba, 1) AS modoPrueba,
-          ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat
+          ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat,
+          ISNULL(urlEnvio, '') AS urlEnvio
         FROM ConfiguracionFacturacionElectronica
         WHERE idEmpresa = @idEmpresa
       `);
     const row = r.recordset[0];
     if (row) {
+      const urlEnvio = String(row.urlEnvio || '').trim();
+      const urlEsBeta = /e-beta\.sunat|cpfegem-beta/i.test(urlEnvio);
       facturacion = {
         configurada: true,
         tieneCertificado: Number(row.tieneCertificado) === 1,
         tieneUsuarioSunat: Number(row.tieneUsuarioSunat) === 1,
         tieneSerieFactura: Number(row.tieneSerieFactura) === 1,
         tieneSerieBoleta: Number(row.tieneSerieBoleta) === 1,
-        modoPrueba: row.modoPrueba === true || row.modoPrueba === 1,
-        envioDirectoSunat: row.envioDirectoSunat === true || row.envioDirectoSunat === 1
+        envioDirectoSunat: row.envioDirectoSunat === true || row.envioDirectoSunat === 1,
+        urlEnvio,
+        urlEsBeta
       };
     }
   } catch (err) {
@@ -88,7 +93,11 @@ async function diagnosticarEmpresa(pool, idEmpresa) {
     if (!facturacion.tieneUsuarioSunat) problemas.push('Falta el usuario SOL (SUNAT) en Configuración → Facturación.');
     if (!facturacion.tieneSerieFactura) problemas.push('Falta serie de factura.');
     if (!facturacion.tieneSerieBoleta) problemas.push('Falta serie de boleta.');
-    if (facturacion.modoPrueba) problemas.push('El envío SUNAT está en modo prueba (beta).');
+    if (facturacion.urlEsBeta) {
+      problemas.push(
+        'La URL BillService apunta a SUNAT BETA (pruebas). No hay casilla "Modo prueba". Para comprobantes reales cambie el campo URL BillService a https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService y guarde.'
+      );
+    }
   }
   if (comprobantesVenta === 0) problemas.push('No hay comprobantes de venta activos (boleta/factura).');
 

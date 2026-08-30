@@ -5,12 +5,13 @@ import { AuthService } from './services/auth.service';
 import { SidebarStateService } from './services/sidebar-state.service';
 import { ConnectionTimerService } from './services/connection-timer.service';
 import { environment } from '../environments/environment';
+import { ChatComercialPublicoComponent } from './components/public/chat-comercial-publico/chat-comercial-publico.component';
 
 @Component({
-  selector: 'app-root',
-  imports: [CommonModule, RouterOutlet],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+    selector: 'app-root',
+    imports: [CommonModule, RouterOutlet, ChatComercialPublicoComponent],
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.css'
 })
 export class AppComponent {
   title = 'adminSPA';
@@ -44,6 +45,19 @@ export class AppComponent {
       url.includes('/publico') ||
       url.includes('/politicas')
     );
+  }
+
+  shouldShowPublicChat(): boolean {
+    const url = (this.router.url || '').toLowerCase().split('?')[0];
+    if (
+      url.includes('/login') ||
+      url.includes('/crear-empresa') ||
+      url.includes('/suscribirse') ||
+      url.includes('/recuperar')
+    ) {
+      return false;
+    }
+    return url === '/' || url.includes('/publico') || url.includes('/planes') || url.includes('/politicas');
   }
 
   ngOnInit() {

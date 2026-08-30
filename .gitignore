@@ -67,6 +67,13 @@ test_login.js
 # Copias de base de datos accidentales en el repo
 *.bak
 
+# QR / fotos de pago del bot WhatsApp (por empresa)
+backAppC/uploads/formas-pago/
+
+# PNG/JPG de flayers comerciales (el bot los envía si existen)
+backAppC/uploads/flayers-comercial/*
+!backAppC/uploads/flayers-comercial/.gitkeep
+
 # Sistema
 .DS_Store
 Thumbs.db

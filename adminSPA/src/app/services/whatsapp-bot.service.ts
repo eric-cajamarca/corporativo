@@ -68,4 +68,25 @@ export class WhatsappBotService {
       { withCredentials: true }
     );
   }
+
+  subirFormaPago(tipo: 'yape' | 'plin' | 'transferencia', archivo: File): Observable<WhatsappBotApiResponse<{ ok: boolean; formasPagoImagenes: WhatsappBotConfig['formasPagoImagenes'] }>> {
+    const fd = new FormData();
+    fd.append('imagen', archivo);
+    return this.http.post<WhatsappBotApiResponse<{ ok: boolean; formasPagoImagenes: WhatsappBotConfig['formasPagoImagenes'] }>>(
+      `${this.baseUrl}/formas-pago/${tipo}`,
+      fd,
+      { withCredentials: true }
+    );
+  }
+
+  obtenerImagenPago(tipo: 'yape' | 'plin' | 'transferencia'): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/formas-pago/${tipo}`, { withCredentials: true, responseType: 'blob' });
+  }
+
+  eliminarFormaPago(tipo: 'yape' | 'plin' | 'transferencia'): Observable<WhatsappBotApiResponse<{ ok: boolean; formasPagoImagenes: WhatsappBotConfig['formasPagoImagenes'] }>> {
+    return this.http.delete<WhatsappBotApiResponse<{ ok: boolean; formasPagoImagenes: WhatsappBotConfig['formasPagoImagenes'] }>>(
+      `${this.baseUrl}/formas-pago/${tipo}`,
+      { withCredentials: true }
+    );
+  }
 }

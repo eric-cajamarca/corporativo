@@ -119,6 +119,11 @@ async function obtenerNombreProductoEjemplo(idEmpresa) {
   return nombre;
 }
 
+async function obtenerNombreEmpresa(idEmpresa) {
+  const perfil = await cargarPerfil(idEmpresa);
+  return perfil?.nombre || perfil?.razonSocial || 'la empresa';
+}
+
 async function responderIdentidad(idEmpresa) {
   const perfil = await cargarPerfil(idEmpresa);
   const nombre = perfil?.nombre || perfil?.razonSocial || 'nuestra empresa';
@@ -260,6 +265,7 @@ async function getRespuesta(idEmpresa, intencion) {
 module.exports = {
   getRespuesta,
   obtenerNombreProductoEjemplo,
+  obtenerNombreEmpresa,
   INTENCIONES_IDENTIDAD,
   invalidarCache: (idEmpresa) => {
     const p = String(idEmpresa);

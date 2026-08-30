@@ -14,9 +14,9 @@
             <a class="btn btn-hero-primary btn-lg" routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">
               Probar 14 días gratis
             </a>
-            <a class="btn btn-whatsapp-hero btn-lg" [href]="whatsappUrl" target="_blank" rel="noopener">
-              <i class="bi bi-whatsapp" aria-hidden="true"></i> Hablar por WhatsApp
-            </a>
+            <button type="button" class="btn btn-whatsapp-hero btn-lg" (click)="chatUi.abrir()">
+              <i class="bi bi-chat-dots" aria-hidden="true"></i> Hablar con un asesor
+            </button>
           </div>
           <a class="hero-login-link" routerLink="/login-empresa">Ya tengo cuenta · Iniciar sesión</a>
           <div class="hero-meta">
@@ -308,10 +308,10 @@
               Al contratar EFAFERP, un asesor te guía por WhatsApp. No necesitas ser experto en SUNAT:
               te acompañamos en la configuración tributaria hasta que emitas tu primer comprobante.
             </p>
-            <a class="btn btn-whatsapp btn-lg" [href]="whatsappUrl" target="_blank" rel="noopener">
-              <i class="bi bi-whatsapp" aria-hidden="true"></i>
-              Escribir al {{ whatsappDisplay }}
-            </a>
+            <button type="button" class="btn btn-whatsapp btn-lg" (click)="chatUi.abrir('Quiero que un asesor me llame')">
+              <i class="bi bi-telephone" aria-hidden="true"></i>
+              Pedir que te llamemos
+            </button>
             <p class="support-hours">Lunes a viernes, 9:00 a 18:00 · hora de Perú</p>
           </div>
           <div class="col-lg-7">
@@ -383,9 +383,9 @@
             <p><i class="bi bi-building"></i> BUSINESS SOFT COMPANY S.A.C. · RUC 20614636930</p>
             <p>
               <i class="bi bi-whatsapp"></i>
-              <a class="contact-wa" [href]="whatsappUrl" target="_blank" rel="noopener">
-                WhatsApp +51 {{ whatsappDisplay }}
-              </a>
+              <button type="button" class="contact-wa" (click)="chatUi.abrir()">
+                +51 {{ whatsappDisplay }} · chatear aquí
+              </button>
             </p>
             <p><i class="bi bi-envelope"></i> businesssoftperu@gmail.com</p>
             <p><i class="bi bi-geo-alt"></i> PJ. LOS OLIVOS NRO. S/N URB. LOS OLIVOS, CAJAMARCA - JAÉN - JAÉN, Perú</p>
@@ -417,16 +417,6 @@
       </div>
     </div>
   </section>
-  <a
-    class="wa-float"
-    [href]="whatsappUrl"
-    target="_blank"
-    rel="noopener"
-    title="Hablar por WhatsApp"
-    [attr.aria-label]="'Hablar por WhatsApp al ' + whatsappDisplay">
-    <i class="bi bi-whatsapp" aria-hidden="true"></i>
-    <span>WhatsApp</span>
-  </a>
   <a
     class="lr-float"
     routerLink="/politicas/libro-reclamaciones"

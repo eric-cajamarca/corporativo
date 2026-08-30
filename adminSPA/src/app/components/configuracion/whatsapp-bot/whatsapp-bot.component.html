@@ -87,7 +87,7 @@
                 <div class="col-12 col-lg-6">
                   <label class="form-label">Mensaje cliente no registrado</label>
                   <textarea class="form-control" rows="4" formControlName="mensajeNoRegistrado"></textarea>
-                  <div class="form-text">Se muestra al consultar pedidos o deuda sin celular en Clientes.</div>
+                  <div class="form-text">Solo se muestra si el cliente quiere *cotizar* y su celular no está en Clientes.</div>
                 </div>
               </div>
 
@@ -145,8 +145,9 @@
                     autocomplete="tel"
                   />
                   <div class="form-text">
-                    Solo digitos con codigo de pais (ej. Peru 51…). Recibe el aviso cuando un cliente pide hablar con una persona.
-                    Si lo deja vacio, se usa el numero vinculado al bot en <a routerLink="/configuracion/whatsapp">Vincular WhatsApp</a>.
+                    Solo dígitos con código de país (ej. Perú 51…). Recibe el aviso cuando un cliente pide hablar con una persona
+                    y también cuando el bot registra un pedido (recojo/envío y medio de pago).
+                    Si lo deja vacío, se usa el número vinculado al bot en <a routerLink="/configuracion/whatsapp">Vincular WhatsApp</a>.
                   </div>
                   @if (configForm.get('numeroEscalamiento')?.invalid && configForm.get('numeroEscalamiento')?.touched) {
                     <div class="text-danger small mt-1">Use entre 9 y 15 digitos o deje el campo vacio.</div>
@@ -162,6 +163,37 @@
                   <input type="number" class="form-control" id="umbralNoEntiendoEscalar" formControlName="umbralNoEntiendoEscalar" min="0" max="20" />
                   <div class="form-text">Veces seguidas antes de ofrecer asesor (0 = nunca ofrecer).</div>
                 </div>
+              </div>
+
+              <hr class="my-4" />
+              <h6 class="fw-semibold mb-2"><i class="bi bi-qr-code me-2 text-success"></i>Fotos de pago (Yape, Plin, banco)</h6>
+              <p class="form-text mb-3">
+                Cuando el cliente elija ese medio, el bot envía la foto (QR o datos de la cuenta) junto con el pedido.
+                Suba una imagen por medio, de esta empresa.
+              </p>
+              <div class="row g-3 mb-4">
+                @for (fp of formasPagoTipos; track fp.id) {
+                  <div class="col-12 col-md-4">
+                    <div class="border rounded p-3 h-100 bg-light">
+                      <div class="fw-semibold mb-1">{{ fp.etiqueta }}</div>
+                      <div class="form-text mb-2">{{ fp.ayuda }}</div>
+                      @if (formasPagoPreview[fp.id]) {
+                        <img [src]="formasPagoPreview[fp.id]" alt="{{ fp.etiqueta }}" class="img-fluid rounded mb-2" style="max-height: 140px; object-fit: contain;" />
+                      }
+                      <input
+                        class="form-control form-control-sm mb-2"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        [disabled]="!!formasPagoSubiendo[fp.id] || !servicioAutorizado"
+                        (change)="onSeleccionarFormaPago(fp.id, $event)" />
+                      @if (formasPagoImagenes[fp.id]) {
+                        <button type="button" class="btn btn-outline-danger btn-sm" (click)="quitarFormaPago(fp.id)">
+                          Quitar imagen
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
 
               <div class="mt-4">

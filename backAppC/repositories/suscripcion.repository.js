@@ -5,6 +5,14 @@ async function obtenerIdEmpresaPrincipal(pool) {
   return r.recordset[0]?.idEmpresa ?? null;
 }
 
+async function obtenerCelularEmpresa(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT celular FROM Empresas WHERE idEmpresa = @idEmpresa');
+  return r.recordset[0]?.celular ?? null;
+}
+
 async function insertarPagoSuscripcion(pool, row) {
   return pool
     .request()
@@ -23,5 +31,6 @@ async function insertarPagoSuscripcion(pool, row) {
 
 module.exports = {
   obtenerIdEmpresaPrincipal,
+  obtenerCelularEmpresa,
   insertarPagoSuscripcion
 };

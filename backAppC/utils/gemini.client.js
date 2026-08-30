@@ -8,10 +8,35 @@ function resolverApiKey() {
   return a || g;
 }
 
+/** Preventa WhatsApp (empresa principal). Puede ser la misma key u otra. */
+function resolverApiKeyBot() {
+  const b = String(process.env.GEMINI_API_KEY_BOT || '').trim();
+  return b || resolverApiKey();
+}
+
 function modelosCandidatos() {
   const preferido = String(process.env.GEMINI_MODEL || '').trim();
-  const lista = [preferido, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+  const lista = [
+    preferido,
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3.1-flash-lite'
+  ];
   return [...new Set(lista.filter(Boolean))];
+}
+
+function esSaturacionOModeloInvalido(err) {
+  const st = Number(err.status) || 0;
+  const msg = String(err.message || '').toLowerCase();
+  if (st === 404 || st === 429 || st === 503) return true;
+  if (msg.includes('no longer available') || msg.includes('not found') || msg.includes('not supported')) {
+    return true;
+  }
+  if (msg.includes('high demand') || msg.includes('try again later') || msg.includes('unavailable')) {
+    return true;
+  }
+  if (st === 400) return true;
+  return false;
 }
 
 async function postGenerate(model, apiKey, payload) {
@@ -46,10 +71,10 @@ function extraerPartes(data) {
 }
 
 /**
- * @param {{ systemInstruction: string, contents: object[], tools?: object[] }} opts
+ * @param {{ systemInstruction: string, contents: object[], tools?: object[], apiKey?: string, generationConfig?: object }} opts
  */
 async function generateConHerramientas(opts) {
-  const apiKey = resolverApiKey();
+  const apiKey = String(opts.apiKey || resolverApiKey()).trim();
   if (!apiKey) {
     const e = new Error('Asistente no configurado: falta GEMINI_API_KEY en el servidor.');
     e.code = 'GEMINI_NO_CONFIG';
@@ -60,7 +85,8 @@ async function generateConHerramientas(opts) {
     contents: opts.contents,
     generationConfig: {
       temperature: 0.35,
-      maxOutputTokens: 1024
+      maxOutputTokens: 1024,
+      ...(opts.generationConfig || {})
     }
   };
   if (opts.tools && opts.tools.length) {
@@ -74,8 +100,10 @@ async function generateConHerramientas(opts) {
       return { data, model };
     } catch (err) {
       lastErr = err;
-      const st = Number(err.status) || 0;
-      if (st === 404 || st === 400) continue;
+      if (esSaturacionOModeloInvalido(err)) {
+        console.error('gemini.client modelo no disponible, siguiente:', model, err.message);
+        continue;
+      }
       throw err;
     }
   }
@@ -84,6 +112,7 @@ async function generateConHerramientas(opts) {
 
 module.exports = {
   resolverApiKey,
+  resolverApiKeyBot,
   generateConHerramientas,
   extraerPartes
 };

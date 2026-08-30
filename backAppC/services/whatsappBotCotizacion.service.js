@@ -10,25 +10,37 @@ const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
+const whatsappBotEscalamiento = require('./whatsappBotEscalamiento.service');
+const whatsappBotFormasPago = require('./whatsappBotFormasPago.service');
 const { getFechaHoyApp, formatearFechaApp } = require('../utils/fechaDisplay.util');
 
 const MEDIOS_PAGO = {
   1: 'Efectivo',
   2: 'Transferencia bancaria',
-  3: 'Yape / Plin',
-  4: 'Tarjeta',
-  5: 'Otro'
+  3: 'Yape',
+  4: 'Plin',
+  5: 'Tarjeta',
+  6: 'Otro'
 };
 
 const TEXTO_MEDIOS_PAGO = [
-  '*¿Cuál es tu medio de pago preferido?*',
+  '*¿Cómo vas a pagar?*',
   '1. Efectivo',
   '2. Transferencia bancaria',
-  '3. Yape / Plin',
-  '4. Tarjeta',
-  '5. Otro',
+  '3. Yape',
+  '4. Plin',
+  '5. Tarjeta',
+  '6. Otro',
   '',
-  'Responde con el número (1-5) o escribe el medio de pago.'
+  'Responde con el número (1-6).'
+].join('\n');
+
+const TEXTO_ENTREGA = [
+  '*¿Cómo lo recibes?*',
+  '1. Recojo en tienda',
+  '2. Envío a domicilio',
+  '',
+  'Responde *1* o *2*.'
 ].join('\n');
 
 function esEstadoCotizacion(estado) {
@@ -47,8 +59,8 @@ function entrarModoCotizacion(idCliente, mensajeExtra) {
   const burbujas = [];
   if (mensajeExtra) burbujas.push(mensajeExtra);
   burbujas.push([
-    '*Modo cotización* 🛒',
-    'Escríbeme el nombre del producto que quieres agregar al carrito.',
+    '*Pedido por WhatsApp* 🛒',
+    'Escríbeme el nombre del producto que quieres.',
     '',
     'Comandos: *CARRITO* | *CONFIRMAR* | *CANCELAR* | *MENÚ*'
   ].join('\n'));
@@ -62,7 +74,7 @@ function entrarModoCotizacion(idCliente, mensajeExtra) {
   };
 }
 
-async function solicitarRegistroOIniciarCotizacion(resCliente) {
+async function solicitarRegistroOIniciarCotizacion(resCliente, config) {
   if (resCliente.encontrado && !resCliente.ambiguo) {
     return entrarModoCotizacion(resCliente.cliente.idCliente);
   }
@@ -77,8 +89,10 @@ async function solicitarRegistroOIniciarCotizacion(resCliente) {
       conv: { estado: 'registro_documento', slots: {}, candidatos: [] }
     };
   }
+  const aviso = String(config?.mensajeNoRegistrado || '').trim()
+    || 'No encontramos su numero registrado. Contacte a la empresa para registrarse.';
   return {
-    respuesta: whatsappBotRegistroCliente.TEXTO_SOLICITAR_DOCUMENTO,
+    respuesta: [aviso, '', whatsappBotRegistroCliente.TEXTO_SOLICITAR_DOCUMENTO].join('\n'),
     conv: { estado: 'registro_documento', slots: {}, candidatos: [] }
   };
 }
@@ -99,14 +113,20 @@ function formatearCarrito(carrito) {
     `${i + 1}. ${it.descripcion} (${it.codigo}) x${it.cantidad} = ${formatearPrecio(it.total)}`
   );
   return [
-    '*Tu cotización:*',
+    '*Tu pedido:*',
     '',
     ...lineas,
     '',
     `*Total: ${formatearPrecio(totalCarrito(carrito))}*`,
     '',
-    'Comandos: *AGREGAR* otro producto | *QUITAR n* | *CONFIRMAR* | *CANCELAR*'
+    'Comandos: *AGREGAR* otro producto | *QUITAR n* | *CONFIRMAR* para pedir | *CANCELAR*'
   ].join('\n');
+}
+
+function textoPedirCantidad(producto) {
+  const stock = Number(producto.stockTotal);
+  const stockTxt = Number.isFinite(stock) ? `\nStock disponible: ${stock}` : '';
+  return `*${producto.descripcion}*\nPrecio: ${formatearPrecio(producto.precioLista)}${stockTxt}\n\n¿Cuántas unidades deseas?`;
 }
 
 function parseCantidad(texto) {
@@ -125,7 +145,8 @@ function agregarAlCarrito(carrito, producto, cantidad) {
     lista[idx] = {
       ...lista[idx],
       cantidad: nuevaCant,
-      total: Math.round(nuevaCant * pVenta * 100) / 100
+      total: Math.round(nuevaCant * pVenta * 100) / 100,
+      stockTotal: Number(producto.stockTotal ?? lista[idx].stockTotal) || 0
     };
   } else {
     lista.push({
@@ -134,10 +155,19 @@ function agregarAlCarrito(carrito, producto, cantidad) {
       descripcion: producto.descripcion,
       pVenta,
       cantidad,
-      total
+      total,
+      stockTotal: Number(producto.stockTotal) || 0
     });
   }
   return lista;
+}
+
+function lineasSinStock(carrito) {
+  return (carrito || []).filter((it) => {
+    const stock = Number(it.stockTotal);
+    if (!Number.isFinite(stock)) return false;
+    return Number(it.cantidad) > stock + 0.0001;
+  });
 }
 
 function quitarDelCarrito(carrito, indice) {
@@ -153,14 +183,111 @@ function resolverMedioPago(texto, nlu) {
   if (/^\d+$/.test(t)) {
     const n = Number(t);
     if (MEDIOS_PAGO[n]) return MEDIOS_PAGO[n];
+    return null;
   }
   if (/\befectivo\b/.test(t)) return MEDIOS_PAGO[1];
   if (/\btransfer/.test(t)) return MEDIOS_PAGO[2];
-  if (/\byape\b|\bplin\b/.test(t)) return MEDIOS_PAGO[3];
-  if (/\btarjeta\b/.test(t)) return MEDIOS_PAGO[4];
-  if (nlu?.intencion === 'medio_pago_otro') return MEDIOS_PAGO[5];
-  if (t.length >= 3) return texto.trim();
+  if (/\byape\b/.test(t)) return MEDIOS_PAGO[3];
+  if (/\bplin\b/.test(t)) return MEDIOS_PAGO[4];
+  if (/\btarjeta\b/.test(t)) return MEDIOS_PAGO[5];
+  if (/\botro\b/.test(t) || nlu?.intencion === 'medio_pago_otro') return MEDIOS_PAGO[6];
+  if (/\bcredito\b|\bcrédito\b|\bfiado\b/.test(t)) return 'CREDITO';
   return null;
+}
+
+function esPagoCredito(medioPago) {
+  return String(medioPago || '').toUpperCase() === 'CREDITO';
+}
+
+function textoCierreCliente({ serieNumero, total, medioPago, tipoEntrega, conPdf, conQr }) {
+  const entrega = tipoEntrega === 'envio'
+    ? 'Entrega: *envío a domicilio*. Un vendedor te escribirá para coordinar dirección y horario.'
+    : 'Entrega: *recojo en tienda*. El pedido ya está registrado; pasa cuando quieras.';
+  const lineas = [
+    `*Pedido ${serieNumero}*`,
+    `Total: ${formatearPrecio(total)}`,
+    `Pago: ${medioPago}`,
+    entrega
+  ];
+  if (conQr) {
+    lineas.push('Te mando la foto con el QR o los datos para pagar.');
+  } else if (whatsappBotFormasPago.claveDesdeMedioPago(medioPago)) {
+    lineas.push('Un vendedor te enviará el QR o los datos de la cuenta para pagar.');
+  }
+  if (conPdf) {
+    lineas.push('También te envío el PDF con el detalle 📄.');
+  } else {
+    lineas.push('El pedido quedó registrado en el sistema.');
+  }
+  return lineas.join('\n');
+}
+
+async function refrescarStockCarrito(idEmpresa, carrito) {
+  try {
+    const ids = (carrito || []).map((it) => it.idProducto).filter(Boolean);
+    const map = await whatsappBotCatalogo.stockPorProductos(idEmpresa, ids);
+    return (carrito || []).map((it) => {
+      const key = String(it.idProducto || '').toLowerCase();
+      const stock = map.has(key) ? map.get(key) : 0;
+      return { ...it, stockTotal: stock };
+    });
+  } catch (err) {
+    console.error('whatsappBotCotizacion stock:', err.message);
+    return carrito || [];
+  }
+}
+
+function respuestaStockInsuficiente(carrito, faltantes, idCliente) {
+  const det = faltantes
+    .map((it) => `• ${it.descripcion}: pediste ${it.cantidad}, hay ${it.stockTotal}`)
+    .join('\n');
+  return {
+    respuesta: [
+      'No puedo confirmar el pedido: no hay stock suficiente.',
+      det,
+      '',
+      'Quita o baja la cantidad (*QUITAR n*) y vuelve a *CONFIRMAR*.'
+    ].join('\n'),
+    conv: { estado: 'cotiz_activa', slots: { carrito, idCliente }, candidatos: [] }
+  };
+}
+
+function cantidadYaEnCarrito(carrito, idProducto) {
+  const it = (carrito || []).find((x) => String(x.idProducto) === String(idProducto));
+  return Number(it?.cantidad) || 0;
+}
+
+function respuestaSiSuperaStock(prod, cantidadNueva, carrito) {
+  const stock = Number(prod.stockTotal);
+  if (!Number.isFinite(stock)) return null;
+  const ya = cantidadYaEnCarrito(carrito, prod.idProducto);
+  const totalPedida = Math.round((ya + cantidadNueva) * 1000) / 1000;
+  if (totalPedida <= stock + 0.0001) return null;
+  if (stock <= 0) {
+    return `No hay stock de *${prod.descripcion}*. Elige otro producto o escribe *CARRITO*.`;
+  }
+  const queda = Math.max(0, Math.round((stock - ya) * 1000) / 1000);
+  if (queda <= 0) {
+    return `Ya tienes ${ya} de *${prod.descripcion}* en el carrito y solo hay ${stock}.`;
+  }
+  return `Solo hay *${stock}* de *${prod.descripcion}*. Indícame una cantidad menor o igual a ${queda}.`;
+}
+
+async function avisarVendedorPedido(ctx, config, resCliente, params) {
+  const numeroVendedor = whatsappBotEscalamiento.resolverNumeroVendedor(
+    config,
+    ctx.telefonoVinculadoBot
+  );
+  try {
+    await whatsappBotEscalamiento.notificarPedidoConfirmado(ctx.idEmpresa, {
+      numeroVendedor,
+      telefonoCliente: ctx.digitosCelular,
+      nombreCliente: resCliente?.cliente?.rSocial || null,
+      ...params
+    });
+  } catch (err) {
+    console.error('whatsappBotCotizacion aviso vendedor:', err.message);
+  }
 }
 
 function hoyIso() {
@@ -319,24 +446,30 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   }
 
   if (nlu.intencion === 'cotizar' || (nlu.intencion === 'menu_numero' && Number(nlu.entidades?.menuNumero) === 4)) {
-    return solicitarRegistroOIniciarCotizacion(resCliente);
+    return solicitarRegistroOIniciarCotizacion(resCliente, config);
   }
 
   if (nlu.intencion === 'agregar_a_cotizacion') {
-    const agregar = await intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente);
+    const agregar = await intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente, config);
     if (agregar) return agregar;
   }
 
-  if (!esEstadoCotizacion(conv.estado) && nlu.intencion !== 'carrito' && nlu.intencion !== 'confirmar_cotizacion') {
+  if (
+    !esEstadoCotizacion(conv.estado)
+    && nlu.intencion !== 'carrito'
+    && nlu.intencion !== 'confirmar_cotizacion'
+    && nlu.intencion !== 'entrega_recojo'
+    && nlu.intencion !== 'entrega_envio'
+  ) {
     if (nlu.intencion === 'cancelar_cotizacion' && !carritoVacio(slots)) {
-      return solicitarRegistroOIniciarCotizacion(resCliente);
+      return solicitarRegistroOIniciarCotizacion(resCliente, config);
     }
     return null;
   }
 
-  if (nlu.intencion === 'cancelar_cotizacion' || (nlu.intencion === 'menu' && conv.estado !== 'cotiz_medio_pago')) {
+  if (nlu.intencion === 'cancelar_cotizacion' || nlu.intencion === 'menu') {
     return {
-      respuesta: 'Cotización cancelada. Escribe *MENÚ* para ver las opciones.',
+      respuesta: 'Pedido cancelado. Escribe *MENÚ* para ver las opciones.',
       conv: { estado: 'menu', slots: {}, candidatos: [] }
     };
   }
@@ -350,21 +483,56 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (nlu.intencion === 'confirmar_cotizacion') {
     if (carritoVacio(slots)) {
+      if (!esEstadoCotizacion(conv.estado)) {
+        return solicitarRegistroOIniciarCotizacion(resCliente, config);
+      }
       return { respuesta: 'Tu carrito está vacío. Agrega productos antes de confirmar.', conv: { ...conv, slots } };
     }
     const idCliente = resolverIdCliente(slots, resCliente);
     if (!idCliente) {
-      return solicitarRegistroOIniciarCotizacion(resCliente);
+      return solicitarRegistroOIniciarCotizacion(resCliente, config);
+    }
+    const carritoStock = await refrescarStockCarrito(idEmpresa, slots.carrito);
+    slots.carrito = carritoStock;
+    const faltantes = lineasSinStock(carritoStock);
+    if (faltantes.length) {
+      return respuestaStockInsuficiente(carritoStock, faltantes, idCliente);
     }
     slots.idCliente = idCliente;
-    slots.esperandoMedioPago = true;
+    slots.esperandoEntrega = true;
+    delete slots.esperandoMedioPago;
     return {
-      respuesta: [
-        formatearCarrito(slots.carrito),
-        TEXTO_MEDIOS_PAGO,
-        '_Un vendedor te contactará para confirmar el pago._'
-      ],
-      conv: { estado: 'cotiz_medio_pago', slots: { ...slots, idCliente }, candidatos: [] }
+      respuesta: [formatearCarrito(carritoStock), TEXTO_ENTREGA],
+      conv: { estado: 'cotiz_entrega', slots: { ...slots, idCliente }, candidatos: [] }
+    };
+  }
+
+  if (
+    conv.estado === 'cotiz_entrega'
+    || nlu.intencion === 'entrega_recojo'
+    || nlu.intencion === 'entrega_envio'
+    || nlu.intencion === 'entrega_invalida'
+  ) {
+    if (carritoVacio(slots)) {
+      return { respuesta: 'Tu carrito está vacío. Escribe *COTIZAR* o *4* para empezar.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    }
+    let tipoEntrega = slots.tipoEntrega;
+    if (nlu.intencion === 'entrega_envio') tipoEntrega = 'envio';
+    else if (nlu.intencion === 'entrega_recojo') tipoEntrega = 'recojo';
+    if (!tipoEntrega) {
+      return { respuesta: 'Elige una opción.\n\n' + TEXTO_ENTREGA, conv: { ...conv, slots, estado: 'cotiz_entrega' } };
+    }
+    const idClienteEnt = resolverIdCliente(slots, resCliente);
+    if (!idClienteEnt) {
+      return solicitarRegistroOIniciarCotizacion(resCliente, config);
+    }
+    delete slots.esperandoEntrega;
+    slots.esperandoMedioPago = true;
+    slots.tipoEntrega = tipoEntrega;
+    slots.idCliente = idClienteEnt;
+    return {
+      respuesta: TEXTO_MEDIOS_PAGO,
+      conv: { estado: 'cotiz_medio_pago', slots, candidatos: [] }
     };
   }
 
@@ -375,8 +543,30 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     }
     const idClienteConfirm = resolverIdCliente(slots, resCliente);
     if (!idClienteConfirm) {
-      return solicitarRegistroOIniciarCotizacion(resCliente);
+      return solicitarRegistroOIniciarCotizacion(resCliente, config);
     }
+
+    const lineasAviso = (slots.carrito || []).map((it) => `${it.descripcion} x${it.cantidad}`);
+
+    if (esPagoCredito(medioPago)) {
+      await avisarVendedorPedido(ctx, config, resCliente, {
+        serieNumero: 'Sin registrar (crédito)',
+        total: formatearPrecio(totalCarrito(slots.carrito)),
+        medioPago: 'Crédito (pendiente de aprobación)',
+        tipoEntrega: slots.tipoEntrega || 'recojo',
+        lineas: lineasAviso
+      });
+      delete slots.esperandoMedioPago;
+      return {
+        respuesta: [
+          'El pago a *crédito* lo confirma un vendedor.',
+          'Ya le avisamos; te escribirá por aquí para evaluarlo.',
+          'Si prefieres pagar ahora, escribe *COTIZAR* y elige otro medio (efectivo, Yape, etc.).'
+        ].join('\n'),
+        conv: { estado: 'menu', slots: {}, candidatos: [] }
+      };
+    }
+
     try {
       try {
         await whatsappBotLimites.assertLimiteCotizacionesDia(idEmpresa, digitosCelular, idClienteConfirm);
@@ -386,33 +576,54 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
           conv: { estado: 'menu', slots: {}, candidatos: [] }
         };
       }
+
+      const carritoStock = await refrescarStockCarrito(idEmpresa, slots.carrito);
+      slots.carrito = carritoStock;
+      const faltantesPago = lineasSinStock(carritoStock);
+      if (faltantesPago.length) {
+        return respuestaStockInsuficiente(carritoStock, faltantesPago, idClienteConfirm);
+      }
+
       const { idCotizacion, pdfData, serieNumero } = await crearCotizacionDesdeCarrito(
         idEmpresa,
         idClienteConfirm,
-        slots.carrito,
+        carritoStock,
         medioPago
       );
-      let adjunto = null;
+      let adjunto = {};
+      const totalTxt = formatearPrecio(totalCarrito(carritoStock));
+      const imgPago = whatsappBotFormasPago.leerComoAdjunto(idEmpresa, medioPago, totalTxt);
+      if (imgPago) {
+        adjunto.imagenes = [imgPago];
+      }
       try {
         const pdf = await generarPdfBase64(pdfData);
-        adjunto = {
-          pdfBase64: pdf.base64,
-          filename: pdf.nombreArchivo,
-          caption: `Cotización ${serieNumero}`
-        };
+        adjunto.pdfBase64 = pdf.base64;
+        adjunto.filename = pdf.nombreArchivo;
+        adjunto.caption = `Pedido ${serieNumero}`;
       } catch (pdfErr) {
         console.error('whatsappBotCotizacion PDF:', pdfErr.message);
       }
+      if (!adjunto.imagenes && !adjunto.pdfBase64) adjunto = null;
+
+      await avisarVendedorPedido(ctx, config, resCliente, {
+        serieNumero,
+        total: totalTxt,
+        medioPago,
+        tipoEntrega: slots.tipoEntrega || 'recojo',
+        lineas: lineasAviso
+      });
+
       const burbujas = [
         `${copy.v('cotizConfirmacion')} ✅`,
-        [
-          `*Cotización ${serieNumero}*`,
-          `Total: ${formatearPrecio(totalCarrito(slots.carrito))}`,
-          `Medio de pago: ${medioPago}`
-        ].join('\n'),
-        adjunto
-          ? 'Te envío el PDF de tu cotización 📄. Un vendedor te llamará pronto para confirmar el pago.'
-          : 'Tu cotización quedó registrada. Un vendedor te llamará pronto para confirmar el pago.'
+        textoCierreCliente({
+          serieNumero,
+          total: totalCarrito(carritoStock),
+          medioPago,
+          tipoEntrega: slots.tipoEntrega || 'recojo',
+          conPdf: !!(adjunto && adjunto.pdfBase64),
+          conQr: !!(adjunto && adjunto.imagenes && adjunto.imagenes.length)
+        })
       ];
       delete slots.esperandoMedioPago;
       return {
@@ -420,12 +631,12 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
         conv: { estado: 'menu', slots: {}, candidatos: [] },
         adjunto,
         reaccion: '✅',
-        meta: { idCotizacion, serieNumero, medioPago }
+        meta: { idCotizacion, serieNumero, medioPago, tipoEntrega: slots.tipoEntrega || 'recojo' }
       };
     } catch (err) {
       console.error('whatsappBotCotizacion crear:', err.message);
       return {
-        respuesta: 'No pude registrar la cotización en este momento. Por favor intenta de nuevo en un minuto o contacta a la empresa.',
+        respuesta: 'No pude registrar el pedido en este momento. Por favor intenta de nuevo en un minuto o escribe *AGENTE* para hablar con un vendedor.',
         conv: { estado: 'cotiz_activa', slots, candidatos: [] }
       };
     }
@@ -439,8 +650,15 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
         conv: { ...conv, slots }
       };
     }
-    const carrito = agregarAlCarrito(slots.carrito, slots.productoPendiente, cantidad);
     const prod = slots.productoPendiente;
+    const avisoStock = respuestaSiSuperaStock(prod, cantidad, slots.carrito);
+    if (avisoStock) {
+      return {
+        respuesta: avisoStock,
+        conv: { estado: 'cotiz_cantidad', slots, candidatos: [] }
+      };
+    }
+    const carrito = agregarAlCarrito(slots.carrito, prod, cantidad);
     delete slots.productoPendiente;
     slots.carrito = carrito;
     return {
@@ -461,7 +679,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     }
     slots.productoPendiente = candidatos[idx];
     return {
-      respuesta: `*${candidatos[idx].descripcion}*\nPrecio: ${formatearPrecio(candidatos[idx].precioLista)}\n\n¿Cuántas unidades deseas?`,
+      respuesta: textoPedirCantidad(candidatos[idx]),
       conv: { estado: 'cotiz_cantidad', slots, candidatos: [] }
     };
   }
@@ -482,7 +700,13 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     };
   }
 
-  if (esEstadoCotizacion(conv.estado) && nlu.terminosBusqueda.length > 0 && nlu.intencion !== 'confirmar_cotizacion') {
+  if (
+    esEstadoCotizacion(conv.estado)
+    && nlu.terminosBusqueda.length > 0
+    && nlu.intencion !== 'confirmar_cotizacion'
+    && conv.estado !== 'cotiz_entrega'
+    && conv.estado !== 'cotiz_medio_pago'
+  ) {
     const limite = whatsappBotCatalogo.LIMITE_OPCIONES_CHAT;
     const { totalEncontrados, hayMas, items } = await whatsappBotCatalogo.buscar(
       idEmpresa,
@@ -498,7 +722,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     if (items.length === 1) {
       slots.productoPendiente = items[0];
       return {
-        respuesta: `*${items[0].descripcion}*\nPrecio: ${formatearPrecio(items[0].precioLista)}\n\n¿Cuántas unidades deseas?`,
+        respuesta: textoPedirCantidad(items[0]),
         conv: { estado: 'cotiz_cantidad', slots, candidatos: [] }
       };
     }
@@ -521,10 +745,10 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   if (esEstadoCotizacion(conv.estado)) {
     return {
       respuesta: [
-        'En modo cotización puedes:',
-        '— Escribir el nombre del producto a buscar',
+        'Para armar tu pedido puedes:',
+        '— Escribir el nombre del producto',
         '— *CARRITO* para ver tu lista',
-        '— *CONFIRMAR* para registrar',
+        '— *CONFIRMAR* para pedir',
         '— *CANCELAR* para salir'
       ].join('\n'),
       conv: { ...conv, slots }
@@ -538,8 +762,8 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
  * Desde busqueda general (sin haber entrado a "COTIZAR"): agrega el producto
  * mostrado o el de la lista segun ultima seleccion / numero en el mensaje.
  */
-async function intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente) {
-  const registro = await solicitarRegistroOIniciarCotizacion(resCliente);
+async function intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente, config) {
+  const registro = await solicitarRegistroOIniciarCotizacion(resCliente, config);
   if (registro.conv.estado === 'registro_documento') {
     return registro;
   }
@@ -592,8 +816,8 @@ async function intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente) {
   if (!producto) {
     return {
       respuesta: [
-        'Primero dime qué producto quieres cotizar (escribe el nombre) o elige uno de una lista.',
-        'También puedes escribir *COTIZAR* para entrar al modo cotización.'
+        'Primero dime qué producto quieres pedir (escribe el nombre) o elige uno de una lista.',
+        'También puedes escribir *COTIZAR* o *4* para armar el pedido.'
       ].join('\n'),
       conv: { estado: 'cotiz_activa', slots, candidatos: [] }
     };
@@ -601,7 +825,7 @@ async function intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente) {
 
   slots.productoPendiente = producto;
   return {
-    respuesta: `*${producto.descripcion}*\nPrecio: ${formatearPrecio(producto.precioLista)}\n\n¿Cuántas unidades deseas?`,
+    respuesta: textoPedirCantidad(producto),
     conv: { estado: 'cotiz_cantidad', slots, candidatos: [] },
     reaccion: '🛒'
   };
@@ -612,5 +836,6 @@ module.exports = {
   intentarAgregarDesdeBusquedaGeneral,
   esEstadoCotizacion,
   MEDIOS_PAGO,
-  TEXTO_MEDIOS_PAGO
+  TEXTO_MEDIOS_PAGO,
+  TEXTO_ENTREGA
 };

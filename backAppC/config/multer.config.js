@@ -121,3 +121,26 @@ exports.uploadProductosExcel = multer({
   fileFilter: excelProductosFilter,
   limits: { fileSize: 8 * 1024 * 1024 }
 }).single('archivo');
+
+const formasPagoBaseDir = path.join(__dirname, '../uploads/formas-pago');
+
+/** QR / datos de Yape, Plin o transferencia. Campo: imagen. */
+exports.uploadFormaPagoBot = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const idEmpresa = req.user && req.user.empresa;
+      if (!idEmpresa) return cb(new Error('Falta idEmpresa'));
+      const dir = path.join(formasPagoBaseDir, String(idEmpresa));
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const tipo = String(req.params && req.params.tipo ? req.params.tipo : '').toLowerCase();
+      const ext = (path.extname(file.originalname) || '').toLowerCase() || '.jpg';
+      const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+      cb(null, `${tipo}${safeExt}`);
+    }
+  }),
+  fileFilter: imageFilter,
+  limits: { fileSize: 2 * 1024 * 1024 }
+}).single('imagen');

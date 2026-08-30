@@ -1,0 +1,63 @@
+@if (!ui.abierto()) {
+  <button
+    type="button"
+    class="chat-fab"
+    (click)="ui.abrir()"
+    aria-expanded="false"
+    aria-label="Abrir chat comercial de EFAFERP">
+    <i class="bi bi-chat-dots-fill" aria-hidden="true"></i>
+    <span>¿Te sirve EFAFERP?</span>
+  </button>
+}
+
+@if (ui.abierto()) {
+  <aside class="chat-panel" role="dialog" aria-label="Asesor comercial EFAFERP">
+    <header class="chat-head">
+      <div>
+        <strong>Asesor comercial</strong>
+        <span>Te decimos si EFAFERP encaja con tu negocio</span>
+      </div>
+      <button type="button" class="chat-close" (click)="ui.cerrar()" aria-label="Cerrar chat">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    <div class="chat-msgs" #listaMensajes>
+      @for (m of mensajes; track $index) {
+        <div class="chat-burbuja" [class.chat-burbuja--user]="m.role === 'user'">
+          <p>{{ textoVisible(m.text) }}</p>
+          @if (m.role === 'model' && m.imagenUrl) {
+            @if (esImagen(m.imagenUrl)) {
+              <img class="chat-img" [src]="m.imagenUrl" [alt]="'Guía comercial'" />
+            } @else {
+              <a class="chat-link" [href]="m.imagenUrl" target="_blank" rel="noopener">Ver guía</a>
+            }
+          }
+          @if (m.role === 'model') {
+            <div class="chat-links">
+              @for (url of extraerUrls(m.text); track url) {
+                <a class="chat-link" [href]="url" target="_blank" rel="noopener">Abrir enlace</a>
+              }
+            </div>
+          }
+        </div>
+      }
+      @if (enviando) {
+        <p class="chat-typing">Escribiendo…</p>
+      }
+      @if (error) {
+        <p class="chat-error">{{ error }}</p>
+      }
+    </div>
+
+    <form class="chat-form" [formGroup]="form" (ngSubmit)="enviar()">
+      <input
+        type="text"
+        formControlName="mensaje"
+        maxlength="800"
+        placeholder="Ej. Ana, 993289440, ferretería"
+        autocomplete="off" />
+      <button type="submit" [disabled]="enviando || form.invalid">Enviar</button>
+    </form>
+  </aside>
+}

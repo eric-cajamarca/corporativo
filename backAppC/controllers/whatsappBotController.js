@@ -6,6 +6,7 @@ function mapError(err, res) {
   }
   const msg = err.message || 'Error';
   let status = 400;
+  if (err.code === 'NOT_FOUND') status = 404;
   if (msg.includes('no activo') || msg.includes('baileys') || msg.includes('desactivado')) status = 403;
   if (msg.includes('Gateway WhatsApp no configurado')) status = 503;
   return res.status(status).json({ status, success: false, message: msg });
@@ -161,6 +162,44 @@ async function desescalarManual(req, res) {
   }
 }
 
+async function subirFormaPago(req, res) {
+  const idEmpresa = requireEmpresa(req, res);
+  if (!idEmpresa) return;
+  try {
+    const data = await whatsappBotService.subirFormaPago(idEmpresa, req.params.tipo, req.file);
+    return res.status(200).json({ status: 200, success: true, data });
+  } catch (err) {
+    console.error('whatsappBotController subirFormaPago:', err.message);
+    return mapError(err, res);
+  }
+}
+
+async function obtenerImagenPago(req, res) {
+  const idEmpresa = requireEmpresa(req, res);
+  if (!idEmpresa) return;
+  try {
+    const data = whatsappBotService.obtenerImagenPago(idEmpresa, req.params.tipo);
+    res.setHeader('Content-Type', data.mime);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    return res.status(200).send(data.buffer);
+  } catch (err) {
+    console.error('whatsappBotController obtenerImagenPago:', err.message);
+    return mapError(err, res);
+  }
+}
+
+async function eliminarFormaPago(req, res) {
+  const idEmpresa = requireEmpresa(req, res);
+  if (!idEmpresa) return;
+  try {
+    const data = await whatsappBotService.eliminarFormaPago(idEmpresa, req.params.tipo);
+    return res.status(200).json({ status: 200, success: true, data });
+  } catch (err) {
+    console.error('whatsappBotController eliminarFormaPago:', err.message);
+    return mapError(err, res);
+  }
+}
+
 module.exports = {
   inbound,
   getConfig,
@@ -172,5 +211,8 @@ module.exports = {
   eliminarSinonimo,
   listarLogs,
   listarEscaladas,
-  desescalarManual
+  desescalarManual,
+  subirFormaPago,
+  obtenerImagenPago,
+  eliminarFormaPago
 };

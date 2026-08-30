@@ -59,15 +59,16 @@
 }
 
 .btn-whatsapp-hero {
-  background: #25d366;
-  border: 1px solid #25d366;
+  background: #1f3b73;
+  border: 1px solid #1f3b73;
   color: #fff;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .btn-whatsapp-hero:hover {
-  background: #1ebe57;
-  border-color: #1ebe57;
+  background: #17305e;
+  border-color: #17305e;
   color: #fff;
 }
 
@@ -586,17 +587,18 @@
 }
 
 .btn-whatsapp {
-  background: #25d366;
+  background: #1f3b73;
   border: none;
   color: #fff;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .btn-whatsapp:hover {
-  background: #1ebe57;
+  background: #17305e;
   color: #fff;
 }
 
@@ -657,14 +659,19 @@
 }
 
 .contact-wa {
-  color: #15803d;
+  color: #1d4ed8;
   font-weight: 700;
   text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
 .contact-wa:hover {
   text-decoration: underline;
-  color: #166534;
+  color: #1e3a8a;
 }
 
 .social-links {

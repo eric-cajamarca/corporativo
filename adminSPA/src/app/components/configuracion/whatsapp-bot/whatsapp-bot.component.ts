@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -19,7 +19,7 @@ import {
   templateUrl: './whatsapp-bot.component.html',
   styleUrl: './whatsapp-bot.component.css'
 })
-export class WhatsappBotComponent implements OnInit {
+export class WhatsappBotComponent implements OnInit, OnDestroy {
   sidebarState = inject(SidebarStateService);
   private fb = inject(FormBuilder);
   private botService = inject(WhatsappBotService);
@@ -34,6 +34,19 @@ export class WhatsappBotComponent implements OnInit {
   sinonimos: WhatsappBotSinonimo[] = [];
   logs: WhatsappBotLogEntry[] = [];
   escaladas: WhatsappBotEscalada[] = [];
+
+  readonly formasPagoTipos: Array<{ id: 'yape' | 'plin' | 'transferencia'; etiqueta: string; ayuda: string }> = [
+    { id: 'yape', etiqueta: 'Yape', ayuda: 'Foto del QR de Yape' },
+    { id: 'plin', etiqueta: 'Plin', ayuda: 'Foto del QR de Plin' },
+    { id: 'transferencia', etiqueta: 'Transferencia / banco', ayuda: 'Foto con banco, cuenta y CCI' }
+  ];
+  formasPagoImagenes: { yape: boolean; plin: boolean; transferencia: boolean } = {
+    yape: false,
+    plin: false,
+    transferencia: false
+  };
+  formasPagoPreview: Partial<Record<'yape' | 'plin' | 'transferencia', string>> = {};
+  formasPagoSubiendo: Partial<Record<'yape' | 'plin' | 'transferencia', boolean>> = {};
 
   configForm = this.fb.group({
     activoBot: [true],
@@ -85,6 +98,7 @@ export class WhatsappBotComponent implements OnInit {
           });
           this.aplicarEstadoControlActivoBot();
           this.aplicarEstadoCamposEscalamiento();
+          this.aplicarFormasPagoImagenes(res.data.formasPagoImagenes);
         }
         if (this.servicioAutorizado) {
           this.cargarCatalogoStatus();
@@ -289,6 +303,81 @@ export class WhatsappBotComponent implements OnInit {
       },
       error: (err) => {
         this.error = err?.error?.message || 'Error al eliminar sinonimo';
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.revocarPreviews();
+  }
+
+  private aplicarFormasPagoImagenes(estado: WhatsappBotConfig['formasPagoImagenes'] | undefined): void {
+    this.formasPagoImagenes = {
+      yape: !!estado?.yape,
+      plin: !!estado?.plin,
+      transferencia: !!estado?.transferencia
+    };
+    for (const tipo of this.formasPagoTipos) {
+      if (this.formasPagoImagenes[tipo.id]) {
+        this.cargarPreviewFormaPago(tipo.id);
+      } else {
+        this.limpiarPreview(tipo.id);
+      }
+    }
+  }
+
+  private cargarPreviewFormaPago(tipo: 'yape' | 'plin' | 'transferencia'): void {
+    this.botService.obtenerImagenPago(tipo).subscribe({
+      next: (blob) => {
+        this.limpiarPreview(tipo);
+        this.formasPagoPreview[tipo] = URL.createObjectURL(blob);
+      },
+      error: () => {
+        this.limpiarPreview(tipo);
+      }
+    });
+  }
+
+  private limpiarPreview(tipo: 'yape' | 'plin' | 'transferencia'): void {
+    const url = this.formasPagoPreview[tipo];
+    if (url) URL.revokeObjectURL(url);
+    delete this.formasPagoPreview[tipo];
+  }
+
+  private revocarPreviews(): void {
+    for (const tipo of this.formasPagoTipos) {
+      this.limpiarPreview(tipo.id);
+    }
+  }
+
+  onSeleccionarFormaPago(tipo: 'yape' | 'plin' | 'transferencia', event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.formasPagoSubiendo[tipo] = true;
+    this.error = '';
+    this.botService.subirFormaPago(tipo, file).subscribe({
+      next: (res) => {
+        this.formasPagoSubiendo[tipo] = false;
+        this.mensaje = `Imagen de ${tipo} guardada. El bot la enviará al cliente al elegir ese pago.`;
+        this.aplicarFormasPagoImagenes(res.data?.formasPagoImagenes);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.formasPagoSubiendo[tipo] = false;
+        this.error = err?.error?.message || 'No se pudo subir la imagen';
+      }
+    });
+  }
+
+  quitarFormaPago(tipo: 'yape' | 'plin' | 'transferencia'): void {
+    this.botService.eliminarFormaPago(tipo).subscribe({
+      next: (res) => {
+        this.mensaje = `Imagen de ${tipo} eliminada`;
+        this.aplicarFormasPagoImagenes(res.data?.formasPagoImagenes);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.error = err?.error?.message || 'No se pudo eliminar la imagen';
       }
     });
   }

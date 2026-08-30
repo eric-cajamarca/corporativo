@@ -19,6 +19,12 @@ export interface WhatsappBotConfig {
   escalamientoActivo?: boolean;
   escalamientoTimeoutMin?: number;
   umbralNoEntiendoEscalar?: number;
+  /** Imágenes de Yape / Plin / transferencia cargadas para el bot. */
+  formasPagoImagenes?: {
+    yape: boolean;
+    plin: boolean;
+    transferencia: boolean;
+  };
 }
 
 /** Conversacion en handoff a humano (GET /escaladas). */

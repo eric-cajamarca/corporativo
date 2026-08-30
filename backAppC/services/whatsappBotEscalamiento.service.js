@@ -18,6 +18,7 @@
 
 const whatsappGatewayClient = require('./whatsappGateway.client');
 const { getAhoraAppIsoLocal } = require('../utils/fechaDisplay.util');
+const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 
 function ahoraIso() { return getAhoraAppIsoLocal(); }
 
@@ -27,12 +28,23 @@ function ofuscarTel(tel) {
   return `${s.slice(0, 3)}****${s.slice(-3)}`;
 }
 
-function resolverNumeroVendedor(config, telefonoVinculadoBot) {
-  const fromConfig = String(config?.numeroEscalamiento || '').replace(/\D/g, '');
-  if (fromConfig.length >= 9) return fromConfig;
-  const fromBot = String(telefonoVinculadoBot || '').replace(/\D/g, '');
-  if (fromBot.length >= 9) return fromBot;
-  return null;
+function destinosPe(valor) {
+  const d = normalizarTelefonoWhatsApp(valor).digitos;
+  return d.length >= 9 ? d : '';
+}
+
+function resolverNumeroVendedor(config, telefonoVinculadoBot, extras = {}) {
+  const propio = destinosPe(telefonoVinculadoBot);
+  const candidatos = [
+    extras.celularEmpresa,
+    config?.numeroEscalamiento,
+    process.env.PAGO_MANUAL_WHATSAPP,
+    telefonoVinculadoBot
+  ]
+    .map(destinosPe)
+    .filter(Boolean);
+  const distintoDelBot = candidatos.find((n) => n !== propio);
+  return distintoDelBot || candidatos[0] || null;
 }
 
 function estaEscalada(conv) {
@@ -141,12 +153,137 @@ async function notificarVendedor(idEmpresa, params) {
   }
 }
 
+async function notificarInteresComercial(idEmpresa, params) {
+  const {
+    numeroVendedor,
+    telefonoCliente,
+    nombreCliente,
+    comercial,
+    motivo,
+    canal,
+    digitosCelular
+  } = params;
+
+  const destino = destinosPe(numeroVendedor);
+  if (!destino) {
+    console.error('whatsappBotEscalamiento: interes comercial sin numeroVendedor');
+    return { ok: false, skipped: true };
+  }
+
+  const f = comercial || {};
+  const esWeb = canal === 'web';
+  const contacto = esWeb
+    ? [
+        `Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(chat de la web pública)`,
+        digitosCelular
+          ? `Celular indicado: +${String(digitosCelular).replace(/\D/g, '')}`
+          : 'Celular: no lo dejó en el chat',
+        telefonoCliente ? `Sesión: ${String(telefonoCliente).slice(0, 24)}` : null
+      ]
+    : [`Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(+${telefonoCliente})`];
+  const body = [
+    motivo === 'llamada'
+      ? (esWeb
+        ? '*Lead web EFAFERP pide llamada de soporte* 📞'
+        : '*Interesado EFAFERP pide llamada de soporte* 📞')
+      : (esWeb
+        ? '*Lead web EFAFERP con alta intención* ✨'
+        : '*Interesado EFAFERP con alta intención* ✨'),
+    ...contacto,
+    `Rubro: ${f.rubro || f.rubroLibre || 'no indicado'}`,
+    `Encaje: ${f.encaja || 'indefinido'} | Intención: ${f.intencionCompra || 'n/d'}`,
+    f.necesidad ? `Necesidad: ${String(f.necesidad).slice(0, 200)}` : null,
+    f.nombre ? `Nombre para llamada: ${f.nombre}` : null,
+    f.mejorHorario ? `Horario: ${f.mejorHorario}` : null,
+    '',
+    esWeb
+      ? 'Contáctalo tú. El visitante no abre WhatsApp desde la web.'
+      : 'El bot sigue atendiendo. Contáctalo para agendar o cerrar.'
+  ].filter(Boolean);
+
+  const texto = body.join('\n');
+  try {
+    if (whatsappGatewayClient.isConfigured()) {
+      const r = await whatsappGatewayClient.sendText(idEmpresa, destino, texto, { skipThrottle: true });
+      if (r.success) return { ok: true, destino, canal: 'baileys' };
+      console.error('whatsappBotEscalamiento interes comercial baileys:', r.message, 'dest:', destino.slice(0, 5) + '****');
+    }
+  } catch (err) {
+    console.error('whatsappBotEscalamiento notificarInteresComercial baileys:', err.message);
+  }
+
+  try {
+    const { withPool } = require('../utils/dbPool.util');
+    const seguridadAlertas = require('./seguridadAlertas.service');
+    const plat = await withPool((pool) => seguridadAlertas.enviarWhatsAppPlataforma(pool, destino, texto));
+    if (plat?.ok) return { ok: true, destino, canal: plat.canal || 'plataforma' };
+    console.error('whatsappBotEscalamiento interes comercial plataforma:', plat?.error || plat?.message || plat?.reason);
+    return { ok: false, error: plat?.error || plat?.message || 'aviso no enviado' };
+  } catch (err) {
+    console.error('whatsappBotEscalamiento notificarInteresComercial plataforma:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+async function notificarPedidoConfirmado(idEmpresa, params) {
+  const {
+    numeroVendedor,
+    telefonoCliente,
+    nombreCliente,
+    serieNumero,
+    total,
+    medioPago,
+    tipoEntrega,
+    lineas
+  } = params;
+
+  if (!numeroVendedor) {
+    console.error('whatsappBotEscalamiento: pedido confirmado sin numeroVendedor');
+    return { ok: false, skipped: true };
+  }
+
+  const entregaTxt = tipoEntrega === 'envio' ? 'Envío (coordinar)' : 'Recojo en tienda';
+  const body = [
+    '*Pedido confirmado por WhatsApp* ✅',
+    `Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(+${telefonoCliente})`,
+    `Documento: ${serieNumero}`,
+    `Total: ${total}`,
+    `Pago: ${medioPago}`,
+    `Entrega: ${entregaTxt}`,
+    ''
+  ];
+  if (Array.isArray(lineas) && lineas.length) {
+    body.push('*Productos:*');
+    for (const ln of lineas.slice(0, 12)) {
+      body.push(`• ${ln}`);
+    }
+    body.push('');
+  }
+  body.push('El cliente ya confirmó. Atiéndelo para cobrar o despachar.');
+
+  try {
+    const r = await whatsappGatewayClient.sendText(idEmpresa, numeroVendedor, body.join('\n'), {
+      skipThrottle: true
+    });
+    if (!r.success) {
+      console.error('whatsappBotEscalamiento pedido:', r.message);
+      return { ok: false, error: r.message };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('whatsappBotEscalamiento notificarPedidoConfirmado:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   estaEscalada,
   limpiarEscaladaExpirada,
   marcarEscalada,
   desescalar,
   notificarVendedor,
+  notificarInteresComercial,
+  notificarPedidoConfirmado,
   resolverNumeroVendedor,
   ofuscarTel
 };

@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const suscripcionPublicController = require('../controllers/suscripcionPublicController');
 const deploymentPublicController = require('../controllers/deploymentPublicController');
+const chatComercialPublicoController = require('../controllers/chatComercialPublico.controller');
 
 const api = express.Router();
 
@@ -19,6 +20,15 @@ const limiterCulqi = rateLimit({
   legacyHeaders: false
 });
 
+const limiterChat = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Demasiadas consultas. Espere unos minutos.' }
+});
+
+api.post('/public/chat-comercial', limiterChat, chatComercialPublicoController.chatear);
 api.get('/public/config/deployment', limiterSuave, deploymentPublicController.getDeploymentConfig);
 api.get('/public/planes', limiterSuave, suscripcionPublicController.listarPlanes);
 api.post('/public/suscripcion/resumen-checkout', limiterSuave, suscripcionPublicController.resumenCheckout);

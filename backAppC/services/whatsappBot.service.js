@@ -11,6 +11,9 @@ const saasPlanLimitesService = require('./saasPlanLimites.service');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 const copy = require('./whatsappBot.copy');
+const whatsappBotIdentidad = require('./whatsappBotIdentidad.service');
+const whatsappBotFormasPago = require('./whatsappBotFormasPago.service');
+const { trace } = require('../utils/whatsappBotTrace.util');
 
 /**
  * Envia una o varias "burbujas" simulando que un humano escribe:
@@ -119,7 +122,8 @@ async function getConfig(idEmpresa) {
   return {
     ...row,
     activoBot: autorizado ? !!row.activoBot : false,
-    servicioAutorizado: autorizado
+    servicioAutorizado: autorizado,
+    formasPagoImagenes: whatsappBotFormasPago.estadoPorEmpresa(idEmpresa)
   };
 }
 
@@ -136,6 +140,36 @@ async function updateConfig(idEmpresa, data) {
   }
   await withPool((pool) => whatsappBotConfigRepository.upsert(pool, idEmpresa, payload));
   return getConfig(idEmpresa);
+}
+
+async function subirFormaPago(idEmpresa, tipo, file) {
+  validarUuid(idEmpresa);
+  await assertEmpresaPuedeUsarBot(idEmpresa);
+  whatsappBotFormasPago.assertTipo(tipo);
+  if (!file || !file.path) {
+    throw new Error('Falta la imagen (JPG, PNG o WEBP, máx. 2 MB).');
+  }
+  whatsappBotFormasPago.eliminarAnteriores(idEmpresa, tipo, file.path);
+  return { ok: true, formasPagoImagenes: whatsappBotFormasPago.estadoPorEmpresa(idEmpresa) };
+}
+
+function obtenerImagenPago(idEmpresa, tipo) {
+  validarUuid(idEmpresa);
+  whatsappBotFormasPago.assertTipo(tipo);
+  const data = whatsappBotFormasPago.leerBuffer(idEmpresa, tipo);
+  if (!data) {
+    const err = new Error('No hay imagen cargada para ese medio de pago.');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  return data;
+}
+
+async function eliminarFormaPago(idEmpresa, tipo) {
+  validarUuid(idEmpresa);
+  await assertEmpresaPuedeUsarBot(idEmpresa);
+  whatsappBotFormasPago.assertTipo(tipo);
+  return { ok: true, formasPagoImagenes: whatsappBotFormasPago.eliminar(idEmpresa, tipo) };
 }
 
 async function syncCatalogo(idEmpresa) {
@@ -236,6 +270,7 @@ async function procesarInbound(payload) {
 
   const textoEntrada = String(text || adjuntoEntrada?.caption || '').trim();
   if (!textoEntrada && !adjuntoEntrada) throw new Error('Mensaje de texto vacio');
+  trace('1.LLEGA_MENSAJE', { idEmpresa, tel: tel.logId, texto: textoEntrada });
 
   const precarga = await whatsappBotInboundContext.precargar(idEmpresa, tel.logId, tel.digitos);
 
@@ -304,7 +339,17 @@ async function procesarInbound(payload) {
     },
     precarga
   );
-  const { respuesta, conv, adjunto, limpiarHistorial, reaccion, suprimirRespuesta } = turno;
+  let { respuesta, conv, adjunto, limpiarHistorial, reaccion, suprimirRespuesta } = turno;
+
+  if (precarga.convNueva && !suprimirRespuesta && respuesta) {
+    try {
+      const nombreEmpresa = await whatsappBotIdentidad.obtenerNombreEmpresa(idEmpresa);
+      const intro = copy.presentacionVendedor(nombreEmpresa, precarga.resCliente?.cliente?.rSocial);
+      respuesta = copy.prependPresentacion(respuesta, intro);
+    } catch (err) {
+      console.error('whatsappBot presentacion:', err.message);
+    }
+  }
 
   if (!limpiarHistorial) {
     registrarLogAsync(idEmpresa, 'in', tel.logId, messageId, textoEntrada);
@@ -346,6 +391,10 @@ async function procesarInbound(payload) {
     usarEmojis: precarga.config?.usarEmojis !== false
   };
   const respuestaArr = Array.isArray(respuesta) ? respuesta : [respuesta];
+  trace('5.RESPUESTA_AL_CLIENTE', {
+    estado: conv?.estado,
+    texto: respuestaArr.filter(Boolean).join(' | ')
+  });
   const respuestaAdaptada = respuestaArr
     .map((b) => copy.adaptarTexto(b, opcionesTexto))
     .map((b) => String(b || '').trim())
@@ -416,6 +465,30 @@ async function procesarInbound(payload) {
     }
   }
 
+  if (Array.isArray(adjunto?.imagenes)) {
+    for (const img of adjunto.imagenes) {
+      if (!img?.imageBase64) continue;
+      whatsappGatewayClient
+        .sendMedia(
+          idEmpresa,
+          tel.destino,
+          'image',
+          img.imageBase64,
+          img.filename || 'pago.jpg',
+          img.caption || '',
+          { skipThrottle: true }
+        )
+        .then((media) => {
+          if (!media.success) {
+            console.error('whatsappBot envio QR pago:', media.message);
+          } else {
+            registrarLogAsync(idEmpresa, 'out', tel.logId, null, `[IMG] ${img.filename || 'pago.jpg'}`);
+          }
+        })
+        .catch((err) => console.error('whatsappBot envio QR pago:', err.message));
+    }
+  }
+
   if (adjunto?.pdfBase64 && adjunto?.filename) {
     whatsappGatewayClient
       .sendMedia(
@@ -467,5 +540,8 @@ module.exports = {
   listarLogs,
   listarEscaladas,
   desescalarManual,
+  subirFormaPago,
+  obtenerImagenPago,
+  eliminarFormaPago,
   NOMBRE_SERVICIO_WHATSAPP_BOT
 };
