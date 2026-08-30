@@ -1,6 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EmpresaService } from '../../../services/empresa.service';
+import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
@@ -13,7 +14,7 @@ declare var iziToast: any;
   templateUrl: './verificar-empresa.component.html',
   styleUrl: './verificar-empresa.component.css'
 })
-export class VerificarEmpresaComponent implements OnInit {
+export class VerificarEmpresaComponent implements OnInit, OnDestroy {
   idEmpresa = signal('');
   codigo = signal('');
   enviando = signal(false);
@@ -22,12 +23,22 @@ export class VerificarEmpresaComponent implements OnInit {
   constructor(
     private empresaService: EmpresaService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private chatUi: ChatComercialPublicoUiService
   ) {}
 
   ngOnInit(): void {
     const id = this.route.snapshot.queryParamMap.get('idEmpresa');
     if (id) this.idEmpresa.set(id);
+    this.chatUi.setPagina({
+      ruta: this.router.url || '/verificar-empresa',
+      paso: 'codigo',
+      errorPantalla: ''
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.chatUi.limpiarPagina();
   }
 
   verificar(): void {

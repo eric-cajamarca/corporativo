@@ -398,6 +398,9 @@ function reaccionPorIntencion(intencion) {
     case 'planes_saas':
     case 'flayer_comercial':
     case 'soporte_asistente':
+    case 'solicitar_demo':
+    case 'contratar_plan':
+    case 'duda_pago_registro':
       return '✨';
     case 'identidad':
     case 'que_vendes':

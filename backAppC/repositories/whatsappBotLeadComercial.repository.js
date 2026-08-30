@@ -60,4 +60,80 @@ async function upsert(pool, row) {
   }
 }
 
-module.exports = { upsert };
+const ESTADOS = new Set(['nuevo', 'interesado', 'llamada_pendiente', 'contactado', 'ganado', 'perdido']);
+
+async function listar(pool, idEmpresa, filtros = {}) {
+  try {
+    const estado = ESTADOS.has(String(filtros.estado || '')) ? String(filtros.estado) : null;
+    const r = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('estado', sql.VarChar(30), estado)
+      .query(`
+        SELECT TOP 200
+          CONVERT(VARCHAR(36), idLead) AS idLead,
+          telefonoLog,
+          digitosCelular,
+          nombre,
+          rubro,
+          rubroLibre,
+          necesidad,
+          intencionCompra,
+          encaja,
+          mejorHorario,
+          estado,
+          CAST(quiereLlamada AS INT) AS quiereLlamada,
+          ultimoMensaje,
+          CONVERT(VARCHAR(19), fCreacion, 120) AS fCreacion,
+          CONVERT(VARCHAR(19), fActualizacion, 120) AS fActualizacion
+        FROM WhatsAppBotLeadComercial
+        WHERE idEmpresa = @idEmpresa
+          AND (@estado IS NULL OR estado = @estado)
+        ORDER BY fActualizacion DESC
+      `);
+    return r.recordset || [];
+  } catch (err) {
+    if (err && err.number === 208) return [];
+    throw err;
+  }
+}
+
+async function actualizarEstado(pool, idEmpresa, idLead, estado) {
+  try {
+    const r = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idLead', sql.UniqueIdentifier, idLead)
+      .input('estado', sql.VarChar(30), estado)
+      .query(`
+      UPDATE WhatsAppBotLeadComercial
+      SET estado = @estado, fActualizacion = GETDATE()
+      WHERE idLead = @idLead AND idEmpresa = @idEmpresa;
+      SELECT TOP 1
+        CONVERT(VARCHAR(36), idLead) AS idLead,
+        telefonoLog,
+        digitosCelular,
+        nombre,
+        rubro,
+        rubroLibre,
+        necesidad,
+        intencionCompra,
+        encaja,
+        mejorHorario,
+        estado,
+        CAST(quiereLlamada AS INT) AS quiereLlamada,
+        ultimoMensaje,
+        CONVERT(VARCHAR(19), fCreacion, 120) AS fCreacion,
+        CONVERT(VARCHAR(19), fActualizacion, 120) AS fActualizacion
+      FROM WhatsAppBotLeadComercial
+      WHERE idLead = @idLead AND idEmpresa = @idEmpresa;
+    `);
+    const rows = r.recordset || [];
+    return rows[0] || null;
+  } catch (err) {
+    if (err && err.number === 208) return null;
+    throw err;
+  }
+}
+
+module.exports = { upsert, listar, actualizarEstado, ESTADOS };

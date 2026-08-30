@@ -17,7 +17,10 @@ const INTENCIONES = new Set([
   'flayer_comercial',
   'soporte_asistente',
   'consulta_comercial',
-  'agendar_llamada'
+  'agendar_llamada',
+  'solicitar_demo',
+  'contratar_plan',
+  'duda_pago_registro'
 ]);
 
 const INTENCIONES_IA = new Set([
@@ -25,7 +28,10 @@ const INTENCIONES_IA = new Set([
   'consulta_comercial',
   'agendar_llamada',
   'planes_saas',
-  'soporte_asistente'
+  'soporte_asistente',
+  'solicitar_demo',
+  'contratar_plan',
+  'duda_pago_registro'
 ]);
 
 const CACHE_PRINCIPAL_MS = 5 * 60 * 1000;
@@ -87,6 +93,7 @@ function enConversacionComercial(conv) {
     conv?.estado === 'comercial_ia'
     || Boolean(com?.esperandoDatosLlamada)
     || Boolean(com?.quiereLlamada)
+    || ['demo', 'pago', 'registro'].includes(com?.flujo)
   );
 }
 
@@ -181,7 +188,10 @@ async function turnoIa(idEmpresa, conv, nlu, textoEntrada, ctx) {
     slots,
     nlu,
     claveRateLimit: `${idEmpresa}:${ctx?.telefonoLog || ctx?.digitosCelular || 'x'}`,
-    canal: ctx?.canal === 'web' ? 'web' : 'whatsapp'
+    canal: ctx?.canal === 'web' ? 'web' : 'whatsapp',
+    rutaActual: ctx?.rutaActual,
+    pasoRegistro: ctx?.pasoRegistro,
+    errorPantalla: ctx?.errorPantalla
   });
   const nextSlots = { ...slots, comercial: ia.comercial };
   let respuesta = ia.respuesta;
@@ -217,7 +227,7 @@ async function intentarProcesar(idEmpresa, conv, nlu, textoEntrada, ctx) {
   const menuN = Number(nlu.entidades?.menuNumero);
 
   if (['menu', 'hola', 'ping', 'despedida', 'solicitar_agente'].includes(nlu.intencion)) {
-    return null;
+    if (!enConversacionComercial(conv)) return null;
   }
 
   if (cederAlCatalogo(nlu, textoEntrada, conv)) return null;

@@ -19,6 +19,7 @@ const { querySafeMiddleware } = require('./middlewares/tenant-query');
 const { saasSuscripcionGate } = require('./middlewares/saasSuscripcionGate');
 const publicSaasRoutes = require('./routes/publicSaas');
 const libroReclamacionesRoutes = require('./routes/libroReclamaciones');
+const leadsComercialRoutes = require('./routes/leadsComercial');
 // Importaci?n de rutas
 const detalleVentasRoutes = require('./routes/detalleventas');
 const adminRoutes = require('./routes/admin');
@@ -245,6 +246,7 @@ app.use('/api', saasSuscripcionGate);
 // Rutas públicas SaaS (planes, checkout) y resto
 app.use('/api', publicSaasRoutes);
 app.use('/api', libroReclamacionesRoutes);
+app.use('/api', leadsComercialRoutes);
 app.use('/api/external', externalRoutes);
 app.use('/api/empresa', require('./routes/empresaPublic'));
 app.use('/api/activacion', require('./routes/activacionPublic')); // Solo activación por código WhatsApp

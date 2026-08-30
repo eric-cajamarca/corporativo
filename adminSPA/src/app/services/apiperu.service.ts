@@ -25,7 +25,7 @@ export class ApiperuService {
 
   /** Consulta RUC sin autenticación (para crear-empresa / registro público). */
   getRucInfoPublic(filtro: string): Observable<any> {
-    const url = `${this.baseUrl}ruc-publico/${encodeURIComponent(filtro.trim())}`;
+    const url = `${environment.API_URL}public/ruc/${encodeURIComponent(filtro.trim())}`;
     return this._http.get(url, {
       headers: new HttpHeaders().set('Content-Type', 'application/json'),
       withCredentials: true

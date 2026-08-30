@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
@@ -6,6 +6,7 @@ import { ApiperuService } from '../../../services/apiperu.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
+import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 declare var iziToast: any;
@@ -19,7 +20,7 @@ const LS_CHECKOUT_PENDIENTE = 'efaf_checkout_pendiente';
   templateUrl: './create-empresa.component.html',
   styleUrl: './create-empresa.component.css'
 })
-export class CreateEmpresaComponent implements OnInit {
+export class CreateEmpresaComponent implements OnInit, OnDestroy {
   // Estado del formulario
   empresaForm!: FormGroup;
   
@@ -72,7 +73,8 @@ export class CreateEmpresaComponent implements OnInit {
     private empresaService: EmpresaService,
     private router: Router,
     private route: ActivatedRoute,
-    private deploymentContext: DeploymentContextService
+    private deploymentContext: DeploymentContextService,
+    private chatUi: ChatComercialPublicoUiService
   ) {}
 
   ngOnInit(): void {
@@ -92,9 +94,35 @@ export class CreateEmpresaComponent implements OnInit {
         }
       }
       this.checkoutOrderNumber = co;
+      const cel = (q.get('celular') || '').replace(/\D/g, '').slice(-9);
+      if (/^9\d{8}$/.test(cel)) {
+        const ctrl = this.empresaForm.get('celular');
+        if (ctrl && !String(ctrl.value || '').trim()) {
+          ctrl.patchValue(cel);
+        }
+      }
+      const email = (q.get('email') || '').trim();
+      if (email && this.empresaForm.get('email') && !String(this.empresaForm.get('email')?.value || '').trim()) {
+        this.empresaForm.patchValue({ email });
+      }
     });
     this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
       this.mostrarOpcionDemo = !!cfg?.mostrarPlanesPublicos;
+    });
+    this.syncChatPagina();
+  }
+
+  ngOnDestroy(): void {
+    this.chatUi.limpiarPagina();
+  }
+
+  private syncChatPagina(errorPantalla = ''): void {
+    const step = this.currentStep();
+    const paso = step === 1 ? 'ruc' : step === 2 ? 'datos' : 'credenciales';
+    this.chatUi.setPagina({
+      ruta: this.router.url || '/crear-empresa',
+      paso,
+      errorPantalla
     });
   }
 
@@ -311,6 +339,7 @@ export class CreateEmpresaComponent implements OnInit {
         
         // Avanzar al siguiente paso
         this.currentStep.set(2);
+        this.syncChatPagina();
         
         iziToast.show({
           title: 'Éxito',
@@ -324,13 +353,18 @@ export class CreateEmpresaComponent implements OnInit {
       error: (error) => {
         this.buscando.set(false);
         console.error('Error buscando RUC:', error);
+        this.syncChatPagina('ruc_sunat');
+        const body = error?.error;
+        const msgApi = String(body?.error || body?.message || '').trim();
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
           color: '#FFF',
           class: 'text-danger',
           position: 'topRight',
-          message: 'Error al conectar con el servicio de validación'
+          message: msgApi && msgApi !== 'NoTokenError'
+            ? msgApi
+            : 'No se pudo consultar el RUC en SUNAT. Pulse Verificar de nuevo.'
         });
       }
     });
@@ -382,6 +416,7 @@ export class CreateEmpresaComponent implements OnInit {
   previousStep(): void {
     if (this.currentStep() > 1) {
       this.currentStep.update(step => step - 1);
+      this.syncChatPagina();
     }
   }
 
@@ -421,6 +456,7 @@ export class CreateEmpresaComponent implements OnInit {
       }
       
       this.currentStep.update(step => step + 1);
+      this.syncChatPagina();
           }
   }
 

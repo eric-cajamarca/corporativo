@@ -49,15 +49,18 @@ export class AppComponent {
 
   shouldShowPublicChat(): boolean {
     const url = (this.router.url || '').toLowerCase().split('?')[0];
-    if (
-      url.includes('/login') ||
-      url.includes('/crear-empresa') ||
-      url.includes('/suscribirse') ||
-      url.includes('/recuperar')
-    ) {
+    if (url.includes('/login') || url.includes('/recuperar')) {
       return false;
     }
-    return url === '/' || url.includes('/publico') || url.includes('/planes') || url.includes('/politicas');
+    return (
+      url === '/'
+      || url.includes('/publico')
+      || url.includes('/planes')
+      || url.includes('/politicas')
+      || url.includes('/suscribirse')
+      || url.includes('/crear-empresa')
+      || url.includes('/verificar-empresa')
+    );
   }
 
   ngOnInit() {

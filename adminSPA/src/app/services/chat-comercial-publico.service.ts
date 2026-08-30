@@ -12,7 +12,13 @@ export class ChatComercialPublicoService {
 
   constructor(private http: HttpClient) {}
 
-  chatear(body: { mensaje: string; sessionId?: string | null }): Observable<ChatComercialRespuesta> {
+  chatear(body: {
+    mensaje: string;
+    sessionId?: string | null;
+    rutaActual?: string;
+    pasoRegistro?: string;
+    errorPantalla?: string;
+  }): Observable<ChatComercialRespuesta> {
     return this.http
       .post<{ data: ChatComercialRespuesta }>(
         `${this.baseUrl}public/chat-comercial`,

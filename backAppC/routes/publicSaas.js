@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const suscripcionPublicController = require('../controllers/suscripcionPublicController');
 const deploymentPublicController = require('../controllers/deploymentPublicController');
 const chatComercialPublicoController = require('../controllers/chatComercialPublico.controller');
+const externalController = require('../controllers/externalController');
 
 const api = express.Router();
 
@@ -29,6 +30,7 @@ const limiterChat = rateLimit({
 });
 
 api.post('/public/chat-comercial', limiterChat, chatComercialPublicoController.chatear);
+api.get('/public/ruc/:ruc', limiterSuave, externalController.getRucPublico);
 api.get('/public/config/deployment', limiterSuave, deploymentPublicController.getDeploymentConfig);
 api.get('/public/planes', limiterSuave, suscripcionPublicController.listarPlanes);
 api.post('/public/suscripcion/resumen-checkout', limiterSuave, suscripcionPublicController.resumenCheckout);

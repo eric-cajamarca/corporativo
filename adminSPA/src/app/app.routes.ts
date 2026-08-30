@@ -127,6 +127,16 @@ export const routes: Routes = [
      },
 
      {
+        path: 'leads-comercial',
+        loadComponent: () =>
+          import('./components/plataforma/index-leads-comercial/index-leads-comercial.component').then(
+            (m) => m.IndexLeadsComercialComponent
+          ),
+        canActivate: [superAdminPlataformaEmpresasGuard, empresaGestoraGuard],
+        title: 'Leads comerciales'
+     },
+
+     {
         path: 'editar-empresa',
         loadComponent: () => import('./components/empresa/update-empresa/update-empresa.component').then((m) => m.UpdateEmpresaComponent),
         canActivate: [empresaGestoraGuard, saasPlanModuloGuard],

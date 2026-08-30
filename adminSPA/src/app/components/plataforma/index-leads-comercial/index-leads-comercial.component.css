@@ -1,0 +1,17 @@
+.content-header .content-subtitle {
+  max-width: 46rem;
+  line-height: 1.45;
+}
+
+.lead-msg {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lead-estado {
+  width: 10.5rem;
+  display: inline-block;
+  vertical-align: middle;
+}

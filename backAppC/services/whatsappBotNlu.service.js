@@ -26,6 +26,11 @@ const PATRONES = {
   solicitarAgente: /\b(agente|asesor|asesora|humano|humana|persona real|alguien real|hablar con alguien|hablar con un|atencion humana|vendedor|vendedora|representante|operador|operadora|ayuda humana)\b/i,
   infoSistema: /\b(efaferp|business soft|sistema de ventas|software de ventas|\berp\b|me conviene|conviene el sistema|me sirve|para mi ferreteria|para mi negocio|el sistema efaferp|comprar el sistema|quiero el sistema|contratar( el)? sistema|\bdemo\b|prueba (gratis|de 14)|14 dias|configurar(lo| la empresa| el sistema)|cuenta demo)\b/i,
   planesSaas: /\b(planes|plan mensual|plan anual|suscripcion|precio del sistema|cuanto cuesta (el )?sistema|cuanto cuesta efaferp|cuanto vale el sistema)\b/i,
+  solicitarDemo: /^(demo|prueba)$/i,
+  solicitarDemoLargo: /\b(demo|cuenta demo|activar demo|prueba(r)?( (gratis|el sistema|14|de 14))?|14 d[ií]as|quiero probar|probar (el )?sistema|(me )?quiero registrar(me)?|registrarme|registr(ar|o) (mi )?(empresa|cuenta)|crear (mi )?(empresa|cuenta))\b/i,
+  contratarPlan: /^(pagar|contratar)$/i,
+  contratarPlanLargo: /\b(contratar|pagar( el)?( plan)?|quiero (el )?plan|comprar (el )?(plan|sistema)|plan emprendedor|plan profesional|\byape\b|\bplin\b|dep[oó]sito bcp)\b/i,
+  dudaPagoRegistro: /\b(ruc|sunat|validaci[oó]n|c[oó]digo de (6|seis)|no me llega (el )?c[oó]digo|contrase[nñ]a|voucher|chk-|activar (la )?(demo|cuenta))\b/i,
   agendarLlamada: /\b(agendar( una)? llamada|quiero( una)? llamada|que me llamen|llamenme|llámenme|llamame|llámame|^llamada$)\b/i,
   consultaComercial: /\b(mi rubro|mi negocio|tengo una|tengo un|somos una|nos dedicamos|a que se dedica|me ayuda (el |con el )?sistema|sirve para|encaja (en|con)|ferreter|repuestos?|pinturer|librer|ropa deport|zapatill|calzado|minimarket|bodega|grifo|restaurant|cevicher|hotel|peluquer|taller mecan)/i,
   flayerComercial: /\b(flayer|flyer|folleto|guias|guia gratuita|robos internos|robo interno|utilidad por producto|control de inventario|cobranzas|\binventario\b|\brobos?\b|\butilidad\b)\b/i,
@@ -95,6 +100,13 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   if (PATRONES.solicitarAgente.test(textoNorm)) return 'solicitar_agente';
 
   if (!esEstadoCotiz(contexto.estado) && !esEstadoPedido(contexto.estado)) {
+    if (t.toUpperCase() === 'DEMO' || PATRONES.solicitarDemo.test(t) || PATRONES.solicitarDemoLargo.test(textoNorm)) {
+      return 'solicitar_demo';
+    }
+    if (t.toUpperCase() === 'PAGAR' || PATRONES.contratarPlan.test(t) || PATRONES.contratarPlanLargo.test(textoNorm)) {
+      return 'contratar_plan';
+    }
+    if (PATRONES.dudaPagoRegistro.test(textoNorm)) return 'duda_pago_registro';
     if (t.toUpperCase() === 'SISTEMA' || PATRONES.infoSistema.test(textoNorm)) return 'info_sistema';
     if (t.toUpperCase() === 'PLANES' || PATRONES.planesSaas.test(textoNorm)) return 'planes_saas';
     if (t.toUpperCase() === 'LLAMADA' || PATRONES.agendarLlamada.test(textoNorm)) return 'agendar_llamada';
@@ -288,7 +300,8 @@ function interpretar(mensaje, contexto = {}) {
     'productos_pedido', 'pdf_pedido', 'pedido_opcion_invalida',
     'solicitar_agente', 'agregar_a_cotizacion',
     'info_sistema', 'planes_saas', 'flayer_comercial', 'soporte_asistente',
-    'consulta_comercial', 'agendar_llamada'
+    'consulta_comercial', 'agendar_llamada', 'solicitar_demo', 'contratar_plan',
+    'duda_pago_registro'
   ];
 
   if (sinTerminos.includes(intencion)) {

@@ -25,8 +25,7 @@ function textoFichaConviene() {
     '• *WhatsApp de tu tienda:* cuando ya eres cliente, tus compradores consultan stock y piden por *tu* número. Este chat es el de Business Soft.',
     '• *Precios de planes:* no los invento aquí. Están actualizados en:',
     urlPublica('/planes'),
-    '• *Probar 14 días* (sin tarjeta):',
-    urlPublica('/suscribirse/demo'),
+    '• *Demo 14 días* (sin tarjeta) o *contratar:* solo si lo pides. Escribe *DEMO* o *PAGAR* y te acompaño paso a paso.',
     '',
     'Si quieres una guía (inventario, robos, utilidad, cobranzas), escribe *GUÍAS*.',
     'Si buscas un *producto* de nuestro catálogo, escribe el nombre.',
@@ -39,7 +38,7 @@ function textoPlanes() {
     'Los planes y precios vigentes están en la web (no los cito de memoria para no equivocarme):',
     urlPublica('/planes'),
     '',
-    `Prueba 14 días sin tarjeta: ${urlPublica('/suscribirse/demo')}`,
+    'Si quieres *probar 14 días* (sin tarjeta), escribe *DEMO* y te acompaño. Si quieres *pagar un plan*, escribe *PAGAR*.',
     '',
     'Al contratar, un asesor te acompaña con SUNAT (usuario SOL, certificado, series). Horario en la web: lun–vie 9:00 a 18:00 (Perú).',
     'Dentro del sistema, el *asistente de la plataforma* es para guiarte en el uso del sistema.'
@@ -51,8 +50,7 @@ function textoSoporteAsistente() {
     'Cuando ya tienes cuenta, el *asistente de la plataforma* es para guiarte en el uso del sistema. No guarda la conversación.',
     '',
     'La puesta en marcha de SUNAT la hace un asesor por WhatsApp, como dice la web.',
-    'Si aún no eres cliente y quieres el sistema, escribe *SISTEMA* o entra a',
-    urlPublica('/suscribirse/demo')
+    'Si aún no eres cliente y quieres el sistema, escribe *DEMO* (prueba 14 días) o *PAGAR* (contratar) y te acompaño.'
   ].join('\n');
 }
 
@@ -106,7 +104,7 @@ function textoQueVendesPrincipal() {
 }
 
 function textoHolaExtraPrincipal() {
-  return 'Si te interesa *EFAFERP*, cuéntame a qué se dedica tu negocio o escribe *SISTEMA*, *PLANES* o *GUÍAS*. Si buscas un producto nuestro, escribe el nombre.';
+  return 'Si te interesa *EFAFERP*, cuéntame a qué se dedica tu negocio o escribe *SISTEMA*, *PLANES*, *DEMO*, *PAGAR* o *GUÍAS*. Si buscas un producto nuestro, escribe el nombre.';
 }
 
 const RUBROS_ENCAJAN = [
@@ -139,10 +137,334 @@ function detectarRubro(texto) {
 function pareceConsultaComercial(texto, nlu, estado) {
   if (estado === 'comercial_ia') return true;
   const int = nlu?.intencion;
-  if (['info_sistema', 'consulta_comercial', 'agendar_llamada'].includes(int)) return true;
+  if ([
+    'info_sistema',
+    'consulta_comercial',
+    'agendar_llamada',
+    'solicitar_demo',
+    'contratar_plan',
+    'duda_pago_registro'
+  ].includes(int)) return true;
   const t = String(texto || '');
   if (t.length >= 50 && /\b(negocio|rubro|sistema|software|factur|sunat)\b/i.test(t)) return true;
   return false;
+}
+
+function last9Celular(valor) {
+  const d = String(valor || '').replace(/\D/g, '');
+  const nueve = d.slice(-9);
+  return /^9\d{8}$/.test(nueve) ? nueve : '';
+}
+
+function urlDemo() {
+  return `${urlPublica('/suscribirse/demo')}?billing=none`;
+}
+
+function urlPlanes() {
+  return urlPublica('/planes');
+}
+
+function urlSuscribirsePlan(planCode, ciclo) {
+  const code = String(planCode || 'emprendedor').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'emprendedor';
+  const billing = ciclo === 'yearly' || ciclo === 'anual' ? 'yearly' : 'monthly';
+  return `${urlPublica(`/suscribirse/${code}`)}?billing=${billing}`;
+}
+
+function urlCrearEmpresaPrefill(opts = {}) {
+  const q = new URLSearchParams();
+  const cel = last9Celular(opts.celular);
+  if (cel) q.set('celular', cel);
+  const qs = q.toString();
+  return urlPublica('/crear-empresa') + (qs ? `?${qs}` : '');
+}
+
+function paginaRegistro(ruta) {
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  return /\/(suscribirse|crear-empresa|verificar-empresa)(\/|$)/.test(r);
+}
+
+function inferirFlujoDesdeRuta(ruta) {
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  if (r.includes('/suscribirse/demo')) return 'demo';
+  if (/\/suscribirse\/[a-z0-9_-]+/.test(r)) return 'pago';
+  if (r.includes('/crear-empresa') || r.includes('/verificar-empresa')) return 'registro';
+  return null;
+}
+
+const PASOS_REGISTRO = new Set(['demo', 'pago', 'ruc', 'datos', 'credenciales', 'codigo']);
+
+function inferirPasoRegistro(ruta, paso, errorPantalla) {
+  const p = String(paso || '').toLowerCase();
+  if (PASOS_REGISTRO.has(p)) return p;
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  if (r.includes('/verificar-empresa')) return 'codigo';
+  if (r.includes('/crear-empresa')) return 'ruc';
+  if (r.includes('/suscribirse/demo')) return 'demo';
+  if (/\/suscribirse\/[a-z0-9_-]+/.test(r)) return 'pago';
+  if (/ruc_sunat|validaci[oó]n|sunat/i.test(String(errorPantalla || ''))) return 'ruc';
+  return null;
+}
+
+function enPasoRuc(paso, ruta) {
+  if (paso === 'ruc') return true;
+  if (paso === 'codigo' || paso === 'credenciales' || paso === 'datos') return false;
+  return String(ruta || '').toLowerCase().includes('/crear-empresa');
+}
+
+function pareceSolicitarDemo(texto) {
+  const t = String(texto || '');
+  if (pareceSolicitarPago(t) && !/\bdemo\b/i.test(t) && !/\bprueba\b/i.test(t)) return false;
+  return (
+    /^(demo|prueba)$/i.test(t.trim())
+    || /\b(demo|cuenta demo|activar demo|prueba(r)?( (gratis|el sistema|14|de 14))?|14 d[ií]as|quiero probar|probar (el )?sistema|(me )?quiero registrar(me)?|registrarme|registr(ar|o) (mi )?(empresa|cuenta)|crear (mi )?(empresa|cuenta)|activar (la )?cuenta)\b/i.test(t)
+  );
+}
+
+function pareceSolicitarPago(texto) {
+  const t = String(texto || '');
+  if (/\b(cu[aá]nto cuesta|precio(s)? (del|de el)|ver planes|^planes$)\b/i.test(t)
+    && !/\b(pagar|contratar|yape|plin|dep[oó]sito)\b/i.test(t)) {
+    return false;
+  }
+  return (
+    /^(pagar|contratar)$/i.test(t.trim())
+    || /\b(contratar|pagar( el)?( plan)?|quiero (el )?plan|comprar (el )?(plan|sistema)|plan emprendedor|plan profesional|plan enterprise|\byape\b|\bplin\b|culqi|tarjeta de cr[eé]dito|dep[oó]sito bcp|suscribirme)\b/i.test(t)
+  );
+}
+
+function pareceDudaPagoRegistro(texto) {
+  const t = String(texto || '');
+  return /\b(ruc|sunat|validaci[oó]n|conectar|servicio de valid|c[oó]digo de (6|seis)|no me llega( el)?( c[oó]digo)?|contrase[nñ]a|yape|plin|voucher|culqi|tarjeta|pol[ií]ticas|chk-|activar (la )?(demo|cuenta|empresa)|correo|email|celular)\b/i.test(t);
+}
+
+function detectarPlanYCiclo(texto) {
+  const t = String(texto || '').toLowerCase();
+  let plan = null;
+  if (/\bemprendedor\b/.test(t)) plan = 'emprendedor';
+  else if (/\bprofesional\b/.test(t)) plan = 'profesional';
+  else if (/\benterprise\b/.test(t)) plan = 'enterprise';
+  let ciclo = null;
+  if (/\b(anual|yearly|a[nñ]o)\b/.test(t)) ciclo = 'yearly';
+  else if (/\b(mensual|monthly|al mes)\b/.test(t)) ciclo = 'monthly';
+  return { plan, ciclo };
+}
+
+function textoAcompanarDemo(com, ruta) {
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  const cel = last9Celular(com?.celular || com?.celularWeb);
+  const registro = urlCrearEmpresaPrefill({ celular: cel });
+  if (r.includes('/suscribirse/demo')) {
+    return [
+      'Estás en la pantalla de la *demo*. Acepta las políticas y pulsa *activar demo* (14 días, *sin tarjeta*).',
+      'Luego te pide el *RUC* (11 dígitos), correo, celular y contraseña. El código de 6 dígitos llega por WhatsApp y correo.',
+      'Si te trabas, dime el paso (políticas, RUC, correo o código). No cierres este chat.'
+    ].join('\n');
+  }
+  if (r.includes('/crear-empresa') || r.includes('/verificar-empresa')) {
+    return textoAcompanarRegistro(ruta, com?.pasoRegistro);
+  }
+  return [
+    'Perfecto. Te acompaño a crear la *demo* (14 días, *sin tarjeta*).',
+    '',
+    '1. Abre este enlace y acepta las políticas:',
+    urlDemo(),
+    '2. Pulsa *activar demo* (no se cobra).',
+    `3. Registra tu empresa (RUC, correo, celular y contraseña): ${registro}`,
+    '4. Te llega un *código de 6 dígitos* por WhatsApp y correo. Lo ingresas en verificar empresa.',
+    '',
+    'Si te trabas (RUC, correo, código, contraseña), escríbeme aquí. No me envíes la contraseña ni datos de tarjeta.'
+  ].join('\n');
+}
+
+function textoAcompanarPago(com, ruta) {
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  const elegido = detectarPlanYCiclo(`${com?.planCode || ''} ${com?.billingCycle || ''}`);
+  const plan = com?.planCode || elegido.plan;
+  const ciclo = com?.billingCycle || elegido.ciclo || 'monthly';
+  if (r.includes('/suscribirse/') && !r.includes('/suscribirse/demo')) {
+    return [
+      'Estás en el *pago del plan*.',
+      '• *Tarjeta:* Culqi en esta misma pantalla. *Nunca* me envíes el número de tarjeta aquí.',
+      '• *Yape / Plin / depósito BCP:* elige esa opción, paga y reporta el *voucher* en el formulario (un asesor valida).',
+      'Luego registras la empresa (RUC, correo, celular, contraseña) y activas con el código de 6 dígitos.',
+      'Dime si te traba el medio de pago, el voucher o el registro. Precios vigentes solo en:',
+      urlPlanes()
+    ].join('\n');
+  }
+  if (r.includes('/crear-empresa') || r.includes('/verificar-empresa')) {
+    return textoAcompanarRegistro(ruta, com?.pasoRegistro);
+  }
+  const lineas = [
+    'Te acompaño a *contratar*. No cobro ni registro la empresa desde este chat: te guío en la web.',
+    '',
+    '1. Elige el plan (precios vigentes; no los invento):',
+    urlPlanes()
+  ];
+  if (plan && plan !== 'enterprise') {
+    lineas.push(`2. Directo a *${plan}* (${ciclo === 'yearly' ? 'anual' : 'mensual'}):`, urlSuscribirsePlan(plan, ciclo));
+  } else {
+    lineas.push('2. Elige *mensual* o *anual*. El más usado es *Emprendedor*.');
+    lineas.push(`   Emprendedor mensual: ${urlSuscribirsePlan('emprendedor', 'monthly')}`);
+  }
+  lineas.push(
+    '3. Paga con *tarjeta* (Culqi) o *Yape / Plin / depósito BCP*.',
+    '4. Si es Yape/Plin, reporta el *voucher* en esa pantalla; un asesor valida.',
+    '5. Luego registras tu empresa (RUC, correo, celular, contraseña) y el código de 6 dígitos.',
+    '',
+    'Dudas de pago o registro, escríbeme. No me envíes contraseñas ni números de tarjeta.'
+  );
+  return lineas.join('\n');
+}
+
+function textoAcompanarRegistro(ruta, paso) {
+  const p = inferirPasoRegistro(ruta, paso);
+  const r = String(ruta || '').toLowerCase().split('?')[0];
+  if (p === 'codigo' || r.includes('/verificar-empresa')) {
+    return [
+      'Estás en *verificar empresa*. Ingresa el *código de 6 dígitos* que te llegó por WhatsApp o correo.',
+      'Si no llega: revisa spam, que el celular (9 dígitos) y el correo estén bien, y pide reenvío en esa pantalla.',
+      'No me envíes el código aquí si puedes ingresarlo en el formulario. Si te sigue fallando, dime qué ves.'
+    ].join('\n');
+  }
+  if (p === 'credenciales') {
+    return [
+      'Estás en *credenciales*. Completa correo, celular (9 dígitos) y contraseña.',
+      'La contraseña: mín. 8, mayúscula, minúscula, número y símbolo. *No me la escribas aquí.*',
+      'El código de 6 dígitos llega *después* de registrar, por WhatsApp y correo.'
+    ].join('\n');
+  }
+  if (p === 'datos') {
+    return 'Revisa razón social y dirección que trajo SUNAT. Si están bien, pulsa *Continuar* para correo, celular y contraseña.';
+  }
+  return [
+    'Estás en *Verificar RUC* (paso 1). Escribe los *11 dígitos* y pulsa *Verificar*.',
+    'SUNAT completa razón social y dirección. Todavía *no* hay código de WhatsApp: ese llega al final, después de correo y contraseña.',
+    'Si el aviso rojo dice que no se pudo consultar el RUC, espera unos segundos y pulsa *Verificar* otra vez.'
+  ].join('\n');
+}
+
+function textoDudaRucSunat(errorPantalla) {
+  return [
+    'Estás en el *paso 1: Verificar RUC*. No es el código de 6 dígitos (ese llega después, por WhatsApp y correo).',
+    'Escribe el RUC de 11 dígitos y pulsa *Verificar* para que SUNAT complete los datos.',
+    /ruc_sunat|conectar|validaci/i.test(String(errorPantalla || ''))
+      ? 'El formulario no pudo consultar SUNAT. Espera un momento y pulsa *Verificar* de nuevo. No escribas ningún código aquí.'
+      : 'Si no carga, reintenta. Si sigue el aviso rojo, dime el texto exacto (sin pegar contraseñas).'
+  ].join('\n');
+}
+
+function textoDudaPagoRegistro(texto, flujo, ruta, paso, errorPantalla) {
+  const t = String(texto || '');
+  const p = inferirPasoRegistro(ruta, paso, errorPantalla);
+  if (enPasoRuc(p, ruta) || /\b(ruc|sunat|validaci[oó]n|conectar|servicio de valid)\b/i.test(t)) {
+    if (p !== 'codigo') {
+      return textoDudaRucSunat(errorPantalla || t);
+    }
+  }
+  if (p === 'codigo' || /\b(c[oó]digo de (6|seis)|no me llega( el)?( c[oó]digo)?|reenv[ií]o)\b/i.test(t)) {
+    return [
+      'El código son *6 dígitos*. Llega por *WhatsApp* y *correo* *después* de registrar la empresa.',
+      `Ingrésalo en: ${urlPublica('/verificar-empresa')}`,
+      'Si no llega: spam, celular de 9 dígitos empezando en 9, y reenvío en esa pantalla.'
+    ].join('\n');
+  }
+  if (/\b(contrase[nñ]a|password|clave)\b/i.test(t)) {
+    return [
+      'La contraseña: *mínimo 8 caracteres*, con mayúscula, minúscula, número y un símbolo (ej. @ # !).',
+      '*No me la escribas en este chat.* Úsala solo en el formulario de registro.'
+    ].join('\n');
+  }
+  if (/\b(yape|plin|voucher|dep[oó]sito|bcp)\b/i.test(t)) {
+    return [
+      'Yape, Plin o depósito *BCP* se pagan en la pantalla de checkout del plan, no en este chat.',
+      `Elige el plan aquí: ${urlPlanes()}`,
+      'Paga y *adjunta el voucher en ese mismo formulario*. Un asesor lo valida. No envíes el voucher aquí si puedes subirlo ahí.',
+      'Después te lleva a registrar la empresa (RUC, correo, celular, contraseña).'
+    ].join('\n');
+  }
+  if (/\b(tarjeta|culqi|cr[eé]dito|d[eé]bito)\b/i.test(t)) {
+    return [
+      'La *tarjeta* se paga con *Culqi* en la pantalla de suscripción. *Nunca* me envíes el número, CVV ni vencimiento aquí.',
+      `Elige el plan y paga ahí: ${urlPlanes()}`,
+      'La demo de 14 días *no pide tarjeta*.'
+    ].join('\n');
+  }
+  if (/\b(correo|email|e-mail|celular|whatsapp)\b/i.test(t) && !/\b(yape|plin|tarjeta)\b/i.test(t)) {
+    return [
+      'Usa un *correo* al que tengas acceso: ahí llega el código y con ese correo entrarás.',
+      'El *celular* es de 9 dígitos Perú (empieza en 9). Ahí llega el código por WhatsApp.',
+      'Si ya los pusiste y no llega el código, revisa spam y pide reenvío en verificar empresa.'
+    ].join('\n');
+  }
+  if (/\b(pol[ií]tica|t[eé]rminos|aceptar)\b/i.test(t)) {
+    return 'Marca que aceptas las políticas en esa misma pantalla y sigue. Sin eso no se activa la demo ni el pago. Si el botón no habilita, recarga y vuelve a marcar.';
+  }
+  if (/\b(cu[aá]nto cuesta|precio|cu[aá]nto vale|plan)\b/i.test(t)) {
+    return [
+      'No cito precios de memoria para no equivocarme. Están actualizados aquí:',
+      urlPlanes(),
+      flujo === 'demo'
+        ? 'La *demo* es 14 días *sin tarjeta* y sin cobro.'
+        : 'Si ya sabes el plan (Emprendedor/Profesional) y mensual o anual, te armo el enlace de pago.'
+    ].filter(Boolean).join('\n');
+  }
+  if (/\b(gratis|cobra|cobran|tarjeta)\b/i.test(t) && (flujo === 'demo' || /\bdemo\b/i.test(t))) {
+    return `La *demo* son 14 días del sistema real, *sin tarjeta* y *sin cobro*. Enlace: ${urlDemo()}`;
+  }
+  if (!pareceDudaPagoRegistro(t)) return null;
+  const donde = flujo === 'pago' ? 'pago (Yape/tarjeta), voucher, RUC, correo o código' : 'políticas, activar demo, RUC, correo, celular o código de 6 dígitos';
+  return `Sigo aquí. Dime en qué paso estás: ${donde}.`;
+}
+
+function turnoAcompanamiento({ texto, flujo, ruta, comercial, iniciar }) {
+  const planCiclo = detectarPlanYCiclo(texto);
+  const paso = inferirPasoRegistro(ruta, comercial?.pasoRegistro, comercial?.errorPantalla);
+  const next = {
+    ...comercial,
+    flujo,
+    pasoRegistro: paso || comercial?.pasoRegistro,
+    errorPantalla: comercial?.errorPantalla,
+    intencionCompra: 'alta',
+    planCode: planCiclo.plan || comercial?.planCode,
+    billingCycle: planCiclo.ciclo || comercial?.billingCycle
+  };
+  if (iniciar && !comercial?.acompanamientoEnviado) {
+    let respuesta;
+    if (flujo === 'pago') respuesta = textoAcompanarPago(next, ruta);
+    else if (flujo === 'registro') respuesta = textoAcompanarRegistro(ruta, paso);
+    else respuesta = textoAcompanarDemo(next, ruta);
+    return {
+      respuesta,
+      comercial: { ...next, acompanamientoEnviado: true },
+      accion: flujo === 'pago' ? 'acompanar_pago' : 'acompanar_demo',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  if (planCiclo.plan && flujo === 'pago') {
+    return {
+      respuesta: [
+        `Plan *${planCiclo.plan}* (${(planCiclo.ciclo || next.billingCycle) === 'yearly' ? 'anual' : 'mensual'}):`,
+        urlSuscribirsePlan(planCiclo.plan, planCiclo.ciclo || next.billingCycle || 'monthly'),
+        'Acepta políticas y paga ahí. Si te trabas, dime el medio (Yape, Plin o tarjeta).'
+      ].join('\n'),
+      comercial: { ...next, acompanamientoEnviado: true },
+      accion: 'acompanar_pago',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  const duda = textoDudaPagoRegistro(texto, flujo, ruta, paso, comercial?.errorPantalla);
+  if (duda) {
+    return {
+      respuesta: duda,
+      comercial: { ...next, acompanamientoEnviado: true },
+      accion: flujo === 'pago' ? 'acompanar_pago' : 'acompanar_demo',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  return null;
 }
 
 function whatsappSoporteDisplay() {
@@ -384,7 +706,11 @@ Hotel: encaje parcial; ofrécelo a evaluar en una llamada.
 Restaurante/cocina/POS de mesas: no es el caso típico; sé honesto y ofrece llamada de soporte.
 
 Datos para responder (usa solo lo que pregunten):
-- Demo: 14 días, sistema real, sin tarjeta. Pueden cargar productos, vender, ver stock y créditos. Enlace: ${site}/suscribirse/demo
+- Demo: 14 días, sistema real, sin tarjeta. Enlace solo si PIDEN demo/probar: ${site}/suscribirse/demo?billing=none
+- Contratar: planes en ${site}/planes. Pago en ${site}/suscribirse/{plan}?billing=monthly|yearly (Culqi o Yape/Plin/depósito). Registro después: ${site}/crear-empresa. Código 6 dígitos WhatsApp+correo.
+- NO ofrezcas demo, planes ni pago si el cliente no lo pidió en este mensaje y no está ya en ese flujo.
+- Si está en /crear-empresa o paso ruc: SOLO ayúdale con el RUC/SUNAT. PROHIBIDO pedirle el código de 6 dígitos (ese es el paso verificar-empresa, después de registrar). "Verificar" en esa pantalla es el botón del RUC, no un código.
+- Si PIDEN demo o pagar, acompaña paso a paso (políticas → activar/pagar → RUC 11 dígitos → correo, celular, contraseña → código 6 dígitos). No inventes precios. No pidas contraseña ni tarjeta en el chat. No crees la empresa ni cobres tú.
 - Quién configura: un asesor de BUSINESS SOFT te acompaña (sobre todo SUNAT: usuario SOL, certificado, series). Lun–vie 9:00 a 18:00 (Perú).
 - Dentro del sistema, el *asistente de la plataforma* es para guiarte en el uso del sistema. No digas “estrellas” ni “aprender las pantallas”.
 - Precios: no los inventes. Solo si preguntan planes/precio, enlaza ${site}/planes
@@ -405,9 +731,11 @@ Intención de compra:
 
 Acciones:
 - preguntar: falta un dato clave
-- ofrecer_demo: encaja y ya puedes orientar
+- ofrecer_demo: SOLO si pidió demo/probar/registrarse
+- acompanar_demo: está en el registro de la demo y hay que guiarlo
+- acompanar_pago: pidió contratar/pagar o está en el checkout
 - ofrecer_llamada: no encaja, es dudoso, o el cliente quiere hablar con soporte
-- enviar_planes: pidió precios/planes
+- enviar_planes: pidió precios/planes (no es lo mismo que “quiero pagar ya”)
 - enviar_guia: pidió un tema de guía (slugFlayer = uno de los slugs de arriba)
 - listo: ya respondiste y no hace falta más
 
@@ -426,7 +754,7 @@ quiereLlamada: true si pide o acepta que lo llamen.
 const TEXTO_MENU_EXTRA_PRINCIPAL = [
   '5. Sobre EFAFERP (el sistema)',
   '',
-  'También: *SISTEMA* | *PLANES* | *GUÍAS* | *LLAMADA*'
+  'También: *SISTEMA* | *PLANES* | *DEMO* | *PAGAR* | *GUÍAS* | *LLAMADA*'
 ].join('\n');
 
 module.exports = {
@@ -446,6 +774,23 @@ module.exports = {
   TEXTO_MENU_EXTRA_PRINCIPAL,
   detectarRubro,
   pareceConsultaComercial,
+  pareceSolicitarDemo,
+  pareceSolicitarPago,
+  pareceDudaPagoRegistro,
+  detectarPlanYCiclo,
+  inferirFlujoDesdeRuta,
+  inferirPasoRegistro,
+  enPasoRuc,
+  paginaRegistro,
+  urlDemo,
+  urlPlanes,
+  urlSuscribirsePlan,
+  urlCrearEmpresaPrefill,
+  textoAcompanarDemo,
+  textoAcompanarPago,
+  textoAcompanarRegistro,
+  textoDudaPagoRegistro,
+  turnoAcompanamiento,
   extraerNombreHorario,
   extraerNombrePersona,
   extraerHorario,

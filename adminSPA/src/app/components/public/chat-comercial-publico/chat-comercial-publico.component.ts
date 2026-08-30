@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, ViewChild, effect, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ChatComercialMensaje } from '../../../models/chat-comercial-publico.model';
 import { ChatComercialPublicoService } from '../../../services/chat-comercial-publico.service';
 import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
@@ -8,7 +9,7 @@ import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-
 const SESSION_KEY = 'efaferp.chatComercial.sessionId';
 const SALUDO: ChatComercialMensaje = {
   role: 'model',
-  text: 'Hola. Soy el asesor comercial de EFAFERP. Cuéntame a qué se dedica tu negocio y te digo si te encaja. Si quieres que te llamemos, deja tu nombre, celular y horario (lun–vie 9:00 a 18:00).'
+  text: 'Hola. Soy el asesor comercial de EFAFERP. Cuéntame a qué se dedica tu negocio y te digo si te encaja. Si quieres la demo o pagar un plan, dímelo y te acompaño paso a paso. Si prefieres que te llamemos, deja tu nombre, celular y horario (lun–vie 9:00 a 18:00).'
 };
 
 @Component({
@@ -22,6 +23,7 @@ export class ChatComercialPublicoComponent {
   readonly ui = inject(ChatComercialPublicoUiService);
   private readonly api = inject(ChatComercialPublicoService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   @ViewChild('listaMensajes') listaMensajes?: ElementRef<HTMLDivElement>;
 
@@ -79,7 +81,14 @@ export class ChatComercialPublicoComponent {
     this.enviando = true;
     this.scrollAlFinal();
 
-    this.api.chatear({ mensaje: texto, sessionId: this.sessionId }).subscribe({
+    const pagina = this.ui.pagina();
+    this.api.chatear({
+      mensaje: texto,
+      sessionId: this.sessionId,
+      rutaActual: pagina.ruta || this.router.url || '/',
+      pasoRegistro: pagina.paso || undefined,
+      errorPantalla: pagina.errorPantalla || undefined
+    }).subscribe({
       next: (data) => {
         if (data?.sessionId) {
           this.sessionId = data.sessionId;

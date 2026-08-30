@@ -32,6 +32,7 @@ function isWhitelistedPublic(pathname, method) {
   if (pathname.startsWith('/api/suscripcion/cancelar-downgrade')) return true;
   // Admin plataforma (empresa principal): validar / limpiar pagos manuales
   if (pathname.startsWith('/api/suscripcion/pagos-manuales')) return true;
+  if (pathname.startsWith('/api/leads-comercial')) return true;
   return false;
 }
 

@@ -15,6 +15,8 @@ const ventanas = new Map();
 const ACCIONES = new Set([
   'preguntar',
   'ofrecer_demo',
+  'acompanar_demo',
+  'acompanar_pago',
   'ofrecer_llamada',
   'enviar_planes',
   'enviar_guia',
@@ -85,6 +87,14 @@ function mergeFicha(prev, incoming, textoEntrada) {
   const cel = ficha.extraerCelularPeru(textoEntrada);
   if (cel) out.celular = cel;
   if (!ficha.esNombrePersona(out.nombre)) delete out.nombre;
+  if (['demo', 'pago', 'registro'].includes(src.flujo)) out.flujo = src.flujo;
+  else if (['demo', 'pago', 'registro'].includes(prev?.flujo)) out.flujo = prev.flujo;
+  if (src.planCode || prev?.planCode) out.planCode = sanitizar(src.planCode || prev.planCode, 40);
+  if (src.billingCycle || prev?.billingCycle) out.billingCycle = sanitizar(src.billingCycle || prev.billingCycle, 20);
+  if (prev?.acompanamientoEnviado) out.acompanamientoEnviado = true;
+  if (prev?.rutaActual) out.rutaActual = prev.rutaActual;
+  if (prev?.pasoRegistro) out.pasoRegistro = prev.pasoRegistro;
+  if (prev?.errorPantalla) out.errorPantalla = prev.errorPantalla;
   return out;
 }
 
@@ -128,10 +138,33 @@ function pedirDatosOConfirmar(comercial, textoEntrada, requiereCelular) {
   return confirmarOAjustarLlamada(comercial, textoEntrada);
 }
 
-function parecePedidoLlamada(texto, nlu, comercial) {
-  if (comercial?.esperandoDatosLlamada || comercial?.quiereLlamada) return true;
+function parecePedidoLlamadaEsteTurno(texto, nlu) {
   if (nlu?.intencion === 'agendar_llamada') return true;
-  return /\b(ll[aá]men|ll[aá]mada|agendar|que me llamen|quiero que me llam)/i.test(String(texto || ''));
+  return /\b(ll[aá]men|ll[aá]mada|agendar|que me llamen|quiero que me llam)\b/i.test(String(texto || ''));
+}
+
+function parecePedidoLlamada(texto, nlu, comercial) {
+  if (parecePedidoLlamadaEsteTurno(texto, nlu)) return true;
+  if (comercial?.esperandoDatosLlamada) return true;
+  return false;
+}
+
+function resolverFlujoTurno(texto, nlu, comercial, ruta) {
+  const pideDemo = nlu?.intencion === 'solicitar_demo' || ficha.pareceSolicitarDemo(texto);
+  const pidePago = nlu?.intencion === 'contratar_plan' || ficha.pareceSolicitarPago(texto);
+  if (pidePago && !(pideDemo && /\bdemo\b/i.test(texto))) return 'pago';
+  if (pideDemo) return 'demo';
+  if (['demo', 'pago', 'registro'].includes(comercial?.flujo)) return comercial.flujo;
+  return ficha.inferirFlujoDesdeRuta(ruta);
+}
+
+function conHistorial(out, historial, texto, requiereCelular) {
+  const hist = historial.concat([
+    { role: 'user', text: texto.slice(0, 400) },
+    { role: 'model', text: String(out.respuesta || '').slice(0, 400) }
+  ]).slice(-MAX_HISTORIAL);
+  out.comercial = { ...out.comercial, requiereCelular, historial: hist };
+  return out;
 }
 
 function confirmarOAjustarLlamada(comercial, textoEntrada) {
@@ -209,18 +242,16 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
       quiereLlamada: false
     };
   }
-  if (/\bdemo\b|14 dias|prueba/i.test(t)) {
-    return {
-      respuesta: [
-        'En la demo entras al *sistema real* 14 días, sin tarjeta: cargas productos, vendes, ves stock y créditos.',
-        `Regístrate aquí: ${ficha.urlPublica('/suscribirse/demo')}`,
-        'Cuando contrates, un asesor te acompaña con SUNAT. ¿Quieres el enlace o que te llamemos?'
-      ].join('\n'),
-      comercial: { ...merged, intencionCompra: 'media' },
-      accion: 'ofrecer_demo',
-      slugFlayer: null,
-      quiereLlamada: false
-    };
+  const flujoFb = resolverFlujoTurno(t, nlu, comercial, comercial.rutaActual);
+  if (flujoFb) {
+    const acomp = ficha.turnoAcompanamiento({
+      texto: t,
+      flujo: flujoFb,
+      ruta: comercial.rutaActual,
+      comercial: merged,
+      iniciar: true
+    });
+    if (acomp) return acomp;
   }
   if (nlu?.intencion === 'planes_saas' || /^(planes)$/i.test(t.trim())) {
     return {
@@ -235,11 +266,11 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
     return {
       respuesta: [
         `Para *${merged.rubro || 'tu rubro'}* sí te encaja: ventas, stock, créditos y SUNAT.`,
-        `Prueba 14 días: ${ficha.urlPublica('/suscribirse/demo')}`,
-        '¿Qué te duele más hoy: inventario, cobranzas o facturación?'
+        '¿Qué te duele más hoy: inventario, cobranzas o facturación?',
+        'Si quieres *probar 14 días* escribe *DEMO*. Si quieres *contratar* escribe *PAGAR*.'
       ].join('\n'),
       comercial: { ...merged, intencionCompra: merged.intencionCompra === 'baja' ? 'media' : merged.intencionCompra },
-      accion: 'ofrecer_demo',
+      accion: 'listo',
       slugFlayer: null,
       quiereLlamada: false
     };
@@ -312,9 +343,15 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
 /**
  * @returns {Promise<{respuesta:string, comercial:object, accion:string, slugFlayer:string|null, quiereLlamada:boolean}>}
  */
-async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal }) {
+async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal, rutaActual, pasoRegistro, errorPantalla }) {
   const comercial = { ...(slots?.comercial || {}) };
   comercial.requiereCelular = canal === 'web' || Boolean(comercial.requiereCelular);
+  if (rutaActual) comercial.rutaActual = sanitizar(rutaActual, 200);
+  if (pasoRegistro) comercial.pasoRegistro = sanitizar(pasoRegistro, 40);
+  if (errorPantalla) comercial.errorPantalla = sanitizar(errorPantalla, 200);
+  else if (ficha.enPasoRuc(comercial.pasoRegistro, comercial.rutaActual)) {
+    comercial.errorPantalla = comercial.errorPantalla || '';
+  }
   const requiereCelular = Boolean(comercial.requiereCelular);
   const historial = Array.isArray(comercial.historial) ? comercial.historial.slice(-MAX_HISTORIAL) : [];
   const texto = sanitizar(textoEntrada);
@@ -336,16 +373,43 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
   }
 
   const mergedEarly = mergeFicha(comercial, {}, texto);
-  if (parecePedidoLlamada(texto, nlu, comercial)) {
+  mergedEarly.rutaActual = comercial.rutaActual;
+  mergedEarly.flujo = comercial.flujo;
+  mergedEarly.pasoRegistro = comercial.pasoRegistro;
+  mergedEarly.errorPantalla = comercial.errorPantalla;
+  mergedEarly.acompanamientoEnviado = comercial.acompanamientoEnviado;
+  mergedEarly.planCode = comercial.planCode;
+  mergedEarly.billingCycle = comercial.billingCycle;
+
+  if (parecePedidoLlamadaEsteTurno(texto, nlu)) {
     const outCita = pedirDatosOConfirmar(mergedEarly, texto, requiereCelular);
-    const histCita = historial.concat([
-      { role: 'user', text: texto.slice(0, 400) },
-      { role: 'model', text: String(outCita.respuesta || '').slice(0, 400) }
-    ]).slice(-MAX_HISTORIAL);
-    outCita.comercial = { ...outCita.comercial, requiereCelular, historial: histCita };
     trace('4.BACKEND_SIN_GEMINI', { motivo: 'cita_datos', accion: outCita.accion, faltantes: ficha.faltantesCita(outCita.comercial, { requiereCelular }) });
     trace('4c.RESPUESTA_BACKEND', { texto: outCita.respuesta });
-    return outCita;
+    return conHistorial(outCita, historial, texto, requiereCelular);
+  }
+
+  const flujo = resolverFlujoTurno(texto, nlu, mergedEarly, comercial.rutaActual);
+  const pideAhora =
+    nlu?.intencion === 'solicitar_demo'
+    || nlu?.intencion === 'contratar_plan'
+    || ficha.pareceSolicitarDemo(texto)
+    || ficha.pareceSolicitarPago(texto);
+  const dudaEspecifica = ficha.pareceDudaPagoRegistro(texto) && !pideAhora;
+  if (flujo && (pideAhora || dudaEspecifica || mergedEarly.flujo || ficha.paginaRegistro(comercial.rutaActual))) {
+    const iniciar = pideAhora || (!mergedEarly.acompanamientoEnviado && ficha.paginaRegistro(comercial.rutaActual) && !dudaEspecifica);
+    const acomp = ficha.turnoAcompanamiento({
+      texto,
+      flujo,
+      ruta: comercial.rutaActual,
+      comercial: mergedEarly,
+      iniciar
+    });
+    if (acomp) {
+      trace('4.BACKEND_SIN_GEMINI', { motivo: 'acompanamiento', accion: acomp.accion, flujo });
+      trace('4c.RESPUESTA_BACKEND', { texto: acomp.respuesta });
+      return conHistorial(acomp, historial, texto, requiereCelular);
+    }
+    mergedEarly.flujo = flujo;
   }
 
   let out;
@@ -353,14 +417,37 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     const parsed = await llamarGemini(texto, comercial, historial, nlu);
     const accion = ACCIONES.has(parsed.accion) ? parsed.accion : 'preguntar';
     const merged = mergeFicha(comercial, parsed.ficha, texto);
+    if (flujo) merged.flujo = flujo;
     const quiereLlamada = Boolean(parsed.quiereLlamada) || accion === 'ofrecer_llamada';
     if (quiereLlamada) merged.quiereLlamada = true;
     let respuesta = sanitizar(ficha.sanitizarAlucinacionesComercial(parsed.respuesta), 1200);
     if (accion === 'enviar_planes' && !/businesssoft\.net\/planes/i.test(respuesta)) {
       respuesta = `${respuesta}\n${ficha.urlPublica('/planes')}`;
     }
-    if (accion === 'ofrecer_demo' && !/suscribirse\/demo/i.test(respuesta)) {
-      respuesta = `${respuesta}\n${ficha.urlPublica('/suscribirse/demo')}`;
+    const pidioDemo = nlu?.intencion === 'solicitar_demo' || ficha.pareceSolicitarDemo(texto);
+    if ((accion === 'ofrecer_demo' || accion === 'acompanar_demo') && pidioDemo) {
+      const guia = ficha.turnoAcompanamiento({
+        texto,
+        flujo: 'demo',
+        ruta: comercial.rutaActual,
+        comercial: merged,
+        iniciar: true
+      });
+      if (guia) {
+        return conHistorial(guia, historial, texto, requiereCelular);
+      }
+    }
+    if ((accion === 'acompanar_pago') && (nlu?.intencion === 'contratar_plan' || ficha.pareceSolicitarPago(texto))) {
+      const guia = ficha.turnoAcompanamiento({
+        texto,
+        flujo: 'pago',
+        ruta: comercial.rutaActual,
+        comercial: merged,
+        iniciar: true
+      });
+      if (guia) {
+        return conHistorial(guia, historial, texto, requiereCelular);
+      }
     }
     let slugFlayer = parsed.slugFlayer || null;
     if (accion === 'enviar_guia' && !slugFlayer) {
@@ -375,21 +462,24 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     trace('4.BACKEND_SIN_GEMINI', { motivo: err.code || err.message, accion: out.accion });
   }
 
-  if (out.quiereLlamada || out.accion === 'ofrecer_llamada' || parecePedidoLlamada(texto, nlu, out.comercial)) {
+  if (
+    parecePedidoLlamadaEsteTurno(texto, nlu)
+    && (out.quiereLlamada || out.accion === 'ofrecer_llamada')
+  ) {
+    out = pedirDatosOConfirmar(out.comercial, texto, requiereCelular);
+  } else if (
+    !flujo
+    && (out.quiereLlamada || out.accion === 'ofrecer_llamada' || (out.comercial?.esperandoDatosLlamada && parecePedidoLlamada(texto, nlu, out.comercial)))
+  ) {
     out = pedirDatosOConfirmar(out.comercial, texto, requiereCelular);
   }
 
-  const hist = historial.concat([
-    { role: 'user', text: texto.slice(0, 400) },
-    { role: 'model', text: String(out.respuesta || '').slice(0, 400) }
-  ]).slice(-MAX_HISTORIAL);
-  out.comercial = { ...out.comercial, requiereCelular, historial: hist };
   trace('4c.RESPUESTA_BACKEND', {
     accion: out.accion,
     quiereLlamada: out.quiereLlamada,
     texto: out.respuesta
   });
-  return out;
+  return conHistorial(out, historial, texto, requiereCelular);
 }
 
 module.exports = {
