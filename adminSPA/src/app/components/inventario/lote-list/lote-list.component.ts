@@ -68,7 +68,6 @@ export class LoteListComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error al cargar lotes', error);
         this.errorMessage = 'No se pudieron cargar los lotes';
         this.isLoading = false;
         iziToast.show({

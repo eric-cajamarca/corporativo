@@ -80,7 +80,6 @@ export class IndexSucursalComponent {
         //console.log('sucursales',this.sucursales);
       },
       error=>{
-        console.error('Error al cargar sucursales:', error);
       }
     )
   }
@@ -94,7 +93,6 @@ export class IndexSucursalComponent {
       },
       error: (err) => {
         this.load_estado = false;
-        console.error('Error al actualizar estado:', err);
       }
     });
   }
@@ -108,7 +106,6 @@ export class IndexSucursalComponent {
       },
       error: (err) => {
         this.load_estado = false;
-        console.error('Error al establecer sucursal principal:', err);
       }
     });
   }

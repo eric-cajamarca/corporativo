@@ -1293,7 +1293,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         }
       },
       error: (err) => {
-        console.error('Error al cargar productos:', err);
       }
     });
   }
@@ -1319,7 +1318,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       setTimeout(() => this.aplicarDefaultsVentaRapida(), 100);
     },
     error: (err) => {
-      console.error('Error:', err);
       this.formasPago = [];
     }
   });
@@ -1376,7 +1374,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         }
       },
       (error) => {
-        console.error('Error al cargar medios de pago:', error);
       }
     );
 
@@ -3810,7 +3807,6 @@ abrirModalPrecios(item: any) {
           error: (err) => {
             this.postVentaGenerandoPdf = false;
             const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
-            console.error('Error generar PDF post-venta:', err);
             iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
           }
         });

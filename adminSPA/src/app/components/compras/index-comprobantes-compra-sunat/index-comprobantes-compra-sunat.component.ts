@@ -111,7 +111,6 @@ export class IndexComprobantesCompraSunatComponent implements OnInit {
     this.consultaXml.consultarComprobantePdf({ proveedor, tipo_doc, serie, correlativo }).subscribe({
       next: (resp) => {
         this.consultaXml.descargarPdfDesdeRespuesta(resp).catch((e) => {
-          console.error('descargarPdf:', e);
           iziToast?.error?.({ title: 'PDF', message: 'No se pudo descargar el PDF.', position: 'topRight' });
         });
       },
@@ -155,7 +154,7 @@ export class IndexComprobantesCompraSunatComponent implements OnInit {
     };
     this.pdfService.generarPdfDinamico(datos, 'lista-compras', 9).subscribe({
       next: (blob) => this.pdfService.previsualizar(blob),
-      error: (err) => console.error('PDF lista SUNAT:', err)
+      error: () => undefined
     });
   }
 
@@ -201,7 +200,7 @@ export class IndexComprobantesCompraSunatComponent implements OnInit {
     };
     this.excelService.generarExcel(datosExcel).subscribe({
       next: (blob) => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
-      error: (err) => console.error('Excel SUNAT:', err)
+      error: () => undefined
     });
   }
 

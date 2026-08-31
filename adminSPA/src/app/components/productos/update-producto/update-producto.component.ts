@@ -162,7 +162,6 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
           this.cargando = false;
         },
         error: (error) => {
-          console.error('Error al cargar producto:', error);
           iziToast.error({ title: 'Error', message: 'No se pudo cargar el producto', position: 'topRight' });
           this.cargando = false;
         }
@@ -259,7 +258,6 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
         this.activeModal.close(true);
       },
       error: (error) => {
-        console.error('Error al actualizar producto:', error);
         iziToast.error({
           title: 'Error',
           message: error?.error?.message || 'No se pudieron guardar los cambios',

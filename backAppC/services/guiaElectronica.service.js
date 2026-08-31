@@ -107,35 +107,17 @@ function extraerCredencialesGre(config, rucEmisorFallback) {
   const fallbackRaw  = String(rucEmisorFallback || "").trim();
   const mergedRaw    = cfgRucRaw || fallbackRaw;
   const rucApiGuias  = normalizarRucSunatGre(mergedRaw) || mergedRaw.replace(/\D/g, "");
-  const fuenteOAuth  = cfgRucRaw ? "rucApiGuias (ConfiguracionFacturacionElectronica)" : "Empresas.ruc (idEmpresa del JWT)";
-  console.error("[GRE] RUC en URL de token OAuth2:", rucApiGuias || "(vacío)", "| origen:", fuenteOAuth);
-  if (cfgRucRaw) {
-    console.error("[GRE] rucApiGuias en BD (raw):", cfgRucRaw);
-  } else {
-    console.error("[GRE] Empresas.ruc (raw desde consulta):", fallbackRaw || "(vacío)");
-  }
   return { urlBase, clientId, clientSecret, rucApiGuias };
 }
 
 /** Obtiene token OAuth2 de SUNAT GRE (api-seguridad). */
 /**
  * Prueba una variante de OAuth2 y retorna la respuesta.
- * Loguea exactamente qué se envía y qué responde SUNAT.
+ * No registra body, tokens ni cabeceras (credenciales).
  */
-async function probarVariante(url, cid, csc, tag, body, extraHeaders = {}) {
+async function probarVariante(url, _cid, _csc, _tag, body, extraHeaders = {}) {
   const headers = { "Content-Type": "application/x-www-form-urlencoded", ...extraHeaders };
-  console.error(`[GRE OAuth2][${tag}] → ${url}`);
-  let bodyLog = body.replace(csc, "***");
-  if (body.includes("password=")) {
-    bodyLog = bodyLog.replace(/password=[^&]*/i, "password=***");
-  }
-  console.error(`[GRE OAuth2][${tag}] body: ${bodyLog}`);
-  if (extraHeaders.Authorization) {
-    console.error(`[GRE OAuth2][${tag}] Authorization: ${extraHeaders.Authorization.slice(0, 20)}...`);
-  }
-  const resp = await axios.post(url, body, { headers, timeout: SUNAT_OAUTH_TIMEOUT, validateStatus: () => true });
-  console.error(`[GRE OAuth2][${tag}] HTTP ${resp.status} →`, JSON.stringify(resp.data));
-  return resp;
+  return axios.post(url, body, { headers, timeout: SUNAT_OAUTH_TIMEOUT, validateStatus: () => true });
 }
 
 /**
@@ -182,11 +164,6 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
   const cid = (clientId     || "").trim();
   const csc = (clientSecret || "").trim();
 
-  console.error("=== [GRE OAuth2] INICIO ===");
-  console.error("[GRE OAuth2] client_id (UUID app):", cid);
-  console.error("[GRE OAuth2] client_secret_len:", csc.length, "| primeros 6:", csc.slice(0, 6));
-  console.error("[GRE OAuth2] RUC emisor (11 dígitos, XML/envío):", rucPath);
-
   // Solo scopes válidos para GRE; NO usar consulta integrada contribuyentes (token inútil para GEM).
   const SCOPES = [
     "https://api-cpe.sunat.gob.pe",
@@ -214,8 +191,6 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
         `${SUNAT_OAUTH_BASE}/v1/clientessol/${cid}/oauth2/token/`,
         `${SUNAT_OAUTH_BASE}/v1/clientessol/${cid}/oauth2/token`
       ];
-      console.error("=== [GRE OAuth2] Flujo DESKTOP/SOL: clientessol/{client_id} + password ===");
-      console.error("[GRE OAuth2][sol] usuario OAuth (RUC+nombre SOL):", usernameGre.slice(0, 18) + (usernameGre.length > 18 ? "…" : ""));
       const params = new URLSearchParams();
       params.set("grant_type", "password");
       params.set("scope", "https://api-cpe.sunat.gob.pe");
@@ -232,21 +207,11 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
         if (rSol.status === 200 && rSol.data?.access_token) {
           const tok = rSol.data.access_token;
           if (!tokenIncluyeAlcanceGemGre(tok)) {
-            console.error("[GRE OAuth2] Token SOL sin alcance GEM/api-cpe en JWT; probando otra URL o flujo Web.");
             continue;
           }
-          console.error("[GRE OAuth2] ÉXITO (SOL/Desktop).");
           return tok;
         }
       }
-      if (solUnauthorizedClient) {
-        console.error(
-          "[GRE OAuth2] Nota: «cliente no autorizado» en clientessol+password suele indicar que este client_id " +
-            "es de una aplicación WEB en SUNAT; ese flujo solo admite apps con alcance «Desktop»."
-        );
-      }
-    } else {
-      console.error("[GRE OAuth2] Sin usuarioSunat/claveSunat → no se prueba flujo SOL.");
     }
   }
 
@@ -254,14 +219,11 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
   if (cid) extranetSegments.push({ label: "client_id(UUID)", value: cid });
   if (rucPath && rucPath !== cid) extranetSegments.push({ label: "ruc", value: rucPath });
 
-  console.error("=== [GRE OAuth2] Flujo WEB: clientesextranet/{segment} + client_credentials ===");
-
   for (const { label, value } of extranetSegments) {
     const URLS = [
       `${SUNAT_OAUTH_BASE}/v1/clientesextranet/${value}/oauth2/token/`,
       `${SUNAT_OAUTH_BASE}/v1/clientesextranet/${value}/oauth2/token`
     ];
-    console.error(`[GRE OAuth2] Probando segmento path (${label}):`, value);
     for (const url of URLS) {
       for (const scope of SCOPES) {
         const scopePart = scope ? `&scope=${scope}` : "";
@@ -273,10 +235,8 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
         if (r1.status === 200 && r1.data?.access_token) {
           const tok = r1.data.access_token;
           if (!tokenIncluyeAlcanceGemGre(tok)) {
-            console.error("[GRE OAuth2] Token client_credentials ignorado: aud sin GEM/api-cpe (no sirve para guías).");
             continue;
           }
-          console.error("[GRE OAuth2] ÉXITO client_credentials (body). segmento:", label, "scope:", scope || "(ninguno)");
           return tok;
         }
         const b64 = Buffer.from(`${cid}:${csc}`).toString("base64");
@@ -285,17 +245,13 @@ async function obtenerTokenOauth2(ruc, clientId, clientSecret, config = null) {
         if (r2.status === 200 && r2.data?.access_token) {
           const tok = r2.data.access_token;
           if (!tokenIncluyeAlcanceGemGre(tok)) {
-            console.error("[GRE OAuth2] Token Basic ignorado: aud sin GEM/api-cpe.");
             continue;
           }
-          console.error("[GRE OAuth2] ÉXITO client_credentials (Basic). segmento:", label, "scope:", scope || "(ninguno)");
           return tok;
         }
       }
     }
   }
-
-  console.error("=== [GRE OAuth2] TODAS LAS VARIANTES FALLARON ===");
 
   const partes = ["No se obtuvo token válido para GRE."];
   if (solUnauthorizedClient) {
@@ -1073,7 +1029,6 @@ async function gemPostJson(url, token, jsonBody) {
     }
   });
   if (resp.status === 401) {
-    console.error("[GRE GEM] POST 401 con Bearer → reintento Authorization: JWT …");
     resp = await axios.post(url, jsonBody, {
       ...base,
       headers: {
@@ -1094,7 +1049,6 @@ async function gemGet(url, token) {
     headers: { Authorization: `Bearer ${t}`, Accept: "application/json" }
   });
   if (resp.status === 401) {
-    console.error("[GRE GEM] GET 401 con Bearer → reintento JWT …");
     resp = await axios.get(url, {
       ...base,
       headers: { Authorization: `JWT ${t}`, Accept: "application/json" }
@@ -1111,7 +1065,6 @@ async function gemGet(url, token) {
  */
 async function enviarZipSunat(urlBase, token, ruc, tipoDoc, serie, numStr, zipInfo) {
   const greUrl = `${urlBase.replace(/\/$/, "")}/v1/contribuyente/gem/comprobantes/${ruc}-${tipoDoc}-${serie}-${numStr}`;
-  console.error("[GRE GEM] POST envío:", greUrl);
   return gemPostJson(greUrl, token, { archivo: zipInfo });
 }
 
@@ -1456,7 +1409,7 @@ exports.registrarGuiaService = async (pool, user, datos) => {
   }
 
   // Error de validación u otro error SUNAT
-  const errMsg = resp.data?.msg || resp.data?.errors?.map(e => `${e.cod}: ${e.msg}`).join(", ") || JSON.stringify(resp.data).slice(0, 200);
+  const errMsg = resp.data?.msg || resp.data?.errors?.map(e => `${e.cod}: ${e.msg}`).join(", ") || `HTTP ${resp.status}`;
   await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuia, idEmpresa, {
     idEstadoSunat    : ESTADO_ERROR,
     descripcionEstado: `HTTP ${resp.status}: ${errMsg}`.slice(0, 200),
@@ -1504,7 +1457,7 @@ async function consultarGemEnvioPorTicketYActualizarBd(pool, idGuiaElectronica, 
     return {
       tuvoTicket: true,
       httpError: true,
-      mensaje: `SUNAT GEM respondió HTTP ${resp.status}: ${JSON.stringify(resp.data || {}).slice(0, 200)}`
+      mensaje: `SUNAT GEM respondió HTTP ${resp.status}`
     };
   }
 
@@ -1552,7 +1505,7 @@ async function consultarGemEnvioPorTicketYActualizarBd(pool, idGuiaElectronica, 
   return {
     tuvoTicket: true,
     inesperado: true,
-    mensaje: `Respuesta inesperada de SUNAT: ${JSON.stringify(resp.data).slice(0, 200)}`
+    mensaje: "Respuesta inesperada de SUNAT"
   };
 }
 
@@ -1629,8 +1582,7 @@ async function consultarGreEstadoPorGemApi(pool, idEmpresa, rucEmisor, tipoDoc, 
   }
 
   if (resp.status !== 200) {
-    const hint = resp.data && typeof resp.data === "object" ? JSON.stringify(resp.data).slice(0, 280) : String(resp.data || "").slice(0, 200);
-    return { error: `GEM HTTP ${resp.status}: ${hint}` };
+    return { error: `GEM HTTP ${resp.status}` };
   }
 
   const d = resp.data && typeof resp.data === "object" ? resp.data : {};
@@ -1651,12 +1603,9 @@ async function consultarGreEstadoPorGemApi(pool, idEmpresa, rucEmisor, tipoDoc, 
     return { aceptado: false, mensaje: "GEM: la respuesta sugiere baja o anulación." };
   }
 
-  console.error("[GRE GEM] GET estado comprobante — cuerpo (recorte):", JSON.stringify(d).slice(0, 500));
   return {
     aceptado: null,
-    mensaje:
-      "GEM respondió 200 pero el formato no es el esperado. Revise logs del servidor o documentación SUNAT. Recorte: " +
-      JSON.stringify(d).slice(0, 350)
+    mensaje: "GEM respondió 200 pero el formato no es el esperado."
   };
 }
 
@@ -2001,7 +1950,7 @@ exports.reenviarGuiaService = async (pool, user, idGuiaElectronica) => {
     };
   }
 
-  const errMsg = resp.data?.msg || JSON.stringify(resp.data).slice(0, 200);
+  const errMsg = resp.data?.msg || `HTTP ${resp.status}`;
   await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuiaElectronica, idEmpresa, {
     idEstadoSunat    : ESTADO_ERROR,
     descripcionEstado: `HTTP ${resp.status}: ${errMsg}`.slice(0, 200),

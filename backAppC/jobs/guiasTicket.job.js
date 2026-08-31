@@ -14,7 +14,6 @@ const axios    = require("axios");
 const { withPool } = require("../utils/dbPool.util");
 const guiaRepo = require("../repositories/guiaElectronica.repository");
 const { descifrar } = require("../utils/cifradoClaveCertificado.util");
-const { normalizarRucSunatGre } = require("../utils/rucSunatGre.util");
 const guiaElectronicaService = require("../services/guiaElectronica.service");
 
 const INTERVALO_MS       = 30 * 1000; // 30 segundos
@@ -35,7 +34,6 @@ async function procesarTicket(pool, guia) {
 
   let token;
   try {
-    console.error("[GRE TICKET] OAuth2 RUC referencia:", normalizarRucSunatGre(ruc) || String(ruc || "").trim(), "| raw BD:", String(ruc || "").trim());
     token = await guiaElectronicaService.obtenerTokenGreConConfig(
       pool,
       ruc,
@@ -44,7 +42,7 @@ async function procesarTicket(pool, guia) {
       idEmpresa
     );
   } catch (err) {
-    console.error(`[GRE TICKET] OAuth2 error guía ${serie}-${numero}:`, err.message);
+    console.error("[GRE TICKET] OAuth2 error:", err.message);
     return; // Reintentará en la siguiente vuelta
   }
 
@@ -91,7 +89,7 @@ async function procesarTicket(pool, guia) {
     return;
   }
 
-  console.error(`[GRE TICKET] Respuesta inesperada guía ${serie}-${numero}: HTTP ${resp.status}`, resp.data);
+  console.error(`[GRE TICKET] Respuesta inesperada HTTP ${resp.status}`);
 }
 
 async function ejecutar() {

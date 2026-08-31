@@ -62,8 +62,8 @@ export class VentaSesionService {
         ultimaActualizacion: new Date().toISOString()
       };
       localStorage.setItem(this.getStorageKey(), JSON.stringify(data));
-    } catch (e) {
-      console.error('VentaSesionService persist:', e);
+    } catch {
+      /* quota o modo privado */
     }
   }
 

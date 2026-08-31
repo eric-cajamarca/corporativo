@@ -85,7 +85,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.empresas_const = response.data || [];
       },
       error: (error) => {
-        console.error('Error cargando empresas:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -151,7 +150,6 @@ export class IndexEmpresaComponent implements OnInit {
       },
       error: (error) => {
         this.load_estado = false;
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -274,7 +272,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.loadingGestores.set(false);
       },
       error: (error) => {
-        console.error('Error cargando gestores:', error);
         this.loadingGestores.set(false);
       }
     });
@@ -314,7 +311,6 @@ export class IndexEmpresaComponent implements OnInit {
       },
       error: (error) => {
         this.buscandoEmpresa.set(false);
-        console.error('Error:', error);
         
         let mensaje = 'Error al buscar la empresa';
         if (error.error?.message) {
@@ -358,7 +354,6 @@ export class IndexEmpresaComponent implements OnInit {
       },
       error: (error) => {
         this.asignandoGestor.set(false);
-        console.error('Error:', error);
         
         let mensaje = 'Error al asignar la empresa';
         if (error.error?.message) {
@@ -390,7 +385,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.cargarGestores();
       },
       error: (error) => {
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -416,7 +410,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.cargarGestores();
       },
       error: (error) => {
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -446,7 +439,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.cargarGestores();
       },
       error: (error) => {
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -496,7 +488,6 @@ export class IndexEmpresaComponent implements OnInit {
       },
       error: (err) => {
         this.loadingServiciosApi.set(false);
-        console.error('Error cargando servicios API:', err);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -575,7 +566,6 @@ export class IndexEmpresaComponent implements OnInit {
         this.agregarConfiguracionesPorDefecto();
       },
       error: (error) => {
-        console.error('Error cargando configuración:', error);
         this.loadingConfiguracion.set(false);
       }
     });
@@ -617,7 +607,6 @@ export class IndexEmpresaComponent implements OnInit {
       },
       error: (error) => {
         this.guardandoConfiguracion.set(false);
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',

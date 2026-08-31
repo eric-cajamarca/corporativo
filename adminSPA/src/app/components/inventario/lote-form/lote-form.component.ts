@@ -89,7 +89,6 @@ export class LoteFormComponent implements OnInit {
         this.cargando = false;
       },
       error: (error) => {
-        console.error('Error cargando datos:', error);
         this.cargando = false;
         iziToast.show({
           title: 'Error',
@@ -121,7 +120,6 @@ export class LoteFormComponent implements OnInit {
         this.cargando = false;
       },
       error: (error) => {
-        console.error('Error al cargar lote', error);
         this.cargando = false;
         iziToast.show({
           title: 'Error',

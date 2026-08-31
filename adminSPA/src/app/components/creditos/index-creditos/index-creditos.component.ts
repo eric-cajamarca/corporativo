@@ -279,7 +279,6 @@ export class IndexCreditosComponent implements OnInit {
         this.clientes = response.clientes || response.data || [];
       },
       error: (error) => {
-        console.error('Error al cargar clientes:', error);
       }
     });
   }
@@ -355,7 +354,6 @@ export class IndexCreditosComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error al cargar resumen:', error);
       }
     });
   }
@@ -680,7 +678,6 @@ export class IndexCreditosComponent implements OnInit {
       next: () => {},
       error: (err) => {
         this.loading = false;
-        console.error('Error al guardar cobranza:', err);
         iziToast.error({
           title: 'Error',
           message: err?.error?.message || err?.message || 'Error al registrar el pago de la cobranza.'
@@ -751,7 +748,6 @@ export class IndexCreditosComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al crear crédito:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al crear el crédito'
@@ -805,7 +801,6 @@ export class IndexCreditosComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al pagar cuota:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al registrar el pago'

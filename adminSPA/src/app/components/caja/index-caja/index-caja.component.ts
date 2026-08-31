@@ -113,7 +113,6 @@ export class IndexCajaComponent implements OnInit {
         }
       },
       error: (err) => {
-        console.error('Error al cargar sucursales (cajas):', err);
         this.sucursales = [];
       }
     });
@@ -129,7 +128,6 @@ export class IndexCajaComponent implements OnInit {
         this.aplicarOnboardingDesdeQuery();
       },
       error: (error) => {
-        console.error('Error al cargar cajas:', error);
         iziToast.error({
           title: 'Error',
           message: error?.error?.message || 'Error al cargar las cajas'
@@ -157,7 +155,6 @@ export class IndexCajaComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error al cargar tipos de movimiento:', error);
       }
     });
   }
@@ -186,7 +183,6 @@ export class IndexCajaComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al cargar movimientos:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar los movimientos'
@@ -309,7 +305,6 @@ export class IndexCajaComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al abrir caja:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al abrir la caja'
@@ -356,7 +351,6 @@ export class IndexCajaComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al registrar movimiento:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al registrar el movimiento'
@@ -391,7 +385,6 @@ export class IndexCajaComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al cerrar caja:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al cerrar la caja'

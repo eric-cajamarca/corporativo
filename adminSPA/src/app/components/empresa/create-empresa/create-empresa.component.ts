@@ -208,17 +208,17 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
   private cargarUbicaciones(): void {
     this.adminService.get_Regiones().subscribe({
       next: (response) => this.regiones = response,
-      error: (error) => console.error('Error cargando regiones:', error)
+      error: () => undefined
     });
 
     this.adminService.get_Procincias().subscribe({
       next: (response) => this.provincias = response,
-      error: (error) => console.error('Error cargando provincias:', error)
+      error: () => undefined
     });
 
     this.adminService.get_Distritos().subscribe({
       next: (response) => this.distritos = response,
-      error: (error) => console.error('Error cargando distritos:', error)
+      error: () => undefined
     });
   }
 
@@ -352,7 +352,6 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.buscando.set(false);
-        console.error('Error buscando RUC:', error);
         this.syncChatPagina('ruc_sunat');
         const body = error?.error;
         const msgApi = String(body?.error || body?.message || '').trim();
@@ -405,8 +404,8 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
           }
         }, 100);
       }
-    } catch (error) {
-      console.error('Error seleccionando ubicación:', error);
+    } catch {
+      /* ubicación opcional */
     }
   }
 
@@ -484,11 +483,7 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
     if (this.empresaForm.invalid) {
       // Marcar todos los campos como touched para mostrar errores
       Object.keys(this.empresaForm.controls).forEach(key => {
-        const control = this.empresaForm.get(key);
-        control?.markAsTouched();
-        if (control?.invalid) {
-          console.error(`Campo ${key} inválido:`, control.errors, 'Valor:', control.value);
-        }
+        this.empresaForm.get(key)?.markAsTouched();
       });
       
       const mensajeError = `Complete todos los campos requeridos. Campos inválidos: ${camposInvalidos.join(', ')}`;
@@ -578,7 +573,6 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
         }
       },
       error: (error) => {
-        console.error('Error creando empresa:', error);
         this.registrando.set(false);
         iziToast.show({
           title: 'Error',

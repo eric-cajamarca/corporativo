@@ -130,7 +130,6 @@ export class ConsultaXMLService {
         });
       });
     } catch (error) {
-      console.error('Error al procesar XML:', error);
       throw error;
     }
   }
@@ -250,9 +249,8 @@ export class ConsultaXMLService {
     try {
       const blob = new Blob([xmlContent], { type: 'application/xml' });
       saveAs(blob, filename || `comprobante_${Date.now()}.xml`);
-    } catch (error) {
-      console.warn('No se pudo descargar el XML:', error);
-      // No lanzamos error porque esto no debería detener el flujo principal
+    } catch {
+      /* la descarga XML no debe detener el flujo */
     }
   }
 

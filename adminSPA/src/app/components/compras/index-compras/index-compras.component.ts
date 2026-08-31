@@ -208,7 +208,6 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
         this.productos_const = this.productos;
       },
       (error: any) => {
-        console.error('Error al cargar productos:', error);
       }
     );
 
@@ -253,7 +252,6 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
         this.load_compras = false;
       },
       error: (err) => {
-        console.error('initData compras:', err);
         this.load_compras = false;
       }
     });
@@ -311,7 +309,6 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
   consultaCompCompra(id: any) {
     if (id == null || id === '') {
-      console.error('consultaCompCompra: idCompra no disponible');
       return;
     }
     this.loadDetalleCompras = true;
@@ -505,13 +502,11 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
         this.pdfService.generarPdfDinamico(datos, 'factura', 9).subscribe({
           next: blob => this.pdfService.previsualizar(blob),
           error: err => {
-            console.error('Error al generar el PDF', err);
             iziToast?.error?.({ title: 'Error', message: 'Error al generar el PDF', position: 'topRight' });
           }
         });
       },
       error: (err) => {
-        console.error('Error al obtener detalle de compra', err);
         iziToast?.error?.({ title: 'Error', message: 'No se pudo cargar el detalle del comprobante', position: 'topRight' });
       }
     });
@@ -541,7 +536,7 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
     this.pdfService.generarPdfDinamico(datos, 'lista-compras', 9).subscribe({
       next: blob => this.pdfService.previsualizar(blob),
-      error: err => console.error('Error PDF', err)
+      error: () => undefined
     });
   }
 
@@ -565,7 +560,7 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
     this.excelService.generarExcel(datosExcel).subscribe({
       next: blob => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
-      error: err => console.error('Error Excel', err)
+      error: () => undefined
     });
   }
 
@@ -586,7 +581,7 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
     this.excelService.generarExcel(datosExcel).subscribe({
       next: blob => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
-      error: err => console.error('Error Excel', err)
+      error: () => undefined
     });
   }
 

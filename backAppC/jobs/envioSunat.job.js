@@ -22,7 +22,6 @@ async function ejecutarEnvio() {
     return;
   }
   ejecucionEnCurso = true;
-  console.error("[SUNAT] envioSunat.job: ejecutarEnvio inicio");
   debugSunatLog.write({ location: "envioSunat.job.ejecutarEnvio", message: "inicio", data: { intervaloMs: INTERVALO_MS } });
   try {
     await withPool(async (pool) => {
@@ -32,17 +31,12 @@ async function ejecutarEnvio() {
       const jobData = {
         total: resultados.length,
         conEnvio: conEnvio.length,
-        pendientesReintento: pendientesReintento.length,
-        resultados
+        pendientesReintento: pendientesReintento.length
       };
-      console.error("[SUNAT] envioSunat.job: resultados", jobData);
       debugSunatLog.write({ location: "envioSunat.job.ejecutarEnvio", message: "resultados", data: jobData });
-      if (conEnvio.length > 0 || pendientesReintento.length > 0) {
-        console.error("Envío automático SUNAT:", JSON.stringify(jobData));
-      }
     });
   } catch (err) {
-    console.error("contexto: Job envío automático SUNAT:", err);
+    console.error("contexto: Job envío automático SUNAT:", err.message || err);
   } finally {
     ejecucionEnCurso = false;
   }

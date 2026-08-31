@@ -83,7 +83,6 @@ export class PermisosService {
                 this._cargando.set(false);
             }),
             catchError(error => {
-                console.error('Error al cargar permisos:', error);
                 this._permisos.set([]);
                 this._deploymentMode.set('enterprise');
                 this._planCodeEfectivo.set(null);
@@ -124,7 +123,6 @@ export class PermisosService {
                 this._cargando.set(false);
             }),
             catchError(error => {
-                console.error('Error al cargar navegación:', error);
                 this._cargando.set(false);
                 return of({ message: 'Error', data: [] });
             })

@@ -22,10 +22,12 @@ function errorHandler(err, req, res, next) {
       path: (req.originalUrl || req.url || '').split('?')[0],
       method: req.method,
       status,
-      errMessage: message
+      errMessage: status >= 500 ? 'Error interno' : message
     })
   );
-  if (err.stack) console.error(err.stack);
+  if (err.stack && process.env.NODE_ENV !== 'production') {
+    console.error(err.stack);
+  }
 
   if (status >= 500) {
     sql

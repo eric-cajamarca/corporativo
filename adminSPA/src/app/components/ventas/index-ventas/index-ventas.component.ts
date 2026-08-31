@@ -1106,7 +1106,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           error: (err) => {
             this.generandoPdf = false;
             const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
-            console.error('Error generar PDF:', err);
             this.toastInfo(msg);
           }
         });
@@ -1114,7 +1113,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.generandoPdf = false;
         const msg = err?.error?.error || err?.message || 'No se pudieron cargar los datos del comprobante.';
-        console.error('Error comprobante PDF:', err);
         this.toastInfo(msg);
       }
     });
@@ -1376,7 +1374,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.exportandoReporteContabilidad = false;
         const msg = (err as { error?: { error?: string } })?.error?.error || (err as Error)?.message || 'Error al generar el PDF.';
-        console.error('Error reporte contabilidad PDF:', err);
         this.toastInfo(msg);
       }
     });
@@ -1402,7 +1399,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
         this.emitirPdfReporteContabilidad(comps, ras, resumen);
       },
       (err) => {
-        console.error('Error al listar comunicaciones de baja para reporte:', err);
         if (comps.length === 0) {
           this.exportandoReporteContabilidad = false;
           this.toastError('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
@@ -1543,7 +1539,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.exportandoLista = false;
         const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
-        console.error('Error exportar lista PDF:', err);
         this.toastInfo(msg);
       }
     });
@@ -1616,7 +1611,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.exportandoLista = false;
         const msg = err?.error?.error || err?.message || 'Error al generar el Excel.';
-        console.error('Error exportar lista Excel:', err);
         this.toastError(msg);
       }
     });

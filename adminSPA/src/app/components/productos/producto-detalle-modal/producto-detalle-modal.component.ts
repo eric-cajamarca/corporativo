@@ -74,7 +74,6 @@ export class ProductoDetalleModalComponent implements OnInit {
         if (this.productosConImagenes && this.idProducto) this.cargarImagenes();
       },
       error: (error) => {
-        console.error('Error al cargar producto:', error);
         iziToast.error({
           title: 'Error',
           message: 'No se pudo cargar el producto',
@@ -133,7 +132,6 @@ export class ProductoDetalleModalComponent implements OnInit {
         this.activeModal.close(true);
       },
       error: (error) => {
-        console.error('Error al actualizar producto:', error);
         iziToast.error({
           title: 'Error',
           message: error?.error?.message || 'No se pudieron guardar los cambios',

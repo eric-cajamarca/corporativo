@@ -46,7 +46,6 @@ export class PrincipalInventarioComponent implements OnInit {
         this.cargandoEstadisticas = false;
       },
       error: (error) => {
-        console.error('Error cargando estadísticas:', error);
         this.cargandoEstadisticas = false;
       }
     });
@@ -60,11 +59,7 @@ export class PrincipalInventarioComponent implements OnInit {
   /** Navegación explícita: en algunos móviles los enlaces tipo botón con routerLink no disparan bien el toque. */
   irConteoFisico(event?: Event): void {
     this.blurTrigger(event);
-    void this.router.navigateByUrl('/inventario/conteo-fisico').then((ok) => {
-      if (!ok) {
-        console.error('No se pudo navegar a conteo físico');
-      }
-    });
+    void this.router.navigateByUrl('/inventario/conteo-fisico');
   }
 
   /**

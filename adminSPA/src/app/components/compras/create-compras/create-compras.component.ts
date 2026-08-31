@@ -372,7 +372,6 @@ export class CreateComprasComponent {
       next: (resp) => {
         this.loadingPdf = false;
         this.sunatService.descargarPdfDesdeRespuesta(resp).catch(err => {
-          console.error('Error al descargar PDF:', err);
           iziToast.error({ title: 'Error', message: 'No se pudo descargar el PDF del comprobante', position: 'topRight' });
         });
       },
@@ -684,7 +683,6 @@ export class CreateComprasComponent {
         this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
       },
       error: (err) => {
-        console.error('obtener_correlativo_empresa:', err);
         // Mantener correlativo inicial { numero: 0 } si la API falla (ej. 500)
       },
     });
@@ -819,7 +817,6 @@ export class CreateComprasComponent {
         }
       },
       error: (err) => {
-        console.error('buscar proveedor:', err);
         this.limpiarProveedorEnCompra();
       },
     });
@@ -1174,8 +1171,9 @@ export class CreateComprasComponent {
             });
           }
         });
-      } catch (error) {
-              }
+      } catch {
+        /* mapeo de presentación opcional */
+      }
     } else {
       iziToast.show({
         title: 'ERROR',
@@ -1730,7 +1728,6 @@ export class CreateComprasComponent {
           }
         },
         error: (stockError: unknown) => {
-          console.error('crearStockSucursal:', stockError);
         },
       });
   }
@@ -1750,7 +1747,6 @@ export class CreateComprasComponent {
         }
       },
       error: (err: unknown) => {
-        console.error('actualizarProducto:', err);
       },
     });
   }
@@ -1774,7 +1770,6 @@ export class CreateComprasComponent {
           }
         },
         error: (err: unknown) => {
-          console.error('editarStockSucursal:', err);
         },
       });
   }
@@ -1796,7 +1791,6 @@ export class CreateComprasComponent {
           }
         },
         error: (detalleError: unknown) => {
-          console.error('crearDetalleCompra:', detalleError);
         },
       });
   }
@@ -1821,7 +1815,6 @@ export class CreateComprasComponent {
           }
         },
         error: (correlativoError: unknown) => {
-          console.error('editarCorrelativo:', correlativoError);
         },
       });
   }

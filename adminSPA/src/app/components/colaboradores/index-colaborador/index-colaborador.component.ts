@@ -144,7 +144,6 @@ export class IndexColaboradorComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error:', error);
       }
     });
   }
@@ -222,7 +221,6 @@ export class IndexColaboradorComponent implements OnInit {
         this.loadingRoles.set(false);
       },
       error: (error) => {
-        console.error('Error cargando roles:', error);
         this.loadingRoles.set(false);
       }
     });
@@ -310,7 +308,6 @@ export class IndexColaboradorComponent implements OnInit {
         this.loadingPermisos.set(false);
       },
       error: (error) => {
-        console.error('Error cargando permisos:', error);
         this.loadingPermisos.set(false);
       }
     });
@@ -342,7 +339,6 @@ export class IndexColaboradorComponent implements OnInit {
         });
       },
       error: (error) => {
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -525,7 +521,6 @@ export class IndexColaboradorComponent implements OnInit {
         this.loadingSucursales.set(false);
       },
       error: (error) => {
-        console.error('Error:', error);
         this.loadingSucursales.set(false);
         iziToast.show({
           title: 'Error',
@@ -584,7 +579,6 @@ export class IndexColaboradorComponent implements OnInit {
       },
       error: (error) => {
         this.guardandoSucursales.set(false);
-        console.error('Error:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',

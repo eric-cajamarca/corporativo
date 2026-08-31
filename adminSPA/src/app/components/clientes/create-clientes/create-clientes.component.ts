@@ -310,7 +310,6 @@ export class CreateClientesComponent implements OnInit, OnChanges {
       this.showError('Formato de documento incorrecto (RUC 11 dígitos, DNI 8 dígitos, CEE 8-15 caracteres)');
     }
   } catch (error) {
-    console.error('Error en búsqueda:', error);
     this.showError(error instanceof Error ? error.message : 'Error desconocido');
     this.busqueda=false;
   }
@@ -341,7 +340,6 @@ private async handleRucSearch(): Promise<void> {
     this.direccionClientes.principal = true;
     this.direccionClientes.codLocal = '0000';
   } catch (error) {
-    console.error('Error en búsqueda RUC:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar RUC');
   } finally {
     this.busqueda = false;
@@ -366,7 +364,6 @@ private async handleDniSearch(): Promise<void> {
     this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
     this.direccionClientes.direccion = '-';
   } catch (error) {
-    console.error('Error en búsqueda DNI:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
   } finally {
     this.busqueda = false;
@@ -390,21 +387,18 @@ private async handleCeeSearch(): Promise<void> {
     const partes = [ap, am, nom].filter(Boolean);
     this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
   } catch (error) {
-    console.error('Error en búsqueda CEE:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar Carnet de extranjería');
   } finally {
     this.busqueda = false;
   }
 }
 
-  private findLocationId(items: any[], name: string, type: string): string | undefined {
+  private findLocationId(items: any[], name: string, _type: string): string | undefined {
     if (!items || items.length === 0) {
-      console.warn(`No hay ${type}s cargados para buscar`);
       return undefined;
     }
 
     if (!name) {
-      console.warn(`El nombre del ${type} es inválido o vacío`);
       return undefined;
     }
 
@@ -433,7 +427,6 @@ private async handleCeeSearch(): Promise<void> {
     }
 
     if (!foundItem) {
-      console.warn(`No se encontró ${type} correspondiente para: ${name}`);
             return undefined;
     }
 
@@ -746,7 +739,6 @@ private showError(message: string): void {
                     this.btn_registrar = false;
         },
         error => {
-                    console.error('Error al crear el cliente:', error);
           this.btn_registrar = false;
         }
 

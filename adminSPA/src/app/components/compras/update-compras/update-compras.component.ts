@@ -162,7 +162,6 @@ export class UpdateComprasComponent {
           }
         },
         error => {
-          console.error('Error al obtener detalle de compra:', error);
           this.loadCompras = false;
         }
       );
@@ -384,7 +383,6 @@ export class UpdateComprasComponent {
         this.productos_const = this.productos;
       },
       (error: any) => {
-        console.error('Error al cargar productos:', error);
       }
     );
   }
@@ -421,10 +419,7 @@ export class UpdateComprasComponent {
               element.marca = selectedObjectMarca;
 
             });
-          } else {
-            console.error('Uno de los arrays es undefined o está vacío.');
           }
-
 
           this.stockSucursales_const = this.stockSucursales;
                   } else {
@@ -741,12 +736,7 @@ export class UpdateComprasComponent {
 
       const selectedObject = this.presentacion.find((item: any) => item.idPresentacion == idPresentacion);
       this.nuevoProducto.presentacion = selectedObject;
-      // Ahora, selectedObject contiene toda la información del elemento seleccionado
-                } else {
-      console.error("Valor inválido para idPresentacion");
     }
-
-
   }
 
   onSelectCategoria(selectedValue: any) {
@@ -766,12 +756,7 @@ export class UpdateComprasComponent {
       // Lógica adicional para manejar la selección de sucursal
       const selectedObject = this.sucursales.find((item: any) => item.idSucursal == numericValue);
       this.nuevoProducto.sucursal = selectedObject;
-      // Ahora, selectedObject contiene toda la información del elemento seleccionado
-                } else {
-      console.error("Valor inválido para idSucursal");
     }
-
-
   }
 
   onCheckboxChange() {
@@ -863,10 +848,8 @@ export class UpdateComprasComponent {
               error => {
                               }
             );
-          } else {
-            console.error("correlativo o correlativo.numero es undefined");
           }
-         
+
           // $('#nuevoProductoModal').modal('hide');
         }
       },
@@ -1138,7 +1121,7 @@ export class UpdateComprasComponent {
             this.compras_const = JSON.parse(JSON.stringify(this.compras));
           }
         },
-        error: (err) => console.error('Error al editar compra:', err)
+        error: () => undefined
       });
     }
 
@@ -1157,7 +1140,7 @@ export class UpdateComprasComponent {
             this.detalleCompras_const = JSON.parse(JSON.stringify(this.detalleCompras));
           }
         },
-        error: (err) => console.error('Error al editar detalle:', err)
+        error: () => undefined
       });
     }
 

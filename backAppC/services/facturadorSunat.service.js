@@ -109,7 +109,7 @@ async function generarXml(baseUrl, ruc, tipoDoc, serie, numero) {
   }
   const res = await axios.post(url, body, { timeout: 30000, headers: { "Content-Type": "application/json" } });
   if (res.status < 200 || res.status >= 300) {
-    console.error("facturadorSunat.service: generarXml status", res.status, res.data);
+    console.error("facturadorSunat.service: generarXml status", res.status);
     throw new Error(res.data?.message || res.data?.Message || `Generar XML falló: ${res.status}`);
   }
   return res.data;
@@ -126,7 +126,7 @@ async function enviarXml(baseUrl, ruc, tipoDoc, serie, numero) {
   }
   const res = await axios.post(url, body, { timeout: 60000, headers: { "Content-Type": "application/json" } });
   if (res.status < 200 || res.status >= 300) {
-    console.error("facturadorSunat.service: enviarXml status", res.status, res.data);
+    console.error("facturadorSunat.service: enviarXml status", res.status);
     throw new Error(res.data?.message || res.data?.Message || `Enviar XML falló: ${res.status}`);
   }
   return res.data;

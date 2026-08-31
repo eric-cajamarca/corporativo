@@ -606,7 +606,6 @@ export class UpdateProveedorComponent {
                 this.btn_registrar = false;
       },
       error => {
-                console.error('Error al crear el cliente:', error);
         this.btn_registrar = false;
       }
 

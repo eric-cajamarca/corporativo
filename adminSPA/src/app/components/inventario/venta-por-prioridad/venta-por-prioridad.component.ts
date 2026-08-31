@@ -99,7 +99,6 @@ export class VentaPorPrioridadComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error cargando datos:', error);
         this.cargando = false;
         iziToast.show({
           title: 'Error',

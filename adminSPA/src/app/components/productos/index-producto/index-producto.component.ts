@@ -124,7 +124,6 @@ export class IndexProductoComponent {
       },
       error: (error: any) => {
         this.mostrarColumnaSucursal = false;
-        console.error('Error al cargar sucursales de empresa:', error);
       }
     });
   }
@@ -161,7 +160,6 @@ export class IndexProductoComponent {
         this.catalogoInicialCargado = true;
       },
       (error: any) => {
-        console.error('Error al cargar productos:', error);
         this.catalogoInicialCargado = true;
         const msg =
           error?.error?.message ||
@@ -256,7 +254,6 @@ export class IndexProductoComponent {
       },
       error: (error: any) => {
         this.desactivandoId = null;
-        console.error('Error al desactivar producto:', error);
         const msg =
           error?.error?.message ||
           error?.message ||
@@ -280,7 +277,6 @@ export class IndexProductoComponent {
       },
       error: (error: any) => {
         this.desactivandoId = null;
-        console.error('Error al activar producto:', error);
         const msg =
           error?.error?.message ||
           error?.message ||
@@ -340,7 +336,6 @@ export class IndexProductoComponent {
       error: (error: any) => {
         this.load_estado = false;
         this.cerrarModalEliminarProducto(id);
-        console.error('Error al eliminar producto:', error);
         const msg =
           error?.error?.message ||
           error?.message ||
@@ -383,12 +378,10 @@ export class IndexProductoComponent {
         if (this.modalCompuestoInstance) {
           this.modalCompuestoInstance.show();
         } else {
-          console.error('Modal no inicializado');
           alert('Por favor, recarga la página o contacta al administrador');
         }
       },
       error: (error: any) => {
-        console.error('Error al cargar productos para kit:', error);
         if (typeof iziToast !== 'undefined') {
           iziToast.error({
             title: 'Error',
@@ -425,7 +418,6 @@ export class IndexProductoComponent {
     if (this.modalVarianteInstance) {
       this.modalVarianteInstance.show();
     } else {
-      console.error('Modal de variantes no inicializado');
       alert('Por favor, recarga la página o contacta al administrador');
     }
   }
@@ -514,7 +506,6 @@ export class IndexProductoComponent {
         this.modalCompuestoInstance.hide();
       },
       error: (error) => {
-        console.error('Error al convertir a compuesto:', error);
         iziToast.error({
           title: 'Error',
           message: 'No se pudo convertir el producto',
@@ -537,7 +528,6 @@ export class IndexProductoComponent {
           this.atributosProducto = response.data || [];
         },
         error: (error) => {
-          console.error('Error al cargar atributos:', error);
         }
       });
   }
@@ -652,7 +642,6 @@ export class IndexProductoComponent {
         this.modalVarianteInstance.hide();
       },
       error: (error) => {
-        console.error('Error al crear variantes:', error);
         iziToast.error({
           title: 'Error',
           message: 'No se pudieron crear las variantes',

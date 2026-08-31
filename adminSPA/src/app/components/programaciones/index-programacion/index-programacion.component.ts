@@ -28,7 +28,6 @@ export class IndexProgramacionComponent implements OnInit {
         this.programado = response?.data ?? response?.programacion ?? [];
       },
       error: (err) => {
-        console.error('Error al cargar programaciones:', err);
         this.programado = [];
       },
       complete: () => { this.loading = false; }

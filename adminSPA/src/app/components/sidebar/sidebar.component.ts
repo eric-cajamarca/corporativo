@@ -182,7 +182,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
         this.actualizarNavegacionSegunEstado(response.data);
       },
       error: (error) => {
-        console.error('Error al cargar estado de configuración:', error);
       }
     });
   }
@@ -636,10 +635,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
         this.closeMobileSidebar();
       } else {
         // Navegación + cierre drawer: en WebKit móvil cerrar en el mismo tick que el click a veces anula la ruta.
-        this.router.navigateByUrl(target).then((ok) => {
-          if (!ok) {
-            console.error('No se pudo navegar a ruta de sidebar:', target);
-          }
+        this.router.navigateByUrl(target).then(() => {
           setTimeout(() => this.closeMobileSidebar(), 0);
         });
       }

@@ -260,7 +260,6 @@ export class CreateProveedorComponent {
 
  
   } catch (error) {
-    console.error('Error en búsqueda:', error);
     this.showError(error instanceof Error ? error.message : 'Error desconocido');
     this.busqueda=false;
   }
@@ -297,7 +296,6 @@ private async handleRucSearch(): Promise<void> {
     this.direccionProveedores.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : undefined;
     this.direccionProveedores.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : undefined;
   } catch (error) {
-    console.error('Error en búsqueda RUC:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar RUC');
   } finally {
     this.busqueda = false;
@@ -327,7 +325,6 @@ private async handleDniSearch(): Promise<void> {
     const partes = [ap, am, nom].filter(Boolean);
     this.proveedores.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
   } catch (error) {
-    console.error('Error en búsqueda DNI:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
   } finally {
     this.busqueda = false;
@@ -353,14 +350,12 @@ private async handleDniSearch(): Promise<void> {
   //   return foundItem.id;
   // }
 
-  private findLocationId(items: any[], name: string, type: string): string | undefined {
+  private findLocationId(items: any[], name: string, _type: string): string | undefined {
     if (!items || items.length === 0) {
-      console.warn(`No hay ${type}s cargados para buscar`);
       return undefined;
     }
 
     if (!name) {
-      console.warn(`El nombre del ${type} es inválido o vacío`);
       return undefined;
     }
 
@@ -389,7 +384,6 @@ private async handleDniSearch(): Promise<void> {
     }
 
     if (!foundItem) {
-      console.warn(`No se encontró ${type} correspondiente para: ${name}`);
             return undefined;
     }
 
@@ -660,7 +654,6 @@ private async handleDniSearch(): Promise<void> {
                     this.btn_registrar = false;
         },
         error => {
-                    console.error('Error al crear el cliente:', error);
           this.btn_registrar = false;
         }
 

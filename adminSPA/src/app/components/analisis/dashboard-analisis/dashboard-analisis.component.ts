@@ -328,7 +328,6 @@ export class DashboardAnalisisComponent implements OnInit {
         this.loading.dashboard = false;
       },
       error: (error) => {
-        console.error('Error al cargar dashboard:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar el dashboard ejecutivo'
@@ -357,7 +356,6 @@ export class DashboardAnalisisComponent implements OnInit {
         this.loading.balance = false;
       },
       error: (error) => {
-        console.error('Error al cargar balance general:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar el balance general'
@@ -393,7 +391,6 @@ export class DashboardAnalisisComponent implements OnInit {
         this.loading.resultados = false;
       },
       error: (error) => {
-        console.error('Error al cargar estado de resultados:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar el estado de resultados'
@@ -415,7 +412,6 @@ export class DashboardAnalisisComponent implements OnInit {
         this.loading.ratios = false;
       },
       error: (error) => {
-        console.error('Error al cargar ratios financieros:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar los ratios financieros'
@@ -439,7 +435,6 @@ export class DashboardAnalisisComponent implements OnInit {
         this.loading.diagnostico = false;
       },
       error: (error) => {
-        console.error('Error al cargar diagnóstico financiero:', error);
         iziToast.error({
           title: 'Error',
           message: 'Error al cargar el diagnóstico financiero'

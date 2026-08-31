@@ -80,7 +80,6 @@ export class UsuarioSucursalService {
                 this._cargando.set(false);
             }),
             catchError(error => {
-                console.error('Error al cargar sucursales:', error);
                 this._cargando.set(false);
                 return of({ message: 'Error', data: [] });
             })

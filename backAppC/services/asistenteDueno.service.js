@@ -1,5 +1,10 @@
 const geminiClient = require('../utils/gemini.client');
-const { GUIA_EFAFERP } = require('../utils/asistenteDueno.conocimiento');
+const {
+  GUIA_EFAFERP,
+  pareceDiagnostico,
+  textoDiagnostico,
+  respuestaGuiaLocal
+} = require('../utils/asistenteDueno.conocimiento');
 const diagnosticoRepo = require('../repositories/asistenteDuenoDiagnostico.repository');
 const { withPool } = require('../utils/dbPool.util');
 
@@ -80,20 +85,16 @@ function textoDePartes(parts) {
     .trim();
 }
 
-async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina }) {
-  if (!idEmpresa || !UUID_RE.test(String(idEmpresa))) {
-    throw new Error('Empresa no válida.');
+async function responderConGuiaLocal(idEmpresa, texto, ruta) {
+  if (pareceDiagnostico(texto)) {
+    const diag = await withPool((pool) => diagnosticoRepo.diagnosticarEmpresa(pool, idEmpresa));
+    return { respuesta: textoDiagnostico(diag), origen: 'local' };
   }
-  const texto = sanitizarTexto(mensaje);
-  if (!texto) {
-    throw new Error('Escriba una pregunta.');
-  }
-  assertRateLimit(String(idEmpresa).toLowerCase());
+  return { respuesta: respuestaGuiaLocal(texto, ruta), origen: 'local' };
+}
 
-  const ruta = sanitizarTexto(rutaActual).slice(0, 200);
-  const titulo = sanitizarTexto(tituloPagina).slice(0, 120);
+async function responderConGemini(idEmpresa, texto, historial, ruta, titulo) {
   const contextoPantalla = `Pantalla actual del usuario: ruta="${ruta || '/'}" título="${titulo || ''}".`;
-
   const contents = [
     ...normalizarHistorial(historial),
     { role: 'user', parts: [{ text: `${contextoPantalla}\n\nPregunta: ${texto}` }] }
@@ -127,12 +128,40 @@ async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina })
     contents.push({ role: 'user', parts: fnParts });
   }
 
-  const respuesta = textoDePartes(lastParts) || 'No pude armar una respuesta. Intente de nuevo o abra el Centro de ayuda.';
-  return { respuesta };
+  const respuesta =
+    textoDePartes(lastParts) || 'No pude armar una respuesta. Intente de nuevo o abra el Centro de ayuda.';
+  return { respuesta, origen: 'gemini' };
+}
+
+async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina }) {
+  if (!idEmpresa || !UUID_RE.test(String(idEmpresa))) {
+    throw new Error('Empresa no válida.');
+  }
+  const texto = sanitizarTexto(mensaje);
+  if (!texto) {
+    throw new Error('Escriba una pregunta.');
+  }
+  assertRateLimit(String(idEmpresa).toLowerCase());
+
+  const ruta = sanitizarTexto(rutaActual).slice(0, 200);
+  const titulo = sanitizarTexto(tituloPagina).slice(0, 120);
+
+  if (!geminiClient.resolverApiKey()) {
+    return responderConGuiaLocal(idEmpresa, texto, ruta);
+  }
+  try {
+    return await responderConGemini(idEmpresa, texto, historial, ruta, titulo);
+  } catch (err) {
+    if (err.code !== 'GEMINI_NO_CONFIG') {
+      console.error('asistenteDueno.gemini:', err.message);
+    }
+    return responderConGuiaLocal(idEmpresa, texto, ruta);
+  }
 }
 
 function estadoConfig() {
-  return { configurado: !!geminiClient.resolverApiKey() };
+  const gemini = !!geminiClient.resolverApiKey();
+  return { configurado: true, gemini };
 }
 
 module.exports = { chat, estadoConfig };

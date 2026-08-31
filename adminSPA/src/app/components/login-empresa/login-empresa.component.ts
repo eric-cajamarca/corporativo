@@ -90,8 +90,7 @@ export class LoginEmpresaComponent implements OnInit {
         this.empresaRecordada = JSON.parse(empresaRecordadaStr);
         this.user.ruc = this.empresaRecordada.ruc;
         this.user.email = this.empresaRecordada.email;
-      } catch (error) {
-        console.error('Error parsing empresa recordada:', error);
+      } catch {
         localStorage.removeItem('empresaRecordada');
       }
     } else if (ultimoPosStr) {
@@ -203,7 +202,6 @@ export class LoginEmpresaComponent implements OnInit {
       },
       error: (error) => {
         this.loading = false;
-        console.error('Login error:', error);
         const body = error?.error;
         const msg =
           (typeof body?.message === 'string' && body.message) ||

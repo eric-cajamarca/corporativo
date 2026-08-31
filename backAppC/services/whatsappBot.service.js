@@ -401,12 +401,7 @@ async function procesarInbound(payload) {
     .filter(Boolean);
 
   if (!respuestaAdaptada.length) {
-    console.error('whatsappBot inbound: respuesta vacia tras procesar turno', {
-      idEmpresa,
-      telefono: tel.logId,
-      estado: conv?.estado,
-      intencion: turno.intencion || null
-    });
+    console.error('whatsappBot inbound: respuesta vacia tras procesar turno');
     withPool((pool) =>
       whatsappBotInboundContext.persistirTurno(pool, idEmpresa, tel.logId, conv, precarga.convNueva)
     ).catch((err) => console.error('whatsappBot persistir conversacion:', err.message));
@@ -512,7 +507,7 @@ async function procesarInbound(payload) {
 
   const ms = Date.now() - t0;
   if (ms > 3000) {
-    console.error(`whatsappBot inbound lento: ${ms}ms idEmpresa=${idEmpresa} texto="${textoEntrada.slice(0, 30)}"`);
+    console.error(`whatsappBot inbound lento: ${ms}ms`);
   }
 
   return {

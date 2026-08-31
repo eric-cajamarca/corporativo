@@ -620,7 +620,6 @@ export class UpdateClientesComponent {
                 this.btn_registrar = false;
       },
       error => {
-                console.error('Error al crear el cliente:', error);
         this.btn_registrar = false;
       }
 

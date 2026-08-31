@@ -92,7 +92,6 @@ export class AsignarStockUbicacionComponent implements OnInit {
         this.cargarUbicaciones();
       },
       error: (error) => {
-        console.error('Error cargando lote:', error);
         this.cargandoLote = false;
         iziToast.show({
           title: 'Error',
@@ -138,7 +137,6 @@ export class AsignarStockUbicacionComponent implements OnInit {
         this.cargarAsignacionesExistentes();
       },
       error: (error) => {
-        console.error('Error cargando ubicaciones:', error);
         this.cargandoUbicaciones = false;
         iziToast.show({
           title: 'Error',
@@ -324,7 +322,6 @@ export class AsignarStockUbicacionComponent implements OnInit {
       },
       error: (error) => {
         this.guardando = false;
-        console.error('Error guardando asignaciones:', error);
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',

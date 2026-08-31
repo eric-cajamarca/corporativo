@@ -204,7 +204,6 @@ export class CreatePreciosComponent implements OnInit {
         this.listasPrecio = response.data || [];
               },
       error: (error) => {
-        console.error('Error al cargar listas de precios:', error);
       }
     });
   }
@@ -230,7 +229,6 @@ export class CreatePreciosComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error al cargar productos:', error);
       }
     });
   }
@@ -242,7 +240,6 @@ export class CreatePreciosComponent implements OnInit {
         this.mostrarColumnaSucursal = Array.isArray(this.sucursales) && this.sucursales.length > 1;
       },
       error: (error) => {
-        console.error('Error al cargar sucursales:', error);
         this.mostrarColumnaSucursal = false;
       }
     });
@@ -254,7 +251,6 @@ export class CreatePreciosComponent implements OnInit {
         this.monedas = response.data;
               },
       error: (error) => {
-        console.error('Error al cargar monedas:', error);
       }
     });
   }
@@ -408,7 +404,6 @@ export class CreatePreciosComponent implements OnInit {
           alert('Lista actualizada correctamente');
         },
         error: (error) => {
-          console.error('Error al editar lista:', error);
           alert('Error al editar lista');
         }
       });
@@ -421,7 +416,6 @@ export class CreatePreciosComponent implements OnInit {
           alert('Lista creada correctamente');
         },
         error: (error) => {
-          console.error('Error al crear lista:', error);
           alert('Error al crear lista');
         }
       });
@@ -512,7 +506,6 @@ export class CreatePreciosComponent implements OnInit {
         this.cargarProductos({ evitarCache: true });
       },
       error: (error) => {
-        console.error('Error al guardar precios o costos:', error);
         alert(
           error?.error?.message ||
             'Error al guardar. Revise la consola o intente de nuevo.'
@@ -711,7 +704,6 @@ export class CreatePreciosComponent implements OnInit {
           }
         },
         error: (error) => {
-          console.error('Error al desactivar lista:', error);
           alert('Error al procesar la lista');
         }
       });

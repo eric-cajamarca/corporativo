@@ -191,7 +191,6 @@ export class InicioComponent implements OnInit, OnDestroy {
         this.cargarDatosDashboard();
       },
       error: (error) => {
-        console.error('Error al cargar permisos:', error);
         this.cargarDatosDashboard();
       }
     });
@@ -240,7 +239,6 @@ export class InicioComponent implements OnInit, OnDestroy {
           setTimeout(() => this.createCharts(), 100);
         },
         error: (error) => {
-          console.error('Error al cargar dashboard consolidado:', error);
           this.dashboardService.obtenerResumen(this.periodoSeleccionado).subscribe({
             next: (response) => {
               this.aplicarResumenDashboard(response.data);
@@ -265,7 +263,6 @@ export class InicioComponent implements OnInit, OnDestroy {
         setTimeout(() => this.createCharts(), 100);
       },
       error: (error) => {
-        console.error('Error al cargar dashboard:', error);
         this.cargandoDatos.set(false);
         this.ventasTotales = 0;
         this.utilidadNeta = 0;
@@ -408,7 +405,6 @@ export class InicioComponent implements OnInit, OnDestroy {
     if (routes[module]) {
       this.router.navigate([routes[module]]);
     } else {
-      console.warn('Módulo no encontrado:', module);
     }
   }
 
@@ -427,7 +423,6 @@ export class InicioComponent implements OnInit, OnDestroy {
         this.cargandoResumenDiario = false;
       },
       error: (error) => {
-        console.error('Error al cargar resumen diario:', error);
         this.resumenDiario = null;
         this.cargandoResumenDiario = false;
       }

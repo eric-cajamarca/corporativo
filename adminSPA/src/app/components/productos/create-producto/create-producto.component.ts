@@ -593,7 +593,6 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.guardando.set(false);
-        console.error('Error:', error);
         const apiMsg = String(error?.error?.message || error?.message || '').trim();
         const status = Number(error?.status || 0);
         const mensaje =
@@ -682,7 +681,6 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         this.productoForm.patchValue({ codigo: this.correlativo.numero || '' });
       },
       error: (error) => {
-        console.error('actualizarCorrelativoSiAplica:', error);
       }
     });
   }

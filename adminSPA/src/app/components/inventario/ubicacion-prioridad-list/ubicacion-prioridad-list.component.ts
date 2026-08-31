@@ -87,7 +87,6 @@ export class UbicacionPrioridadListComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error cargando sucursales', error);
       }
     });
   }
@@ -115,7 +114,6 @@ export class UbicacionPrioridadListComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error al cargar ubicaciones', error);
         this.isLoading = false;
         iziToast.show({
           title: 'Error',

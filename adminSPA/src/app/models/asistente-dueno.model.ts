@@ -20,7 +20,7 @@ export interface AsistenteChatResponse {
 export interface AsistenteEstadoResponse {
   status: number;
   success: boolean;
-  data?: { configurado: boolean };
+  data?: { configurado: boolean; gemini?: boolean };
   message?: string;
 }
 

@@ -38,7 +38,7 @@ async function enviarCodigoVerificacionWhatsApp(telefonoDestino, codigo, idEmpre
     return { sent: true };
   } catch (error) {
     const msg = error?.response?.data?.message || error.message;
-    console.error('Error enviando WhatsApp de verificación:', error?.response?.data || error.message);
+    console.error('Error enviando WhatsApp de verificación:', msg || 'fallo');
     return { sent: false, error: msg || 'Error al enviar por WhatsApp.' };
   }
 }

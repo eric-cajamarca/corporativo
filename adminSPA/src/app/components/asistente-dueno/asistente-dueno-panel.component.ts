@@ -31,7 +31,7 @@ export class AsistenteDuenoPanelComponent {
   ];
   enviando = false;
   error = '';
-  configurado = true;
+  gemini = true;
 
   readonly form = this.fb.nonNullable.group({
     mensaje: ['', [Validators.required, Validators.maxLength(2000)]]
@@ -40,10 +40,14 @@ export class AsistenteDuenoPanelComponent {
   constructor() {
     this.api.estado().subscribe({
       next: (r) => {
-        this.configurado = r.data?.configurado !== false;
+        if (typeof r.data?.gemini === 'boolean') {
+          this.gemini = r.data.gemini;
+        } else {
+          this.gemini = r.data?.configurado !== false;
+        }
       },
       error: () => {
-        this.configurado = true;
+        this.gemini = false;
       }
     });
   }

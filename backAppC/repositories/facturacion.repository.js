@@ -1881,30 +1881,17 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
   const tieneUrl = !!urlParaEnvio;
   const tieneUsuario = !!(config.usuarioSunat && String(config.usuarioSunat).trim());
   const tieneClave = !!(config.claveSunat != null && String(config.claveSunat).trim() !== "");
-  if (!usaEnvioDirecto || !tieneUrl || !tieneUsuario || !tieneClave) {
-    console.error("[SUNAT] enviarComprobanteSunatRepo: no se usa envío directo", {
-      envioDirectoSunat: config.envioDirectoSunat,
-      usaEnvioDirecto,
-      tieneUrl,
-      tieneUsuario,
-      tieneClave
-    });
-  }
   if (usaEnvioDirecto && tieneUrl && tieneUsuario && tieneClave) {
-    console.error("[SUNAT] Creación XML: tipo", comp.tipoComprobante, "serie-número", base);
     const signed = await exports.generarYFirmarXmlComprobanteRepo(pool, user, idComprobanteElectronico);
     if (signed.ok === false) return signed;
     const { xml, nombreBase } = signed;
-    console.error("[SUNAT] Firma XML: OK");
     try {
       if (!fs.existsSync(CARPETA_XML_FIRMADOS)) fs.mkdirSync(CARPETA_XML_FIRMADOS, { recursive: true });
       const rutaXml = path.join(CARPETA_XML_FIRMADOS, `${nombreBase}.xml`);
       fs.writeFileSync(rutaXml, xml, "utf8");
-      console.error("[SUNAT] Descarga guardada:", rutaXml);
     } catch (err) {
-      console.error("[SUNAT] Error al guardar XML en disco:", err);
+      console.error("[SUNAT] Error al guardar XML en disco:", err.message || err);
     }
-    console.error("[SUNAT] Envío a SUNAT:", nombreBase);
     const usuarioSOAP = config.usuarioSunat.length >= 20 || /^\d+/.test(config.usuarioSunat)
       ? config.usuarioSunat
       : rucStr + String(config.usuarioSunat).trim();
@@ -1918,9 +1905,8 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
         claveSunatDec || config.claveSunat,
         urlParaEnvio
       );
-      console.error("[SUNAT] Respuesta SUNAT:", JSON.stringify(resultado));
     } catch (err) {
-      console.error("[SUNAT] Error en envío a SUNAT:", err);
+      console.error("[SUNAT] Error en envío a SUNAT:", err.message || err);
       const infraCatch = esFalloInfraestructuraSunat(null, err);
       if (infraCatch) {
         return {
@@ -1948,8 +1934,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
         idUsuarioDesdePayloadUser(user)
       );
     }
-    const resDir = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
-    console.error("[SUNAT] enviarComprobanteSunatRepo: resultado envío directo", resDir);
+    const resDir = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta };
     debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoDirecto", message: "resultado", data: resDir });
     if (infraDir) {
       return {

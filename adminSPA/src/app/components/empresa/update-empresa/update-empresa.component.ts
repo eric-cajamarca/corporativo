@@ -694,7 +694,6 @@ export class UpdateEmpresaComponent {
         });
       },
       error => {
-        console.error('Error al actualizar la empresa:', error);
         iziToast.show({
           title: 'ERROR',
           titleColor: '#FF0000',

@@ -183,7 +183,6 @@ export class ArqueoCajaComponent implements OnInit {
         }
       },
       error: (error) => {
-        console.error('Error al cargar cajas para arqueo:', error);
         iziToast.error({
           title: 'Error',
           message: 'No se pudieron cargar las cajas'
@@ -340,7 +339,6 @@ export class ArqueoCajaComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error al obtener arqueo dinámico:', error);
         iziToast.error({
           title: 'Error',
           message: error.error?.message || 'Error al obtener el arqueo'
