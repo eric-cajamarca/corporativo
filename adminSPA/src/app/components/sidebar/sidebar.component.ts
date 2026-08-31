@@ -9,6 +9,7 @@ import { EmpresaService } from '../../services/empresa.service';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { MenuItem, SubMenuItem } from '../../interfaces/permisos-interface';
 import { nivelPlan } from '../../config/saas-plan-reglas.util';
+import { esRubroPintura } from '../../utils/rubro-empresa.util';
 
 @Component({
   selector: 'app-sidebar',
@@ -35,6 +36,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   estadoConfiguracion = signal<any>(null);
   /** Código rubro sistema (HOTEL, GRF, etc.) para etiquetas del menú. */
   codigoRubroEmpresa = signal<string | null>(null);
+  rubroTextoEmpresa = signal<string | null>(null);
 
   // Eventos
   @Output() sidebarToggle = new EventEmitter<boolean>();
@@ -107,19 +109,25 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Carga el estado de configuración de la empresa
    */
   private cargarRubroEmpresa(): void {
-    const actual = this.empresaService.getEmpresaActual()?.codigoRubro;
-    if (actual) {
-      this.codigoRubroEmpresa.set(String(actual).trim().toUpperCase());
+    const actual = this.empresaService.getEmpresaActual();
+    if (actual?.codigoRubro || actual?.rubro) {
+      this.codigoRubroEmpresa.set(actual?.codigoRubro ? String(actual.codigoRubro).trim().toUpperCase() : null);
+      this.rubroTextoEmpresa.set(actual?.rubro ? String(actual.rubro).trim() : null);
       return;
     }
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
         const cod = emp?.codigoRubro != null ? String(emp.codigoRubro).trim().toUpperCase() : '';
         this.codigoRubroEmpresa.set(cod || null);
+        this.rubroTextoEmpresa.set(emp?.rubro ? String(emp.rubro).trim() : null);
         this.refrescarEtiquetaHistorialVentas();
       },
       error: () => {}
     });
+  }
+
+  private esRubroPintura(): boolean {
+    return esRubroPintura(this.codigoRubroEmpresa(), this.rubroTextoEmpresa());
   }
 
   private esRubroHotel(): boolean {
@@ -134,9 +142,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
   /** Renombra «Historial» → «Recepción» en submenús de ventas cuando el rubro es hotel. */
   private parchearSubmenuVentas(submenu: SubMenuItem[]): SubMenuItem[] {
     const esGestora = this.estadoConfiguracion()?.esGestora === true;
-    const base = (esGestora || this.esRubroHotel())
+    let base = (esGestora || this.esRubroHotel())
       ? submenu.filter((s) => s.ruta !== '/ventas/rapida')
       : submenu;
+    if (this.codigoRubroEmpresa() || this.rubroTextoEmpresa()) {
+      if (!this.esRubroPintura()) {
+        base = base.filter((s) => s.ruta !== '/matizado');
+      }
+    }
     if (!this.esRubroHotel()) return base;
     const label = this.etiquetaHistorialVentas();
     return base.map((s) => {
@@ -388,15 +401,19 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   private buildSubmenuVentas(): SubMenuItem[] {
     const labelHistorial = this.etiquetaHistorialVentas();
-    return [
-      { nombre: labelHistorial, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
-      {
-        nombre: 'Reporte detallado',
-        ruta: '/ventas/reporte-detallado',
-        permiso: 'REPORTE_DETALLADO_VENTAS',
-        visible: this.permisosService.tienePermiso('REPORTE_DETALLADO_VENTAS')
-      }
-    ].filter((s) => s.visible !== false);
+    const items: SubMenuItem[] = [
+      { nombre: labelHistorial, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true }
+    ];
+    if (this.esRubroPintura()) {
+      items.push({ nombre: 'Matizador', ruta: '/matizado', permiso: 'VER_VENTAS', visible: true });
+    }
+    items.push({
+      nombre: 'Reporte detallado',
+      ruta: '/ventas/reporte-detallado',
+      permiso: 'REPORTE_DETALLADO_VENTAS',
+      visible: this.permisosService.tienePermiso('REPORTE_DETALLADO_VENTAS')
+    });
+    return items.filter((s) => s.visible !== false);
   }
 
   /** Submenú Facturación: emisión de guías siempre visible; resto de guías si están habilitadas en empresa. */

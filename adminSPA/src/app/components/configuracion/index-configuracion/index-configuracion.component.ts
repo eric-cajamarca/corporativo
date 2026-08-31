@@ -120,7 +120,13 @@ export class IndexConfiguracionComponent implements OnInit {
     /** En PDF/ticket de comprobante: concatenar "descripción - marca" */
     pdfIncluirMarcaEnDescripcion: true,
     /** Leyenda SUNAT Amazonía (PDF + XML cat. 52 código 2001) */
-    leyendaAmazonia: false
+    leyendaAmazonia: false,
+    /** Vender un producto en fracciones (1/4, 1/32) sin otro código */
+    usarConversionUnidades: false,
+    /** En Ventas → Matizador se crean las fórmulas; en la venta solo se jalan */
+    usarMatizado: false,
+    /** Cargo que se suma al precio de la lata */
+    cargoMatizado: 0
   };
   public ventasGuardando = false;
 
@@ -692,6 +698,16 @@ export class IndexConfiguracionComponent implements OnInit {
           getVal('VENTAS_LEYENDA_AMAZONIA', 'false'),
           false
         );
+        this.ventas.usarConversionUnidades = interpretarBooleanoConfig(
+          getVal('VENTAS_USAR_CONVERSION_UNIDADES', 'false'),
+          false
+        );
+        this.ventas.usarMatizado = interpretarBooleanoConfig(
+          getVal('VENTAS_USAR_MATIZADO', 'false'),
+          false
+        );
+        const cargoRaw = Number(getVal('VENTAS_CARGO_MATIZADO', '0'));
+        this.ventas.cargoMatizado = Number.isFinite(cargoRaw) && cargoRaw >= 0 ? cargoRaw : 0;
       },
       error: () => {}
     });
@@ -915,6 +931,26 @@ export class IndexConfiguracionComponent implements OnInit {
         descripcion:
           'Mostrar leyenda de bienes transferidos en la Amazonía en PDF y enviarla en XML SUNAT (catálogo 52, código 2001)',
         tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_USAR_CONVERSION_UNIDADES',
+        valor: this.ventas.usarConversionUnidades ? 'true' : 'false',
+        descripcion:
+          'Permitir vender un producto en fracciones (1/4, 1/32, gramos) sin crear otro código. Solo aplica a productos con unidades configuradas.',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_USAR_MATIZADO',
+        valor: this.ventas.usarMatizado ? 'true' : 'false',
+        descripcion:
+          'En Ventas → Matizador se crean las fórmulas. En el POS solo se jala el color. El cliente no ve los tintes en el ticket.',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_CARGO_MATIZADO',
+        valor: String(this.ventas.cargoMatizado ?? 0),
+        descripcion: 'Monto que se suma al precio de la lata cuando hay matizado',
+        tipoDato: 'NUMBER'
       }
     ];
     this._gestoresService.guardarConfiguracion(configs).subscribe({

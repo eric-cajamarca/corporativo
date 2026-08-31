@@ -15,6 +15,7 @@ import { ProductoEditarModalService } from '../../../services/producto-editar-mo
 import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductoGaleriaModalService } from '../../../services/producto-galeria-modal.service';
+import { ProductoUnidadesMedidaModalService } from '../../../services/producto-unidades-medida-modal.service';
 import { AuthService } from '../../../services/auth.service';
 
 declare var iziToast: any;
@@ -86,6 +87,7 @@ export class IndexProductoComponent {
     private _productoCrearModal: ProductoCrearModalService,
     private _gestoresService: GestoresService,
     private _productoGaleriaModal: ProductoGaleriaModalService,
+    private _productoUnidadesMedidaModal: ProductoUnidadesMedidaModalService,
     public sidebarState: SidebarStateService,
     private _auth: AuthService,
   ) {
@@ -192,6 +194,24 @@ export class IndexProductoComponent {
     this._productoEditarModal.abrir(idProducto).then(() => {
       this.initData();
     }).catch(() => {});
+  }
+
+  abrirConvertirUnidadesMedida(item: {
+    idProducto?: string;
+    codigo?: string;
+    descripcion?: string;
+    codigoPresentacion?: string;
+    pVenta?: number;
+  }): void {
+    if (!item?.idProducto) return;
+    const etiqueta = [item.codigo, item.descripcion].filter((x) => !!x && String(x).trim() !== '').join(' — ');
+    const presentacion = String(item.codigoPresentacion || '').trim();
+    this._productoUnidadesMedidaModal
+      .abrir(item.idProducto, etiqueta, presentacion, Number(item.pVenta) || 0)
+      .then(() => {
+        this.initData();
+      })
+      .catch(() => {});
   }
 
   abrirCrearProducto(): void {

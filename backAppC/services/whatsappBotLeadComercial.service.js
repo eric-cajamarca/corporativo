@@ -8,7 +8,7 @@ function estadoDesdeComercial(com, quiereLlamada) {
   const horarioOk = Boolean(com?.mejorHorario);
   const celOk = ficha.celularValido(com?.celular || com?.celularWeb);
   if (quiereLlamada && nombreOk && horarioOk && (celOk || !com?.requiereCelular)) return 'llamada_pendiente';
-  if (com?.intencionCompra === 'alta') return 'interesado';
+  if (com?.pagoReportado || com?.intencionCompra === 'alta') return 'interesado';
   if (com?.rubro || nombreOk) return 'nuevo';
   return 'nuevo';
 }
@@ -17,7 +17,7 @@ async function registrarDesdeTurno(idEmpresa, ctx, ia, textoEntrada) {
   const com = ia?.comercial;
   if (!com) return;
   const nombreOk = ficha.esNombrePersona(com.nombre);
-  const tieneAlgo = nombreOk || com.rubro || com.necesidad || ia.quiereLlamada || com.intencionCompra === 'alta';
+  const tieneAlgo = nombreOk || com.rubro || com.necesidad || ia.quiereLlamada || com.intencionCompra === 'alta' || com.pagoReportado;
   if (!tieneAlgo) return;
 
   const tel = String(ctx?.telefonoLog || ctx?.digitosCelular || '').slice(0, 40);

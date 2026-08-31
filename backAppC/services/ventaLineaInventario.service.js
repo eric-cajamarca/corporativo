@@ -1,6 +1,7 @@
 const stockService = require('./stock.service');
 const productoInventarioMetaService = require('./productoInventarioMeta.service');
 const inventarioRepository = require('../repositories/inventario.repository');
+const productoUnidadVentaService = require('./productoUnidadVenta.service');
 
 /**
  * Salida de inventario al vender una línea.
@@ -13,13 +14,26 @@ async function procesarSalidaInventarioVentaLinea(params) {
     idSucursal,
     idProducto,
     cantPedida,
+    idUnidadVenta,
+    cantidadStockForzada,
     descripcion,
     permitirVentasNegativas,
     controlUbicaciones,
-    cache
+    cache,
+    mensajeStockInsuficiente
   } = params;
 
-  const cant = parseFloat(cantPedida) || 0;
+  const cantComercial = parseFloat(cantPedida) || 0;
+  const cant =
+    cantidadStockForzada != null && Number.isFinite(Number(cantidadStockForzada))
+      ? Number(cantidadStockForzada)
+      : await productoUnidadVentaService.resolverCantidadStock(
+          transaction,
+          idEmpresa,
+          idProducto,
+          idUnidadVenta,
+          cantComercial
+        );
   const meta = await productoInventarioMetaService.obtenerMeta(transaction, idEmpresa, idProducto, cache);
 
   if (!meta.controlaInventario) {
@@ -27,7 +41,7 @@ async function procesarSalidaInventarioVentaLinea(params) {
     return {
       controlaInventario: false,
       consumosPorLote: [],
-      costoTotalLinea: cant * costoU,
+      costoTotalLinea: cantComercial * costoU,
       costoUnitarioProm: costoU,
       avisoStock: null,
       cantidadADescontar: 0
@@ -45,8 +59,13 @@ async function procesarSalidaInventarioVentaLinea(params) {
   if (stockDisponible < cant) {
     if (!permitirVentasNegativas) {
       const etiqueta = descripcion || idProducto;
+      const extra =
+        typeof mensajeStockInsuficiente === 'function'
+          ? mensajeStockInsuficiente(stockDisponible, cant)
+          : mensajeStockInsuficiente;
       throw new Error(
-        `Stock insuficiente para "${etiqueta}". Disponible: ${stockDisponible}, solicitado: ${cant}.`
+        extra ||
+          `Stock insuficiente para "${etiqueta}". Disponible: ${stockDisponible}, solicitado: ${cant}.`
       );
     }
     avisoStock = {
@@ -73,7 +92,7 @@ async function procesarSalidaInventarioVentaLinea(params) {
         0
       )
     : 0;
-  const costoUnitarioProm = cant > 0 ? costoTotalLinea / cant : 0;
+  const costoUnitarioProm = cantComercial > 0 ? costoTotalLinea / cantComercial : 0;
 
   return {
     controlaInventario: true,
@@ -97,8 +116,10 @@ async function registrarMovimientosSalidaVenta(params) {
     controlaInventario,
     cantidadADescontar,
     consumosPorLote,
-    costoUnitarioProm
+    costoUnitarioProm,
+    observaciones
   } = params;
+  const obs = observaciones || 'Venta';
 
   if (!controlaInventario || !cantidadADescontar || cantidadADescontar <= 0 || !idUsuario) {
     return;
@@ -117,7 +138,7 @@ async function registrarMovimientosSalidaVenta(params) {
         docRelacionado: compVenta,
         idComprobante,
         idUsuario,
-        observaciones: 'Venta',
+        observaciones: obs,
         costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
         idLote: c.idLote || null
       });
@@ -134,7 +155,7 @@ async function registrarMovimientosSalidaVenta(params) {
     docRelacionado: compVenta,
     idComprobante,
     idUsuario,
-    observaciones: 'Venta',
+    observaciones: obs,
     costoUnitario: costoUnitarioProm,
     idLote: null
   });

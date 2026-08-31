@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+﻿import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
@@ -122,8 +122,8 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
 
   etiquetaAnexoSunat(anexo?: string): string {
     if (anexo === '25.1') return 'Regulado';
-    if (anexo === '25.2') return 'Detracción';
-    if (anexo === '25.3') return 'Percepción';
+    if (anexo === '25.2') return 'DetracciÃ³n';
+    if (anexo === '25.3') return 'PercepciÃ³n';
     return anexo || '';
   }
 
@@ -212,15 +212,15 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
   getError(field: string): string {
     const c = this.productoForm.get(field);
     if (c?.errors?.['required']) return 'Requerido';
-    if (c?.errors?.['minlength']) return `Mín. ${c.errors['minlength'].requiredLength} caracteres`;
-    if (c?.errors?.['min']) return `Valor mínimo: ${c.errors['min'].min}`;
+    if (c?.errors?.['minlength']) return `MÃ­n. ${c.errors['minlength'].requiredLength} caracteres`;
+    if (c?.errors?.['min']) return `Valor mÃ­nimo: ${c.errors['min'].min}`;
     return '';
   }
 
   guardar(): void {
     if (this.productoForm.invalid) {
       Object.keys(this.productoForm.controls).forEach(k => this.productoForm.get(k)?.markAsTouched());
-      iziToast.warning({ title: 'Validación', message: 'Complete los campos requeridos', position: 'topRight' });
+      iziToast.warning({ title: 'ValidaciÃ³n', message: 'Complete los campos requeridos', position: 'topRight' });
       return;
     }
 

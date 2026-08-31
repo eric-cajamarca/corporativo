@@ -1,10 +1,10 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const { esRubroGrifo, esRubroHotel } = require('../utils/rubroEmpresa.util');
+const { esRubroGrifo, esRubroHotel, esRubroPintura } = require('../utils/rubroEmpresa.util');
 
 /**
  * Middleware: exige que la empresa del JWT tenga el rubro indicado.
- * @param {'GRF'|'HOTEL'} codigoRequerido
+ * @param {'GRF'|'HOTEL'|'PINT'} codigoRequerido
  */
 function requireRubro(codigoRequerido) {
   return async function requireRubroMiddleware(req, res, next) {
@@ -32,7 +32,9 @@ function requireRubro(codigoRequerido) {
           ? esRubroGrifo(codigo, rubro)
           : codigoRequerido === 'HOTEL'
             ? esRubroHotel(codigo, rubro)
-            : codigo === String(codigoRequerido).trim().toUpperCase();
+            : codigoRequerido === 'PINT'
+              ? esRubroPintura(codigo, rubro)
+              : codigo === String(codigoRequerido).trim().toUpperCase();
 
       if (!ok) {
         return res.status(403).json({

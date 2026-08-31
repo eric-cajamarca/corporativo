@@ -8,6 +8,7 @@ const { normalizarGuid } = require('../utils/plataformaEmpresa.util');
 const ficha = require('../utils/whatsappBotComercial.conocimiento');
 const flayersCatalogo = require('../utils/whatsappBotFlayers.catalogo');
 const comercialIa = require('./whatsappBotComercialIa.service');
+const comercialPublicoDatos = require('./whatsappBotComercialPublico.datos');
 const whatsappBotEscalamiento = require('./whatsappBotEscalamiento.service');
 const whatsappBotLeadComercial = require('./whatsappBotLeadComercial.service');
 
@@ -20,7 +21,9 @@ const INTENCIONES = new Set([
   'agendar_llamada',
   'solicitar_demo',
   'contratar_plan',
-  'duda_pago_registro'
+  'duda_pago_registro',
+  'confirma_pago_manual',
+  'datos_pago_publico'
 ]);
 
 const INTENCIONES_IA = new Set([
@@ -31,7 +34,9 @@ const INTENCIONES_IA = new Set([
   'soporte_asistente',
   'solicitar_demo',
   'contratar_plan',
-  'duda_pago_registro'
+  'duda_pago_registro',
+  'confirma_pago_manual',
+  'datos_pago_publico'
 ]);
 
 const CACHE_PRINCIPAL_MS = 5 * 60 * 1000;
@@ -140,6 +145,28 @@ async function avisarSoporteSiCorresponde(idEmpresa, ctx, ia, slots) {
     && com.mejorHorario
     && !com.avisoLlamadaOk
     && !(ctx.canal === 'web' && !ficha.celularValido(celularLead));
+  if ((ia.accion === 'aviso_pago_manual' || com.pagoReportado) && !com.avisoPagoOk) {
+    slots.comercial = com;
+    try {
+      const r = await whatsappBotEscalamiento.notificarInteresComercial(idEmpresa, {
+        ...payload,
+        motivo: 'pago_reportado',
+        ultimoMensaje: com.ultimoMensajePago || null
+      });
+      if (r?.ok) {
+        com.avisoPagoEnviado = true;
+        com.avisoPagoOk = true;
+        slots.comercial = com;
+        return r;
+      }
+      console.error('whatsappBotComercial aviso pago no enviado:', r?.error || r?.skipped);
+      return r || { ok: false };
+    } catch (err) {
+      console.error('whatsappBotComercial aviso pago:', err.message);
+      return { ok: false, error: err.message };
+    }
+  }
+
   if (listaParaAvisarLlamada) {
     slots.comercial = com;
     try {
@@ -183,6 +210,7 @@ async function turnoIa(idEmpresa, conv, nlu, textoEntrada, ctx) {
       celularWeb: ctx.canal === 'web' ? ctx.digitosCelular : slots.comercial?.celularWeb
     };
   }
+  const publicDatos = await comercialPublicoDatos.cargarDatos();
   const ia = await comercialIa.procesarTurnoIa({
     textoEntrada,
     slots,
@@ -191,7 +219,8 @@ async function turnoIa(idEmpresa, conv, nlu, textoEntrada, ctx) {
     canal: ctx?.canal === 'web' ? 'web' : 'whatsapp',
     rutaActual: ctx?.rutaActual,
     pasoRegistro: ctx?.pasoRegistro,
-    errorPantalla: ctx?.errorPantalla
+    errorPantalla: ctx?.errorPantalla,
+    publicDatos
   });
   const nextSlots = { ...slots, comercial: ia.comercial };
   let respuesta = ia.respuesta;
@@ -206,6 +235,10 @@ async function turnoIa(idEmpresa, conv, nlu, textoEntrada, ctx) {
         respuesta = `${respuesta}\n\n${ficha.textoUnFlayer(fl, !!img)}`;
       }
     }
+  }
+  if (ia.comercial && (ia.accion === 'aviso_pago_manual' || ia.comercial.pagoReportado)) {
+    ia.comercial.ultimoMensajePago = String(textoEntrada || '').slice(0, 300);
+    nextSlots.comercial = ia.comercial;
   }
   const aviso = await avisarSoporteSiCorresponde(idEmpresa, ctx, ia, nextSlots);
   whatsappBotLeadComercial.registrarDesdeTurno(idEmpresa, ctx, ia, textoEntrada).catch((err) => {
@@ -247,7 +280,8 @@ async function intentarProcesar(idEmpresa, conv, nlu, textoEntrada, ctx) {
     && /^(planes)$/i.test(String(textoEntrada || '').trim())
     && estado !== 'comercial_ia';
   if (planesExplicitos) {
-    return turno(ficha.textoPlanes(), { estado: 'menu', slots, candidatos: [] });
+    const publicDatos = await comercialPublicoDatos.cargarDatos();
+    return turno(comercialPublicoDatos.textoPlanesReales(publicDatos), { estado: 'menu', slots, candidatos: [] });
   }
 
   if (nlu.intencion === 'soporte_asistente' && estado !== 'comercial_ia') {

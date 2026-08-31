@@ -1,7 +1,8 @@
 const sql = require('mssql');
 
-const CODIGOS_RUBRO_ACTIVOS = new Set(['GEN', 'GRF', 'HOTEL']);
+const CODIGOS_RUBRO_ACTIVOS = new Set(['GEN', 'GRF', 'HOTEL', 'PINT']);
 const CODIGOS_COMERCIO = new Set(['GEN', 'FERR', 'RETAIL', null, '']);
+const CODIGOS_PINTURA = new Set(['PINT', 'PINTURA', 'PINTURAS']);
 
 /** Rubro Grifo en BD: código `GRF`. Si hay código de sistema, el texto SUNAT no lo sobrescribe. */
 function esRubroGrifo(codigoRubro, rubroTexto) {
@@ -20,6 +21,14 @@ function esRubroHotel(codigoRubro, rubroTexto) {
   return rubro === 'hotel' || rubro.includes('hotel');
 }
 
+function esRubroPintura(codigoRubro, rubroTexto) {
+  const codigo = String(codigoRubro || '').trim().toUpperCase();
+  if (CODIGOS_PINTURA.has(codigo)) return true;
+  if (codigo) return false;
+  const rubro = String(rubroTexto || '').trim().toLowerCase();
+  return /\bpintur/.test(rubro);
+}
+
 function esRubroComercio(codigoRubro) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
   return !codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL';
@@ -27,7 +36,7 @@ function esRubroComercio(codigoRubro) {
 
 function normalizarCodigoRubroVentas(codigoRubro) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
-  if (!codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL') return 'GEN';
+      if (!codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL' || codigo === 'PINT') return 'GEN';
   if (codigo === 'GRF' || codigo === 'GRIFO') return 'GRF';
   if (codigo === 'HOTEL') return 'HOTEL';
   return 'GEN';
@@ -56,6 +65,7 @@ module.exports = {
   CODIGOS_COMERCIO,
   esRubroGrifo,
   esRubroHotel,
+  esRubroPintura,
   esRubroComercio,
   normalizarCodigoRubroVentas,
   obtenerRubroEmpresa

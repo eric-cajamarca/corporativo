@@ -159,6 +159,11 @@
                           (click)="abrirModalGestionarVariantes(item)">
                           <i class="bi bi-palette me-1"></i> Gestionar Variantes
                         </a>
+                        <a style="cursor: pointer;" class="dropdown-item"
+                          *ngIf="item.idProducto"
+                          (click)="abrirConvertirUnidadesMedida(item)">
+                          <i class="bi bi-rulers me-1"></i> Convertir unidades de medida
+                        </a>
                                         <!-- *ngIf="item.tipoProducto === 'S'" -->
 
                         <!-- Si ya es COMPUESTO -->

@@ -4,8 +4,7 @@ const leadsComercialController = require('../controllers/leadsComercial.controll
 
 const router = express.Router();
 
-router.use(auth.auth);
-router.get('/leads-comercial', leadsComercialController.listar);
-router.patch('/leads-comercial/:idLead/estado', leadsComercialController.actualizarEstado);
+router.get('/leads-comercial', auth.auth, leadsComercialController.listar);
+router.patch('/leads-comercial/:idLead/estado', auth.auth, leadsComercialController.actualizarEstado);
 
 module.exports = router;

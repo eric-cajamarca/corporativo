@@ -26,6 +26,13 @@ import { ModalPreciosComponent } from '../../modal-precios/modal-precios.compone
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { VentaUnidadMatizadoFlowService } from '../../../services/venta-unidad-matizado-flow.service';
+import { cantidadEnUnidadCompra, etiquetaUnidadCarrito } from '../../../utils/unidad-venta.util';
+import {
+  descripcionConColorMatizado,
+  payloadMatizadoParaApi,
+  reescalarMatizadoPorCantidad
+} from '../../../utils/matizado-venta.util';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -212,6 +219,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
   mostrarModalPdfTrasRegistrarVenta = true;
+  usarConversionUnidades = false;
+  usarMatizado = false;
+  cargoMatizado = 0;
   /** Config ventas: cantidad + ver precios en buscador de productos */
   mostrarCantidadPreciosEnBuscador = false;
   /** Config ventas: stock por ubicación en buscador (empresa no gestora). */
@@ -295,6 +305,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private _documentosService: DocumentoService,
     private modalService: ModalService,
     private buscadorProductosModal: BuscadorProductosModalService,
+    private ventaUnidadMatizadoFlow: VentaUnidadMatizadoFlowService,
     private ventasService: VentasService,
     private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
@@ -394,6 +405,16 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
           false
         );
+        this.usarConversionUnidades = interpretarBooleanoConfig(
+          getVal('VENTAS_USAR_CONVERSION_UNIDADES', 'false'),
+          false
+        );
+        this.usarMatizado = interpretarBooleanoConfig(
+          getVal('VENTAS_USAR_MATIZADO', 'false'),
+          false
+        );
+        const cargoMz = Number(getVal('VENTAS_CARGO_MATIZADO', '0'));
+        this.cargoMatizado = Number.isFinite(cargoMz) && cargoMz >= 0 ? cargoMz : 0;
         this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(
           getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR', 'false'),
           false
@@ -898,7 +919,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   lineaCarritoStockInsuficiente(item: any): boolean {
     if (esProductoServicio(item?.codigoPresentacion)) return false;
     if (this.permitirVentasNegativas) return false;
-    const cant = Number(item?.cantidad) || 0;
+    const cant = cantidadEnUnidadCompra(item);
     const disp = this.obtenerStockDisponibleParaLineaCarrito(item);
     if (disp == null) return false;
     if (disp <= 0) return true;
@@ -1594,6 +1615,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
   agregarAlCarrito(producto: any): void {
+    if (
+      (this.usarConversionUnidades || this.usarMatizado) &&
+      !producto?.idUnidadVenta &&
+      !producto?._sinConversion
+    ) {
+      this.resolverUnidadYAgregar(producto);
+      return;
+    }
     if (!this.productoPerteneceEmpresaOperativa(producto)) {
       iziToast.warning({
         title: 'Producto no permitido',
@@ -1630,7 +1659,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     const existe = this.carrito.find(p =>
       String(p.idProducto) === String(producto.idProducto) &&
       String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
-      String(p.idEmpresa || '') === String(producto.idEmpresa || '')
+      String(p.idEmpresa || '') === String(producto.idEmpresa || '') &&
+      String(p.idUnidadVenta || '') === String(producto.idUnidadVenta || '') &&
+      !p.matizado &&
+      !producto.matizado
     );
     if (existe) {
       const cantNueva = (Number(existe.cantidad) || 0) + cantAgregar;
@@ -1842,8 +1874,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     cantidadNueva: number
   ): { valido: boolean; mensaje?: string; advertencia?: string } {
     const stock = this.obtenerStockDisponibleParaLineaCarrito(producto);
+    const cantidadEnCompra = cantidadEnUnidadCompra(producto, cantidadNueva);
     return validarStockLinea({
-      cantidadNueva,
+      cantidadNueva: cantidadEnCompra,
       stockDisponible: stock,
       permitirVentasNegativas: this.permitirVentasNegativas,
       nombreProducto: producto?.descripcion || producto?.codigo,
@@ -2166,16 +2199,47 @@ abrirModalPrecios(item: any) {
       nuevo = Number(item.cantidad) || 0;
     }
     item.cantidad = Math.round(nuevo * 1e6) / 1e6;
+    reescalarMatizadoPorCantidad(item, item.cantidad);
     this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
+  }
+
+  etiquetaUnidadLinea(item: { nombreUnidadVenta?: string; codigoPresentacion?: string; presentacion?: string }): string {
+    return etiquetaUnidadCarrito(item);
+  }
+
+  private resolverUnidadYAgregar(producto: any): void {
+    void this.ventaUnidadMatizadoFlow
+      .prepararLinea({
+        producto,
+        stockCompra: this.obtenerStockDisponibleParaLineaCarrito(producto),
+        usarConversionUnidades: this.usarConversionUnidades,
+        usarMatizado: this.usarMatizado,
+        cargoMatizado: this.cargoMatizado,
+        idSucursal: this.ventas?.idSucursal
+      })
+      .then((parche) => {
+        if (!parche) return;
+        this.agregarAlCarrito({ ...producto, ...parche });
+      });
   }
 
   private descripcionLineaParaDetalle(item: {
     permiteDescripcionEnVenta?: boolean;
     descripcion?: string;
     producto?: { descripcion?: string };
+    nombreUnidadVenta?: string;
+    matizado?: { nombreColor?: string };
   }): string | undefined {
-    return snapshotDescripcionLineaVenta(item);
+    const base = snapshotDescripcionLineaVenta(item);
+    const unidad = String(item?.nombreUnidadVenta || '').trim();
+    let out = base;
+    if (unidad && out && !out.toLowerCase().includes(unidad.toLowerCase())) {
+      out = `${out} — ${unidad}`;
+    } else if (!out) {
+      out = unidad;
+    }
+    return descripcionConColorMatizado(out || '', item?.matizado?.nombreColor) || undefined;
   }
   
 
@@ -3448,7 +3512,9 @@ abrirModalPrecios(item: any) {
         sucursal: item.sucursal || undefined,
         descripcion: item.descripcion || undefined,
         codigo: item.codigo || undefined,
-        descripcionLinea: this.descripcionLineaParaDetalle(item)
+        descripcionLinea: this.descripcionLineaParaDetalle(item),
+        idUnidadVenta: item.idUnidadVenta || undefined,
+        matizado: payloadMatizadoParaApi(item)
       };
     });
 

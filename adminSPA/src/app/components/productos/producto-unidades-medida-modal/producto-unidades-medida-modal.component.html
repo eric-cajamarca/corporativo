@@ -1,0 +1,134 @@
+<div class="modal-header bg-primary text-white">
+  <h5 class="modal-title">
+    <i class="bi bi-rulers me-2"></i>
+    Convertir unidades de medida
+  </h5>
+  <button type="button" class="btn-close btn-close-white" aria-label="Cerrar" (click)="cerrar()"></button>
+</div>
+
+<div class="modal-body">
+  @if (etiquetaProducto) {
+    <p class="text-muted small mb-3">{{ etiquetaProducto }}</p>
+  }
+
+  @if (cargando) {
+    <div class="text-center py-4">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-2 text-muted mb-0">Cargando…</p>
+    </div>
+  } @else {
+    <div class="border rounded p-3">
+      <div class="form-check mb-2">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="usaConversionProductoModal"
+          [(ngModel)]="usaConversionProducto"
+          (change)="onToggleConversionProducto()" />
+        <label class="form-check-label" for="usaConversionProductoModal">
+          Este producto se vende en varias unidades
+        </label>
+      </div>
+      @if (usaConversionProducto) {
+        <div class="alert alert-light border py-2 mb-3 small">
+          Precio normal de la lista:
+          @if (precioPrincipal > 0) {
+            <strong>S/ {{ precioPrincipal | number:'1.2-2' }}</strong>
+            por envase de compra. Puedes cambiar el precio de cada fila.
+          } @else {
+            <span class="text-warning">no hay precio en la lista principal. Cárgalo en Precios y vuelve a abrir.</span>
+          }
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Unidad interna (kardex)</label>
+            <input class="form-control form-control-sm" [(ngModel)]="unidadInternaNombre" placeholder="gramo o 1/32 de galón" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">1 pote / envase tiene</label>
+            <div class="input-group input-group-sm">
+              <input
+                type="number"
+                min="0.000001"
+                step="any"
+                class="form-control"
+                [(ngModel)]="factorCompraAInterna"
+                (ngModelChange)="onFactorCompraChange()" />
+              <span class="input-group-text">{{ unidadInternaNombre || 'unidades' }}</span>
+            </div>
+            <div class="form-text">Si el tinte es de 28 g, pon 28. El kardex sigue contando potes.</div>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-end gap-2 mb-2">
+          <div class="flex-grow-1" style="min-width: 12rem">
+            <label class="form-label mb-1">Elegir unidad</label>
+            <select class="form-select form-select-sm" [(ngModel)]="sugeridaElegida" (ngModelChange)="agregarSugerida()">
+              <option value="">— Galón, fracciones o 1 gramo —</option>
+              @for (s of sugeridas; track s.nombre) {
+                <option [value]="s.nombre">{{ s.nombre }}</option>
+              }
+            </select>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="agregarFilaUnidad()">
+            Unidad personalizada
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2">
+            <thead>
+              <tr>
+                <th>Unidad que elige el vendedor</th>
+                <th>Resta adentro</th>
+                <th>Precio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fila of filasUnidad; track $index) {
+                <tr>
+                  <td>
+                    <input class="form-control form-control-sm" [(ngModel)]="fila.nombre" placeholder="Nombre de la unidad" />
+                  </td>
+                  <td style="max-width:6rem">
+                    <input
+                      type="number"
+                      min="0.000001"
+                      step="any"
+                      class="form-control form-control-sm"
+                      [(ngModel)]="fila.factorAInterna"
+                      (ngModelChange)="onFactorFilaChange(fila)" />
+                  </td>
+                  <td style="max-width:7rem">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="form-control form-control-sm"
+                      [(ngModel)]="fila.precio"
+                      (ngModelChange)="onPrecioFilaChange(fila)" />
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-link text-danger" (click)="quitarFilaUnidad($index)">
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (textoEjemploGramos) {
+          <div class="alert alert-info py-2 px-3 small mb-2">{{ textoEjemploGramos }}</div>
+        }
+        <p class="small text-muted mb-0">{{ textoAyudaConversion }}</p>
+      }
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cerrar()">Cancelar</button>
+  <button type="button" class="btn btn-primary" (click)="guardarUnidades()" [disabled]="guardandoUnidades || cargando || !idProducto">
+    {{ guardandoUnidades ? 'Guardando…' : 'Guardar unidades' }}
+  </button>
+</div>

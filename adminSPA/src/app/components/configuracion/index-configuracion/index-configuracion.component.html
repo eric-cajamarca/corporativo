@@ -577,6 +577,31 @@
                   </div>
                   <div class="col-12 d-flex align-items-center">
                     <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="usarConversionUnidades" [(ngModel)]="ventas.usarConversionUnidades" name="usarConversionUnidades">
+                      <label class="form-check-label" for="usarConversionUnidades">
+                        Usar <strong>conversión de unidades de medida</strong>.
+                        Permite vender un producto en fracciones (1/4, 1/32) sin crear otro código.
+                        Solo aplica a productos configurados en <strong>Opciones → Convertir unidades de medida</strong>.
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="usarMatizado" [(ngModel)]="ventas.usarMatizado" name="usarMatizado">
+                      <label class="form-check-label" for="usarMatizado">
+                        Usar <strong>matizado</strong> en ventas.
+                        En <strong>Ventas → Matizador</strong> se crean las fórmulas; en la venta solo se jala el color.
+                        El cliente no ve los tintes en el ticket.
+                        Requiere conversión de unidades en la base y en cada tinte (1 pote = N gramos).
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="cargoMatizado" class="form-label">Cargo de matizado (S/)</label>
+                    <input type="number" class="form-control" id="cargoMatizado" [(ngModel)]="ventas.cargoMatizado" name="cargoMatizado" min="0" step="0.1">
+                  </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="leyendaAmazonia" [(ngModel)]="ventas.leyendaAmazonia" name="leyendaAmazonia">
                       <label class="form-check-label" for="leyendaAmazonia">
                         Incluir leyenda de <strong>Amazonía</strong>:

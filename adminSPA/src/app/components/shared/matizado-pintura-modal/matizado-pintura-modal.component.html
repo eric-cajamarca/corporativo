@@ -1,0 +1,88 @@
+<div class="modal-header">
+  <h5 class="modal-title">Elegir fórmula de matizado</h5>
+  <button type="button" class="btn-close" aria-label="Cerrar" (click)="cancelar()"></button>
+</div>
+<div class="modal-body">
+  <p class="mb-1 fw-semibold">{{ descripcionBase }}</p>
+  <p class="small text-muted mb-3">
+    Mezcla para {{ factorEscala | number:'1.2-3' }} {{ presentacionCompra }}.
+    Los gramos se calculan de la receta (1 galón). El cliente no ve los tintes.
+    @if (cargoMatizado > 0) {
+      Cargo: S/ {{ cargoMatizado | number:'1.2-2' }}.
+    }
+  </p>
+  <p class="small mb-3">
+    Las fórmulas se crean en
+    <button type="button" class="btn btn-link btn-sm p-0 align-baseline" (click)="irAlMatizador()">
+      Ventas → Matizador
+    </button>.
+  </p>
+
+  <div class="mb-3">
+    <label class="form-label">Buscar fórmula</label>
+    <input
+      class="form-control"
+      [(ngModel)]="busquedaFormula"
+      name="busquedaFormula"
+      (ngModelChange)="onFormulaInput()"
+      placeholder="Nombre del color, marca o placa"
+    />
+    @if (buscandoFormulas) {
+      <div class="small text-muted mt-1">Buscando…</div>
+    }
+    @if (formulasHalladas.length) {
+      <ul class="list-group mt-1 matizado-lista">
+        @for (f of formulasHalladas; track f.idFormula) {
+          <li class="list-group-item list-group-item-action py-1 px-2" (click)="cargarFormula(f)">
+            <strong>{{ f.nombre }}</strong>
+            @if (f.placa) { · {{ f.placa }} }
+            @if (f.marcaVehiculo) { · {{ f.marcaVehiculo }} }
+          </li>
+        }
+      </ul>
+    } @else if (!buscandoFormulas && !idFormula) {
+      <p class="small text-muted mt-2 mb-0">No hay fórmulas. Créelas en el Matizador.</p>
+    }
+  </div>
+
+  @if (cargandoDetalle) {
+    <p class="text-muted small">Cargando receta…</p>
+  }
+
+  @if (idFormula) {
+    <div class="border rounded p-2 mb-2">
+      <div class="fw-semibold">{{ nombreColor }}</div>
+      <div class="small text-muted mb-2">
+        @if (placa) { Placa {{ placa }} }
+        @if (marcaVehiculo) { · {{ marcaVehiculo }} }
+      </div>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Tinte</th>
+            <th class="text-end">Gramos (esta mezcla)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of tintes; track t.idProductoTinte) {
+            <tr>
+              <td>{{ t.descripcion || t.codigo }}</td>
+              <td class="text-end">{{ t.gramos | number:'1.1-2' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="small text-muted mb-0 mt-2">Total: {{ totalGramos | number:'1.1-2' }} g</p>
+    </div>
+  }
+
+  @if (aviso) {
+    <p class="small text-danger mb-0">{{ aviso }}</p>
+  }
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancelar()">Cancelar</button>
+  <button type="button" class="btn btn-primary" (click)="confirmar()" [disabled]="!idFormula">
+    Usar esta fórmula
+  </button>
+</div>

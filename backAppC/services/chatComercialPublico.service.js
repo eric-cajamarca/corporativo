@@ -119,9 +119,8 @@ function turnoBienvenida(conv) {
   return {
     respuesta: [
       'Hola. Soy el asesor comercial de *EFAFERP* (BUSINESS SOFT).',
-      'Cuéntame a qué se dedica tu negocio y te digo si te encaja.',
-      'Si quieres la *demo* o *pagar un plan*, escríbelo y te acompaño paso a paso.',
-      'Si quieres que te llamemos, escribe *LLAMADA* y tu *nombre*, *celular* y *rubro* (ej. Ana, 993289440, ferretería).'
+      'Cuéntame a qué se dedica tu negocio y en qué te ayudo.',
+      'Si quieres *demo* o *pagar*, te guío en la web. También podemos agendar *LLAMADA* con soporte.'
     ].join('\n'),
     conv: { estado: 'comercial_ia', slots: conv.slots || {}, candidatos: [] }
   };

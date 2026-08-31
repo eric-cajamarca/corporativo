@@ -145,12 +145,18 @@ exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucu
       idSucursalFiltro
     );
 
+  const fetchConUnidades = async () => {
+    const rows = await fetchFn();
+    const productoUnidadVentaService = require('./productoUnidadVenta.service');
+    return productoUnidadVentaService.adjuntarUnidadesAProductos(pool, user.empresa, rows);
+  };
+
   if (skipCache) {
-    return fetchFn();
+    return fetchConUnidades();
   }
 
   const cacheKey = buscarVentaCacheKey(user, term, lim, idSucursalFiltro);
-  return cache.getCached(cacheKey, fetchFn, ttlSeconds);
+  return cache.getCached(cacheKey, fetchConUnidades, ttlSeconds);
 };
 
 exports.obtenerProductosComprasService = async (pool, user) => {

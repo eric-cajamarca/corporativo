@@ -9,7 +9,7 @@ import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-
 const SESSION_KEY = 'efaferp.chatComercial.sessionId';
 const SALUDO: ChatComercialMensaje = {
   role: 'model',
-  text: 'Hola. Soy el asesor comercial de EFAFERP. Cuéntame a qué se dedica tu negocio y te digo si te encaja. Si quieres la demo o pagar un plan, dímelo y te acompaño paso a paso. Si prefieres que te llamemos, deja tu nombre, celular y horario (lun–vie 9:00 a 18:00).'
+  text: 'Hola. Soy el asesor comercial de EFAFERP. Cuéntame a qué se dedica tu negocio y tus dudas: te respondo con lo que está publicado, sin inventar. No creo cuentas ni cobro; si quieres demo o un plan, te guío en la web. Si algo no lo tengo claro, agendamos una llamada con soporte.'
 };
 
 @Component({

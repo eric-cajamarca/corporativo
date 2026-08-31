@@ -5,6 +5,7 @@ import { AdminGuard } from './guards/admin.guards';
 import { empresaGestoraGuard } from './guards/empresa-gestora.guard';
 import { superAdminPlataformaEmpresasGuard } from './guards/superadmin-plataforma-empresas.guard';
 import { saasPlanModuloGuard } from './guards/saas-plan-modulo.guard';
+import { rubroPinturaGuard } from './guards/rubro-pintura.guard';
 
 const loadHomePublic = () =>
   import('./components/public/home-public/home-public.component').then((m) => m.HomePublicComponent);
@@ -309,6 +310,8 @@ export const routes: Routes = [
 
      { path: 'hotel/configuracion', loadComponent: () => import('./components/hotel/hotel-configuracion/hotel-configuracion.component').then((m) => m.HotelConfiguracionComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Configuración Hotel' },
 
+
+     { path: 'matizado', loadComponent: () => import('./components/matizado/index-matizado/index-matizado.component').then((m) => m.IndexMatizadoComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard, rubroPinturaGuard], title: 'Matizador' },
 
      { path: 'cotizaciones', loadComponent: () => import('./components/cotizaciones/index-cotizaciones/index-cotizaciones.component').then((m) => m.IndexCotizacionesComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Cotizaciones' },
 

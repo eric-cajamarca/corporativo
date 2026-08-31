@@ -3,6 +3,8 @@
  * Cada dominio es un menú colapsable; dentro, módulos con enlaces (acordeón en el SPA).
  */
 
+const { esRubroPintura: esPinturaEmpresa } = require('./rubroEmpresa.util');
+
 const DOMINIO_MODULO_KEY = {
   Comercial: 'DOMINIO_COMERCIAL',
   Abastecimiento: 'DOMINIO_ABASTECIMIENTO',
@@ -145,6 +147,10 @@ function esRubroHotel(ctx) {
   return rubroTexto === 'hotel' || rubroTexto.includes('hotel');
 }
 
+function esRubroPintura(ctx) {
+  return esPinturaEmpresa(ctx?.codigoRubro, ctx?.rubro);
+}
+
 function etiquetaHistorialVentas(ctx) {
   return esRubroHotel(ctx) ? 'Recepción' : 'Historial';
 }
@@ -182,6 +188,12 @@ function construirNavegacionPorDominios(ctx) {
     const subVentas = [
       { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
+      {
+        nombre: 'Matizador',
+        ruta: '/matizado',
+        permiso: 'VER_VENTAS',
+        visible: esRubroPintura({ codigoRubro, rubro })
+      },
       { nombre: labelHistorialVentas, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       { nombre: 'Reporte detallado', ruta: '/ventas/reporte-detallado', permiso: 'REPORTE_DETALLADO_VENTAS', visible: can('REPORTE_DETALLADO_VENTAS') },
       { nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true }
@@ -484,6 +496,9 @@ function construirNavegacionGestoraPorDominios(ctx) {
     subVentas.push({ nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: true });
   }
   if (can('VER_VENTAS')) {
+    if (esRubroPintura({ codigoRubro, rubro })) {
+      subVentas.push({ nombre: 'Matizador', ruta: '/matizado', permiso: 'VER_VENTAS', visible: true });
+    }
     subVentas.push({ nombre: labelHistorialVentas, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
     subVentas.push({ nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true });
   }

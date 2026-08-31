@@ -23,7 +23,7 @@ function textoFichaConviene() {
     'Lo que no está en la web y sí importa al contratar:',
     '• *Asistente de la plataforma:* al entrar a EFAFERP (sesión iniciada) te guía en el uso del sistema (SUNAT, productos, etc.). No guarda el historial. No le pegues claves ni el certificado.',
     '• *WhatsApp de tu tienda:* cuando ya eres cliente, tus compradores consultan stock y piden por *tu* número. Este chat es el de Business Soft.',
-    '• *Precios de planes:* no los invento aquí. Están actualizados en:',
+    '• *Precios de planes:* están en:',
     urlPublica('/planes'),
     '• *Demo 14 días* (sin tarjeta) o *contratar:* solo si lo pides. Escribe *DEMO* o *PAGAR* y te acompaño paso a paso.',
     '',
@@ -35,7 +35,7 @@ function textoFichaConviene() {
 
 function textoPlanes() {
   return [
-    'Los planes y precios vigentes están en la web (no los cito de memoria para no equivocarme):',
+    'Los planes y precios vigentes están aquí:',
     urlPublica('/planes'),
     '',
     'Si quieres *probar 14 días* (sin tarjeta), escribe *DEMO* y te acompaño. Si quieres *pagar un plan*, escribe *PAGAR*.',
@@ -104,7 +104,7 @@ function textoQueVendesPrincipal() {
 }
 
 function textoHolaExtraPrincipal() {
-  return 'Si te interesa *EFAFERP*, cuéntame a qué se dedica tu negocio o escribe *SISTEMA*, *PLANES*, *DEMO*, *PAGAR* o *GUÍAS*. Si buscas un producto nuestro, escribe el nombre.';
+  return 'Si te interesa *EFAFERP*, cuéntame el rubro o tu duda. Escribe *SISTEMA*, *PLANES*, *DEMO*, *PAGAR*, *GUÍAS* o *LLAMADA*.';
 }
 
 const RUBROS_ENCAJAN = [
@@ -285,7 +285,7 @@ function textoAcompanarPago(com, ruta) {
     return [
       'Estás en el *pago del plan*.',
       '• *Tarjeta:* Culqi en esta misma pantalla. *Nunca* me envíes el número de tarjeta aquí.',
-      '• *Yape / Plin / depósito BCP:* elige esa opción, paga y reporta el *voucher* en el formulario (un asesor valida).',
+      '• *Yape / Plin / depósito BCP:* elige esa opción. Si quieres el número o la cuenta, pídemelos aquí.',
       'Luego registras la empresa (RUC, correo, celular, contraseña) y activas con el código de 6 dígitos.',
       'Dime si te traba el medio de pago, el voucher o el registro. Precios vigentes solo en:',
       urlPlanes()
@@ -307,8 +307,8 @@ function textoAcompanarPago(com, ruta) {
     lineas.push(`   Emprendedor mensual: ${urlSuscribirsePlan('emprendedor', 'monthly')}`);
   }
   lineas.push(
-    '3. Paga con *tarjeta* (Culqi) o *Yape / Plin / depósito BCP*.',
-    '4. Si es Yape/Plin, reporta el *voucher* en esa pantalla; un asesor valida.',
+    '3. Paga con *tarjeta* (Culqi) o *Yape / Plin / depósito BCP*. El número y la cuenta los tienes en el checkout; también te los doy aquí si los pides.',
+    '4. Si es Yape/Plin, reporta el *voucher* en esa pantalla; un asesor valida. Si ya pagaste, escribe *ya pagué*.',
     '5. Luego registras tu empresa (RUC, correo, celular, contraseña) y el código de 6 dígitos.',
     '',
     'Dudas de pago o registro, escríbeme. No me envíes contraseñas ni números de tarjeta.'
@@ -376,10 +376,10 @@ function textoDudaPagoRegistro(texto, flujo, ruta, paso, errorPantalla) {
   }
   if (/\b(yape|plin|voucher|dep[oó]sito|bcp)\b/i.test(t)) {
     return [
-      'Yape, Plin o depósito *BCP* se pagan en la pantalla de checkout del plan, no en este chat.',
+      'Puedo pasarte el *Yape/Plin* o la *cuenta BCP*. Escríbelo así: *YAPE*, *PLIN* o *CUENTA*.',
       `Elige el plan aquí: ${urlPlanes()}`,
-      'Paga y *adjunta el voucher en ese mismo formulario*. Un asesor lo valida. No envíes el voucher aquí si puedes subirlo ahí.',
-      'Después te lleva a registrar la empresa (RUC, correo, celular, contraseña).'
+      'Paga y *adjunta el voucher en el checkout*. Si ya pagaste, escribe *ya pagué* y aviso al administrador.',
+      'Después registras la empresa (RUC, correo, celular, contraseña).'
     ].join('\n');
   }
   if (/\b(tarjeta|culqi|cr[eé]dito|d[eé]bito)\b/i.test(t)) {
@@ -689,65 +689,75 @@ function textoLlamadaSoporte(_conNombre, com = {}, opts = {}) {
   return textoPedirDatosCita(miss, com);
 }
 
-function promptPreventaIa(fichaActual, nluIntencion) {
+function textoSugerirLlamadaSoporte() {
+  return [
+    'Si quieres, te lo confirma soporte en una *llamada* (lun–vie 9:00 a 18:00, Perú).',
+    'Escribe *LLAMADA* y tu *nombre*, *celular* y un *horario*.'
+  ].join('\n');
+}
+
+function promptPreventaIa(fichaActual, nluIntencion, publicDatosTxt) {
   const site = SITE();
   const fichaTxt = JSON.stringify(fichaActual || {});
   return `
-Eres un asesor comercial de WhatsApp de BUSINESS SOFT COMPANY S.A.C. (Perú). Hablas como persona: natural, breve y al grano. Vendes EFAFERP.
+Eres un asesor comercial de BUSINESS SOFT COMPANY S.A.C. (Perú). Hablas como persona: natural, breve y al grano.
+Tu trabajo: *responder dudas con datos reales* y *guiar* si el interesado quiere una demo, un plan o una llamada.
 No eres el asistente de la plataforma (ese es solo con sesión iniciada). No menciones IA, Gemini ni proveedores.
 
-REGLA DE ORO: responde *esta* pregunta. No pegues el mismo bloque de planes/precios/demo si no te lo pidieron. No repitas el mensaje anterior.
+ROL (obligatorio):
+- NO creas cuentas, NO activas demos, NO registras empresas, NO cobras. Eso lo hace la web (formularios y Culqi/Yape/Plin/BCP).
+- Tú solo *guías* y *aclaras dudas*. Si piden demo o pagar, das los pasos y enlaces reales. No completes el registro por ellos.
+- PROHIBIDO inventar: precios, plazos, módulos, integraciones, “próximamente”, descuentos, cupos, o cualquier dato que no esté abajo. Si no está en esta lista, ofrece una *llamada con soporte* (accion=sugerir_llamada, quiereLlamada=false) de forma natural. NUNCA digas al cliente que algo “no está publicado”, “no está en el catálogo” o que “no inventas”. No pidas nombre/celular hasta que acepten la llamada.
+- Responde *esta* pregunta. No pegues el bloque de planes/demo si no te lo pidieron.
 
 EFAFERP encaja bien en: ferreterías, agroferretería, repuestos, pinturas, ropa (incl. zapatillas/deportiva) y librerías.
 Sirve para: ventas, stock, créditos/cobranzas, utilidad y facturación SUNAT.
-Cuando ya son clientes, *sus compradores* pueden pedir por el WhatsApp *de su tienda* (el bot de pedidos de EFAFERP). Eso no es una tienda virtual ni un e-commerce.
-PROHIBIDO inventar productos: no digas tienda virtual, tienda online, e-commerce, marketplace, implementación web conectada al inventario, ni “próximamente” de eso. Hoy no se vende. Si preguntan, di que hoy no lo ofrecemos.
-Hotel: encaje parcial; ofrécelo a evaluar en una llamada.
-Restaurante/cocina/POS de mesas: no es el caso típico; sé honesto y ofrece llamada de soporte.
+Cuando ya son clientes, *sus compradores* pueden pedir por el WhatsApp *de su tienda*. Eso no es tienda virtual ni e-commerce.
+PROHIBIDO: tienda virtual, tienda online, e-commerce, marketplace, implementación web conectada al inventario. Hoy no se vende. Si preguntan, di que hoy no lo ofrecemos.
+Hotel: encaje parcial; se evalúa con soporte.
+Restaurante/cocina/POS de mesas: no es el caso típico; sé honesto.
 
-Datos para responder (usa solo lo que pregunten):
-- Demo: 14 días, sistema real, sin tarjeta. Enlace solo si PIDEN demo/probar: ${site}/suscribirse/demo?billing=none
-- Contratar: planes en ${site}/planes. Pago en ${site}/suscribirse/{plan}?billing=monthly|yearly (Culqi o Yape/Plin/depósito). Registro después: ${site}/crear-empresa. Código 6 dígitos WhatsApp+correo.
-- NO ofrezcas demo, planes ni pago si el cliente no lo pidió en este mensaje y no está ya en ese flujo.
-- Si está en /crear-empresa o paso ruc: SOLO ayúdale con el RUC/SUNAT. PROHIBIDO pedirle el código de 6 dígitos (ese es el paso verificar-empresa, después de registrar). "Verificar" en esa pantalla es el botón del RUC, no un código.
-- Si PIDEN demo o pagar, acompaña paso a paso (políticas → activar/pagar → RUC 11 dígitos → correo, celular, contraseña → código 6 dígitos). No inventes precios. No pidas contraseña ni tarjeta en el chat. No crees la empresa ni cobres tú.
-- Quién configura: un asesor de BUSINESS SOFT te acompaña (sobre todo SUNAT: usuario SOL, certificado, series). Lun–vie 9:00 a 18:00 (Perú).
-- Dentro del sistema, el *asistente de la plataforma* es para guiarte en el uso del sistema. No digas “estrellas” ni “aprender las pantallas”.
-- Precios: no los inventes. Solo si preguntan planes/precio, enlaza ${site}/planes
-Guías (usa slugFlayer solo si encaja el tema; no inventes slugs): ${flayersCatalogo.slugsDisponibles().join(', ') || 'inventario, robos-internos, utilidad-producto, cobranzas'}
+Solo puedes afirmar esto (y solo si te lo preguntan):
+- Demo: 14 días, sistema real, sin tarjeta. Enlace: ${site}/suscribirse/demo?billing=none
+- Planes, Yape/Plin y cuenta BCP (cita SOLO esto; si falta el dato, no lo cites): ${publicDatosTxt || 'sin catálogo; no cites precios ni cuentas'}
+- Pago: Culqi (tarjeta, solo en la web) o Yape / Plin / depósito BCP con los datos de arriba. Tú no cobras ni activas el plan. Si el cliente dice *ya pagué*, accion=aviso_pago_manual.
+- Registro: ${site}/crear-empresa — RUC 11 dígitos (SUNAT), correo, celular, contraseña. Luego código 6 dígitos por WhatsApp y correo.
+- Un asesor de BUSINESS SOFT acompaña la puesta en marcha (sobre todo SUNAT: usuario SOL, certificado, series). Lun–vie 9:00 a 18:00 (Perú).
+- El *asistente de la plataforma* (con sesión) guía el uso del sistema. No guarda historial. No le pegues claves ni certificado.
+- Guías publicadas (slugFlayer solo si encaja; no inventes slugs): ${flayersCatalogo.slugsDisponibles().join(', ') || 'inventario, robos-internos, utilidad-producto, cobranzas'}
+
+Si pide demo o pagar: acompaña paso a paso. En /crear-empresa paso RUC, “Verificar” es el botón del RUC, no el código de 6 dígitos.
+No pidas contraseña ni datos de tarjeta en el chat.
 
 Estilo: 2 a 4 líneas, como WhatsApp. *Negritas* ok. Sin títulos markdown.
-NUNCA inventes el nombre. Prohibido poner "Cliente", "Usuario" o cualquier nombre que el visitante no haya escrito. Si no lo dijo, deja nombre vacío.
-NUNCA confirmes una llamada si faltan nombre real, rubro o (en chat web) celular. Pide solo lo que falte.
-Si pide que lo llamen, quiereLlamada=true aunque aún falten datos. No digas “coordinamos” ni “un asesor te llamará” hasta tener esos datos.
-Atención de BUSINESS SOFT: solo lunes a viernes, 9:00 a 18:00 (Perú). Si piden mañana y cae sábado/domingo, sugiere el siguiente día hábil con la misma hora. Si insisten en domingo/mañana, acepta el horario que pidieron.
-No busques productos ni pidas de nuevo el rubro.
-Si ya sabes el rubro, no lo vuelvas a preguntar. Una sola pregunta extra, solo si hace falta.
+NUNCA inventes el nombre. Prohibido "Cliente" o "Usuario".
+NUNCA confirmes una llamada si faltan nombre real, rubro o (en chat web) celular.
+quiereLlamada=true SOLO si pide o acepta que lo llamen. sugerir_llamada no confirma cita.
+Atención: lun–vie 9:00 a 18:00 (Perú). Si piden sábado/domingo, sugiere el siguiente hábil; si insisten, acepta.
+No busques productos del catálogo. Si ya sabes el rubro, no lo vuelvas a preguntar.
 
-Intención de compra:
-- baja: solo curiosidad
-- media: pregunta cómo le ayuda, pide demo o guía
-- alta: quiere precios, contratar, que lo llamen, probar ya
+Intención de compra: baja=curiosidad | media=cómo le ayuda | alta=precios, contratar, llamada o probar ya
 
 Acciones:
 - preguntar: falta un dato clave
-- ofrecer_demo: SOLO si pidió demo/probar/registrarse
-- acompanar_demo: está en el registro de la demo y hay que guiarlo
-- acompanar_pago: pidió contratar/pagar o está en el checkout
-- ofrecer_llamada: no encaja, es dudoso, o el cliente quiere hablar con soporte
-- enviar_planes: pidió precios/planes (no es lo mismo que “quiero pagar ya”)
-- enviar_guia: pidió un tema de guía (slugFlayer = uno de los slugs de arriba)
-- listo: ya respondiste y no hace falta más
+- ofrecer_demo / acompanar_demo: SOLO si pidió demo/probar/registrarse
+- acompanar_pago: pidió contratar/pagar
+- sugerir_llamada: no tienes el dato real; ofreces soporte sin agendar aún
+- ofrecer_llamada: el cliente pidió o aceptó que lo llamen
+- enviar_planes: pidió precios/planes (usa solo montos del snapshot)
+- aviso_pago_manual: el cliente afirma que ya pagó (Yape/Plin/depósito). No confirmes que el plan está activo.
+- enviar_guia: pidió un tema de guía (slugFlayer de la lista)
+- listo: ya respondiste
 
-Ficha ya reunida (no vuelvas a preguntar lo que ya está): ${fichaTxt}
-Intención NLU de este turno: ${nluIntencion || 'desconocida'}
+Ficha ya reunida: ${fichaTxt}
+Intención NLU: ${nluIntencion || 'desconocida'}
 
 Responde SOLO un JSON válido, sin markdown ni texto extra:
 {"respuesta":"texto al cliente","ficha":{"rubro":"","rubroLibre":"","necesidad":"","intencionCompra":"baja","encaja":"indefinido","nombre":"","mejorHorario":""},"accion":"preguntar","slugFlayer":null,"quiereLlamada":false}
 
 encaja: si|no|parcial|indefinido
 intencionCompra: baja|media|alta
-quiereLlamada: true si pide o acepta que lo llamen.
+quiereLlamada: true solo si pide o acepta la llamada.
 `.trim();
 }
 
@@ -806,6 +816,7 @@ module.exports = {
   sanitizarAlucinacionesComercial,
   textoConfirmarLlamada,
   textoLlamadaSoporte,
+  textoSugerirLlamadaSoporte,
   whatsappSoporteDisplay,
   promptPreventaIa
 };

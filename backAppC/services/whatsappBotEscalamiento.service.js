@@ -161,7 +161,8 @@ async function notificarInteresComercial(idEmpresa, params) {
     comercial,
     motivo,
     canal,
-    digitosCelular
+    digitosCelular,
+    ultimoMensaje
   } = params;
 
   const destino = destinosPe(numeroVendedor);
@@ -181,24 +182,33 @@ async function notificarInteresComercial(idEmpresa, params) {
         telefonoCliente ? `Sesión: ${String(telefonoCliente).slice(0, 24)}` : null
       ]
     : [`Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(+${telefonoCliente})`];
-  const body = [
-    motivo === 'llamada'
+  const titulo = motivo === 'pago_reportado'
+    ? (esWeb
+      ? '*Lead web dice que ya pagó el plan* 💸'
+      : '*Lead WhatsApp dice que ya pagó el plan* 💸')
+    : motivo === 'llamada'
       ? (esWeb
         ? '*Lead web EFAFERP pide llamada de soporte* 📞'
         : '*Interesado EFAFERP pide llamada de soporte* 📞')
       : (esWeb
         ? '*Lead web EFAFERP con alta intención* ✨'
-        : '*Interesado EFAFERP con alta intención* ✨'),
+        : '*Interesado EFAFERP con alta intención* ✨');
+  const cierre = motivo === 'pago_reportado'
+    ? 'Valida el voucher en el checkout. El bot NO activó el plan.'
+    : esWeb
+      ? 'Contáctalo tú. El visitante no abre WhatsApp desde la web.'
+      : 'El bot sigue atendiendo. Contáctalo para agendar o cerrar.';
+  const body = [
+    titulo,
     ...contacto,
     `Rubro: ${f.rubro || f.rubroLibre || 'no indicado'}`,
     `Encaje: ${f.encaja || 'indefinido'} | Intención: ${f.intencionCompra || 'n/d'}`,
     f.necesidad ? `Necesidad: ${String(f.necesidad).slice(0, 200)}` : null,
     f.nombre ? `Nombre para llamada: ${f.nombre}` : null,
     f.mejorHorario ? `Horario: ${f.mejorHorario}` : null,
+    ultimoMensaje ? `Último mensaje: ${String(ultimoMensaje).slice(0, 220)}` : null,
     '',
-    esWeb
-      ? 'Contáctalo tú. El visitante no abre WhatsApp desde la web.'
-      : 'El bot sigue atendiendo. Contáctalo para agendar o cerrar.'
+    cierre
   ].filter(Boolean);
 
   const texto = body.join('\n');

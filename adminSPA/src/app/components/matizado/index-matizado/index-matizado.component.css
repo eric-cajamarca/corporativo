@@ -1,0 +1,13 @@
+.mz-lista {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.mz-suggest {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.mz-suggest .list-group-item {
+  cursor: pointer;
+}

@@ -1,0 +1,8 @@
+.matizado-lista {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.matizado-lista .list-group-item {
+  cursor: pointer;
+}

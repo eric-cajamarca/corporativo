@@ -24,6 +24,8 @@ const {
 const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
 const ventaLineaInventarioService = require('./ventaLineaInventario.service');
+const formulaMatizadoService = require('./formulaMatizado.service');
+const productoUnidadVentaService = require('./productoUnidadVenta.service');
 const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const ventasDetalleReporteRepository = require('../repositories/ventasDetalleReporte.repository');
@@ -44,6 +46,50 @@ const FLAGS_INVENTARIO_DEFECTO = Object.freeze({
   permitirVentasNegativas: false,
   controlUbicaciones: true
 });
+
+function enriquecerDescripcionMatizado(det) {
+  if (!det?.matizado) return;
+  const extra = formulaMatizadoService.textoDescripcionMatizado(det.matizado);
+  if (!extra) return;
+  const actual = String(det.descripcionLinea || det.descripcion || '').trim();
+  if (!actual) {
+    det.descripcionLinea = extra;
+    return;
+  }
+  if (!actual.toLowerCase().includes(extra.toLowerCase())) {
+    det.descripcionLinea = `${actual} — ${extra}`;
+  }
+}
+
+async function aplicarMatizadoLineaVenta(params) {
+  const { det, salida } = params;
+  if (!det?.matizado) return;
+  let factorEscala = Number(salida?.cantidadADescontar) || 0;
+  if (factorEscala <= 0) {
+    factorEscala = await productoUnidadVentaService.resolverCantidadStock(
+      params.transaction,
+      params.idEmpresa,
+      det.idProducto,
+      det.idUnidadVenta || null,
+      parseFloat(det.cantidad) || 0
+    );
+  }
+  await formulaMatizadoService.procesarEnVenta({
+    transaction: params.transaction,
+    idEmpresa: params.idEmpresa,
+    idSucursal: params.idSucursal,
+    idVenta: params.idVenta,
+    idProductoBase: det.idProducto,
+    idUsuario: params.idUsuario,
+    factorEscala,
+    matizado: det.matizado,
+    permitirVentasNegativas: params.permitirVentasNegativas,
+    controlUbicaciones: params.controlUbicaciones,
+    cache: params.cache,
+    compVenta: params.compVenta,
+    idComprobante: params.idComprobante
+  });
+}
 
 /** Flags de inventario por empresa (ConfiguracionEmpresa), clave = idEmpresa en minúsculas. */
 async function cargarFlagsInventarioPorEmpresas(pool, idsEmpresa) {
@@ -724,6 +770,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         idSucursal: idSucursalLinea,
         idProducto: det.idProducto,
         cantPedida,
+        idUnidadVenta: det.idUnidadVenta || null,
         descripcion: det.descripcion,
         permitirVentasNegativas,
         controlUbicaciones,
@@ -733,6 +780,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         avisoStockInsuficiente.push(salida.avisoStock);
       }
 
+      enriquecerDescripcionMatizado(det);
       await detalleVentaService.crearDetalle(transaction, {
         ...det,
         idVenta,
@@ -758,6 +806,21 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         cantidadADescontar: salida.cantidadADescontar,
         consumosPorLote: salida.consumosPorLote,
         costoUnitarioProm: salida.costoUnitarioProm
+      });
+
+      await aplicarMatizadoLineaVenta({
+        transaction,
+        det,
+        salida,
+        idEmpresa: user.empresa,
+        idSucursal: idSucursalLinea,
+        idVenta,
+        idUsuario: idUsuarioEmpresa,
+        permitirVentasNegativas,
+        controlUbicaciones,
+        cache: metaInventarioCache,
+        compVenta,
+        idComprobante: idComprobanteDestino
       });
     }
 
@@ -1150,6 +1213,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           idSucursal: idSucursalEmpresa,
           idProducto: det.idProducto,
           cantPedida,
+          idUnidadVenta: det.idUnidadVenta || null,
           descripcion: det.descripcion || det.aliasEmpresa,
           permitirVentasNegativas: permitirNegativoLinea,
           controlUbicaciones: flagsInvProducto.controlUbicaciones,
@@ -1159,6 +1223,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           avisoStockInsuficiente.push(salida.avisoStock);
         }
 
+        enriquecerDescripcionMatizado(det);
         await detalleVentaService.crearDetalle(transaction, {
           ...det,
           idVenta,
@@ -1184,6 +1249,21 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           cantidadADescontar: salida.cantidadADescontar,
           consumosPorLote: salida.consumosPorLote,
           costoUnitarioProm: salida.costoUnitarioProm
+        });
+
+        await aplicarMatizadoLineaVenta({
+          transaction,
+          det,
+          salida,
+          idEmpresa: idEmpresaProducto,
+          idSucursal: idSucursalEmpresa,
+          idVenta,
+          idUsuario: idUsuarioEmpresa,
+          permitirVentasNegativas: permitirNegativoLinea,
+          controlUbicaciones: flagsInvProducto.controlUbicaciones,
+          cache: metaInventarioCachePart,
+          compVenta,
+          idComprobante: idComprobanteDestino
         });
       }
 

@@ -4,6 +4,7 @@
  */
 const geminiClient = require('../utils/gemini.client');
 const ficha = require('../utils/whatsappBotComercial.conocimiento');
+const pubDatos = require('./whatsappBotComercialPublico.datos');
 const { trace } = require('../utils/whatsappBotTrace.util');
 
 const MAX_TEXTO = 800;
@@ -17,9 +18,11 @@ const ACCIONES = new Set([
   'ofrecer_demo',
   'acompanar_demo',
   'acompanar_pago',
+  'sugerir_llamada',
   'ofrecer_llamada',
   'enviar_planes',
   'enviar_guia',
+  'aviso_pago_manual',
   'listo'
 ]);
 
@@ -95,6 +98,8 @@ function mergeFicha(prev, incoming, textoEntrada) {
   if (prev?.rutaActual) out.rutaActual = prev.rutaActual;
   if (prev?.pasoRegistro) out.pasoRegistro = prev.pasoRegistro;
   if (prev?.errorPantalla) out.errorPantalla = prev.errorPantalla;
+  if (prev?.pagoReportado || src.pagoReportado) out.pagoReportado = true;
+  if (prev?.avisoPagoOk) out.avisoPagoOk = true;
   return out;
 }
 
@@ -158,12 +163,20 @@ function resolverFlujoTurno(texto, nlu, comercial, ruta) {
   return ficha.inferirFlujoDesdeRuta(ruta);
 }
 
+function limpiarDatosEfimeros(com) {
+  if (!com) return com;
+  const out = { ...com };
+  delete out.publicDatos;
+  delete out.publicDatosTxt;
+  return out;
+}
+
 function conHistorial(out, historial, texto, requiereCelular) {
   const hist = historial.concat([
     { role: 'user', text: texto.slice(0, 400) },
     { role: 'model', text: String(out.respuesta || '').slice(0, 400) }
   ]).slice(-MAX_HISTORIAL);
-  out.comercial = { ...out.comercial, requiereCelular, historial: hist };
+  out.comercial = { ...limpiarDatosEfimeros(out.comercial), requiereCelular, historial: hist };
   return out;
 }
 
@@ -214,6 +227,60 @@ function confirmarOAjustarLlamada(comercial, textoEntrada) {
   return confirmarLlamada(comercial);
 }
 
+function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
+  if (!publicDatos) return null;
+  const base = { slugFlayer: null, quiereLlamada: false };
+  if (pubDatos.pareceConfirmaPago(texto, nlu)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoConfirmaPagoCliente(),
+      comercial: { ...comercial, intencionCompra: 'alta', pagoReportado: true },
+      accion: 'aviso_pago_manual'
+    };
+  }
+  if (pubDatos.parecePreguntaYape(texto) && !pubDatos.parecePreguntaPlin(texto)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoYapePlin(publicDatos, 'yape'),
+      comercial: { ...comercial, intencionCompra: 'alta' },
+      accion: 'acompanar_pago'
+    };
+  }
+  if (pubDatos.parecePreguntaPlin(texto)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoYapePlin(publicDatos, 'plin'),
+      comercial: { ...comercial, intencionCompra: 'alta' },
+      accion: 'acompanar_pago'
+    };
+  }
+  if (pubDatos.parecePreguntaCuenta(texto)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoCuentaBancaria(publicDatos),
+      comercial: { ...comercial, intencionCompra: 'alta' },
+      accion: 'acompanar_pago'
+    };
+  }
+  if (pubDatos.parecePreguntaMediosPago(texto)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoMediosPago(publicDatos),
+      comercial: { ...comercial, intencionCompra: 'alta' },
+      accion: 'acompanar_pago'
+    };
+  }
+  if (pubDatos.parecePreguntaPlanes(texto, nlu)) {
+    return {
+      ...base,
+      respuesta: pubDatos.textoPlanesReales(publicDatos),
+      comercial: { ...comercial, intencionCompra: 'alta' },
+      accion: 'enviar_planes'
+    };
+  }
+  return null;
+}
+
 function extraerJsonTurno(data) {
   const parts = geminiClient.extraerPartes(data);
   const texto = parts.map((p) => (typeof p.text === 'string' ? p.text : '')).join('\n');
@@ -242,6 +309,8 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
       quiereLlamada: false
     };
   }
+  const pubFb = turnoDatoPublico(t, nlu, merged, comercial.publicDatos);
+  if (pubFb) return pubFb;
   const flujoFb = resolverFlujoTurno(t, nlu, comercial, comercial.rutaActual);
   if (flujoFb) {
     const acomp = ficha.turnoAcompanamiento({
@@ -255,7 +324,9 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
   }
   if (nlu?.intencion === 'planes_saas' || /^(planes)$/i.test(t.trim())) {
     return {
-      respuesta: ficha.textoPlanes(),
+      respuesta: comercial.publicDatos
+        ? pubDatos.textoPlanesReales(comercial.publicDatos)
+        : ficha.textoPlanes(),
       comercial: { ...merged, intencionCompra: 'alta' },
       accion: 'enviar_planes',
       slugFlayer: null,
@@ -265,9 +336,8 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
   if (merged.encaja === 'si') {
     return {
       respuesta: [
-        `Para *${merged.rubro || 'tu rubro'}* sí te encaja: ventas, stock, créditos y SUNAT.`,
-        '¿Qué te duele más hoy: inventario, cobranzas o facturación?',
-        'Si quieres *probar 14 días* escribe *DEMO*. Si quieres *contratar* escribe *PAGAR*.'
+        `Para *${merged.rubro || 'tu rubro'}* EFAFERP encaja: ventas, stock, créditos y facturación SUNAT.`,
+        'Pregúntame lo que quieras. Si quieres probar o pagar, dímelo y te guío en la web.'
       ].join('\n'),
       comercial: { ...merged, intencionCompra: merged.intencionCompra === 'baja' ? 'media' : merged.intencionCompra },
       accion: 'listo',
@@ -279,19 +349,18 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
     return {
       respuesta: [
         merged.encaja === 'parcial'
-          ? 'En ese rubro hay que evaluarlo con calma (no es el caso típico de ferretería/repuestos/pinturas/ropa/librería).'
+          ? 'En ese rubro no es el caso típico (ferretería, repuestos, pinturas, ropa, librería). No te aseguro que encaje.'
           : 'Ese rubro no es el que EFAFERP atiende de forma típica. No quiero venderte algo que no te sirva.',
-        '',
-        ficha.textoLlamadaSoporte(false, merged, { requiereCelular: Boolean(comercial.requiereCelular) })
+        ficha.textoSugerirLlamadaSoporte()
       ].join('\n'),
-      comercial: { ...merged, quiereLlamada: true, esperandoDatosLlamada: true },
-      accion: 'ofrecer_llamada',
+      comercial: { ...merged, intencionCompra: 'media' },
+      accion: 'sugerir_llamada',
       slugFlayer: null,
-      quiereLlamada: true
+      quiereLlamada: false
     };
   }
   return {
-    respuesta: 'Para decirte si EFAFERP te sirve, ¿a qué se dedica tu negocio? (ferretería, repuestos, pinturas, ropa, librería u otro)',
+    respuesta: 'Para orientarte, ¿a qué se dedica tu negocio? (ferretería, repuestos, pinturas, ropa, librería u otro).',
     comercial: merged,
     accion: 'preguntar',
     slugFlayer: null,
@@ -310,6 +379,8 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
   delete fichaLimpia.historial;
   delete fichaLimpia.avisoLlamadaEnviado;
   delete fichaLimpia.avisoAltaEnviado;
+  delete fichaLimpia.publicDatos;
+  delete fichaLimpia.publicDatosTxt;
 
   const contents = [];
   for (const h of historial) {
@@ -322,7 +393,7 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
 
   const { data } = await geminiClient.generateConHerramientas({
     apiKey,
-    systemInstruction: ficha.promptPreventaIa(fichaLimpia, nlu?.intencion),
+    systemInstruction: ficha.promptPreventaIa(fichaLimpia, nlu?.intencion, comercial.publicDatosTxt),
     contents,
     generationConfig: { temperature: 0.4, maxOutputTokens: 700 }
   });
@@ -343,9 +414,18 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
 /**
  * @returns {Promise<{respuesta:string, comercial:object, accion:string, slugFlayer:string|null, quiereLlamada:boolean}>}
  */
-async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal, rutaActual, pasoRegistro, errorPantalla }) {
+async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal, rutaActual, pasoRegistro, errorPantalla, publicDatos }) {
   const comercial = { ...(slots?.comercial || {}) };
   comercial.requiereCelular = canal === 'web' || Boolean(comercial.requiereCelular);
+  comercial.publicDatos = publicDatos || null;
+  if (publicDatos) {
+    const snap = pubDatos.snapshotParaPrompt(publicDatos);
+    comercial.publicDatosTxt = [
+      snap.planesTxt,
+      snap.yapePlin ? `Yape/Plin: ${snap.yapePlin}` : 'Yape/Plin: (sin número; no lo cites)',
+      snap.bcpTxt ? `Depósito: ${snap.bcpTxt}` : 'Depósito: (sin cuenta; no la cites)'
+    ].join(' | ');
+  }
   if (rutaActual) comercial.rutaActual = sanitizar(rutaActual, 200);
   if (pasoRegistro) comercial.pasoRegistro = sanitizar(pasoRegistro, 40);
   if (errorPantalla) comercial.errorPantalla = sanitizar(errorPantalla, 200);
@@ -362,7 +442,7 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
       if (err.code === 'RATE_LIMIT') {
         return {
           respuesta: 'Dame un momento y escribe de nuevo, o pide *LLAMADA* para que te contacte soporte.',
-          comercial,
+          comercial: limpiarDatosEfimeros(comercial),
           accion: 'preguntar',
           slugFlayer: null,
           quiereLlamada: false
@@ -386,6 +466,13 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     trace('4.BACKEND_SIN_GEMINI', { motivo: 'cita_datos', accion: outCita.accion, faltantes: ficha.faltantesCita(outCita.comercial, { requiereCelular }) });
     trace('4c.RESPUESTA_BACKEND', { texto: outCita.respuesta });
     return conHistorial(outCita, historial, texto, requiereCelular);
+  }
+
+  const pubTurno = turnoDatoPublico(texto, nlu, mergedEarly, comercial.publicDatos);
+  if (pubTurno) {
+    trace('4.BACKEND_SIN_GEMINI', { motivo: 'dato_publico', accion: pubTurno.accion });
+    trace('4c.RESPUESTA_BACKEND', { texto: pubTurno.respuesta });
+    return conHistorial(pubTurno, historial, texto, requiereCelular);
   }
 
   const flujo = resolverFlujoTurno(texto, nlu, mergedEarly, comercial.rutaActual);
@@ -418,11 +505,25 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     const accion = ACCIONES.has(parsed.accion) ? parsed.accion : 'preguntar';
     const merged = mergeFicha(comercial, parsed.ficha, texto);
     if (flujo) merged.flujo = flujo;
-    const quiereLlamada = Boolean(parsed.quiereLlamada) || accion === 'ofrecer_llamada';
+    const pidioLlamada = parecePedidoLlamadaEsteTurno(texto, nlu);
+    const quiereLlamada = pidioLlamada || (accion === 'ofrecer_llamada' && Boolean(parsed.quiereLlamada) && pidioLlamada);
     if (quiereLlamada) merged.quiereLlamada = true;
     let respuesta = sanitizar(ficha.sanitizarAlucinacionesComercial(parsed.respuesta), 1200);
-    if (accion === 'enviar_planes' && !/businesssoft\.net\/planes/i.test(respuesta)) {
+    if (accion === 'sugerir_llamada') {
+      merged.quiereLlamada = false;
+      if (!/\bLLAMADA\b/i.test(respuesta)) {
+        respuesta = `${respuesta}\n\n${ficha.textoSugerirLlamadaSoporte()}`;
+      }
+    }
+    if (accion === 'enviar_planes' && comercial.publicDatos) {
+      respuesta = pubDatos.textoPlanesReales(comercial.publicDatos);
+    } else if (accion === 'enviar_planes' && !/businesssoft\.net\/planes/i.test(respuesta)) {
       respuesta = `${respuesta}\n${ficha.urlPublica('/planes')}`;
+    }
+    if (accion === 'aviso_pago_manual') {
+      merged.pagoReportado = true;
+      merged.intencionCompra = 'alta';
+      respuesta = pubDatos.textoConfirmaPagoCliente();
     }
     const pidioDemo = nlu?.intencion === 'solicitar_demo' || ficha.pareceSolicitarDemo(texto);
     if ((accion === 'ofrecer_demo' || accion === 'acompanar_demo') && pidioDemo) {
@@ -437,7 +538,11 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
         return conHistorial(guia, historial, texto, requiereCelular);
       }
     }
-    if ((accion === 'acompanar_pago') && (nlu?.intencion === 'contratar_plan' || ficha.pareceSolicitarPago(texto))) {
+    const yaDioDatoPago = pubDatos.parecePreguntaYape(texto)
+      || pubDatos.parecePreguntaPlin(texto)
+      || pubDatos.parecePreguntaCuenta(texto)
+      || pubDatos.parecePreguntaMediosPago(texto);
+    if ((accion === 'acompanar_pago') && !yaDioDatoPago && (nlu?.intencion === 'contratar_plan' || ficha.pareceSolicitarPago(texto))) {
       const guia = ficha.turnoAcompanamiento({
         texto,
         flujo: 'pago',
@@ -462,14 +567,12 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     trace('4.BACKEND_SIN_GEMINI', { motivo: err.code || err.message, accion: out.accion });
   }
 
-  if (
-    parecePedidoLlamadaEsteTurno(texto, nlu)
-    && (out.quiereLlamada || out.accion === 'ofrecer_llamada')
-  ) {
-    out = pedirDatosOConfirmar(out.comercial, texto, requiereCelular);
+  if (out.accion === 'sugerir_llamada') {
+    out.quiereLlamada = false;
+    if (out.comercial) out.comercial.quiereLlamada = false;
   } else if (
-    !flujo
-    && (out.quiereLlamada || out.accion === 'ofrecer_llamada' || (out.comercial?.esperandoDatosLlamada && parecePedidoLlamada(texto, nlu, out.comercial)))
+    parecePedidoLlamadaEsteTurno(texto, nlu)
+    || (out.comercial?.esperandoDatosLlamada && parecePedidoLlamada(texto, nlu, out.comercial))
   ) {
     out = pedirDatosOConfirmar(out.comercial, texto, requiereCelular);
   }

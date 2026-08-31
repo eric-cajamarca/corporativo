@@ -21,6 +21,13 @@ import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { esFormaOMedioSaldoFavor, filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
+import { VentaUnidadMatizadoFlowService } from '../../../services/venta-unidad-matizado-flow.service';
+import { cantidadEnUnidadCompra, etiquetaUnidadCarrito } from '../../../utils/unidad-venta.util';
+import {
+  descripcionConColorMatizado,
+  payloadMatizadoParaApi,
+  reescalarMatizadoPorCantidad
+} from '../../../utils/matizado-venta.util';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -216,6 +223,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
   mostrarModalPdfTrasRegistrarVenta = true;
+  usarConversionUnidades = false;
+  usarMatizado = false;
+  cargoMatizado = 0;
 
   /** Modal comprobante PDF tras registrar venta */
   postVentaIdVenta: number | null = null;
@@ -305,6 +315,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private ventaCotizacionUi: VentaCotizacionUiService,
     private creditosService: CreditosService,
     private gestoresService: GestoresService,
+    private ventaUnidadMatizadoFlow: VentaUnidadMatizadoFlowService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
     private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
@@ -379,6 +390,31 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
             ? (itemPdfModal as { valor?: string; Valor?: string }).valor
             : (itemPdfModal as { valor?: string; Valor?: string })?.Valor;
         this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
+        const itemConv = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_CONVERSION_UNIDADES'
+        );
+        const vConv =
+          itemConv && (itemConv as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemConv as { valor?: string; Valor?: string }).valor
+            : (itemConv as { valor?: string; Valor?: string })?.Valor;
+        this.usarConversionUnidades = interpretarBooleanoConfig(vConv, false);
+        const itemMz = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_MATIZADO'
+        );
+        const vMz =
+          itemMz && (itemMz as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemMz as { valor?: string; Valor?: string }).valor
+            : (itemMz as { valor?: string; Valor?: string })?.Valor;
+        this.usarMatizado = interpretarBooleanoConfig(vMz, false);
+        const itemCargo = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_CARGO_MATIZADO'
+        );
+        const vCargo =
+          itemCargo && (itemCargo as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemCargo as { valor?: string; Valor?: string }).valor
+            : (itemCargo as { valor?: string; Valor?: string })?.Valor;
+        const cargoMz = Number(vCargo ?? 0);
+        this.cargoMatizado = Number.isFinite(cargoMz) && cargoMz >= 0 ? cargoMz : 0;
         const itemPermNeg = lista.find(
           (c: { clave?: string; Clave?: string }) => normClave(c) === 'INVENTARIO_PERMITIR_VENTAS_NEGATIVAS'
         );
@@ -1149,7 +1185,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   lineaCarritoStockInsuficiente(item: any): boolean {
     if (esProductoServicio(item?.codigoPresentacion)) return false;
     if (this.permitirVentasNegativas) return false;
-    const cant = Number(item?.cantidad) || 0;
+    const cant = cantidadEnUnidadCompra(item);
     const disp = this.obtenerStockDisponibleParaLineaCarrito(item);
     if (disp == null) return false;
     if (disp <= 0) return true;
@@ -1841,6 +1877,14 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
 
   agregarAlCarrito(producto: any): void {
+    if (
+      (this.usarConversionUnidades || this.usarMatizado) &&
+      !producto?.idUnidadVenta &&
+      !producto?._sinConversion
+    ) {
+      this.resolverUnidadYAgregar(producto);
+      return;
+    }
     if (!this.productoPerteneceEmpresaOperativa(producto)) {
       iziToast.warning({
         title: 'Producto no permitido',
@@ -1863,13 +1907,20 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         return;
       }
     }
+    const cantAgregar = Math.max(
+      0.000001,
+      Number(producto?.cantidadSeleccionada) > 0 ? Number(producto.cantidadSeleccionada) : 1
+    );
     const existe = this.carrito.find(p =>
       String(p.idProducto) === String(producto.idProducto) &&
       String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
-      String(p.idEmpresa || '') === String(producto.idEmpresa || '')
+      String(p.idEmpresa || '') === String(producto.idEmpresa || '') &&
+      String(p.idUnidadVenta || '') === String(producto.idUnidadVenta || '') &&
+      !p.matizado &&
+      !producto.matizado
     );
     if (existe) {
-      const cantNueva = (Number(existe.cantidad) || 0) + 1;
+      const cantNueva = (Number(existe.cantidad) || 0) + cantAgregar;
       const stockVal = this.validarStockAgregarAlCarrito(existe, cantNueva);
       if (!stockVal.valido) {
         iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
@@ -1881,7 +1932,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       existe.cantidad = cantNueva;
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
-      const stockVal = this.validarStockAgregarAlCarrito(producto, 1);
+      const stockVal = this.validarStockAgregarAlCarrito(producto, cantAgregar);
       if (!stockVal.valido) {
         iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
         return;
@@ -1892,7 +1943,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
-        cantidad: 1,
+        cantidad: cantAgregar,
         descripcionOriginal: descCat,
         permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1)
       });
@@ -1908,7 +1959,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   ): { valido: boolean; mensaje?: string; advertencia?: string } {
     const stock = this.obtenerStockDisponibleParaLineaCarrito(producto);
     return validarStockLinea({
-      cantidadNueva,
+      cantidadNueva: cantidadEnUnidadCompra(producto, cantidadNueva),
       stockDisponible: stock,
       permitirVentasNegativas: this.permitirVentasNegativas,
       nombreProducto: producto?.descripcion || producto?.codigo,
@@ -2187,16 +2238,47 @@ abrirModalPrecios(item: any) {
       nuevo = Number(item.cantidad) || 0;
     }
     item.cantidad = Math.round(nuevo * 1e6) / 1e6;
+    reescalarMatizadoPorCantidad(item, item.cantidad);
     this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
+  }
+
+  etiquetaUnidadLinea(item: { nombreUnidadVenta?: string; codigoPresentacion?: string; presentacion?: string }): string {
+    return etiquetaUnidadCarrito(item);
+  }
+
+  private resolverUnidadYAgregar(producto: any): void {
+    void this.ventaUnidadMatizadoFlow
+      .prepararLinea({
+        producto,
+        stockCompra: this.obtenerStockDisponibleParaLineaCarrito(producto),
+        usarConversionUnidades: this.usarConversionUnidades,
+        usarMatizado: this.usarMatizado,
+        cargoMatizado: this.cargoMatizado,
+        idSucursal: this.ventas?.idSucursal
+      })
+      .then((parche) => {
+        if (!parche) return;
+        this.agregarAlCarrito({ ...producto, ...parche });
+      });
   }
 
   private descripcionLineaParaDetalle(item: {
     permiteDescripcionEnVenta?: boolean;
     descripcion?: string;
     producto?: { descripcion?: string };
+    nombreUnidadVenta?: string;
+    matizado?: { nombreColor?: string };
   }): string | undefined {
-    return snapshotDescripcionLineaVenta(item);
+    const base = snapshotDescripcionLineaVenta(item);
+    const unidad = String(item?.nombreUnidadVenta || '').trim();
+    let out = base;
+    if (unidad && out && !out.toLowerCase().includes(unidad.toLowerCase())) {
+      out = `${out} — ${unidad}`;
+    } else if (!out) {
+      out = unidad;
+    }
+    return descripcionConColorMatizado(out || '', item?.matizado?.nombreColor) || undefined;
   }
   
 
@@ -3450,7 +3532,9 @@ abrirModalPrecios(item: any) {
         sucursal: item.sucursal || undefined,
         descripcion: item.descripcion || undefined,
         codigo: item.codigo || undefined,
-        descripcionLinea: this.descripcionLineaParaDetalle(item)
+        descripcionLinea: this.descripcionLineaParaDetalle(item),
+        idUnidadVenta: item.idUnidadVenta || undefined,
+        matizado: payloadMatizadoParaApi(item)
       };
     });
 

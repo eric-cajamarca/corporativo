@@ -170,7 +170,7 @@ export class UpdateEmpresaComponent {
     );
     this._rubrosService.listar({ activo: true }).subscribe(res => {
       const todos = res.data || [];
-      this.rubros = todos.filter(r => ['GEN', 'GRF', 'HOTEL'].includes((r.codigo || '').trim().toUpperCase()));
+      this.rubros = todos.filter(r => ['GEN', 'GRF', 'HOTEL', 'PINT'].includes((r.codigo || '').trim().toUpperCase()));
     });
 
     this._empresasService.getDireccionEmpresa_id().subscribe(

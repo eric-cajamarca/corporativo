@@ -30,6 +30,8 @@ const PATRONES = {
   solicitarDemoLargo: /\b(demo|cuenta demo|activar demo|prueba(r)?( (gratis|el sistema|14|de 14))?|14 d[ií]as|quiero probar|probar (el )?sistema|(me )?quiero registrar(me)?|registrarme|registr(ar|o) (mi )?(empresa|cuenta)|crear (mi )?(empresa|cuenta))\b/i,
   contratarPlan: /^(pagar|contratar)$/i,
   contratarPlanLargo: /\b(contratar|pagar( el)?( plan)?|quiero (el )?plan|comprar (el )?(plan|sistema)|plan emprendedor|plan profesional|\byape\b|\bplin\b|dep[oó]sito bcp)\b/i,
+  confirmaPagoManual: /\b(ya pagu[eé]|ya yap[eé]|ya transfer[ií]|ya deposit[eé]|acabo de pagar|pagu[eé] (ya|ahora|hace|con|por)|realic[eé] el (pago|yape|dep[oó]sito)|envi[eé] (el )?voucher|ya envi[eé] el voucher|ya hice el (pago|dep[oó]sito|yape))\b/i,
+  datosPagoPublico: /\b(yape|plin|cci|cuenta (bcp|bancaria)|n[uú]mero de cuenta|a qu[eé] cuenta|medios de pago|formas de pago|con qu[eé] (puedo )?pag)\b/i,
   dudaPagoRegistro: /\b(ruc|sunat|validaci[oó]n|c[oó]digo de (6|seis)|no me llega (el )?c[oó]digo|contrase[nñ]a|voucher|chk-|activar (la )?(demo|cuenta))\b/i,
   agendarLlamada: /\b(agendar( una)? llamada|quiero( una)? llamada|que me llamen|llamenme|llámenme|llamame|llámame|^llamada$)\b/i,
   consultaComercial: /\b(mi rubro|mi negocio|tengo una|tengo un|somos una|nos dedicamos|a que se dedica|me ayuda (el |con el )?sistema|sirve para|encaja (en|con)|ferreter|repuestos?|pinturer|librer|ropa deport|zapatill|calzado|minimarket|bodega|grifo|restaurant|cevicher|hotel|peluquer|taller mecan)/i,
@@ -100,9 +102,11 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   if (PATRONES.solicitarAgente.test(textoNorm)) return 'solicitar_agente';
 
   if (!esEstadoCotiz(contexto.estado) && !esEstadoPedido(contexto.estado)) {
+    if (PATRONES.confirmaPagoManual.test(textoNorm)) return 'confirma_pago_manual';
     if (t.toUpperCase() === 'DEMO' || PATRONES.solicitarDemo.test(t) || PATRONES.solicitarDemoLargo.test(textoNorm)) {
       return 'solicitar_demo';
     }
+    if (PATRONES.datosPagoPublico.test(textoNorm)) return 'datos_pago_publico';
     if (t.toUpperCase() === 'PAGAR' || PATRONES.contratarPlan.test(t) || PATRONES.contratarPlanLargo.test(textoNorm)) {
       return 'contratar_plan';
     }
@@ -301,7 +305,7 @@ function interpretar(mensaje, contexto = {}) {
     'solicitar_agente', 'agregar_a_cotizacion',
     'info_sistema', 'planes_saas', 'flayer_comercial', 'soporte_asistente',
     'consulta_comercial', 'agendar_llamada', 'solicitar_demo', 'contratar_plan',
-    'duda_pago_registro'
+    'duda_pago_registro', 'confirma_pago_manual', 'datos_pago_publico'
   ];
 
   if (sinTerminos.includes(intencion)) {
