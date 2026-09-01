@@ -1,5 +1,6 @@
 const { getAppTimezone } = require('./fechaDisplay.util');
 const flayersCatalogo = require('./whatsappBotFlayers.catalogo');
+const { isSaas } = require('../config/deployment.config');
 
 /**
  * Preventa EFAFERP solo para el WhatsApp de la empresa principal.
@@ -18,7 +19,7 @@ function urlPublica(ruta) {
 
 function textoFichaConviene() {
   return [
-    'Si te encaja el rubro (ferretería, repuestos, pinturas, ropa o librería) y quieres controlar ventas, stock y créditos con SUNAT, *sí te conviene* probar.',
+    'Si te encaja el rubro (tienda con stock y SUNAT: ferretería, repuestos, pinturas, ropa, librería, tecnología, abarrotes…) y quieres controlar ventas, créditos y facturación, *sí te conviene* probar.',
     '',
     'Lo que no está en la web y sí importa al contratar:',
     '• *Asistente de la plataforma:* al entrar a EFAFERP (sesión iniciada) te guía en el uso del sistema (SUNAT, productos, etc.). No guarda el historial. No le pegues claves ni el certificado.',
@@ -47,11 +48,50 @@ function textoPlanes() {
 
 function textoSoporteAsistente() {
   return [
-    'Cuando ya tienes cuenta, el *asistente de la plataforma* es para guiarte en el uso del sistema. No guarda la conversación.',
+    'Hay *tres* cosas distintas, para no confundirlas:',
     '',
-    'La puesta en marcha de SUNAT la hace un asesor por WhatsApp, como dice la web.',
-    'Si aún no eres cliente y quieres el sistema, escribe *DEMO* (prueba 14 días) o *PAGAR* (contratar) y te acompaño.'
+    '1. *Este chat* (el de la web/WhatsApp de Business Soft): te orienta *antes* de contratar. No crea tu cuenta.',
+    '2. *Asistente de la plataforma:* cuando ya entras a EFAFERP (sesión iniciada). Te guía a usar el sistema (ventas, SUNAT, productos). No guarda el historial.',
+    '3. *WhatsApp de tu tienda:* vinculas *tu* número en Configuración. Desde el plan *Básico* envías boletas/facturas desde EFAFERP, sin abrir WhatsApp Web en el navegador cada vez (el celular queda vinculado). El *bot de pedidos* para que *tus clientes* consulten stock es desde el plan *Emprendedor*.',
+    '',
+    'Si quieres probar: *demo* 14 días sin tarjeta.'
   ].join('\n');
+}
+
+function textoWhatsAppVinculado() {
+  return [
+    'Sí. En el plan *Básico* vinculas *tu* WhatsApp en el sistema y envías la boleta/factura *desde EFAFERP*.',
+    'No tienes que abrir WhatsApp Web en el navegador para cada envío: el número queda vinculado (el celular debe estar en línea).',
+    'Eso es distinto del *bot de pedidos* (para que *tus clientes* te escriban): ese es desde *Emprendedor*.',
+    'Si quieres probarlo: *demo* 14 días sin tarjeta.'
+  ].join('\n');
+}
+
+function textoBotPedidos() {
+  return [
+    'El *bot de pedidos* (tus clientes consultan stock y piden por *tu* WhatsApp) entra desde el plan *Emprendedor*.',
+    'En el plan *Básico* sí puedes *vincular tu WhatsApp* para *enviar boletas/facturas* desde EFAFERP, sin abrir WhatsApp Web cada vez.',
+    'El *asistente de la plataforma* (dentro del sistema, con sesión) lo tienes al ser cliente, para aprender a usar EFAFERP.',
+    'Si quieres, te paso el enlace de *demo* 14 días o *planes*.'
+  ].join('\n');
+}
+
+function parecePreguntaModulo(texto) {
+  return /\b(whats?app|vincular|bot( de pedidos| asistente)?|asistente( vendedor)?|factura|boletas?|comprobantes?|enviar (las )?(facturas|boletas)|whatsapp web|sin (tener que )?abrir|consiste|expl[ií]ca(me)?|h[aá]blame (sobre|del|de))\b/i.test(
+    String(texto || '')
+  );
+}
+
+function textoRespuestaModulo(texto) {
+  const t = String(texto || '');
+  if (!parecePreguntaModulo(t)) return null;
+  const hablaAsistente = /\b(asistente|bot asistente|como es eso)\b/i.test(t) && !/\b(vincular|enviar (las )?facturas|whatsapp web)\b/i.test(t);
+  const hablaBotPedidos = /\b(bot de pedidos|el bot|bot que ofrece|consiste el bot|sobre el bot|bot para (mis |mi )?(clientes|empresa)|usar( lo)? yo para mi empresa)\b/i.test(t);
+  const hablaWa = /\b(whats?app|vincular|factura|boleta|comprobante|whatsapp web)\b/i.test(t);
+  if (hablaAsistente && !hablaWa) return textoSoporteAsistente();
+  if (hablaBotPedidos && !hablaWa) return textoBotPedidos();
+  if (hablaWa) return textoWhatsAppVinculado();
+  return textoSoporteAsistente();
 }
 
 function textoListaFlayers() {
@@ -104,7 +144,7 @@ function textoQueVendesPrincipal() {
 }
 
 function textoHolaExtraPrincipal() {
-  return 'Si te interesa *EFAFERP*, cuéntame el rubro o tu duda. Escribe *SISTEMA*, *PLANES*, *DEMO*, *PAGAR*, *GUÍAS* o *LLAMADA*.';
+  return 'Cuéntame a qué se dedica tu negocio y te digo si EFAFERP te sirve. Si ya quieres probar: *demo 14 días* sin tarjeta.';
 }
 
 const RUBROS_ENCAJAN = [
@@ -112,7 +152,12 @@ const RUBROS_ENCAJAN = [
   { id: 'repuestos', re: /\b(repuestos?|automotriz)/i, etiqueta: 'repuestos' },
   { id: 'pinturas', re: /\b(pinturer|pinturas?)/i, etiqueta: 'pinturas' },
   { id: 'ropa', re: /\b(ropa|zapatill|zapatos|calzado|confeccion|boutique|deportiv)/i, etiqueta: 'ropa' },
-  { id: 'libreria', re: /\b(librer|utiles escolares|papeler)/i, etiqueta: 'librería' }
+  { id: 'libreria', re: /\b(librer|utiles escolares|papeler)/i, etiqueta: 'librería' },
+  { id: 'tecnologia', re: /\b(tecnolog|computador|laptops?|notebooks?|celulares?|smartphones?|electr[oó]nic)/i, etiqueta: 'tecnología' },
+  { id: 'abarrotes', re: /\b(abarrotes|minimarket|bodega)\b/i, etiqueta: 'abarrotes' },
+  { id: 'farmacia', re: /\b(farmacia|botica)\b/i, etiqueta: 'farmacia' },
+  { id: 'grifo', re: /\b(grifo|estacion de servicio|gasolinera)\b/i, etiqueta: 'grifo' },
+  { id: 'lubricantes', re: /\b(lubricantes?|aceites?( motoriz| de motor| automotrices)?)\b/i, etiqueta: 'lubricantes' }
 ];
 
 const RUBROS_NO_TIPICOS = [
@@ -121,6 +166,8 @@ const RUBROS_NO_TIPICOS = [
   { id: 'colegio', re: /\b(colegio|academia|instituto educativo)/i }
 ];
 
+const RE_NO_ES_RUBRO = /^(hola|buenas|buenos dias|buenas tardes|ok|okay|si|sí|no|gracias|planes|demo|pagar|sistema|guias|guías|llamada|agente|menu|menú|info|\d+)$/i;
+
 function detectarRubro(texto) {
   const t = String(texto || '');
   const si = RUBROS_ENCAJAN.find((r) => r.re.test(t));
@@ -128,10 +175,108 @@ function detectarRubro(texto) {
   const no = RUBROS_NO_TIPICOS.find((r) => r.re.test(t));
   if (no) return { id: no.id, etiqueta: no.id, encaja: 'no' };
   if (/\b(hotel|hospedaje|hostal)\b/i.test(t)) return { id: 'hotel', etiqueta: 'hotel', encaja: 'parcial' };
-  if (/\b(minimarket|bodega|grifo|taller)\b/i.test(t)) {
-    return { id: 'comercio', etiqueta: 'comercio', encaja: 'parcial' };
-  }
+  if (/\b(taller|mec[aá]nica)\b/i.test(t)) return { id: 'taller', etiqueta: 'taller', encaja: 'parcial' };
   return null;
+}
+
+function pareceComercioInventario(texto) {
+  return /\b(vendo|revendo|reventa|tienda|stock|inventario|productos?|computador|laptops?|tecnolog|celular|electr[oó]nic|abarrotes|farmacia|repuesto|ferreter|pintur|ropa|librer|calzado|minimarket|bodega|grifo|lubricantes?|aceites?)\b/i.test(
+    String(texto || '')
+  );
+}
+
+function pareceDescripcionNegocio(texto) {
+  const t = String(texto || '').trim();
+  if (t.length < 3 || t.length > 280) return false;
+  if (RE_NO_ES_RUBRO.test(t)) return false;
+  if (pareceSolicitarDemo(t) || pareceSolicitarPago(t)) return false;
+  if (/^(qu[eé]|c[oó]mo|cu[aá]nto|d[oó]nde|por qu[eé])\b/i.test(t)) return false;
+  return (
+    pareceComercioInventario(t)
+    || /\b(negocio|rubro|me dedico|se dedica|somos|tengo una?|mi (tienda|negocio|empresa))\b/i.test(t)
+  );
+}
+
+/** Etiqueta corta para hablar del rubro. Nunca el mensaje completo del cliente. */
+function resumirEtiquetaRubro(texto) {
+  let t = String(texto || '').replace(/\s+/g, ' ').trim();
+  t = t.replace(/^(hola|buenas|buenos d[ií]as|buenas tardes|buenas noches)[.,!¡]?\s+/i, '');
+  t = t.replace(/[¿?].*$/g, ' ').trim();
+  t = t.replace(/\b(crees que|piensas que|me (puede|podr[ií]a) ayudar|tu sistema|les sirve).*$/i, '').trim();
+  const deNegocio = t.match(/\b(?:negocio|tienda|empresa|local|venta)\s+de\s+(.+)$/i);
+  if (deNegocio) t = deNegocio[1].trim();
+  const vendo = t.match(/\b(?:vendo|revendo|vendemos|comercializo)\s+(.+)$/i);
+  if (vendo) t = vendo[1].trim();
+  const dedico = t.match(/\b(?:me dedico a|nos dedicamos a|se dedica a)\s+(.+)$/i);
+  if (dedico) t = dedico[1].trim();
+  t = t.replace(/^(tengo una?|tenemos una?|somos una?|es un[ae]?)\s+/i, '');
+  t = t.replace(/^(un|una|el|la|mi)\s+negocio\s+de\s+/i, '');
+  t = t.replace(/[.,;:]+$/g, '').trim();
+  if (t.length > 48) t = t.slice(0, 48).replace(/\s+\S*$/, '').trim();
+  if (!t || RE_NO_ES_RUBRO.test(t) || t.split(/\s+/).length > 8) return '';
+  return t;
+}
+
+function extraerRubroLibre(texto, prev) {
+  const detectado = detectarRubro(texto);
+  if (detectado) {
+    return { rubro: detectado.etiqueta, rubroLibre: detectado.etiqueta, encaja: detectado.encaja };
+  }
+  const t = String(texto || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220);
+  if (!t || RE_NO_ES_RUBRO.test(t)) return null;
+  const etiqueta = resumirEtiquetaRubro(t);
+  const esperando = Boolean(prev?.esperandoRubro);
+  if (esperando) {
+    if (/^(qu[eé]|c[oó]mo|cu[aá]nto|d[oó]nde)\b/i.test(t) || t.length < 3) return null;
+    const rubroLibre = etiqueta || t.slice(0, 48);
+    return { rubroLibre, encaja: pareceComercioInventario(t) ? 'si' : 'parcial' };
+  }
+  if (!pareceDescripcionNegocio(t) && !etiqueta) return null;
+  if (!pareceDescripcionNegocio(t) && !pareceComercioInventario(etiqueta)) return null;
+  if (!etiqueta) return null;
+  return { rubroLibre: etiqueta, encaja: pareceComercioInventario(t) ? 'si' : 'parcial' };
+}
+
+function tieneRubro(com) {
+  return Boolean(String(com?.rubro || '').trim() || String(com?.rubroLibre || '').trim());
+}
+
+function etiquetaRubro(com) {
+  const catalogo = detectarRubro(`${com?.rubro || ''} ${com?.rubroLibre || ''}`);
+  if (catalogo) return catalogo.etiqueta;
+  const limpio = resumirEtiquetaRubro(com?.rubro || com?.rubroLibre || '');
+  return limpio || 'tu negocio';
+}
+
+function parecePreguntaRubro(texto) {
+  return /\b(a qu[eé] se dedica|qu[eé] rubro|orientarte|dedica tu negocio)\b/i.test(String(texto || ''));
+}
+
+function textoPitchRubroYDemo(com) {
+  const nombre = etiquetaRubro(com);
+  const encaja = String(com?.encaja || 'indefinido');
+  if (encaja === 'no') {
+    return [
+      `Anoté *${nombre}*. No es el caso típico de EFAFERP (tiendas con stock y SUNAT).`,
+      'Si igual vendes productos y quieres facturar, puedes *probar 14 días* sin tarjeta:',
+      urlDemo(),
+      'O pide una *llamada* y te contacta un asesor.'
+    ].join('\n');
+  }
+  const linea =
+    encaja === 'parcial'
+      ? `En *${nombre}* no es el caso más típico, pero si manejas *stock y facturación SUNAT* sí te puede servir.`
+      : `Para *${nombre}* te sirve: ventas, stock, créditos y boleta/factura SUNAT.`;
+  return [
+    linea,
+    '',
+    '¿Quieres *probar 14 días* (sin tarjeta) o que te llame un asesor?',
+    `Demo: ${urlDemo()}`,
+    'Si te trabas al registrarte, dime aquí.'
+  ].join('\n');
 }
 
 function pareceConsultaComercial(texto, nlu, estado) {
@@ -157,7 +302,7 @@ function last9Celular(valor) {
 }
 
 function urlDemo() {
-  return `${urlPublica('/suscribirse/demo')}?billing=none`;
+  return `${urlPublica('/suscribirse/demo')}?billing=none&origen=bot`;
 }
 
 function urlPlanes() {
@@ -174,6 +319,12 @@ function urlCrearEmpresaPrefill(opts = {}) {
   const q = new URLSearchParams();
   const cel = last9Celular(opts.celular);
   if (cel) q.set('celular', cel);
+  if (isSaas()) {
+    q.set('billing', 'none');
+    q.set('origen', 'bot');
+    const qs = q.toString();
+    return `${urlPublica('/suscribirse/demo')}${qs ? `?${qs}` : ''}`;
+  }
   const qs = q.toString();
   return urlPublica('/crear-empresa') + (qs ? `?${qs}` : '');
 }
@@ -251,8 +402,6 @@ function detectarPlanYCiclo(texto) {
 
 function textoAcompanarDemo(com, ruta) {
   const r = String(ruta || '').toLowerCase().split('?')[0];
-  const cel = last9Celular(com?.celular || com?.celularWeb);
-  const registro = urlCrearEmpresaPrefill({ celular: cel });
   if (r.includes('/suscribirse/demo')) {
     return [
       'Estás en la pantalla de la *demo*. Acepta las políticas y pulsa *activar demo* (14 días, *sin tarjeta*).',
@@ -269,7 +418,7 @@ function textoAcompanarDemo(com, ruta) {
     '1. Abre este enlace y acepta las políticas:',
     urlDemo(),
     '2. Pulsa *activar demo* (no se cobra).',
-    `3. Registra tu empresa (RUC, correo, celular y contraseña): ${registro}`,
+    '3. La web te lleva a registrar tu empresa (RUC, correo, celular y contraseña).',
     '4. Te llega un *código de 6 dígitos* por WhatsApp y correo. Lo ingresas en verificar empresa.',
     '',
     'Si te trabas (RUC, correo, código, contraseña), escríbeme aquí. No me envíes la contraseña ni datos de tarjeta.'
@@ -696,75 +845,84 @@ function textoSugerirLlamadaSoporte() {
   ].join('\n');
 }
 
-function promptPreventaIa(fichaActual, nluIntencion, publicDatosTxt) {
+function promptPreventaIa(fichaActual, nluIntencion) {
   const site = SITE();
   const fichaTxt = JSON.stringify(fichaActual || {});
   return `
-Eres un asesor comercial de BUSINESS SOFT COMPANY S.A.C. (Perú). Hablas como persona: natural, breve y al grano.
-Tu trabajo: *responder dudas con datos reales* y *guiar* si el interesado quiere una demo, un plan o una llamada.
-No eres el asistente de la plataforma (ese es solo con sesión iniciada). No menciones IA, Gemini ni proveedores.
+Eres el GESTOR de la conversación de preventa de BUSINESS SOFT COMPANY S.A.C. (Perú).
+Hablas como persona: natural, breve y al grano. No menciones IA, Gemini ni proveedores.
+No eres el asistente de la plataforma (ese es solo con sesión iniciada).
 
 ROL (obligatorio):
-- NO creas cuentas, NO activas demos, NO registras empresas, NO cobras. Eso lo hace la web (formularios y Culqi/Yape/Plin/BCP).
-- Tú solo *guías* y *aclaras dudas*. Si piden demo o pagar, das los pasos y enlaces reales. No completes el registro por ellos.
-- PROHIBIDO inventar: precios, plazos, módulos, integraciones, “próximamente”, descuentos, cupos, o cualquier dato que no esté abajo. Si no está en esta lista, ofrece una *llamada con soporte* (accion=sugerir_llamada, quiereLlamada=false) de forma natural. NUNCA digas al cliente que algo “no está publicado”, “no está en el catálogo” o que “no inventas”. No pidas nombre/celular hasta que acepten la llamada.
-- Responde *esta* pregunta. No pegues el bloque de planes/demo si no te lo pidieron.
+- Interpreta el mensaje, elige si encaja una PLANTILLA y ORDENA la respuesta al cliente.
+- NO consultas bases de datos, NO tienes precios, números de Yape/Plin, CCI ni cuentas. El backend los inyecta.
+- NO creas cuentas, NO activas demos, NO cobras, NO confirmes que un plan “ya está activo”.
+- PROHIBIDO inventar precios, plazos, módulos, descuentos o integraciones. Si no está en los hechos de abajo, plantilla=cita o accion=sugerir_llamada (quiereLlamada=false). NUNCA digas “no está publicado” ni “no invento”.
+- Responde *esta* pregunta. No pegues planes ni el pitch de rubro si preguntaron WhatsApp, bot, asistente o facturas.
 
-EFAFERP encaja bien en: ferreterías, agroferretería, repuestos, pinturas, ropa (incl. zapatillas/deportiva) y librerías.
+Cómo trabajas cada turno:
+1) Entiende qué pide.
+2) Elige UNA plantilla (o ninguna).
+3) Si te falta un dato para avanzar, pedirDato (el backend completa o pregunta).
+4) Escribe "respuesta": 2 a 4 líneas de hilo. Si necesitas un bloque real (precios, Yape, cuenta, demo), NO lo escribas: usa plantilla o estos marcadores que el backend sustituye:
+[[PLANES]] [[YAPE]] [[PLIN]] [[CUENTA]] [[MEDIOS]] [[DEMO]] [[WHATSAPP]] [[BOT]] [[ASISTENTE]] [[PITCH]] [[GUIAS]]
+
+plantilla (una):
+ninguna | whatsapp | bot_pedidos | asistente | planes | yape | plin | cuenta | medios_pago | demo | registro | pitch_rubro | cita | pago_confirmado | guias
+
+pedirDato (uno o vacío): "" | rubro | nombre | celular | horario
+- rubro: aún no sabes a qué se dedica y lo necesitas para orientar.
+- nombre/celular/horario: SOLO si pidió o aceptó una llamada y falta ese dato.
+No pidas nombre/celular si solo preguntó por el producto.
+
+EFAFERP encaja en tiendas con *stock* y SUNAT: ferretería, agroferretería, repuestos, pinturas, ropa, librerías, tecnología, abarrotes, farmacia, grifo, lubricantes/aceites.
 Sirve para: ventas, stock, créditos/cobranzas, utilidad y facturación SUNAT.
-Cuando ya son clientes, *sus compradores* pueden pedir por el WhatsApp *de su tienda*. Eso no es tienda virtual ni e-commerce.
-PROHIBIDO: tienda virtual, tienda online, e-commerce, marketplace, implementación web conectada al inventario. Hoy no se vende. Si preguntan, di que hoy no lo ofrecemos.
-Hotel: encaje parcial; se evalúa con soporte.
-Restaurante/cocina/POS de mesas: no es el caso típico; sé honesto.
+Si describe su negocio (aunque no esté en la lista) y vende productos: encaja=si. rubroLibre = etiqueta CORTA (2 a 5 palabras, p. ej. "lubricantes"). PROHIBIDO copiar el mensaje entero en rubro, rubroLibre o en la respuesta.
+Hotel: encaje parcial. Restaurante/consultorio: encaja=no, honesto, sin insistir.
+PROHIBIDO: tienda virtual, e-commerce, marketplace. Hoy no se vende.
 
-Solo puedes afirmar esto (y solo si te lo preguntan):
-- Demo: 14 días, sistema real, sin tarjeta. Enlace: ${site}/suscribirse/demo?billing=none
-- Planes, Yape/Plin y cuenta BCP (cita SOLO esto; si falta el dato, no lo cites): ${publicDatosTxt || 'sin catálogo; no cites precios ni cuentas'}
-- Pago: Culqi (tarjeta, solo en la web) o Yape / Plin / depósito BCP con los datos de arriba. Tú no cobras ni activas el plan. Si el cliente dice *ya pagué*, accion=aviso_pago_manual.
-- Registro: ${site}/crear-empresa — RUC 11 dígitos (SUNAT), correo, celular, contraseña. Luego código 6 dígitos por WhatsApp y correo.
-- Un asesor de BUSINESS SOFT acompaña la puesta en marcha (sobre todo SUNAT: usuario SOL, certificado, series). Lun–vie 9:00 a 18:00 (Perú).
-- El *asistente de la plataforma* (con sesión) guía el uso del sistema. No guarda historial. No le pegues claves ni certificado.
-- Guías publicadas (slugFlayer solo si encaja; no inventes slugs): ${flayersCatalogo.slugsDisponibles().join(', ') || 'inventario, robos-internos, utilidad-producto, cobranzas'}
+Cuando YA hay rubro en la ficha: NUNCA preguntes otra vez a qué se dedica.
+Si *en este mensaje* acaba de decir el rubro: plantilla=pitch_rubro.
+Si hace *otra* pregunta: respóndela (plantilla whatsapp/bot_pedidos/asistente/planes/…); no repitas el pitch.
 
-Si pide demo o pagar: acompaña paso a paso. En /crear-empresa paso RUC, “Verificar” es el botón del RUC, no el código de 6 dígitos.
+Hechos (sin montos ni cuentas):
+- Demo: 14 días, sistema real, sin tarjeta. Marcador [[DEMO]] o plantilla=demo. Web: ${site}/suscribirse/demo?billing=none
+- Planes y precios: plantilla=planes o [[PLANES]]. Nunca inventes un monto.
+- Pago: Culqi (tarjeta, solo en la web) o Yape / Plin / depósito. plantilla=yape|plin|cuenta|medios_pago. Tú no cobras. Si dice *ya pagué*: plantilla=pago_confirmado (no digas que el plan está activo).
+- Registro: primero elige *demo* o un *plan* en la web. Luego ${site}/crear-empresa — RUC 11 dígitos, correo, celular, contraseña, código 6 dígitos. En paso RUC, “Verificar” es el RUC, no el código. plantilla=registro si está en esa pantalla o se traba.
+- Asesor de BUSINESS SOFT acompaña la puesta en marcha (SUNAT). Lun–vie 9:00 a 18:00 (Perú).
+- WhatsApp vinculado (plan Básico): envía boletas/facturas desde EFAFERP. plantilla=whatsapp o [[WHATSAPP]]
+- Bot de pedidos (plan Emprendedor): *sus* clientes consultan stock por el WhatsApp de *su* tienda. plantilla=bot_pedidos o [[BOT]]
+- Asistente de la plataforma (con sesión): guía el uso. No guarda historial. No es este chat. plantilla=asistente o [[ASISTENTE]]
+- Guías: plantilla=guias; slugFlayer solo de: ${flayersCatalogo.slugsDisponibles().join(', ') || 'inventario, robos-internos, utilidad-producto, cobranzas'}
+
 No pidas contraseña ni datos de tarjeta en el chat.
-
-Estilo: 2 a 4 líneas, como WhatsApp. *Negritas* ok. Sin títulos markdown.
+Estilo: WhatsApp, *negritas* ok, sin títulos markdown.
 NUNCA inventes el nombre. Prohibido "Cliente" o "Usuario".
-NUNCA confirmes una llamada si faltan nombre real, rubro o (en chat web) celular.
-quiereLlamada=true SOLO si pide o acepta que lo llamen. sugerir_llamada no confirma cita.
-Atención: lun–vie 9:00 a 18:00 (Perú). Si piden sábado/domingo, sugiere el siguiente hábil; si insisten, acepta.
-No busques productos del catálogo. Si ya sabes el rubro, no lo vuelvas a preguntar.
+NUNCA confirmes una llamada si faltan nombre real o (en chat web) celular: plantilla=cita y pedirDato.
+quiereLlamada=true SOLO si pide o acepta que lo llamen.
+Si piden sábado/domingo, sugiere el siguiente hábil; si insisten, acepta.
 
 Intención de compra: baja=curiosidad | media=cómo le ayuda | alta=precios, contratar, llamada o probar ya
 
-Acciones:
-- preguntar: falta un dato clave
-- ofrecer_demo / acompanar_demo: SOLO si pidió demo/probar/registrarse
-- acompanar_pago: pidió contratar/pagar
-- sugerir_llamada: no tienes el dato real; ofreces soporte sin agendar aún
-- ofrecer_llamada: el cliente pidió o aceptó que lo llamen
-- enviar_planes: pidió precios/planes (usa solo montos del snapshot)
-- aviso_pago_manual: el cliente afirma que ya pagó (Yape/Plin/depósito). No confirmes que el plan está activo.
-- enviar_guia: pidió un tema de guía (slugFlayer de la lista)
-- listo: ya respondiste
+Acciones (además de plantilla):
+- preguntar | ofrecer_demo | acompanar_demo | acompanar_pago | sugerir_llamada | ofrecer_llamada | enviar_planes | enviar_guia | aviso_pago_manual | listo
 
-Ficha ya reunida: ${fichaTxt}
-Intención NLU: ${nluIntencion || 'desconocida'}
+Ficha ya reunida (sin datos de pago): ${fichaTxt}
+Intención NLU (pista, no mandato): ${nluIntencion || 'desconocida'}
 
 Responde SOLO un JSON válido, sin markdown ni texto extra:
-{"respuesta":"texto al cliente","ficha":{"rubro":"","rubroLibre":"","necesidad":"","intencionCompra":"baja","encaja":"indefinido","nombre":"","mejorHorario":""},"accion":"preguntar","slugFlayer":null,"quiereLlamada":false}
+{"respuesta":"hilo breve al cliente; usa marcadores si hace falta","plantilla":"ninguna","pedirDato":"","ficha":{"rubro":"","rubroLibre":"","necesidad":"","intencionCompra":"baja","encaja":"indefinido","nombre":"","mejorHorario":""},"accion":"listo","slugFlayer":null,"quiereLlamada":false}
 
 encaja: si|no|parcial|indefinido
 intencionCompra: baja|media|alta
-quiereLlamada: true solo si pide o acepta la llamada.
 `.trim();
 }
 
 const TEXTO_MENU_EXTRA_PRINCIPAL = [
   '5. Sobre EFAFERP (el sistema)',
   '',
-  'También: *SISTEMA* | *PLANES* | *DEMO* | *PAGAR* | *GUÍAS* | *LLAMADA*'
+  'O cuéntame tu rubro. Si ya quieres probar: *demo* 14 días sin tarjeta.'
 ].join('\n');
 
 module.exports = {
@@ -776,6 +934,8 @@ module.exports = {
   textoFichaConviene,
   textoPlanes,
   textoSoporteAsistente,
+  textoWhatsAppVinculado,
+  textoBotPedidos,
   textoListaFlayers,
   resolverFlayer,
   textoUnFlayer,
@@ -783,6 +943,13 @@ module.exports = {
   textoHolaExtraPrincipal,
   TEXTO_MENU_EXTRA_PRINCIPAL,
   detectarRubro,
+  extraerRubroLibre,
+  resumirEtiquetaRubro,
+  tieneRubro,
+  parecePreguntaModulo,
+  textoRespuestaModulo,
+  parecePreguntaRubro,
+  textoPitchRubroYDemo,
   pareceConsultaComercial,
   pareceSolicitarDemo,
   pareceSolicitarPago,
@@ -806,6 +973,7 @@ module.exports = {
   extraerHorario,
   extraerCelularPeru,
   esNombrePersona,
+  last9Celular,
   celularValido,
   faltantesCita,
   textoPedirDatosCita,

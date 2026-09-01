@@ -29,9 +29,14 @@ Pantallas (rutas reales):
 - Compras / ingreso stock: [Compras](/compras)
 - Ventas: [Ventas](/ventas)
 - Cotizaciones: [Cotizaciones](/cotizaciones)
+- Caja (apertura, movimientos, arqueo): [Caja](/caja)
+- Créditos y cuotas: [Créditos](/creditos)
+- Sucursales: [Sucursales](/sucursal)
+- Colaboradores y permisos: [Colaboradores](/colaborador)
 - WhatsApp vincular: [WhatsApp](/configuracion/whatsapp)
 - Bot WhatsApp: [Bot WhatsApp](/configuracion/whatsapp-bot)
 - Guías de remisión: [Guías](/facturacion/guias-remision)
+- Hotel (si el rubro es hotel): [Hotel](/hotel/configuracion)
 
 Errores frecuentes:
 - No emite boleta/factura: falta certificado, usuario SOL, series, o la URL BillService sigue en e-beta (pruebas).
@@ -105,6 +110,38 @@ const TEMAS_GUIA = [
     id: 'clientes',
     re: /\b(cliente|ruc|dni)\b/i,
     respuesta: 'Alta y ficha: [Clientes](/clientes). El RUC se consulta en la ficha; no hace falta otra pantalla.'
+  },
+  {
+    id: 'caja',
+    re: /\b(caja|arqueo|apertura de caja|cierre de caja|recibo de (ingreso|egreso))\b/i,
+    respuesta: [
+      'Caja del día: [Caja](/caja). Ahí se abre, se registran ingresos/egresos y se cierra.',
+      'Arqueo: [Arqueo](/caja/arqueo). Recibos: [Ingreso](/caja/recibo-ingreso) y [Egreso](/caja/recibo-egreso).',
+      'Si no deja vender, casi siempre falta *abrir caja* en la sucursal activa.'
+    ].join('\n')
+  },
+  {
+    id: 'creditos',
+    re: /\b(cr[eé]dito|cuotas?|cobranza|saldo (del )?cliente|letra)\b/i,
+    respuesta: [
+      'Créditos y cuotas: [Créditos](/creditos). Ahí se cobran cuotas y se ve la cartera.',
+      'La venta al crédito se marca en [Nueva venta](/ventas/create) (forma de pago crédito).'
+    ].join('\n')
+  },
+  {
+    id: 'sucursal',
+    re: /\b(sucursal(es)?|almac[eé]n|local)\b/i,
+    respuesta: 'Sucursales y almacén: [Sucursales](/sucursal). El stock es por sucursal; elija la sucursal activa arriba a la derecha.'
+  },
+  {
+    id: 'usuarios',
+    re: /\b(colaborador|usuario|permisos|rol|cajero|vendedor)\b/i,
+    respuesta: 'Usuarios y permisos: [Colaboradores](/colaborador). Cree el usuario y asigne un rol; no comparta la cuenta del dueño.'
+  },
+  {
+    id: 'hotel',
+    re: /\b(hotel|habitaci[oó]n|check-?in|check-?out|reserva)\b/i,
+    respuesta: 'Módulo hotel: [Configuración hotel](/hotel/configuracion). Check-in/out y reservas están en el menú Hotel (solo si el rubro de la empresa es hotel).'
   }
 ];
 
@@ -142,9 +179,15 @@ function respuestaGuiaLocal(texto, ruta) {
   if (/producto/i.test(r)) {
     return TEMAS_GUIA.find((x) => x.id === 'productos').respuesta;
   }
+  if (/caja/i.test(r)) {
+    return TEMAS_GUIA.find((x) => x.id === 'caja').respuesta;
+  }
+  if (/credito/i.test(r)) {
+    return TEMAS_GUIA.find((x) => x.id === 'creditos').respuesta;
+  }
   return [
-    'Puedo guiarte sin conexión a Gemini, con la guía de EFAFERP. Pregunta por SUNAT, productos, stock, ventas, WhatsApp o matizado.',
-    'Pantallas: [Configuración](/configuracion), [Productos](/productos), [Ventas](/ventas), [Compras](/compras).',
+    'Puedo guiarte sin conexión a Gemini, con la guía de EFAFERP. Pregunta por SUNAT, productos, stock, ventas, caja, créditos, WhatsApp o matizado.',
+    'Pantallas: [Configuración](/configuracion), [Productos](/productos), [Ventas](/ventas), [Caja](/caja), [Compras](/compras).',
     'Si dices «qué me falta», reviso el estado de tu empresa.'
   ].join('\n');
 }

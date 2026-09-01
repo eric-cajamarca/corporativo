@@ -157,9 +157,13 @@ function snapshotParaPrompt(datos) {
 }
 
 function parecePreguntaPlanes(texto, nlu) {
-  if (nlu?.intencion === 'planes_saas') return true;
-  return /\b(planes|qu[eé] planes|con qu[eé] planes|cu[aá]les son los planes|precio(s)?|cu[aá]nto (cuesta|vale)|plan mensual|plan anual)\b/i.test(
-    String(texto || '')
+  const t = String(texto || '');
+  if (/\b(whats?app|vincular|bot|asistente|factura|boletas?|comprobantes?)\b/i.test(t)) {
+    return false;
+  }
+  if (/^(planes|precios?)$/i.test(t.trim())) return true;
+  return /\b(cu[aá]les son los planes|qu[eé] planes (hay|tienen|ofrecen)|lista de planes|precio(s)? del (sistema|plan)|cu[aá]nto (cuesta|vale) (el )?sistema|cu[aá]nto cuesta efaferp|plan mensual|plan anual)\b/i.test(
+    t
   );
 }
 

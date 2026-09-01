@@ -5,6 +5,7 @@ import { AdminGuard } from './guards/admin.guards';
 import { empresaGestoraGuard } from './guards/empresa-gestora.guard';
 import { superAdminPlataformaEmpresasGuard } from './guards/superadmin-plataforma-empresas.guard';
 import { saasPlanModuloGuard } from './guards/saas-plan-modulo.guard';
+import { saasCrearEmpresaGuard } from './guards/saas-crear-empresa.guard';
 import { rubroPinturaGuard } from './guards/rubro-pintura.guard';
 
 const loadHomePublic = () =>
@@ -78,6 +79,7 @@ export const routes: Routes = [
      {
         path:'crear-empresa',
         loadComponent: () => import('./components/empresa/create-empresa/create-empresa.component').then((m) => m.CreateEmpresaComponent),
+        canActivate: [saasCrearEmpresaGuard],
         title: 'Crear empresa | EFAFERP',
      },
 

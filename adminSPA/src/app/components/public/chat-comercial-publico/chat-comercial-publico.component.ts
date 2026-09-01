@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, ViewChild, effect, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 import { ChatComercialMensaje } from '../../../models/chat-comercial-publico.model';
 import { ChatComercialPublicoService } from '../../../services/chat-comercial-publico.service';
 import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
@@ -60,6 +61,59 @@ export class ChatComercialPublicoComponent {
 
   extraerUrls(texto: string): string[] {
     return String(texto || '').match(/https?:\/\/[^\s)]+/g) || [];
+  }
+
+  /** Demo, planes y registro en la misma pestaña para no perder el hilo del chat. */
+  abrirEnlace(ev: Event, url: string): void {
+    const spa = this.rutaSpaMismaVentana(url);
+    if (!spa) return;
+    ev.preventDefault();
+    this.ui.abrir();
+    void this.router.navigateByUrl(spa);
+  }
+
+  esEnlaceExterno(url: string): boolean {
+    return this.rutaSpaMismaVentana(url) == null;
+  }
+
+  private rutaSpaMismaVentana(raw: string): string | null {
+    let parsed: URL;
+    try {
+      parsed = new URL(String(raw || '').trim(), window.location.origin);
+    } catch {
+      return null;
+    }
+    if (/\.[a-z0-9]{2,4}$/i.test(parsed.pathname)) return null;
+    const ruta = `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
+    const path = ruta.startsWith('/') ? ruta : `/${ruta}`;
+    if (this.esRutaPublicaConocida(parsed.pathname)) return path;
+    if (!this.esHostDeEstaApp(parsed.hostname)) return null;
+    return path;
+  }
+
+  private esRutaPublicaConocida(pathname: string): boolean {
+    const p = (pathname || '/').toLowerCase();
+    return (
+      p === '/planes' ||
+      p.startsWith('/planes/') ||
+      p.startsWith('/suscribirse') ||
+      p.startsWith('/crear-empresa') ||
+      p.startsWith('/verificar-empresa') ||
+      p.startsWith('/politicas') ||
+      p.startsWith('/publico')
+    );
+  }
+
+  private esHostDeEstaApp(hostname: string): boolean {
+    const host = hostname.replace(/^www\./i, '').toLowerCase();
+    const actual = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+    if (host === actual) return true;
+    try {
+      const front = new URL(environment.FRONTEND_URL).hostname.replace(/^www\./i, '').toLowerCase();
+      return host === front;
+    } catch {
+      return false;
+    }
   }
 
   textoVisible(texto: string): string {

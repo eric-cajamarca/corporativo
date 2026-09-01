@@ -2,11 +2,11 @@
  * Alineado con SaasPlanFactiliza / niveles de menú en backend.
  */
 
-import { NIVEL_MIN_PROFESIONAL, nivelPlan } from '../config/saas-plan-reglas.util';
+import { NIVEL_MIN_PLACA_SOAT, nivelPlan } from '../config/saas-plan-reglas.util';
 
 export { nivelPlan } from '../config/saas-plan-reglas.util';
 
-/** Consultas Factiliza placa/SOAT: desde plan profesional en SaaS; en enterprise todo. */
+/** Consultas Factiliza placa/SOAT: desde plan básico en SaaS; en enterprise todo. */
 export function tarjetaPermiteConsultaPlacaSoat(
   deploymentMode: string | null | undefined,
   planCode: string | null | undefined
@@ -14,7 +14,7 @@ export function tarjetaPermiteConsultaPlacaSoat(
   if ((deploymentMode || '').toLowerCase() !== 'saas') {
     return true;
   }
-  return nivelPlan(planCode) >= NIVEL_MIN_PROFESIONAL;
+  return nivelPlan(planCode) >= NIVEL_MIN_PLACA_SOAT;
 }
 
 export function tarjetaMostrarArqueoDemoPlan(

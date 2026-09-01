@@ -78,10 +78,24 @@ function mergeFicha(prev, incoming, textoEntrada) {
   const intent = String(src.intencionCompra || out.intencionCompra || 'baja');
   out.intencionCompra = ['baja', 'media', 'alta'].includes(intent) ? intent : 'baja';
 
-  const detectado = ficha.detectarRubro(textoEntrada);
+  const detectado = ficha.detectarRubro(`${textoEntrada} ${out.rubro || ''} ${out.rubroLibre || ''}`);
   if (detectado) {
-    if (!out.rubro) out.rubro = detectado.etiqueta;
+    out.rubro = detectado.etiqueta;
+    out.rubroLibre = detectado.etiqueta;
     if (out.encaja === 'indefinido') out.encaja = detectado.encaja;
+    out.esperandoRubro = false;
+  } else {
+    const libre = ficha.extraerRubroLibre(textoEntrada, out);
+    if (libre) {
+      if (!out.rubro && libre.rubro) out.rubro = libre.rubro;
+      if (!out.rubroLibre) out.rubroLibre = libre.rubroLibre;
+      if (out.encaja === 'indefinido' && libre.encaja) out.encaja = libre.encaja;
+      out.esperandoRubro = false;
+    }
+  }
+  if (out.rubroLibre) {
+    const limpio = ficha.resumirEtiquetaRubro(out.rubroLibre);
+    if (limpio) out.rubroLibre = limpio;
   }
   const horario = ficha.extraerHorario(textoEntrada);
   if (horario) out.mejorHorario = horario;
@@ -144,13 +158,35 @@ function pedirDatosOConfirmar(comercial, textoEntrada, requiereCelular) {
 }
 
 function parecePedidoLlamadaEsteTurno(texto, nlu) {
+  if (ficha.parecePreguntaModulo(texto) || parecePausaCita(texto)) return false;
   if (nlu?.intencion === 'agendar_llamada') return true;
+  if (nlu?.intencion === 'solicitar_agente') return true;
   return /\b(ll[aá]men|ll[aá]mada|agendar|que me llamen|quiero que me llam)\b/i.test(String(texto || ''));
 }
 
+function parecePausaCita(texto) {
+  const t = String(texto || '');
+  if (ficha.parecePreguntaModulo(t)) return true;
+  if (/[¿?]/.test(t) && t.length > 15) return true;
+  return /\b(antes de (pasar|darte|dar(te)?|pasarte|entregar)(me|te)? (mis |los |mis)?datos|expl[ií]ca(me)?|h[aá]blame|de qu[eé] se trata|c[oó]mo (es|funciona)|no (quiero|deseo) (la )?llamada|ahora no|despu[eé]s te (paso|doy))\b/i.test(
+    t
+  );
+}
+
+function pareceDatoCita(texto) {
+  const t = String(texto || '').trim();
+  if (!t || parecePausaCita(t)) return false;
+  if (ficha.extraerCelularPeru(t)) return true;
+  if (ficha.extraerNombreHorario(t)) return true;
+  if (ficha.extraerHorario(t)) return true;
+  if (ficha.extraerNombrePersona(t) && t.split(/\s+/).length <= 5 && !/[¿?]/.test(t)) return true;
+  return /^(si|sí|ok|okay|dale|bueno|de acuerdo|claro|va)$/i.test(t);
+}
+
 function parecePedidoLlamada(texto, nlu, comercial) {
+  if (parecePausaCita(texto)) return false;
   if (parecePedidoLlamadaEsteTurno(texto, nlu)) return true;
-  if (comercial?.esperandoDatosLlamada) return true;
+  if (comercial?.esperandoDatosLlamada && pareceDatoCita(texto)) return true;
   return false;
 }
 
@@ -283,8 +319,213 @@ function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
 
 function extraerJsonTurno(data) {
   const parts = geminiClient.extraerPartes(data);
-  const texto = parts.map((p) => (typeof p.text === 'string' ? p.text : '')).join('\n');
-  return parseJsonModelo(texto);
+  const texto = parts.map((p) => (typeof p.text === 'string' ? p.text : '')).join('\n').trim();
+  const parsed = parseJsonModelo(texto);
+  if (parsed && (parsed.respuesta || parsed.plantilla)) return parsed;
+  if (texto && !texto.startsWith('{')) {
+    return {
+      respuesta: texto.slice(0, 1200),
+      plantilla: 'ninguna',
+      pedirDato: '',
+      ficha: {},
+      accion: 'listo',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  return parsed;
+}
+
+const PLANTILLAS = new Set([
+  'ninguna',
+  'whatsapp',
+  'bot_pedidos',
+  'asistente',
+  'planes',
+  'yape',
+  'plin',
+  'cuenta',
+  'medios_pago',
+  'demo',
+  'registro',
+  'pitch_rubro',
+  'cita',
+  'pago_confirmado',
+  'guias'
+]);
+
+const PLANTILLAS_FORZAR_BLOQUE = new Set([
+  'planes',
+  'yape',
+  'plin',
+  'cuenta',
+  'medios_pago',
+  'pago_confirmado',
+  'demo',
+  'registro'
+]);
+
+function normalizarPlantilla(v) {
+  const id = String(v || 'ninguna').toLowerCase().trim();
+  return PLANTILLAS.has(id) ? id : 'ninguna';
+}
+
+function accionDesdePlantilla(plantilla, accionParsed) {
+  const map = {
+    whatsapp: 'listo',
+    bot_pedidos: 'listo',
+    asistente: 'listo',
+    planes: 'enviar_planes',
+    yape: 'acompanar_pago',
+    plin: 'acompanar_pago',
+    cuenta: 'acompanar_pago',
+    medios_pago: 'acompanar_pago',
+    demo: 'acompanar_demo',
+    registro: 'acompanar_demo',
+    pitch_rubro: 'ofrecer_demo',
+    cita: 'ofrecer_llamada',
+    pago_confirmado: 'aviso_pago_manual',
+    guias: 'enviar_guia'
+  };
+  if (map[plantilla]) return map[plantilla];
+  return ACCIONES.has(accionParsed) ? accionParsed : 'listo';
+}
+
+function fichaParaPrompt(comercial) {
+  const f = { ...(comercial || {}) };
+  delete f.historial;
+  delete f.avisoLlamadaEnviado;
+  delete f.avisoAltaEnviado;
+  delete f.publicDatos;
+  delete f.publicDatosTxt;
+  const cel = String(f.celular || f.celularWeb || '').replace(/\D/g, '');
+  if (cel.length >= 9) {
+    f.tieneCelular = true;
+    f.celularHint = cel.slice(-4);
+  }
+  delete f.celular;
+  delete f.celularWeb;
+  return f;
+}
+
+function bloquePlantilla(id, comercial, publicDatos) {
+  switch (normalizarPlantilla(id)) {
+    case 'whatsapp':
+      return ficha.textoWhatsAppVinculado();
+    case 'bot_pedidos':
+      return ficha.textoBotPedidos();
+    case 'asistente':
+      return ficha.textoSoporteAsistente();
+    case 'planes':
+      return publicDatos ? pubDatos.textoPlanesReales(publicDatos) : ficha.textoPlanes();
+    case 'yape':
+      return publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : null;
+    case 'plin':
+      return publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : null;
+    case 'cuenta':
+      return publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : null;
+    case 'medios_pago':
+      return publicDatos ? pubDatos.textoMediosPago(publicDatos) : null;
+    case 'demo':
+      return ficha.textoAcompanarDemo(comercial, comercial?.rutaActual);
+    case 'registro':
+      return ficha.textoAcompanarRegistro(comercial?.rutaActual, comercial?.pasoRegistro);
+    case 'pitch_rubro':
+      return ficha.tieneRubro(comercial) ? ficha.textoPitchRubroYDemo(comercial) : null;
+    case 'cita':
+      return ficha.textoLlamadaSoporte(true, comercial, { requiereCelular: Boolean(comercial?.requiereCelular) });
+    case 'pago_confirmado':
+      return pubDatos.textoConfirmaPagoCliente();
+    case 'guias':
+      return ficha.textoListaFlayers();
+    default:
+      return null;
+  }
+}
+
+function inyectarMarcadores(texto, comercial, publicDatos) {
+  let r = String(texto || '');
+  const mapa = {
+    '[[PLANES]]': publicDatos ? pubDatos.textoPlanesReales(publicDatos) : ficha.textoPlanes(),
+    '[[YAPE]]': publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : '',
+    '[[PLIN]]': publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : '',
+    '[[CUENTA]]': publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : '',
+    '[[MEDIOS]]': publicDatos ? pubDatos.textoMediosPago(publicDatos) : '',
+    '[[DEMO]]': ficha.urlDemo(),
+    '[[WHATSAPP]]': ficha.textoWhatsAppVinculado(),
+    '[[BOT]]': ficha.textoBotPedidos(),
+    '[[ASISTENTE]]': ficha.textoSoporteAsistente(),
+    '[[PITCH]]': ficha.tieneRubro(comercial) ? ficha.textoPitchRubroYDemo(comercial) : '',
+    '[[GUIAS]]': ficha.textoListaFlayers()
+  };
+  for (const [k, v] of Object.entries(mapa)) {
+    if (r.includes(k)) r = r.split(k).join(v || '');
+  }
+  return r.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function pedirDatoTexto(dato) {
+  switch (String(dato || '').toLowerCase()) {
+    case 'rubro':
+      return 'Para orientarte: ¿a qué se dedica tu negocio? (qué vendes).';
+    case 'nombre':
+      return '¿Cómo te llamas?';
+    case 'celular':
+      return 'Pásame tu celular de 9 dígitos (empieza en 9).';
+    case 'horario':
+      return '¿En qué horario te queda una llamada? (lun–vie 9:00 a 18:00, Perú).';
+    default:
+      return '';
+  }
+}
+
+function empiezaIgual(a, b, n = 28) {
+  const x = String(a || '').replace(/\s+/g, ' ').trim();
+  const y = String(b || '').replace(/\s+/g, ' ').trim();
+  if (!x || !y) return false;
+  return x.includes(y.slice(0, n)) || y.includes(x.slice(0, n));
+}
+
+function inferirPlantillaDatoReal(plantilla, texto, nlu, parsed) {
+  if (plantilla !== 'ninguna') return plantilla;
+  if (parsed.accion === 'enviar_planes') return 'planes';
+  if (parsed.accion === 'aviso_pago_manual' || pubDatos.pareceConfirmaPago(texto, nlu)) return 'pago_confirmado';
+  if (pubDatos.parecePreguntaYape(texto) && !pubDatos.parecePreguntaPlin(texto)) return 'yape';
+  if (pubDatos.parecePreguntaPlin(texto)) return 'plin';
+  if (pubDatos.parecePreguntaCuenta(texto)) return 'cuenta';
+  if (pubDatos.parecePreguntaMediosPago(texto)) return 'medios_pago';
+  if (pubDatos.parecePreguntaPlanes(texto, nlu)) return 'planes';
+  if (parsed.accion === 'ofrecer_llamada' || parsed.quiereLlamada) return 'cita';
+  if (parsed.accion === 'acompanar_demo') return 'demo';
+  if (parsed.accion === 'enviar_guia') return 'guias';
+  return plantilla;
+}
+
+function componerGestor(parsed, comercial, publicDatos) {
+  const plantilla = normalizarPlantilla(parsed.plantilla);
+  let respuesta = inyectarMarcadores(
+    sanitizar(ficha.sanitizarAlucinacionesComercial(parsed.respuesta), 1200),
+    comercial,
+    publicDatos
+  );
+  const bloque = bloquePlantilla(plantilla, comercial, publicDatos);
+  if (bloque) {
+    if (!respuesta) {
+      respuesta = bloque;
+    } else if (PLANTILLAS_FORZAR_BLOQUE.has(plantilla) && !empiezaIgual(respuesta, bloque)) {
+      respuesta = `${respuesta}\n\n${bloque}`.trim();
+    } else if (plantilla === 'pitch_rubro' && !/suscribirse\/demo/i.test(respuesta) && !empiezaIgual(respuesta, bloque)) {
+      respuesta = `${respuesta}\n\n${bloque}`.trim();
+    } else if (plantilla === 'cita' && respuesta.length < 120) {
+      respuesta = `${respuesta}\n\n${bloque}`.trim();
+    }
+  }
+  const pedirDato = String(parsed.pedirDato || '').toLowerCase();
+  const extra = pedirDatoTexto(pedirDato);
+  if (extra && !empiezaIgual(respuesta, extra, 18)) {
+    respuesta = `${respuesta}\n\n${extra}`.trim();
+  }
+  return { respuesta, plantilla, pedirDato };
 }
 
 function fallbackReglas(textoEntrada, comercial, nlu) {
@@ -293,7 +534,7 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
   if (comercial.sugirioCambioDia && comercial.nombre) {
     return confirmarOAjustarLlamada({ ...comercial, ...merged, nombre: merged.nombre || comercial.nombre }, t);
   }
-  if (parecePedidoLlamada(t, nlu, comercial)) {
+  if (parecePedidoLlamada(t, nlu, comercial) && !ficha.textoRespuestaModulo(t)) {
     return pedirDatosOConfirmar(merged, t, Boolean(comercial.requiereCelular));
   }
   if (/\b(configur|quien me ayuda|quien me acompaña|me ayudan a)\b/i.test(t)) {
@@ -304,6 +545,21 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
         'Si quieres, escribe *LLAMADA* y tu nombre + horario.'
       ].join('\n'),
       comercial: { ...merged, intencionCompra: 'media' },
+      accion: 'listo',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  const modulo = ficha.textoRespuestaModulo(t);
+  if (modulo) {
+    return {
+      respuesta: modulo,
+      comercial: {
+        ...merged,
+        intencionCompra: 'media',
+        esperandoDatosLlamada: false,
+        quiereLlamada: false
+      },
       accion: 'listo',
       slugFlayer: null,
       quiereLlamada: false
@@ -322,7 +578,10 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
     });
     if (acomp) return acomp;
   }
-  if (nlu?.intencion === 'planes_saas' || /^(planes)$/i.test(t.trim())) {
+  if (
+    (nlu?.intencion === 'planes_saas' || /^(planes)$/i.test(t.trim()))
+    && pubDatos.parecePreguntaPlanes(t, nlu)
+  ) {
     return {
       respuesta: comercial.publicDatos
         ? pubDatos.textoPlanesReales(comercial.publicDatos)
@@ -333,35 +592,33 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
       quiereLlamada: false
     };
   }
-  if (merged.encaja === 'si') {
+  const rubroNuevoEsteTurno = !ficha.tieneRubro(comercial) && ficha.tieneRubro(merged);
+  if (rubroNuevoEsteTurno && !ficha.parecePreguntaModulo(t)) {
     return {
-      respuesta: [
-        `Para *${merged.rubro || 'tu rubro'}* EFAFERP encaja: ventas, stock, créditos y facturación SUNAT.`,
-        'Pregúntame lo que quieras. Si quieres probar o pagar, dímelo y te guío en la web.'
-      ].join('\n'),
-      comercial: { ...merged, intencionCompra: merged.intencionCompra === 'baja' ? 'media' : merged.intencionCompra },
+      respuesta: ficha.textoPitchRubroYDemo(merged),
+      comercial: {
+        ...merged,
+        esperandoRubro: false,
+        ofrecioDemo: true,
+        intencionCompra: merged.intencionCompra === 'baja' ? 'media' : merged.intencionCompra
+      },
+      accion: merged.encaja === 'no' ? 'sugerir_llamada' : 'ofrecer_demo',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
+  if (ficha.tieneRubro(merged)) {
+    return {
+      respuesta: 'Dime la duda concreta (WhatsApp, facturas, bot, planes o demo) y te respondo con eso. No hace falta repetir el rubro.',
+      comercial: { ...merged, esperandoRubro: false },
       accion: 'listo',
       slugFlayer: null,
       quiereLlamada: false
     };
   }
-  if (merged.encaja === 'no' || merged.encaja === 'parcial') {
-    return {
-      respuesta: [
-        merged.encaja === 'parcial'
-          ? 'En ese rubro no es el caso típico (ferretería, repuestos, pinturas, ropa, librería). No te aseguro que encaje.'
-          : 'Ese rubro no es el que EFAFERP atiende de forma típica. No quiero venderte algo que no te sirva.',
-        ficha.textoSugerirLlamadaSoporte()
-      ].join('\n'),
-      comercial: { ...merged, intencionCompra: 'media' },
-      accion: 'sugerir_llamada',
-      slugFlayer: null,
-      quiereLlamada: false
-    };
-  }
   return {
-    respuesta: 'Para orientarte, ¿a qué se dedica tu negocio? (ferretería, repuestos, pinturas, ropa, librería u otro).',
-    comercial: merged,
+    respuesta: 'Para orientarte: ¿a qué se dedica tu negocio? (qué vendes o tu rubro).',
+    comercial: { ...merged, esperandoRubro: true },
     accion: 'preguntar',
     slugFlayer: null,
     quiereLlamada: false
@@ -375,12 +632,7 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
     e.code = 'GEMINI_NO_CONFIG';
     throw e;
   }
-  const fichaLimpia = { ...comercial };
-  delete fichaLimpia.historial;
-  delete fichaLimpia.avisoLlamadaEnviado;
-  delete fichaLimpia.avisoAltaEnviado;
-  delete fichaLimpia.publicDatos;
-  delete fichaLimpia.publicDatosTxt;
+  const fichaLimpia = fichaParaPrompt(comercial);
 
   const contents = [];
   for (const h of historial) {
@@ -393,22 +645,41 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
 
   const { data } = await geminiClient.generateConHerramientas({
     apiKey,
-    systemInstruction: ficha.promptPreventaIa(fichaLimpia, nlu?.intencion, comercial.publicDatosTxt),
+    systemInstruction: ficha.promptPreventaIa(fichaLimpia, nlu?.intencion),
     contents,
     generationConfig: { temperature: 0.4, maxOutputTokens: 700 }
   });
   const parsed = extraerJsonTurno(data);
-  if (!parsed || !parsed.respuesta) {
+  if (!parsed || !(parsed.respuesta || parsed.plantilla)) {
     throw new Error('Respuesta comercial IA no válida');
   }
   trace('4b.INTERPRETACION_GEMINI', {
     accion: parsed.accion,
+    plantilla: parsed.plantilla,
+    pedirDato: parsed.pedirDato,
     encaja: parsed.ficha?.encaja,
     intencionCompra: parsed.ficha?.intencionCompra,
     quiereLlamada: parsed.quiereLlamada,
     respuesta: parsed.respuesta
   });
   return parsed;
+}
+
+function aplicarCierreComercial(out) {
+  if (!out || !out.comercial) return out;
+  const com = out.comercial;
+  if (!ficha.tieneRubro(com)) {
+    if (out.pedirDato === 'rubro' || (out.accion === 'preguntar' && ficha.parecePreguntaRubro(out.respuesta))) {
+      com.esperandoRubro = true;
+    }
+    return out;
+  }
+  com.esperandoRubro = false;
+  if (/suscribirse\/demo/i.test(String(out.respuesta || '')) || out.plantilla === 'pitch_rubro' || out.plantilla === 'demo') {
+    com.ofrecioDemo = true;
+    if (com.intencionCompra === 'baja') com.intencionCompra = 'media';
+  }
+  return out;
 }
 
 /**
@@ -418,14 +689,6 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
   const comercial = { ...(slots?.comercial || {}) };
   comercial.requiereCelular = canal === 'web' || Boolean(comercial.requiereCelular);
   comercial.publicDatos = publicDatos || null;
-  if (publicDatos) {
-    const snap = pubDatos.snapshotParaPrompt(publicDatos);
-    comercial.publicDatosTxt = [
-      snap.planesTxt,
-      snap.yapePlin ? `Yape/Plin: ${snap.yapePlin}` : 'Yape/Plin: (sin número; no lo cites)',
-      snap.bcpTxt ? `Depósito: ${snap.bcpTxt}` : 'Depósito: (sin cuenta; no la cites)'
-    ].join(' | ');
-  }
   if (rutaActual) comercial.rutaActual = sanitizar(rutaActual, 200);
   if (pasoRegistro) comercial.pasoRegistro = sanitizar(pasoRegistro, 40);
   if (errorPantalla) comercial.errorPantalla = sanitizar(errorPantalla, 200);
@@ -461,124 +724,119 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
   mergedEarly.planCode = comercial.planCode;
   mergedEarly.billingCycle = comercial.billingCycle;
 
-  if (parecePedidoLlamadaEsteTurno(texto, nlu)) {
+  if (parecePausaCita(texto) && (comercial.esperandoDatosLlamada || mergedEarly.esperandoDatosLlamada)) {
+    comercial.esperandoDatosLlamada = false;
+    comercial.quiereLlamada = false;
+    mergedEarly.esperandoDatosLlamada = false;
+    mergedEarly.quiereLlamada = false;
+  }
+
+  if (mergedEarly.esperandoDatosLlamada && pareceDatoCita(texto)) {
     const outCita = pedirDatosOConfirmar(mergedEarly, texto, requiereCelular);
-    trace('4.BACKEND_SIN_GEMINI', { motivo: 'cita_datos', accion: outCita.accion, faltantes: ficha.faltantesCita(outCita.comercial, { requiereCelular }) });
+    trace('4.BACKEND_SIN_GEMINI', { motivo: 'cita_relleno', accion: outCita.accion, faltantes: ficha.faltantesCita(outCita.comercial, { requiereCelular }) });
     trace('4c.RESPUESTA_BACKEND', { texto: outCita.respuesta });
     return conHistorial(outCita, historial, texto, requiereCelular);
   }
 
-  const pubTurno = turnoDatoPublico(texto, nlu, mergedEarly, comercial.publicDatos);
-  if (pubTurno) {
-    trace('4.BACKEND_SIN_GEMINI', { motivo: 'dato_publico', accion: pubTurno.accion });
-    trace('4c.RESPUESTA_BACKEND', { texto: pubTurno.respuesta });
-    return conHistorial(pubTurno, historial, texto, requiereCelular);
-  }
-
   const flujo = resolverFlujoTurno(texto, nlu, mergedEarly, comercial.rutaActual);
-  const pideAhora =
-    nlu?.intencion === 'solicitar_demo'
-    || nlu?.intencion === 'contratar_plan'
-    || ficha.pareceSolicitarDemo(texto)
-    || ficha.pareceSolicitarPago(texto);
-  const dudaEspecifica = ficha.pareceDudaPagoRegistro(texto) && !pideAhora;
-  if (flujo && (pideAhora || dudaEspecifica || mergedEarly.flujo || ficha.paginaRegistro(comercial.rutaActual))) {
-    const iniciar = pideAhora || (!mergedEarly.acompanamientoEnviado && ficha.paginaRegistro(comercial.rutaActual) && !dudaEspecifica);
-    const acomp = ficha.turnoAcompanamiento({
-      texto,
-      flujo,
-      ruta: comercial.rutaActual,
-      comercial: mergedEarly,
-      iniciar
-    });
-    if (acomp) {
-      trace('4.BACKEND_SIN_GEMINI', { motivo: 'acompanamiento', accion: acomp.accion, flujo });
-      trace('4c.RESPUESTA_BACKEND', { texto: acomp.respuesta });
-      return conHistorial(acomp, historial, texto, requiereCelular);
-    }
-    mergedEarly.flujo = flujo;
-  }
+  if (flujo) mergedEarly.flujo = flujo;
 
   let out;
   try {
     const parsed = await llamarGemini(texto, comercial, historial, nlu);
-    const accion = ACCIONES.has(parsed.accion) ? parsed.accion : 'preguntar';
     const merged = mergeFicha(comercial, parsed.ficha, texto);
     if (flujo) merged.flujo = flujo;
+    parsed.plantilla = inferirPlantillaDatoReal(normalizarPlantilla(parsed.plantilla), texto, nlu, parsed);
+    const compuesto = componerGestor(parsed, merged, comercial.publicDatos);
+    let { respuesta, plantilla, pedirDato } = compuesto;
+    let accion = accionDesdePlantilla(plantilla, parsed.accion);
+
+    const rubroNuevoEsteTurno = !ficha.tieneRubro(comercial) && ficha.tieneRubro(merged);
+    if (rubroNuevoEsteTurno && plantilla === 'ninguna' && !ficha.parecePreguntaModulo(texto) && !pubDatos.parecePreguntaPlanes(texto, nlu)) {
+      const pitch = ficha.textoPitchRubroYDemo(merged);
+      if (!empiezaIgual(respuesta, pitch)) {
+        respuesta = `${respuesta}\n\n${pitch}`.trim();
+      }
+      plantilla = 'pitch_rubro';
+      accion = merged.encaja === 'no' ? 'sugerir_llamada' : 'ofrecer_demo';
+    }
+
     const pidioLlamada = parecePedidoLlamadaEsteTurno(texto, nlu);
-    const quiereLlamada = pidioLlamada || (accion === 'ofrecer_llamada' && Boolean(parsed.quiereLlamada) && pidioLlamada);
-    if (quiereLlamada) merged.quiereLlamada = true;
-    let respuesta = sanitizar(ficha.sanitizarAlucinacionesComercial(parsed.respuesta), 1200);
+    const quiereLlamada = pidioLlamada || (plantilla === 'cita' && Boolean(parsed.quiereLlamada)) || (accion === 'ofrecer_llamada' && Boolean(parsed.quiereLlamada) && pidioLlamada);
+    if (quiereLlamada || plantilla === 'cita') {
+      merged.quiereLlamada = Boolean(quiereLlamada || parsed.quiereLlamada || pidioLlamada);
+    }
+    if (plantilla === 'cita' || (merged.quiereLlamada && ['nombre', 'celular', 'horario'].includes(pedirDato))) {
+      if (pidioLlamada || merged.esperandoDatosLlamada || parsed.quiereLlamada) {
+        merged.esperandoDatosLlamada = true;
+        merged.quiereLlamada = true;
+        accion = 'ofrecer_llamada';
+        const miss = ficha.faltantesCita(merged, { requiereCelular });
+        if (!miss.length) {
+          out = confirmarOAjustarLlamada(merged, texto);
+          out.plantilla = 'cita';
+          out.pedirDato = '';
+          out = aplicarCierreComercial(out);
+          trace('4c.RESPUESTA_BACKEND', { accion: out.accion, plantilla: 'cita', texto: out.respuesta });
+          return conHistorial(out, historial, texto, requiereCelular);
+        }
+        if (!respuesta || respuesta.length < 20) {
+          respuesta = ficha.textoPedirDatosCita(miss, merged);
+        }
+      }
+    }
     if (accion === 'sugerir_llamada') {
       merged.quiereLlamada = false;
       if (!/\bLLAMADA\b/i.test(respuesta)) {
         respuesta = `${respuesta}\n\n${ficha.textoSugerirLlamadaSoporte()}`;
       }
     }
-    if (accion === 'enviar_planes' && comercial.publicDatos) {
-      respuesta = pubDatos.textoPlanesReales(comercial.publicDatos);
-    } else if (accion === 'enviar_planes' && !/businesssoft\.net\/planes/i.test(respuesta)) {
-      respuesta = `${respuesta}\n${ficha.urlPublica('/planes')}`;
-    }
-    if (accion === 'aviso_pago_manual') {
+    if (accion === 'aviso_pago_manual' || plantilla === 'pago_confirmado') {
       merged.pagoReportado = true;
       merged.intencionCompra = 'alta';
-      respuesta = pubDatos.textoConfirmaPagoCliente();
+      accion = 'aviso_pago_manual';
     }
-    const pidioDemo = nlu?.intencion === 'solicitar_demo' || ficha.pareceSolicitarDemo(texto);
-    if ((accion === 'ofrecer_demo' || accion === 'acompanar_demo') && pidioDemo) {
-      const guia = ficha.turnoAcompanamiento({
-        texto,
-        flujo: 'demo',
-        ruta: comercial.rutaActual,
-        comercial: merged,
-        iniciar: true
-      });
-      if (guia) {
-        return conHistorial(guia, historial, texto, requiereCelular);
-      }
+    if (['planes', 'yape', 'plin', 'cuenta', 'medios_pago'].includes(plantilla)) {
+      merged.intencionCompra = 'alta';
     }
-    const yaDioDatoPago = pubDatos.parecePreguntaYape(texto)
-      || pubDatos.parecePreguntaPlin(texto)
-      || pubDatos.parecePreguntaCuenta(texto)
-      || pubDatos.parecePreguntaMediosPago(texto);
-    if ((accion === 'acompanar_pago') && !yaDioDatoPago && (nlu?.intencion === 'contratar_plan' || ficha.pareceSolicitarPago(texto))) {
-      const guia = ficha.turnoAcompanamiento({
-        texto,
-        flujo: 'pago',
-        ruta: comercial.rutaActual,
-        comercial: merged,
-        iniciar: true
-      });
-      if (guia) {
-        return conHistorial(guia, historial, texto, requiereCelular);
-      }
+    if (pedirDato === 'rubro') {
+      merged.esperandoRubro = true;
+      if (accion === 'listo') accion = 'preguntar';
     }
     let slugFlayer = parsed.slugFlayer || null;
     if (accion === 'enviar_guia' && !slugFlayer) {
       slugFlayer = ficha.resolverFlayer(texto)?.slug || null;
     }
-    out = { respuesta, comercial: merged, accion, slugFlayer, quiereLlamada };
+    out = {
+      respuesta,
+      comercial: merged,
+      accion,
+      slugFlayer,
+      quiereLlamada: Boolean(merged.quiereLlamada && (plantilla === 'cita' || accion === 'ofrecer_llamada')),
+      plantilla,
+      pedirDato
+    };
   } catch (err) {
     if (err.code !== 'GEMINI_NO_CONFIG') {
       console.error('whatsappBotComercialIa:', err.message);
     }
     out = fallbackReglas(texto, { ...comercial, requiereCelular }, nlu);
+    out.plantilla = out.plantilla || 'ninguna';
+    out.pedirDato = out.pedirDato || '';
     trace('4.BACKEND_SIN_GEMINI', { motivo: err.code || err.message, accion: out.accion });
   }
+
+  out = aplicarCierreComercial(out);
 
   if (out.accion === 'sugerir_llamada') {
     out.quiereLlamada = false;
     if (out.comercial) out.comercial.quiereLlamada = false;
-  } else if (
-    parecePedidoLlamadaEsteTurno(texto, nlu)
-    || (out.comercial?.esperandoDatosLlamada && parecePedidoLlamada(texto, nlu, out.comercial))
-  ) {
-    out = pedirDatosOConfirmar(out.comercial, texto, requiereCelular);
   }
 
   trace('4c.RESPUESTA_BACKEND', {
     accion: out.accion,
+    plantilla: out.plantilla,
+    pedirDato: out.pedirDato,
     quiereLlamada: out.quiereLlamada,
     texto: out.respuesta
   });

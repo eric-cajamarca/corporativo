@@ -30,13 +30,23 @@
             @if (esImagen(m.imagenUrl)) {
               <img class="chat-img" [src]="m.imagenUrl" [alt]="'Guía comercial'" />
             } @else {
-              <a class="chat-link" [href]="m.imagenUrl" target="_blank" rel="noopener">Ver guía</a>
+              <a
+                class="chat-link"
+                [href]="m.imagenUrl"
+                [attr.target]="esEnlaceExterno(m.imagenUrl) ? '_blank' : null"
+                rel="noopener"
+                (click)="abrirEnlace($event, m.imagenUrl)">Ver guía</a>
             }
           }
           @if (m.role === 'model') {
             <div class="chat-links">
               @for (url of extraerUrls(m.text); track url) {
-                <a class="chat-link" [href]="url" target="_blank" rel="noopener">Abrir enlace</a>
+                <a
+                  class="chat-link"
+                  [href]="url"
+                  [attr.target]="esEnlaceExterno(url) ? '_blank' : null"
+                  rel="noopener"
+                  (click)="abrirEnlace($event, url)">Abrir enlace</a>
               }
             </div>
           }

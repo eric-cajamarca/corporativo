@@ -73,7 +73,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
   public soatVencidoCount = 0;
   private soatVencidoToastYaMostrado = false;
 
-  /** Tarjeta de perfil: enlaces según plan SaaS (Factiliza placa/SOAT desde profesional; demo + arqueo). */
+  /** Tarjeta de perfil: enlaces según plan SaaS (Factiliza placa/SOAT desde básico; demo + arqueo). */
   public mostrarPlacaSoatTarjeta = true;
   public mostrarMiPerfilSuscripcion = false;
   public mostrarArqueoCajaTarjeta = false;

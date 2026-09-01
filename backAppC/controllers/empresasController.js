@@ -78,6 +78,8 @@ const emailService = require('../services/email.service');
 const empresasAdministracionService = require('../services/empresasAdministracion.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
 const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
+const whatsappBotLeadComercial = require('../services/whatsappBotLeadComercial.service');
+const { isSaas } = require('../config/deployment.config');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
@@ -159,6 +161,16 @@ const createEmpresa = async function (req, res, next) {
     const fregistro = currentDate;
 
     try {
+        if (isSaas()) {
+            const checkout = String(req.body.checkoutOrderNumber || '').trim();
+            const demo = !!req.body.solicitudDemo;
+            if (!checkout && !demo) {
+                return res.status(400).send({
+                    message: 'Elige un plan o la demo de 14 días antes de registrar la empresa.',
+                    data: undefined
+                });
+            }
+        }
         await withPool(async (pool) => {
             const existentes = await empresasAdministracionService.buscarPorRuc(pool, ruc);
             if (existentes.length > 0) {
@@ -190,6 +202,10 @@ const createEmpresa = async function (req, res, next) {
                 estSunat,
                 estado: 0,
                 fregistro
+            });
+
+            whatsappBotLeadComercial.marcarRegistroEmpresa(celular, idEmpresa).catch((err) => {
+                console.error('lead comercial registro empresa:', err.message);
             });
 
             try {

@@ -44,6 +44,7 @@ const PLANES = {
       'Hasta 2 usuarios, 1 sucursal y 2 000 productos',
       'WhatsApp vinculado ilimitado (envío de comprobantes)',
       'Cotizaciones, compras y clientes sin límite',
+      'Consultas de placa y SOAT',
       'Sin bot de pedidos WhatsApp'
     ]
   },

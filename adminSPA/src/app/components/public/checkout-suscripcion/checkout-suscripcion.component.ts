@@ -8,6 +8,7 @@ import { SaasPublicService } from '../../../services/saas-public.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { AuthService } from '../../../services/auth.service';
 import { CheckoutResumen } from '../../../models/saas-public.model';
+import { LS_CHECKOUT_PENDIENTE } from '../../../utils/saas-registro-origen.util';
 
 type MedioPagoManual = 'yape' | 'plin' | 'bcp';
 /** Canal principal: Culqi (tarjeta) o transferencia / Yape / Plin. */
@@ -15,8 +16,6 @@ type ViaPago = 'culqi' | 'manual';
 
 const CULQI_SCRIPT_SRC = 'https://checkout.culqi.com/js/v4';
 const CULQI_3DS_SCRIPT_SRC = 'https://3ds.culqi.com';
-/** Respaldo si el usuario pierde la URL (p. ej. corte de luz); se limpia al registrar empresa. */
-const LS_CHECKOUT_PENDIENTE = 'efaf_checkout_pendiente';
 
 @Component({
   selector: 'app-checkout-suscripcion',
@@ -599,7 +598,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     if (autenticado) {
       await this.router.navigate(['/cuenta', 'suscripcion'], { queryParams: { checkout: order } });
     } else {
-      await this.router.navigate(['/crear-empresa'], { queryParams: { checkout: order } });
+      await this.router.navigate(['/crear-empresa'], { queryParams: this.queryRegistroEmpresa(order) });
     }
   }
 
@@ -691,7 +690,14 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       }
       this.procesando.set(false);
     }
-    void this.router.navigate(['/crear-empresa'], { queryParams: { checkout: order } });
+    void this.router.navigate(['/crear-empresa'], { queryParams: this.queryRegistroEmpresa(order) });
+  }
+
+  private queryRegistroEmpresa(order: string): Record<string, string> {
+    const qp: Record<string, string> = { checkout: order };
+    const cel = (this.route.snapshot.queryParamMap.get('celular') || '').replace(/\D/g, '').slice(-9);
+    if (/^9\d{8}$/.test(cel)) qp['celular'] = cel;
+    return qp;
   }
 
   volverPlanes(): void {

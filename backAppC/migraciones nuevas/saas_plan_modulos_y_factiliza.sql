@@ -73,6 +73,9 @@ INSERT INTO @f SELECT 'emprendedor', nombre FROM dbo.FactilizaConfig WHERE nombr
 INSERT INTO @f SELECT 'profesional', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza WHATSAPP', N'Factiliza TIPO CAMBIO') AND estado = 1;
 INSERT INTO @f SELECT 'empresarial', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza WHATSAPP', N'Factiliza TIPO CAMBIO') AND estado = 1;
 INSERT INTO @f SELECT 'enterprise', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza WHATSAPP', N'Factiliza TIPO CAMBIO') AND estado = 1;
+-- Desde básico: PLACA, SOAT
+INSERT INTO @f SELECT 'basico', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza PLACA', N'Factiliza SOAT') AND estado = 1;
+INSERT INTO @f SELECT 'emprendedor', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza PLACA', N'Factiliza SOAT') AND estado = 1;
 -- Desde profesional: PDF, PLACA, SOAT, LICENCIA
 INSERT INTO @f SELECT 'profesional', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza SUNAT PDF', N'Factiliza PLACA', N'Factiliza SOAT', N'Factiliza LICENCIA') AND estado = 1;
 INSERT INTO @f SELECT 'empresarial', nombre FROM dbo.FactilizaConfig WHERE nombre IN (N'Factiliza SUNAT PDF', N'Factiliza PLACA', N'Factiliza SOAT', N'Factiliza LICENCIA') AND estado = 1;

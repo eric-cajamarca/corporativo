@@ -15,3 +15,68 @@
   display: inline-block;
   vertical-align: middle;
 }
+
+.lead-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1040;
+}
+
+.lead-modal {
+  position: fixed;
+  z-index: 1050;
+  top: 4vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(42rem, calc(100vw - 1.5rem));
+  max-height: 92vh;
+}
+
+.lead-modal .card {
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.lead-modal .card-body {
+  overflow: auto;
+}
+
+.lead-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 18rem;
+  overflow: auto;
+  background: #f6f7f9;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.lead-chat-msg {
+  max-width: 88%;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.lead-chat-msg.out {
+  align-self: flex-end;
+  background: #dbeafe;
+}
+
+.lead-chat-msg.in {
+  align-self: flex-start;
+}
+
+.lead-chat-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-bottom: 0.15rem;
+}
+
+.lead-chat-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

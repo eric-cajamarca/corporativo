@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of } from 'rxjs';
 import { catchError, take } from 'rxjs/operators';
@@ -46,7 +46,8 @@ export class PlanesPublicComponent implements OnInit {
     private saasSubscription: SaasSubscriptionService,
     private auth: AuthService,
     private deployment: DeploymentContextService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
@@ -57,6 +58,9 @@ export class PlanesPublicComponent implements OnInit {
         return;
       }
       this.cargarPlanesYPermisoEdicion();
+      if (this.route.snapshot.queryParamMap.get('registro') === 'elige-plan') {
+        this.avisoMsg.set('Para registrar tu empresa, elige primero la demo de 14 días o un plan.');
+      }
     });
   }
 
@@ -174,7 +178,7 @@ export class PlanesPublicComponent implements OnInit {
   }
 
   irCrearEmpresa(): void {
-    void this.router.navigate(['/crear-empresa']);
+    void this.router.navigate(['/planes'], { queryParams: { registro: 'elige-plan' } });
   }
 
   esPlanActual(planCode: string): boolean {

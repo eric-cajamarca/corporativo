@@ -1,5 +1,5 @@
 /**
- * Nivel ordinal del plan (cotizaciones, compras SUNAT, placa/SOAT, etc.).
+ * Nivel ordinal del plan (cotizaciones, compras SUNAT, WhatsApp bot, etc.).
  * Caja demo se trata aparte en `saasPlanAcceso.service.js`.
  */
 export function nivelPlan(planCode: string | null | undefined): number {
@@ -21,7 +21,10 @@ export const NIVEL_MIN_BASICO = 2;
 /** Mínimo plan Emprendedor para bot de pedidos WhatsApp. */
 export const NIVEL_MIN_EMPRENDEDOR = 3;
 
-/** Mínimo plan Profesional para placa/SOAT en tarjeta de perfil (legacy UI). */
+/** Mínimo plan Básico para consultas placa/SOAT en tarjeta de perfil. */
+export const NIVEL_MIN_PLACA_SOAT = NIVEL_MIN_BASICO;
+
+/** Mínimo plan Profesional (legado / otras reglas). */
 export const NIVEL_MIN_PROFESIONAL = 4;
 
 export function planPermiteWhatsAppVinculado(planCode: string | null | undefined): boolean {

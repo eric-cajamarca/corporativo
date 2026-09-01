@@ -4,12 +4,105 @@
       <div>
         <h1 class="content-title mb-1">Leads comerciales</h1>
         <p class="content-subtitle text-muted mb-0">
-          Interesados de EFAFERP (chat web y WhatsApp de preventa). Solo empresa principal.
+          Embudo de preventa: el bot ofrece la demo; al registrar empresa con el mismo celular se marca ganado.
+          La página de demo no escribe en la base de datos.
         </p>
       </div>
       <a class="btn btn-outline-secondary" routerLink="/empresa">Volver a empresas</a>
     </div>
   </div>
+
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <span class="text-muted small">Periodo</span>
+    @for (r of rangos; track r.dias) {
+      <button
+        type="button"
+        class="btn btn-sm"
+        [class.btn-primary]="rangoDias === r.dias"
+        [class.btn-outline-secondary]="rangoDias !== r.dias"
+        (click)="cambiarRango(r.dias)">
+        {{ r.label }}
+      </button>
+    }
+  </div>
+
+  @if (metricas(); as m) {
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-muted small">Leads</div>
+            <div class="fs-3 fw-semibold">{{ m.leads }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-muted small">Ofreció demo</div>
+            <div class="fs-3 fw-semibold">{{ m.ofrecioDemo }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-muted small">Registró empresa</div>
+            <div class="fs-3 fw-semibold">{{ m.empresas }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="text-muted small">Conversión demo → empresa</div>
+            <div class="fs-3 fw-semibold">{{ m.pctDemo }}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (cola().length > 0) {
+    <div class="card mb-3 border-warning">
+      <div class="card-body">
+        <h2 class="h6 mb-2">Revisar ({{ cola().length }})</h2>
+        <p class="text-muted small mb-3">
+          Ofreció demo, no registró empresa y lleva más de 48 h (o ya está interesado/perdido).
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Celular</th>
+                <th>Rubro</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of cola(); track row.idLead) {
+                <tr>
+                  <td>{{ row.nombre || '—' }}</td>
+                  <td class="text-nowrap">{{ celularVisible(row) }}</td>
+                  <td>{{ rubroVisible(row) }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="badgeClass(row.estado)">{{ etiquetaEstado(row.estado) }}</span>
+                  </td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirChat(row)">
+                      Ver chat
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
 
   <div class="card mb-3">
     <div class="card-body d-flex flex-wrap gap-2 align-items-end">
@@ -51,8 +144,8 @@
                 <th>Celular</th>
                 <th>Canal</th>
                 <th>Rubro</th>
-                <th>Intención</th>
-                <th>Horario</th>
+                <th>Demo</th>
+                <th>Empresa</th>
                 <th>Estado</th>
                 <th>Último mensaje</th>
                 <th></th>
@@ -75,16 +168,33 @@
                     </span>
                   </td>
                   <td>
-                    <div>{{ row.rubro || row.rubroLibre || '—' }}</div>
+                    <div>{{ rubroVisible(row) }}</div>
                     <small class="text-muted">{{ row.encaja || '' }}</small>
                   </td>
-                  <td>{{ row.intencionCompra || '—' }}</td>
-                  <td>{{ row.mejorHorario || '—' }}</td>
+                  <td>
+                    @if (row.ofrecioDemo) {
+                      <span class="badge text-bg-info">Sí</span>
+                      <div class="small text-muted">{{ row.fOfrecioDemo || '' }}</div>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (row.idEmpresaRegistrada) {
+                      <span class="badge text-bg-success">Registró</span>
+                      <div class="small text-muted">{{ row.fRegistroEmpresa || '' }}</div>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
                   <td>
                     <span class="badge" [ngClass]="badgeClass(row.estado)">{{ etiquetaEstado(row.estado) }}</span>
                   </td>
                   <td class="lead-msg" [title]="row.ultimoMensaje || ''">{{ row.ultimoMensaje || '—' }}</td>
                   <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="abrirChat(row)">
+                      Chat
+                    </button>
                     @if (whatsappUrl(row); as wa) {
                       <a class="btn btn-sm btn-outline-success me-1" [href]="wa" target="_blank" rel="noopener">
                         WhatsApp
@@ -111,3 +221,73 @@
     </div>
   </div>
 </div>
+
+@if (modalAbierto()) {
+  <div class="lead-modal-backdrop" (click)="cerrarChat()"></div>
+  <div class="lead-modal" role="dialog" aria-modal="true">
+    <div class="card shadow">
+      @if (leadChat(); as lead) {
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold">{{ lead.nombre || 'Lead' }}</div>
+          <small class="text-muted">{{ celularVisible(lead) }} · {{ rubroVisible(lead) }}</small>
+        </div>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarChat()"></button>
+      </div>
+      <div class="card-body">
+        @if (chatLoading()) {
+          <p class="text-muted mb-0">Cargando chat…</p>
+        } @else if (mensajes().length === 0) {
+          <p class="text-muted">No hay historial de WhatsApp (el chat web no se guarda aquí).</p>
+          @if (lead.ultimoMensaje) {
+            <p class="mb-0"><strong>Último mensaje:</strong> {{ lead.ultimoMensaje }}</p>
+          }
+        } @else {
+          <div class="lead-chat">
+            @for (msg of mensajes(); track $index) {
+              <div class="lead-chat-msg" [class.out]="msg.direccion === 'out'" [class.in]="msg.direccion === 'in'">
+                <div class="lead-chat-meta">{{ msg.direccion === 'out' ? 'Bot' : 'Cliente' }} · {{ msg.fRegistro }}</div>
+                <div class="lead-chat-text">{{ msg.texto }}</div>
+              </div>
+            }
+          </div>
+        }
+        <div class="mt-3">
+          <label class="form-label" for="notaRevisionLead">Nota de revisión</label>
+          <textarea
+            id="notaRevisionLead"
+            class="form-control"
+            rows="3"
+            maxlength="500"
+            [(ngModel)]="notaRevision"
+            name="notaRevision"
+            placeholder="Qué falló, qué faltó en el conocimiento, si conviene llamarlo…"></textarea>
+        </div>
+      </div>
+      <div class="card-footer d-flex flex-wrap gap-2 justify-content-end">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          [disabled]="actualizando() === lead.idLead"
+          (click)="guardarRevision()">
+          Marcar revisado
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-danger"
+          [disabled]="actualizando() === lead.idLead"
+          (click)="guardarRevision('perdido')">
+          Perdido
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="actualizando() === lead.idLead"
+          (click)="guardarRevision('contactado')">
+          Contactado
+        </button>
+      </div>
+      }
+    </div>
+  </div>
+}

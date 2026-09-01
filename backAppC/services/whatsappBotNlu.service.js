@@ -23,7 +23,7 @@ const PATRONES = {
   productosPedido: /\b(productos|producto|detalle|items|que trae|que incluye|lista|ver pedido)\b/i,
   pdfPedido: /\b(pdf|comprobante|documento|recibo|boleta|factura)\b/i,
   // Solicitud explicita de hablar con un humano (escalamiento Fase 3).
-  solicitarAgente: /\b(agente|asesor|asesora|humano|humana|persona real|alguien real|hablar con alguien|hablar con un|atencion humana|vendedor|vendedora|representante|operador|operadora|ayuda humana)\b/i,
+  solicitarAgente: /\b((un |el )?(agente|asesor|asesora)|humano|humana|persona real|alguien real|hablar con alguien|hablar con un|atencion humana|representante|operador|operadora|ayuda humana)\b/i,
   infoSistema: /\b(efaferp|business soft|sistema de ventas|software de ventas|\berp\b|me conviene|conviene el sistema|me sirve|para mi ferreteria|para mi negocio|el sistema efaferp|comprar el sistema|quiero el sistema|contratar( el)? sistema|\bdemo\b|prueba (gratis|de 14)|14 dias|configurar(lo| la empresa| el sistema)|cuenta demo)\b/i,
   planesSaas: /\b(planes|plan mensual|plan anual|suscripcion|precio del sistema|cuanto cuesta (el )?sistema|cuanto cuesta efaferp|cuanto vale el sistema)\b/i,
   solicitarDemo: /^(demo|prueba)$/i,
@@ -112,7 +112,9 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
     }
     if (PATRONES.dudaPagoRegistro.test(textoNorm)) return 'duda_pago_registro';
     if (t.toUpperCase() === 'SISTEMA' || PATRONES.infoSistema.test(textoNorm)) return 'info_sistema';
-    if (t.toUpperCase() === 'PLANES' || PATRONES.planesSaas.test(textoNorm)) return 'planes_saas';
+    if (t.toUpperCase() === 'PLANES' || (PATRONES.planesSaas.test(textoNorm) && !/\b(whats?app|bot|asistente|vincular|factura)\b/i.test(textoNorm))) {
+      return 'planes_saas';
+    }
     if (t.toUpperCase() === 'LLAMADA' || PATRONES.agendarLlamada.test(textoNorm)) return 'agendar_llamada';
     if (PATRONES.consultaComercial.test(textoNorm)) return 'consulta_comercial';
     if (t.toUpperCase() === 'GUIAS' || t.toUpperCase() === 'GUÍAS' || PATRONES.flayerComercial.test(textoNorm)) {

@@ -8,10 +8,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { LS_CHECKOUT_PENDIENTE, leerCheckoutPendienteLocal } from '../../../utils/saas-registro-origen.util';
 
 declare var iziToast: any;
-
-const LS_CHECKOUT_PENDIENTE = 'efaf_checkout_pendiente';
 
 @Component({
   selector: 'app-create-empresa',
@@ -36,8 +35,9 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
 
   /** Número de orden Culqi (CHK-...) si el usuario pagó desde /planes. */
   checkoutOrderNumber = '';
-  /** Mostrar opción demo solo en modo SaaS. */
+  /** Mostrar opción demo solo en modo SaaS y si aún no eligió plan/demo (checkout). */
   mostrarOpcionDemo = false;
+  private saasPublico = false;
 
   // Datos de la empresa encontrada
   empresaEncontrada: any = null;
@@ -81,19 +81,9 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
     this.initForm();
     this.cargarUbicaciones();
     this.route.queryParamMap.subscribe((q) => {
-      let co = (q.get('checkout') || '').trim();
-      if (!co) {
-        try {
-          const raw = localStorage.getItem(LS_CHECKOUT_PENDIENTE);
-          if (raw) {
-            const parsed = JSON.parse(raw) as { orderNumber?: string };
-            co = (parsed?.orderNumber || '').trim();
-          }
-        } catch {
-          /* ignore */
-        }
-      }
+      const co = (q.get('checkout') || '').trim() || leerCheckoutPendienteLocal();
       this.checkoutOrderNumber = co;
+      this.actualizarOpcionDemo();
       const cel = (q.get('celular') || '').replace(/\D/g, '').slice(-9);
       if (/^9\d{8}$/.test(cel)) {
         const ctrl = this.empresaForm.get('celular');
@@ -107,13 +97,18 @@ export class CreateEmpresaComponent implements OnInit, OnDestroy {
       }
     });
     this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
-      this.mostrarOpcionDemo = !!cfg?.mostrarPlanesPublicos;
+      this.saasPublico = !!cfg?.mostrarPlanesPublicos;
+      this.actualizarOpcionDemo();
     });
     this.syncChatPagina();
   }
 
   ngOnDestroy(): void {
     this.chatUi.limpiarPagina();
+  }
+
+  private actualizarOpcionDemo(): void {
+    this.mostrarOpcionDemo = this.saasPublico && !this.checkoutOrderNumber;
   }
 
   private syncChatPagina(errorPantalla = ''): void {
