@@ -1,1 +1,0 @@
-<soap-env:Envelope xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/" xmlns:br="http://service.sunat.gob.pe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap-env:Body><br:sendSummaryResponse><ticket>500000457639533</ticket></br:sendSummaryResponse></soap-env:Body></soap-env:Envelope>

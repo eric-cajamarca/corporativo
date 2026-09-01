@@ -46,6 +46,8 @@ backAppC/scripts/test-*.js
 backAppC/scripts/e2e*.js
 backAppC/test-*.js
 backAppC/test_*.js
+backAppC/xml_firmados_sunat/
+backAppC/sunat_respuestas/
 
 # Variables de entorno — usar solo *.example versionados
 .env
