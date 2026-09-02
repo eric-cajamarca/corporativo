@@ -4,6 +4,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './services/auth.service';
 import { SidebarStateService } from './services/sidebar-state.service';
 import { ConnectionTimerService } from './services/connection-timer.service';
+import { PwaUpdateService } from './services/pwa-update.service';
 import { environment } from '../environments/environment';
 import { ChatComercialPublicoComponent } from './components/public/chat-comercial-publico/chat-comercial-publico.component';
 
@@ -20,6 +21,7 @@ export class AppComponent {
     private authService: AuthService,
     private sidebarState: SidebarStateService,
     private connectionTimer: ConnectionTimerService,
+    private pwaUpdateService: PwaUpdateService,
     private router: Router
   ) {}
 
@@ -65,5 +67,6 @@ export class AppComponent {
 
   ngOnInit() {
     this.authService.initialize();
+    this.pwaUpdateService.init();
   }
 }
