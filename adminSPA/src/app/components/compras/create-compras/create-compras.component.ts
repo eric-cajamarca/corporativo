@@ -946,12 +946,18 @@ export class CreateComprasComponent {
 
       }
 
+  /** Último código vinculado en el modal (evita toasts/re-binds repetidos). */
+  private codigoVinculadoEnModal: string | null = null;
+
   //ahora quiero seleccionar el index de la tabla detalleCompra y pasar los datos del registro al objeto nuevoProducto y mostrarlo en un modal
   seleccionarDetalle(idx: number) {
     this.indexDetalle = idx;
         //quiero agregar a this.nuevoProducto el objeto seleccionado
     if (idx >= 0 && idx < this.detalleCompras.length) {
       this.nuevoProducto = this.detalleCompras[idx];
+      this.codigoVinculadoEnModal = this.nuevoProducto?.idProducto
+        ? String(this.nuevoProducto?.codigo ?? '').trim().toUpperCase() || null
+        : null;
       
       //quiero buscar en this.productos el codigo y traer todo el objeto del codigo
       const selectedObject = this.productos.find(
@@ -983,6 +989,103 @@ export class CreateComprasComponent {
       );
       this.nuevoProducto.marca = selectedObjectMarca;
     }
+  }
+
+  /**
+   * Al escribir el código de un producto ya existente, vincula la línea:
+   * asigna idProducto, descripción, categoría, marca y presentación del catálogo.
+   * Conserva cantidad, P.Unit., sucursal y fechas de la factura.
+   */
+  vincularProductoPorCodigoEnModal(): void {
+    if (!this.nuevoProducto || this.nuevoProducto.useCorrelativo) {
+      return;
+    }
+
+    const codigo = String(this.nuevoProducto.codigo ?? '').trim();
+    if (!codigo) {
+      this.codigoVinculadoEnModal = null;
+      return;
+    }
+
+    const key = codigo.toUpperCase();
+    if (this.codigoVinculadoEnModal === key && this.nuevoProducto.idProducto) {
+      return;
+    }
+
+    const producto = this.buscarProductoCatalogoPorCodigo(codigo);
+    if (!producto) {
+      if (this.nuevoProducto.idProducto) {
+        this.nuevoProducto.idProducto = null;
+        this.nuevoProducto.producto = undefined;
+      }
+      this.codigoVinculadoEnModal = null;
+      return;
+    }
+
+    this.aplicarProductoCatalogoALineaModal(producto);
+    this.codigoVinculadoEnModal = key;
+    iziToast.show({
+      title: 'OK',
+      titleColor: '#1DC74C',
+      color: '#FFF',
+      class: 'text-success',
+      position: 'topRight',
+      message: `Vinculado a «${producto['descripcion'] || codigo}»`,
+      timeout: 2500,
+    });
+  }
+
+  private buscarProductoCatalogoPorCodigo(codigo: string): Record<string, unknown> | null {
+    const key = String(codigo ?? '').trim().toUpperCase();
+    if (!key) return null;
+    const catalogo = Array.isArray(this.productos_const) ? this.productos_const : [];
+    const encontrado = catalogo.find(
+      (p: Record<string, unknown>) =>
+        String(p?.['codigo'] ?? p?.['Codigo'] ?? '')
+          .trim()
+          .toUpperCase() === key
+    );
+    return encontrado || null;
+  }
+
+  private aplicarProductoCatalogoALineaModal(producto: Record<string, unknown>): void {
+    const cantidad = this.nuevoProducto.cantidad;
+    const cUnitario = this.nuevoProducto.cUnitario ?? this.nuevoProducto.pUnitario;
+    const idSucursal =
+      this.nuevoProducto.idSucursal ||
+      this.compras?.idSucursal ||
+      producto['idSucursal'];
+    const fproduccion =
+      this.nuevoProducto.fproduccion ?? this.nuevoProducto.fProduccion ?? '';
+    const fvencimiento =
+      this.nuevoProducto.fvencimiento ?? this.nuevoProducto.fVencimiento ?? '';
+    const ubicacion = this.nuevoProducto.ubicacion;
+
+    this.nuevoProducto.idProducto = producto['idProducto'];
+    this.nuevoProducto.codigo =
+      producto['codigo'] ?? producto['Codigo'] ?? this.nuevoProducto.codigo;
+    this.nuevoProducto.descripcion =
+      producto['descripcion'] ?? this.nuevoProducto.descripcion;
+    this.nuevoProducto.idCategoria = producto['idCategoria'];
+    this.nuevoProducto.idMarca = producto['idMarca'];
+    this.nuevoProducto.idPresentacion = producto['idPresentacion'];
+    this.nuevoProducto.useCorrelativo = false;
+    this.nuevoProducto.cantidad = cantidad;
+    this.nuevoProducto.cUnitario = cUnitario;
+    this.nuevoProducto.pUnitario = cUnitario;
+    this.nuevoProducto.subtotal =
+      (Number(cantidad) || 0) * (Number(cUnitario) || 0);
+    this.nuevoProducto.idSucursal = idSucursal;
+    this.nuevoProducto.fproduccion = fproduccion;
+    this.nuevoProducto.fProduccion = fproduccion;
+    this.nuevoProducto.fvencimiento = fvencimiento;
+    this.nuevoProducto.fVencimiento = fvencimiento;
+    this.nuevoProducto.ubicacion = ubicacion;
+    this.nuevoProducto.producto = producto;
+    this.nuevoProducto.codigoPresentacion = producto['codigoPresentacion'];
+    this.nuevoProducto.descripcionPres = producto['descripcionPres'];
+
+    this.enriquecerObjetosDetalleCompra(this.nuevoProducto);
   }
 
   buscarDescripcion() {
@@ -1082,10 +1185,12 @@ export class CreateComprasComponent {
 
       this.nuevoProducto.codigo = this.correlativo.numero;
       this.nuevoProducto.idProducto = undefined;
+      this.codigoVinculadoEnModal = null;
 
           } else {
             // Realiza acciones cuando el checkbox NO está marcado
       this.nuevoProducto.codigo = '';
+      this.codigoVinculadoEnModal = null;
     }
   }
 
@@ -1207,6 +1312,8 @@ export class CreateComprasComponent {
 
   //aqui quiero editar el producto modificado y agregarlo a detalleCompras
   actualizarDetalleCompras(idx: number) {
+    // Por si guardan sin blur: intentar vincular por código antes de persistir la línea
+    this.vincularProductoPorCodigoEnModal();
     //deseo multiplicar el precio por la cantidad de this.nuevoProducto
     this.nuevoProducto.subtotal =
       this.nuevoProducto.cUnitario * this.nuevoProducto.cantidad;
@@ -1215,6 +1322,7 @@ export class CreateComprasComponent {
       this.detalleCompras[idx] = { ...this.nuevoProducto };
 
       this.nuevoProducto = {};
+      this.codigoVinculadoEnModal = null;
       this.sumarDetalleCompras();
       this.sumarFooterFactura();
       if (this.correlativo && typeof this.correlativo === 'object') {

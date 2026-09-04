@@ -425,8 +425,14 @@
                                                             <label for="Codigo">Código (*)</label>
 
                                                             <input type="text" class="form-control" name="Codigo"
-
-                                                                [(ngModel)]="nuevoProducto.codigo">
+                                                                [(ngModel)]="nuevoProducto.codigo"
+                                                                (blur)="vincularProductoPorCodigoEnModal()"
+                                                                (keydown.enter)="$event.preventDefault(); vincularProductoPorCodigoEnModal()"
+                                                                placeholder="Código de tu catálogo"
+                                                                autocomplete="off">
+                                                            <small class="text-muted d-block mt-1">
+                                                                Si el código ya existe, se vincula al producto (nombre, categoría, marca).
+                                                            </small>
 
                                                         </div>
 

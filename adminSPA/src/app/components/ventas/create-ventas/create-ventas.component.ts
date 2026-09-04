@@ -1989,9 +1989,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
       const aplicarDescuentoLinea = this.aplicaDescuentoEnTotalLinea(item);
+      const precioPrincipal = aplicarDescuentoLinea ? this.obtenerPrecioPrincipal(item) : 0;
 
-      if (aplicarDescuentoLinea) {
-        const precioPrincipal = this.obtenerPrecioPrincipal(item);
+      // Descuento lista vs vendido solo si hay precio de lista > 0 y se vende a ese o menos.
+      // Si lista es 0 / sin precio, o el precio manual es mayor, usar pVenta (visible en totales).
+      if (aplicarDescuentoLinea && precioPrincipal > 0 && precioPrincipal >= pVenta) {
         const subtotalItem = redondear2(precioPrincipal * cant);
         this.ventas.subTotal += subtotalItem;
         if (precioPrincipal > pVenta) {
