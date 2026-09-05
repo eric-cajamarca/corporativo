@@ -307,6 +307,35 @@ exports.editarCompra = async (idEmpresa, idUsuario, idCompra, body) => {
 };
 
 /**
+ * Marca compras pendientes como pagadas (flujo pago a proveedores).
+ * body: { idsCompra: string[], idMediosPago?: number, idEmpresaOperacion?: string }
+ */
+exports.marcarComprasPagadas = async (user, body) => {
+    const idsCompra = Array.isArray(body?.idsCompra) ? body.idsCompra : [];
+    if (!idsCompra.length) {
+        throw new Error('Debe indicar al menos una compra a marcar como pagada');
+    }
+    const idMediosPago = body?.idMediosPago != null ? Number(body.idMediosPago) : null;
+    const idUsuario = user.sub || user.idUsuario || null;
+
+    return withPool(async (pool) => {
+        const idEmpresa = await resolverIdEmpresaOperacionCaja(
+            pool,
+            user,
+            body?.idEmpresaOperacion ?? user.empresa
+        );
+        const actualizadas = await comprasRepository.marcarComprasPagadas(
+            pool,
+            idEmpresa,
+            idsCompra,
+            idMediosPago,
+            idUsuario
+        );
+        return { actualizadas };
+    });
+};
+
+/**
  * Elimina una compra por idEmpresa (token) e idCompra. Retorna rowsAffected.
  */
 exports.eliminarCompra = async (idEmpresa, idCompra) => {

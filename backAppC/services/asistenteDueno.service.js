@@ -3,7 +3,10 @@ const {
   GUIA_EFAFERP,
   pareceDiagnostico,
   textoDiagnostico,
-  respuestaGuiaLocal
+  respuestaGuiaLocal,
+  sanitizarFotoPantalla,
+  redactarMensajeUsuario,
+  armarContextoGuia
 } = require('../utils/asistenteDueno.conocimiento');
 const diagnosticoRepo = require('../repositories/asistenteDuenoDiagnostico.repository');
 const { withPool } = require('../utils/dbPool.util');
@@ -53,10 +56,7 @@ function assertRateLimit(idEmpresa) {
 }
 
 function sanitizarTexto(v) {
-  return String(v || '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
-    .trim()
-    .slice(0, MAX_MENSAJE);
+  return redactarMensajeUsuario(v).slice(0, MAX_MENSAJE);
 }
 
 function normalizarHistorial(historial) {
@@ -85,16 +85,16 @@ function textoDePartes(parts) {
     .trim();
 }
 
-async function responderConGuiaLocal(idEmpresa, texto, ruta) {
+async function responderConGuiaLocal(idEmpresa, texto, ruta, foto, historial) {
   if (pareceDiagnostico(texto)) {
     const diag = await withPool((pool) => diagnosticoRepo.diagnosticarEmpresa(pool, idEmpresa));
     return { respuesta: textoDiagnostico(diag), origen: 'local' };
   }
-  return { respuesta: respuestaGuiaLocal(texto, ruta), origen: 'local' };
+  return { respuesta: respuestaGuiaLocal(texto, ruta, foto, historial), origen: 'local' };
 }
 
-async function responderConGemini(idEmpresa, texto, historial, ruta, titulo) {
-  const contextoPantalla = `Pantalla actual del usuario: ruta="${ruta || '/'}" título="${titulo || ''}".`;
+async function responderConGemini(idEmpresa, texto, historial, ruta, titulo, foto) {
+  const contextoPantalla = armarContextoGuia(foto, ruta, titulo, texto, historial);
   const contents = [
     ...normalizarHistorial(historial),
     { role: 'user', parts: [{ text: `${contextoPantalla}\n\nPregunta: ${texto}` }] }
@@ -133,7 +133,7 @@ async function responderConGemini(idEmpresa, texto, historial, ruta, titulo) {
   return { respuesta, origen: 'gemini' };
 }
 
-async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina }) {
+async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina, fotoPantalla }) {
   if (!idEmpresa || !UUID_RE.test(String(idEmpresa))) {
     throw new Error('Empresa no válida.');
   }
@@ -145,17 +145,18 @@ async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina })
 
   const ruta = sanitizarTexto(rutaActual).slice(0, 200);
   const titulo = sanitizarTexto(tituloPagina).slice(0, 120);
+  const foto = sanitizarFotoPantalla(fotoPantalla);
 
   if (!geminiClient.resolverApiKey()) {
-    return responderConGuiaLocal(idEmpresa, texto, ruta);
+    return responderConGuiaLocal(idEmpresa, texto, ruta, foto, historial);
   }
   try {
-    return await responderConGemini(idEmpresa, texto, historial, ruta, titulo);
+    return await responderConGemini(idEmpresa, texto, historial, ruta, titulo, foto);
   } catch (err) {
     if (err.code !== 'GEMINI_NO_CONFIG') {
       console.error('asistenteDueno.gemini:', err.message);
     }
-    return responderConGuiaLocal(idEmpresa, texto, ruta);
+    return responderConGuiaLocal(idEmpresa, texto, ruta, foto, historial);
   }
 }
 

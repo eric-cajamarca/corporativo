@@ -1,8 +1,8 @@
-<div class="page-body">
-    <div class="content-wrap">
-        <div class="container">
-        <div class="card" style="margin-top: 20px;">
-            <div class="card-header">
+<div [ngClass]="desdeCompra ? 'create-proveedor-embed' : 'page-body'">
+    <div [ngClass]="desdeCompra ? 'create-proveedor-form' : 'content-wrap'">
+        <div [ngClass]="desdeCompra ? 'container-fluid px-0' : 'container'">
+        <div class="card" [style.margin-top.px]="desdeCompra ? 0 : 20">
+            <div class="card-header" *ngIf="!desdeCompra">
 
                 <!-- Title -->
                 <h4 class="card-header-title">
@@ -10,9 +10,9 @@
                 </h4>
 
             </div>
-            <div class="card-body">
+            <div class="card-body" [class.py-2]="desdeCompra" [class.px-3]="desdeCompra">
                 <div class="col-sm-6 col-log-3 col-md-12">
-                    <div class="form-group row" style="margin-bottom: 20px;">
+                    <div class="form-group row" [style.margin-bottom.px]="desdeCompra ? 10 : 20">
                         <label class="col-xl-3 col-lg-3 col-form-label">Tipo de documento</label>
                         <div class="col-lg-9 col-xl-9">
                             <select required name="idDocumento" [(ngModel)]="proveedores.idDocumento" class="form-control">
@@ -279,7 +279,8 @@
         </form>
 
         <!-- Modal Establecimientos RUC -->
-        <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1"
+            [style.background]="'rgba(0,0,0,0.5)'" [style.z-index]="desdeCompra ? 1065 : null">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">

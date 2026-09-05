@@ -6,7 +6,8 @@ import { CajaService } from '../../../services/caja.service';
 import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../services/caja-operacion-context.service';
 import { ComprasService } from '../../../services/compras.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
-import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { DocumentoService } from '../../../services/documento.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
@@ -51,7 +52,7 @@ export class PagoProveedoresComponent implements OnInit {
   proveedores: any[] = [];
   cajas: any[] = [];
   tiposMovimiento: any[] = [];
-  mediosPago: any[] = [];
+  formasPago: FormaPago[] = [];
   loading = false;
 
   empresasOperacion: EmpresaCajaOperacion[] = [];
@@ -71,6 +72,8 @@ export class PagoProveedoresComponent implements OnInit {
   proveedorSeleccionado: { idProveedor: number; ruc: string; razonSocial: string; direccion?: string } | null = null;
   proveedorBusqueda = '';
   comprobantes: ComprobantePagoRow[] = [];
+  /** Compra desde la que se abrió el recibo (para vincular el pago). */
+  private idCompraEnfoque: string | null = null;
 
   form = {
     serie: '0001',
@@ -118,7 +121,7 @@ export class PagoProveedoresComponent implements OnInit {
     private cajaOpCtx: CajaOperacionContextService,
     private comprasService: ComprasService,
     private proveedoresService: ProveedoresService,
-    private tablasSunat: TablasSunatService,
+    private documentoService: DocumentoService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -138,9 +141,9 @@ export class PagoProveedoresComponent implements OnInit {
       }
     });
     this.tiposEgreso();
-    this.tablasSunat.obtener_medios_pago().subscribe({
-      next: (r) => { this.mediosPago = r.data || []; },
-      error: () => {}
+    this.documentoService.getFormasPago().subscribe({
+      next: (r) => { this.formasPago = r.data || []; },
+      error: () => { this.formasPago = []; }
     });
   }
 
@@ -241,7 +244,9 @@ export class PagoProveedoresComponent implements OnInit {
       idCompra: c.idCompra,
       idEmpresa: c.idEmpresa,
       fecha: c.fEmision,
-      documento: (c.serie || '') + '-' + (c.numero || ''),
+      documento: (c.compCompra && String(c.compCompra).trim())
+        ? String(c.compCompra).trim()
+        : this.formatearComprobante(c.serie, c.numero),
       idProveedor: c.idProveedor,
       proveedor: proveedor ? (proveedor.rSocial || proveedor.razonSocial || proveedor.nombre || '') : '',
       ruc: proveedor?.ruc || proveedor?.nroDoc || '',
@@ -262,6 +267,7 @@ export class PagoProveedoresComponent implements OnInit {
     this.proveedorSeleccionado = null;
     this.proveedorBusqueda = '';
     this.comprobantes = [];
+    this.idCompraEnfoque = null;
     this.form = {
       serie: '0001',
       numero: '0000002',
@@ -296,6 +302,7 @@ export class PagoProveedoresComponent implements OnInit {
   }
 
   seleccionarProveedor(p: any): void {
+    this.idCompraEnfoque = null;
     this.proveedorSeleccionado = {
       idProveedor: p.idProveedor,
       ruc: p.ruc || p.nroDoc || '',
@@ -331,14 +338,30 @@ export class PagoProveedoresComponent implements OnInit {
         this.comprobantes = compras.map((c: any, i: number) => ({
           item: i + 1,
           idCompra: c.idCompra,
-          comprobante: (c.serie || '') + '-' + (c.numero || ''),
+          comprobante: (c.compCompra && String(c.compCompra).trim())
+            ? String(c.compCompra).trim()
+            : this.formatearComprobante(c.serie, c.numero),
           fechaVenta: c.fEmision,
           totalComprobante: Number(c.total || 0),
           fechaVencimiento: c.fVencimiento || c.fEmision,
           importePagado: 0
         }));
+        if (this.idCompraEnfoque) {
+          const fila = this.comprobantes.find((c) => c.idCompra === this.idCompraEnfoque);
+          if (fila) {
+            const sugerido = Number(this.form.importeACancelar) || fila.totalComprobante;
+            fila.importePagado = Math.min(sugerido, fila.totalComprobante);
+          }
+        }
       }
     });
+  }
+
+  private formatearComprobante(serie: unknown, numero: unknown): string {
+    const s = String(serie ?? '').trim();
+    const n = String(numero ?? '').trim();
+    if (!s && !n) return '-';
+    return `${s}-${n}`;
   }
 
   get deudaTotal(): number {
@@ -357,6 +380,7 @@ export class PagoProveedoresComponent implements OnInit {
     this.mostrarForm = false;
     this.proveedorSeleccionado = null;
     this.comprobantes = [];
+    this.idCompraEnfoque = null;
   }
 
   ver(item: CompraProveedorItem): void {
@@ -371,6 +395,7 @@ export class PagoProveedoresComponent implements OnInit {
       this.cajaOpCtx.setEmpresaOperacion(this.idEmpresaOperacionSel);
       this.cargarDatos();
     }
+    this.idCompraEnfoque = item.idCompra || null;
     this.proveedorSeleccionado = {
       idProveedor: item.idProveedor,
       ruc: item.ruc || '',
@@ -440,9 +465,19 @@ export class PagoProveedoresComponent implements OnInit {
   }
 
   guardar(): void {
-    const importe = this.form.importeACancelar > 0 ? this.form.importeACancelar : this.totalImportePagado;
-    if (importe <= 0) {
-      iziToast.warning({ title: 'Advertencia', message: 'Ingrese importe a cancelar o asigne importes en la tabla.' });
+    const importeTabla = Number(this.totalImportePagado) || 0;
+    const importeCampo = Number(this.form.importeACancelar) || 0;
+    const importe = importeCampo > 0 ? importeCampo : importeTabla;
+
+    if (importeCampo <= 0 && importeTabla <= 0) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'Complete el importe a cancelar o asigne importes en la tabla de comprobantes.'
+      });
+      return;
+    }
+    if (this.form.idMediosPago == null || Number(this.form.idMediosPago) <= 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Seleccione la forma de pago.' });
       return;
     }
     if (!this.proveedorSeleccionado) {
@@ -458,8 +493,25 @@ export class PagoProveedoresComponent implements OnInit {
       return;
     }
 
+    const idsCompraAPagar = this.resolverIdsCompraAMarcar(importe);
+    if (!idsCompraAPagar.length) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'Asigne el importe a cancelar en la(s) compra(s) de la tabla para vincular el pago.'
+      });
+      return;
+    }
+
+    const docs = this.comprobantes
+      .filter((c) => idsCompraAPagar.includes(c.idCompra))
+      .map((c) => c.comprobante)
+      .filter(Boolean)
+      .join(', ');
     const concepto = `Pago a proveedor - ${this.proveedorSeleccionado.razonSocial} (${this.proveedorSeleccionado.ruc})`;
-    const observaciones = [this.form.observaciones, `Recibo: ${this.form.serie}-${this.form.numero}`].filter(Boolean).join(' | ');
+    const observaciones = [
+      this.form.observaciones,
+      docs ? `Compras: ${docs}` : null
+    ].filter(Boolean).join(' | ');
 
     this.cajaService.registrarMovimientoEgreso({
       idApertura: this.form.idApertura,
@@ -467,24 +519,72 @@ export class PagoProveedoresComponent implements OnInit {
       fechaMovimiento: fechaEmisionVentaParaApi(this.form.fechaEmision),
       concepto,
       monto: importe,
-      idMediosPago: this.form.idMediosPago ?? undefined,
+      idMediosPago: Number(this.form.idMediosPago),
+      documentoRelacionado: docs || undefined,
       observaciones: observaciones || undefined,
       idEmpresaOperacion: this.idEmpresaOperacionSel || null
     }).subscribe({
       next: (data: any) => {
         const comprobante = (data?.documentoRelacionado || '').toString().trim() || 'N/A';
-        iziToast.success({
-          title: 'Éxito',
-          message: 'Pago registrado. Comprobante: Recibo de Egreso ' + comprobante + '. El monto se refleja en el arqueo de caja.'
+        this.comprasService.marcarComprasPagadas({
+          idsCompra: idsCompraAPagar,
+          idMediosPago: Number(this.form.idMediosPago),
+          idEmpresaOperacion: this.idEmpresaOperacionSel || null
+        }).subscribe({
+          next: () => {
+            iziToast.success({
+              title: 'Éxito',
+              message: 'Pago registrado y compra(s) marcada(s) como pagada(s). Comprobante: Recibo de Egreso ' + comprobante
+            });
+            this.cerrarForm();
+            this.cargarLista();
+            this.cargarDatos();
+          },
+          error: (e) => {
+            iziToast.warning({
+              title: 'Pago en caja OK',
+              message: (e.error?.message || 'El egreso se registró, pero no se pudo actualizar el estado de la compra. Revise el listado.')
+            });
+            this.cerrarForm();
+            this.cargarLista();
+            this.cargarDatos();
+          }
         });
-        this.cerrarForm();
-        this.cargarLista();
-        this.cargarDatos();
       },
       error: (e) => {
         iziToast.error({ title: 'Error', message: e.error?.message || 'Error al guardar.' });
       }
     });
+  }
+
+  /**
+   * Determina qué compras marcar como pagadas según importes de tabla o compra enfocada.
+   * Solo marca pago completo (importe >= total del comprobante).
+   */
+  private resolverIdsCompraAMarcar(importe: number): string[] {
+    const conImporte = this.comprobantes.filter((c) => (Number(c.importePagado) || 0) > 0);
+    if (conImporte.length) {
+      return conImporte
+        .filter((c) => (Number(c.importePagado) || 0) + 0.009 >= (Number(c.totalComprobante) || 0))
+        .map((c) => c.idCompra)
+        .filter(Boolean);
+    }
+
+    if (this.idCompraEnfoque) {
+      const fila = this.comprobantes.find((c) => c.idCompra === this.idCompraEnfoque);
+      if (fila && importe + 0.009 >= (Number(fila.totalComprobante) || 0)) {
+        return [fila.idCompra];
+      }
+    }
+
+    if (this.comprobantes.length === 1) {
+      const unica = this.comprobantes[0];
+      if (importe + 0.009 >= (Number(unica.totalComprobante) || 0)) {
+        return [unica.idCompra];
+      }
+    }
+
+    return [];
   }
 
   formatCurrency(n: number): string {

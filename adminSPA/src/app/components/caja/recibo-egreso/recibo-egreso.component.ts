@@ -28,6 +28,7 @@ export interface ReciboEgresoItem {
   usuario?: string;
   glosa?: string;
   entregueA?: string;
+  eliminado?: boolean;
 }
 
 @Component({
@@ -300,8 +301,13 @@ export class ReciboEgresoComponent implements OnInit {
       observaciones: m.observaciones,
       usuario: m.usuario,
       glosa,
-      entregueA: entregueA || (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : '')
+      entregueA: entregueA || (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : ''),
+      eliminado: m.eliminado === true || m.eliminado === 1
     };
+  }
+
+  esEliminado(item: ReciboEgresoItem): boolean {
+    return item.eliminado === true;
   }
 
   buscar(): void {
@@ -492,6 +498,10 @@ export class ReciboEgresoComponent implements OnInit {
   }
 
   eliminar(item: ReciboEgresoItem): void {
+    if (this.esEliminado(item)) {
+      iziToast.info({ title: 'Aviso', message: 'Este recibo ya está eliminado.' });
+      return;
+    }
     if (!confirm('¿Eliminar este recibo de egreso?')) return;
     this.cajaService.eliminarMovimiento(item.idMovimientoCaja).subscribe({
       next: () => {

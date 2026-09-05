@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, EventEmitter, HostBinding, Input, OnChanges, OnInit, Output, SimpleChanges, inject } from '@angular/core';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { ApiperuService } from '../../../services/apiperu.service';
 import { DocumentoService } from '../../../services/documento.service';
@@ -18,7 +18,22 @@ declare var iziToast: any;
   templateUrl: './create-proveedor.component.html',
   styleUrl: './create-proveedor.component.css'
 })
-export class CreateProveedorComponent {
+export class CreateProveedorComponent implements OnInit, OnChanges {
+  @HostBinding('class.create-proveedor-host-embed')
+  get hostEmbed(): boolean {
+    return this.desdeCompra;
+  }
+
+  /** Tipo documento precargado desde registrar compra (RUC=6, DNI=1). */
+  @Input() idDocumentoPre?: string;
+  /** Número de documento precargado (RUC/DNI buscado). */
+  @Input() rucPre?: string;
+  /** Contador: al incrementarse se reaplican idDocumentoPre y rucPre. */
+  @Input() preCargarSerial = 0;
+  /** Embebido en modal de compra: no navega al listado al guardar. */
+  @Input() desdeCompra = false;
+  @Output() proveedorCreado = new EventEmitter<Record<string, unknown>>();
+
   public sidebarState = inject(SidebarStateService);
   public busqueda = false;
   public filtro: any = "";
@@ -98,20 +113,35 @@ export class CreateProveedorComponent {
 
       }
 
-  ngOnInit() {
+  ngOnInit(): void {
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        
-        //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
-        //  this.documento.forEach((element: { id: string | number; name: any; }) => {
-        //   this.documento[element.id] = element.id;
-        //  });
-
+        this.aplicarPrecargaDesdeCompraInputs();
       }
     );
-
+    this.aplicarPrecargaDesdeCompraInputs();
     this.select_pais();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.desdeCompra) return;
+    if (changes['idDocumentoPre'] || changes['rucPre'] || changes['preCargarSerial']) {
+      this.aplicarPrecargaDesdeCompraInputs();
+    }
+  }
+
+  /** Rellena tipo y número cuando el modal se abre desde registrar compra. */
+  private aplicarPrecargaDesdeCompraInputs(): void {
+    if (!this.desdeCompra) return;
+    const id = this.idDocumentoPre;
+    const r = this.rucPre;
+    if (id != null && String(id).trim() !== '') {
+      this.proveedores.idDocumento = String(id).trim();
+    }
+    if (r != null && String(r).trim() !== '') {
+      this.proveedores.ruc = String(r).trim();
+    }
   }
 
 
@@ -618,16 +648,38 @@ private async handleDniSearch(): Promise<void> {
                     return;
                   }
                   if (idx > pendientes.length) {
-                    iziToast.show({
-                      title: 'SUCCESS',
-                      titleColor: '#006064',
-                      color: '#FFF',
-                      class: 'text-success',
-                      position: 'topRight',
-                      message: 'Proveedor creado correctamente'
-                    });
-                    this.btn_registrar = false;
-                    this._router.navigate(['/proveedores']);
+                    if (this.desdeCompra) {
+                      const payload: Record<string, unknown> = {
+                        idProveedor,
+                        idDocumento: provRes.data[0]?.idDocumento ?? this.proveedores.idDocumento,
+                        ruc: provRes.data[0]?.ruc ?? this.proveedores.ruc,
+                        rSocial: (provRes.data[0]?.rSocial ?? this.proveedores.rSocial ?? '').toString().trim(),
+                        correo: provRes.data[0]?.correo ?? this.proveedores.correo ?? '',
+                        celular: provRes.data[0]?.celular ?? this.proveedores.celular ?? '',
+                        condicion: provRes.data[0]?.condicion ?? this.proveedores.condicion ?? 'ACTIVO'
+                      };
+                      this.btn_registrar = false;
+                      iziToast.show({
+                        title: 'SUCCESS',
+                        titleColor: '#006064',
+                        color: '#FFF',
+                        class: 'text-success',
+                        position: 'topRight',
+                        message: 'Proveedor registrado.'
+                      });
+                      this.proveedorCreado.emit(payload);
+                    } else {
+                      iziToast.show({
+                        title: 'SUCCESS',
+                        titleColor: '#006064',
+                        color: '#FFF',
+                        class: 'text-success',
+                        position: 'topRight',
+                        message: 'Proveedor creado correctamente'
+                      });
+                      this.btn_registrar = false;
+                      this._router.navigate(['/proveedores']);
+                    }
                     return;
                   }
                   const e = pendientes[idx - 1];

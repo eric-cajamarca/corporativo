@@ -359,6 +359,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   ngOnDestroy(): void {
+    this.ventaProvisionalUi.limpiarAlDestruirComponente();
     this.posKeyboard.desactivar();
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.pdfPostVentaModalEl = null;

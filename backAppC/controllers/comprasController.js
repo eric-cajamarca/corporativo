@@ -146,6 +146,26 @@ const editar_compra = async (req, res, next) => {
     }
 };
 
+/** Marca compras pendientes como pagadas (pago a proveedores). */
+const marcar_compras_pagadas = async (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    try {
+        const data = await comprasService.marcarComprasPagadas(req.user, req.body || {});
+        res.status(200).send({ message: 'Compras marcadas como pagadas', data });
+    } catch (error) {
+        console.error('marcar_compras_pagadas:', error);
+        if (error.message === 'EMPRESA_OPERACION_NO_PERMITIDA') {
+            return res.status(403).send({ message: 'Empresa de operación no permitida', data: undefined });
+        }
+        if (error.message && /compra/i.test(error.message)) {
+            return res.status(400).send({ message: error.message, data: undefined });
+        }
+        return next(error);
+    }
+};
+
 const eliminar_idcompra_empresa = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -379,6 +399,7 @@ module.exports = {
     crear_compra_completa,
     getBootstrapCompra,
     editar_compra,
+    marcar_compras_pagadas,
     eliminar_idcompra_empresa,
     obtener_borrador_compras_empresa,
     crear_borrador_compras_empresa,

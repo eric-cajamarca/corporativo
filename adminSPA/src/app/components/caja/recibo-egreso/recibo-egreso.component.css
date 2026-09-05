@@ -36,6 +36,11 @@
   font-size: 1rem;
 }
 
+tr.movimiento-eliminado td {
+  color: #e67e22;
+  text-decoration: line-through;
+}
+
 .btn-nueva-accion-movil {
   display: inline-flex;
   align-items: center;

@@ -74,13 +74,18 @@
                                 <div style="width: 80px;">
                                     <label for="serie">Serie</label>
                                     <input type="text" class="form-control" name="serie" [(ngModel)]="compras.serie"
-                                        placeholder="F001">
+                                        placeholder="F001" maxlength="4"
+                                        (input)="onSerieCompraInput()"
+                                        (blur)="onSerieCompraBlur()">
                                 </div>
 
                                 <div style="width: 100px;">
                                     <label for="numero">Número</label>
                                     <input type="text" class="form-control" name="numero" [(ngModel)]="compras.numero"
-                                        placeholder="00000001" (change)="onInputChangesCompCompras()">
+                                        placeholder="00000001" maxlength="8"
+                                        (input)="onNumeroCompraInput()"
+                                        (blur)="onNumeroCompraBlur()"
+                                        (change)="onInputChangesCompCompras()">
                                 </div>
 
                             </div>

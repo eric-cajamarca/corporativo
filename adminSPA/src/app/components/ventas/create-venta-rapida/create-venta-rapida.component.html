@@ -1,14 +1,52 @@
 <header class="pos-topbar">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2">
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+  <div class="pos-topbar-inner">
+    <div class="pos-topbar-nav">
       <a routerLink="/ventas" class="btn btn-sm btn-outline-secondary" title="Historial de ventas">
-        <i class="bi bi-arrow-left"></i> Historial
+        <i class="bi bi-arrow-left"></i>
+        <span class="d-none d-sm-inline">Historial</span>
       </a>
-      <h5 class="mb-0 text-success fw-semibold"><i class="bi bi-lightning-charge-fill me-1"></i>Venta rápida</h5>
+      <span class="pos-topbar-brand text-success" title="Venta rápida">
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span class="d-none d-md-inline">Venta rápida</span>
+      </span>
     </div>
-    <a class="btn btn-sm btn-outline-secondary" routerLink="/ventas/create">
-      <i class="bi bi-receipt me-1"></i>Venta completa
-    </a>
+
+    <div class="pos-topbar-total venta-rapida-total">
+      <span class="text-muted small">Total</span>
+      <span class="pos-topbar-total-monto text-success">S/ {{ ventas.total | number:'1.2-2' }}</span>
+      <span class="text-muted small d-none d-sm-inline" *ngIf="carrito.length">
+        ({{ carrito.length }} ítem{{ carrito.length === 1 ? '' : 's' }})
+      </span>
+    </div>
+
+    <div class="pos-topbar-actions">
+      <button type="button" class="btn btn-outline-info btn-sm" (click)="abrirRecuperarVentasGuardadas()"
+        [class.btn-info]="hayVentasGuardadas" [class.text-white]="hayVentasGuardadas"
+        title="Recuperar ventas en curso guardadas">
+        <i class="bi bi-cloud-download"></i>
+        <span class="d-none d-lg-inline ms-1">Recuperar</span>
+      </button>
+      <button type="button" class="btn btn-outline-danger btn-sm" (click)="anularVenta()"
+        [disabled]="carrito.length === 0 && !ventas.idComprobante"
+        title="Anular">
+        <i class="bi bi-x-circle"></i>
+        <span class="d-none d-lg-inline ms-1">Anular</span>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalPagoMixto()"
+        title="Varias formas de pago o referencia de operación">
+        <i class="bi bi-wallet2"></i>
+        <span class="d-none d-xl-inline ms-1">Pagos mixtos</span>
+      </button>
+      <button type="button" class="btn btn-success btn-sm pos-topbar-cobrar" (click)="cobrarVentaRapida()"
+        [disabled]="loading || carrito.length === 0"
+        title="Cobrar (F4)">
+        <i class="bi bi-cash-stack me-1"></i>{{ loading ? '...' : 'Cobrar' }}
+      </button>
+      <a class="btn btn-sm btn-outline-secondary" routerLink="/ventas/create" title="Ir a venta completa">
+        <i class="bi bi-receipt"></i>
+        <span class="d-none d-md-inline ms-1">Venta completa</span>
+      </a>
+    </div>
   </div>
 </header>
 
@@ -113,32 +151,6 @@
                   <select class="form-select form-select-sm" [(ngModel)]="formaPagoRapidaId" (ngModelChange)="onFormaPagoRapidaChange()">
                     <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
                   </select>
-                </div>
-              </div>
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-2 border-top">
-                <div class="venta-rapida-total">
-                  <span class="text-muted small">Total</span>
-                  <span class="fs-4 fw-bold text-success ms-2">S/ {{ ventas.total | number:'1.2-2' }}</span>
-                  <span class="text-muted small ms-2" *ngIf="carrito.length">({{ carrito.length }} ítem{{ carrito.length === 1 ? '' : 's' }})</span>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="btn btn-outline-info btn-sm" (click)="abrirRecuperarVentasGuardadas()"
-                    [class.btn-info]="hayVentasGuardadas" [class.text-white]="hayVentasGuardadas"
-                    title="Recuperar ventas en curso guardadas">
-                    <i class="bi bi-cloud-download me-1"></i>Recuperar
-                  </button>
-                  <button type="button" class="btn btn-outline-danger btn-sm" (click)="anularVenta()"
-                    [disabled]="carrito.length === 0 && !ventas.idComprobante">
-                    <i class="bi bi-x-circle me-1"></i>Anular
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalPagoMixto()"
-                    title="Varias formas de pago o referencia de operación">
-                    <i class="bi bi-wallet2 me-1"></i>Pagos mixtos
-                  </button>
-                  <button type="button" class="btn btn-success btn-lg px-4" (click)="cobrarVentaRapida()"
-                    [disabled]="loading || carrito.length === 0">
-                    <i class="bi bi-cash-stack me-2"></i>{{ loading ? 'Guardando...' : 'Cobrar' }}
-                  </button>
                 </div>
               </div>
             </div>
@@ -424,8 +436,8 @@
 </main>
 
 <!-- Modal: Recuperar ventas provisionales (tras apagón o cierre) -->
-<div class="modal fade" id="modalRecuperar" tabindex="-1" aria-labelledby="modalRecuperarLabel" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade modal-recuperar-provisional" id="modalRecuperar" tabindex="-1" aria-labelledby="modalRecuperarLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
         <h5 class="modal-title" id="modalRecuperarLabel">
@@ -445,7 +457,7 @@
           }
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer flex-wrap gap-2">
         <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalRecuperar()">
           Continuar sin recuperar
         </button>

@@ -179,15 +179,15 @@
             <input type="text" class="form-control form-control-sm" [value]="formatCurrency(deudaTotal)" readonly>
           </div>
           <div class="col-md-4">
-            <label class="form-label">Importe a Cancelar</label>
+            <label class="form-label">Importe a Cancelar <span class="text-danger">*</span></label>
             <input type="number" class="form-control form-control-sm" [(ngModel)]="form.importeACancelar"
                    step="0.01" min="0" placeholder="0.00">
           </div>
           <div class="col-md-4">
-            <label class="form-label">Medio de pago</label>
+            <label class="form-label">Forma de pago <span class="text-danger">*</span></label>
             <select class="form-select form-select-sm" [(ngModel)]="form.idMediosPago">
               <option [ngValue]="null">::Seleccione::</option>
-              <option *ngFor="let mp of mediosPago" [ngValue]="mp.idMediosPago">{{ mp.descripcion }}</option>
+              <option *ngFor="let fp of formasPago" [ngValue]="fp.idFormaPago">{{ fp.descripcion }}</option>
             </select>
           </div>
         </div>

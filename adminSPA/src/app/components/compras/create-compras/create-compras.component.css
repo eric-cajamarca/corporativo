@@ -39,6 +39,11 @@
   overflow: hidden;
 }
 
+#modalCrearProveedor .modal-body {
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+
 #proveedoresModal app-index-proveedor {
   display: block;
 }

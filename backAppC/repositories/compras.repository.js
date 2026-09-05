@@ -215,13 +215,17 @@ exports.obtenerCodigoComprobante = async (pool, idEmpresa, idComprobante) => {
  * Inserta una compra. No retorna filas.
  */
 exports.crearCompra = async (executor, params) => {
+    const serie = (params.serie || '').toString().replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 4);
+    const numeroRaw = (params.numero || '').toString().replace(/\D/g, '').substring(0, 8);
+    const numero = numeroRaw ? numeroRaw.padStart(8, '0') : '';
+    const compCompra = (serie || numero) ? `${serie}-${numero}` : (params.compCompra || '');
     const req = executor.request()
         .input('idCompra', sql.UniqueIdentifier, params.idCompra)
         .input('idEmpresa', sql.UniqueIdentifier, params.idEmpresa)
-        .input('compCompra', sql.VarChar(13), params.compCompra || '')
+        .input('compCompra', sql.VarChar(13), String(compCompra).substring(0, 13))
         .input('idComprobante', sql.Int, params.idComprobante)
-        .input('serie', sql.VarChar(4), (params.serie || '').toString().substring(0, 4))
-        .input('numero', sql.VarChar(8), (params.numero || '').toString().substring(0, 8))
+        .input('serie', sql.VarChar(4), serie)
+        .input('numero', sql.VarChar(8), numero)
         .input('fEmision', sql.VarChar(23), params.fEmision)
         .input('fVencimiento', sql.VarChar(23), params.fVencimiento)
         .input('idProveedor', sql.Int, params.idProveedor)
@@ -247,12 +251,16 @@ exports.crearCompra = async (executor, params) => {
  * Actualiza una compra por idEmpresa e idCompra. Retorna rowsAffected.
  */
 exports.actualizarCompra = async (pool, params) => {
+    const serie = (params.serie || '').toString().replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 4);
+    const numeroRaw = (params.numero || '').toString().replace(/\D/g, '').substring(0, 8);
+    const numero = numeroRaw ? numeroRaw.padStart(8, '0') : '';
+    const compCompra = (serie || numero) ? `${serie}-${numero}` : (params.compCompra ?? '');
     const result = await pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, params.idEmpresa)
         .input('idcompra', sql.UniqueIdentifier, params.idCompra)
-        .input('compCompra', sql.VarChar, params.compCompra ?? '')
-        .input('serie', sql.VarChar, params.serie ?? '')
-        .input('numero', sql.VarChar, params.numero ?? '')
+        .input('compCompra', sql.VarChar, String(compCompra).substring(0, 13))
+        .input('serie', sql.VarChar, serie)
+        .input('numero', sql.VarChar, numero)
         .input('fEmision', sql.VarChar(23), params.fEmision)
         .input('fVencimiento', sql.VarChar(23), params.fVencimiento)
         .input('idProveedor', sql.Int, params.idProveedor)
@@ -273,6 +281,50 @@ exports.actualizarCompra = async (pool, params) => {
             WHERE idEmpresa=@idEmpresa AND idCompra=@idcompra
         `);
     return result.rowsAffected?.[0] ?? 0;
+};
+
+/**
+ * Marca compras pendientes como pagadas (pago a proveedores).
+ * Filtra por idEmpresa y solo actualiza idEstadoPago = 1.
+ */
+exports.marcarComprasPagadas = async (pool, idEmpresa, idsCompra, idMediosPago, idUsuario) => {
+    const ids = (Array.isArray(idsCompra) ? idsCompra : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+    if (!ids.length) return 0;
+
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+        let total = 0;
+        for (let i = 0; i < ids.length; i++) {
+            const req = transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idCompra', sql.UniqueIdentifier, ids[i])
+                .input('idMediosPago', sql.Int, idMediosPago != null ? Number(idMediosPago) : null)
+                .input('idUsuario', sql.UniqueIdentifier, idUsuario || null);
+            const result = await req.query(`
+                UPDATE Compras
+                SET idEstadoPago = 2,
+                    idMediosPago = COALESCE(@idMediosPago, idMediosPago),
+                    idUsuarioModifica = COALESCE(@idUsuario, idUsuarioModifica),
+                    fModificacion = GETDATE()
+                WHERE idEmpresa = @idEmpresa
+                  AND idCompra = @idCompra
+                  AND idEstadoPago = 1
+            `);
+            total += result.rowsAffected?.[0] ?? 0;
+        }
+        await transaction.commit();
+        return total;
+    } catch (error) {
+        try {
+            await transaction.rollback();
+        } catch (re) {
+            console.error('compras.repository marcarComprasPagadas rollback:', re);
+        }
+        throw error;
+    }
 };
 
 /**

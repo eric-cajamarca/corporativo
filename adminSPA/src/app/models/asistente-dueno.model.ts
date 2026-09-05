@@ -3,11 +3,31 @@ export interface AsistenteMensaje {
   text: string;
 }
 
+export type AsistenteCampoEstado = 'vacio' | 'lleno' | 'oculto';
+
+export interface AsistenteFotoCampo {
+  etiqueta: string;
+  estado: AsistenteCampoEstado;
+}
+
+/** Resumen de UI para el asistente. Nunca lleva values ni secretos. */
+export interface AsistenteFotoPantalla {
+  ruta: string;
+  pantalla: string;
+  paso: string;
+  modo: string;
+  acciones: string[];
+  campos: AsistenteFotoCampo[];
+  faltantes: string[];
+  listos: string[];
+}
+
 export interface AsistenteChatRequest {
   mensaje: string;
   historial: AsistenteMensaje[];
   rutaActual: string;
   tituloPagina: string;
+  fotoPantalla?: AsistenteFotoPantalla;
 }
 
 export interface AsistenteChatResponse {

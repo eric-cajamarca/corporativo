@@ -132,6 +132,19 @@ export class ComprasService {
     });
   }
 
+  /** Marca compras pendientes como pagadas (pago a proveedores). */
+  marcarComprasPagadas(payload: {
+    idsCompra: string[];
+    idMediosPago?: number | null;
+    idEmpresaOperacion?: string | null;
+  }): Observable<{ data?: { actualizadas?: number } }> {
+    return this._http.post<{ data?: { actualizadas?: number } }>(
+      this.url + 'compras/marcar-pagadas',
+      payload,
+      { withCredentials: true }
+    );
+  }
+
   //api.delete('/compras/:id',auth.auth, comprasController.eliminar_compra);
 
   eliminar_idcompra_empresa(id: any): Observable<any> {

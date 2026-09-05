@@ -692,6 +692,7 @@ export class UpdateComprasComponent {
           }
 
   onInputChangesCompCompras() {
+    this.normalizarSerieNumeroCompra();
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
             
     let idProveedor = {};
@@ -725,6 +726,46 @@ export class UpdateComprasComponent {
 
     this.updatecompra++;
 
+  }
+
+  /** Serie: máx. 4 caracteres alfanuméricos en mayúsculas. */
+  onSerieCompraInput(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, false);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  onSerieCompraBlur(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, true);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  /** Número: solo dígitos, máx. 8; al salir del campo se completa con ceros a la izquierda. */
+  onNumeroCompraInput(): void {
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, false);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  onNumeroCompraBlur(): void {
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, true);
+    this.onInputChangesCompCompras();
+  }
+
+  private normalizarSerieNumeroCompra(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, true);
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, true);
+  }
+
+  private normalizarSerieCompra(valor: unknown, _final: boolean): string {
+    return String(valor ?? '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 4);
+  }
+
+  private normalizarNumeroCompra(valor: unknown, pad: boolean): string {
+    const digits = String(valor ?? '').replace(/\D/g, '').slice(0, 8);
+    if (!digits) return '';
+    return pad ? digits.padStart(8, '0') : digits;
   }
 
   onSelectPresentacion(event: any) {
@@ -1083,6 +1124,9 @@ export class UpdateComprasComponent {
   ActualizarCompras() {
     this.sumarDetalleCompras();
     this.sumarFooterFactura();
+
+    this.normalizarSerieNumeroCompra();
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
 
     const comprasCambiadas = !this.sonIguales(this.compras, this.compras_const);
     const detalleCambiado = !this.sonIguales(this.detalleCompras, this.detalleCompras_const);

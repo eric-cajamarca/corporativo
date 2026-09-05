@@ -36,6 +36,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
+import { CreateProveedorComponent } from '../../proveedores/create-proveedor/create-proveedor.component';
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { AuthService } from '../../../services/auth.service';
 import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
@@ -43,6 +44,8 @@ import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
 declare var iziToast: any;
 declare var bootstrap: any;
 const FORMATO_FECHA = 'dd/MM/yyyy';
+const ID_DOC_RUC = '6';
+const ID_DOC_DNI = '1';
 
 interface CuotaCompraSunatForm {
   numeroCuota: number;
@@ -58,7 +61,8 @@ interface CuotaCompraSunatForm {
     RouterModule,
     CommonModule,
     ReactiveFormsModule,
-    IndexProveedorComponent],
+    IndexProveedorComponent,
+    CreateProveedorComponent],
   templateUrl: './create-compras.component.html',
   styleUrl: './create-compras.component.css',
 })
@@ -102,6 +106,8 @@ export class CreateComprasComponent {
   public nuevoDetalleCompra: any = {};
   public comprobantes: any = [];
   public proveedores: any = {};
+  /** Contador para reaplicar precarga en modal crear proveedor. */
+  public crearProveedorPreSerial = 0;
   public productos: any = {};
   public prodSelecionado: any = {};
   public productos_const: any = {};
@@ -276,12 +282,13 @@ export class CreateComprasComponent {
 
         if (info.serieNumero) {
           const [s, n] = String(info.serieNumero).split('-');
-          this.compras.serie = s || '';
-          this.compras.numero = n || '';
+          this.compras.serie = this.normalizarSerieCompra(s || '', true);
+          this.compras.numero = this.normalizarNumeroCompra(n || '', true);
         } else {
           this.compras.serie = '';
           this.compras.numero = '';
         }
+        this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
         const tipoSunat = String(info.tipoDocumento ?? this.consultaForm?.value?.tipo_doc ?? '01').trim().padStart(2, '0');
         this.asignarIdComprobantePorCodigoSunat(tipoSunat);
         this.compras.ruc = emisor.ruc || '';
@@ -800,25 +807,99 @@ export class CreateComprasComponent {
   }
 
   buscar() {
-    this._proveedoresService.obtener_proveedor_ruc(this.compras.ruc).subscribe({
+    const digitos = this.normalizarDigitosDocumentoProveedor((this.compras.ruc ?? '').toString());
+    if (!digitos) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'Ingrese el número de documento (RUC o DNI).',
+        position: 'topRight'
+      });
+      return;
+    }
+    const inferido = this.inferirIdDocumentoProveedorPorLongitud(digitos);
+    if (inferido == null) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'Ingrese 8 dígitos (DNI) u 11 dígitos (RUC).',
+        position: 'topRight'
+      });
+      return;
+    }
+    this.compras.ruc = digitos;
+    this.compras.idDocumento = inferido;
+
+    this._proveedoresService.obtener_proveedor_ruc(digitos).subscribe({
       next: (response) => {
         if (response?.data && response.data.length > 0) {
           this.asignarProveedorEnCompra(response.data[0]);
         } else {
           this.limpiarProveedorEnCompra();
-          iziToast.show({
-            title: 'ERROR',
-            titleColor: '#FF0000',
-            color: '#FFF',
-            class: 'text-danger',
-            position: 'topRight',
-            message: 'El proveedor no existe.',
-          });
+          this.compras.ruc = digitos;
+          this.compras.idDocumento = inferido;
+          this.crearProveedorPreSerial += 1;
+          this.abrirModalCrearProveedor();
         }
       },
-      error: (err) => {
+      error: () => {
         this.limpiarProveedorEnCompra();
+        this.compras.ruc = digitos;
+        this.compras.idDocumento = inferido;
+        this.crearProveedorPreSerial += 1;
+        this.abrirModalCrearProveedor();
       },
+    });
+  }
+
+  private normalizarDigitosDocumentoProveedor(raw: string): string {
+    return (raw ?? '').toString().replace(/\D/g, '');
+  }
+
+  private inferirIdDocumentoProveedorPorLongitud(digitos: string): string | null {
+    if (digitos.length === 11) return ID_DOC_RUC;
+    if (digitos.length === 8) return ID_DOC_DNI;
+    return null;
+  }
+
+  abrirModalCrearProveedor(): void {
+    const modalEl = document.getElementById('modalCrearProveedor');
+    if (!modalEl) return;
+    setTimeout(() => {
+      const modalInst = bootstrap?.Modal?.getOrCreateInstance?.(modalEl)
+        ?? (window as any).bootstrap?.Modal?.getOrCreateInstance?.(modalEl);
+      modalInst?.show();
+    }, 0);
+  }
+
+  onProveedorCreadoDesdeModal(event: Record<string, unknown>): void {
+    const modalEl = document.getElementById('modalCrearProveedor');
+    const modalInst = bootstrap?.Modal?.getInstance?.(modalEl as HTMLElement)
+      ?? (window as any).bootstrap?.Modal?.getInstance?.(modalEl);
+    modalInst?.hide();
+    const numero = (event?.['ruc'] ?? this.compras?.ruc ?? '').toString().trim();
+    if (!numero) {
+      if (event) {
+        this.asignarProveedorEnCompra(event);
+      }
+      return;
+    }
+    this._proveedoresService.obtener_proveedor_ruc(numero).subscribe({
+      next: (response) => {
+        if (response?.data != null && response.data.length > 0) {
+          this.asignarProveedorEnCompra(response.data[0]);
+          iziToast.success({
+            title: 'OK',
+            message: 'Proveedor registrado y cargado.',
+            position: 'topRight'
+          });
+        } else if (event) {
+          this.asignarProveedorEnCompra(event);
+        }
+      },
+      error: () => {
+        if (event) {
+          this.asignarProveedorEnCompra(event);
+        }
+      }
     });
   }
 
@@ -1113,6 +1194,7 @@ export class CreateComprasComponent {
   }
 
   onInputChangesCompCompras() {
+    this.normalizarSerieNumeroCompra();
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
             
     let idProveedor = {};
@@ -1145,6 +1227,46 @@ export class CreateComprasComponent {
     //     console.log(error);
     //   }
     // );
+  }
+
+  /** Serie: máx. 4 caracteres alfanuméricos en mayúsculas. */
+  onSerieCompraInput(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, false);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  onSerieCompraBlur(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, true);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  /** Número: solo dígitos, máx. 8; al salir del campo se completa con ceros a la izquierda. */
+  onNumeroCompraInput(): void {
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, false);
+    this.compras.compCompra = `${this.compras.serie || ''}-${this.compras.numero || ''}`;
+  }
+
+  onNumeroCompraBlur(): void {
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, true);
+    this.onInputChangesCompCompras();
+  }
+
+  private normalizarSerieNumeroCompra(): void {
+    this.compras.serie = this.normalizarSerieCompra(this.compras.serie, true);
+    this.compras.numero = this.normalizarNumeroCompra(this.compras.numero, true);
+  }
+
+  private normalizarSerieCompra(valor: unknown, _final: boolean): string {
+    return String(valor ?? '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 4);
+  }
+
+  private normalizarNumeroCompra(valor: unknown, pad: boolean): string {
+    const digits = String(valor ?? '').replace(/\D/g, '').slice(0, 8);
+    if (!digits) return '';
+    return pad ? digits.padStart(8, '0') : digits;
   }
 
   onselectMarca(selectedValue: any) {
@@ -1456,6 +1578,7 @@ export class CreateComprasComponent {
   }
 
   registrarCompras() {
+    this.normalizarSerieNumeroCompra();
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
     this.loadButton = true;
 
@@ -1954,8 +2077,14 @@ export class CreateComprasComponent {
   }
 
   agregarNuevoProveedor() {
-    
-    window.open('/proveedores/create', '_blank');
+    const digitos = this.normalizarDigitosDocumentoProveedor((this.compras.ruc ?? '').toString());
+    const inferido = digitos ? this.inferirIdDocumentoProveedorPorLongitud(digitos) : null;
+    if (digitos && inferido) {
+      this.compras.ruc = digitos;
+      this.compras.idDocumento = inferido;
+    }
+    this.crearProveedorPreSerial += 1;
+    this.abrirModalCrearProveedor();
   }
 
   agregarNuevaSucursal() {

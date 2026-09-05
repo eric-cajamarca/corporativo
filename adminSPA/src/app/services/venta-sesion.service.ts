@@ -81,7 +81,7 @@ export class VentaSesionService {
 
   private generarNombre(): string {
     const n = this.sesiones.length + 1;
-    return this.modo === 'rapida' ? `Venta r?pida ${n}` : `Venta ${n}`;
+    return this.modo === 'rapida' ? `Venta rápida ${n}` : `Venta ${n}`;
   }
 
   crearSesion(nombre?: string): VentaSesion {

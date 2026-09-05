@@ -4,6 +4,37 @@
   background: #f5f7fa;
 }
 
+/* Modal recuperar: capas por encima del backdrop (Safari iOS) */
+:host .modal-recuperar-provisional.show,
+.modal-recuperar-provisional.show {
+  z-index: 1065 !important;
+  pointer-events: auto !important;
+}
+
+:host .modal-recuperar-provisional .modal-dialog,
+.modal-recuperar-provisional .modal-dialog {
+  pointer-events: auto !important;
+  z-index: 1066;
+  margin: 1.25rem auto;
+  max-width: min(500px, calc(100vw - 1.5rem));
+}
+
+:host .modal-recuperar-provisional .modal-content,
+.modal-recuperar-provisional .modal-content {
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+:host .modal-recuperar-provisional .btn,
+:host .modal-recuperar-provisional .btn-close,
+:host .modal-recuperar-provisional .list-group-item,
+.modal-recuperar-provisional .btn,
+.modal-recuperar-provisional .btn-close,
+.modal-recuperar-provisional .list-group-item {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
 .main-content {
   margin-left: 260px;
   margin-top: 64px;

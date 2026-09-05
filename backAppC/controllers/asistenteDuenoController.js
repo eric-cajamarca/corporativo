@@ -24,7 +24,8 @@ async function chat(req, res) {
       mensaje: req.body?.mensaje,
       historial: req.body?.historial,
       rutaActual: req.body?.rutaActual,
-      tituloPagina: req.body?.tituloPagina
+      tituloPagina: req.body?.tituloPagina,
+      fotoPantalla: req.body?.fotoPantalla
     });
     return res.status(200).json({ status: 200, success: true, data });
   } catch (err) {

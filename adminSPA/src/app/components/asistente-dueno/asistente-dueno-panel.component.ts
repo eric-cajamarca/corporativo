@@ -6,6 +6,10 @@ import { Title } from '@angular/platform-browser';
 import { AsistenteDuenoService } from '../../services/asistente-dueno.service';
 import { AsistenteDuenoUiService } from '../../services/asistente-dueno-ui.service';
 import { AsistenteEnlace, AsistenteMensaje } from '../../models/asistente-dueno.model';
+import {
+  capturarFotoPantalla,
+  redactarMensajeUsuario
+} from '../../utils/asistente-pantalla-snapshot.util';
 
 @Component({
   selector: 'app-asistente-dueno-panel',
@@ -26,7 +30,7 @@ export class AsistenteDuenoPanelComponent {
   mensajes: AsistenteMensaje[] = [
     {
       role: 'model',
-      text: 'Soy el asistente de la plataforma. Pregúntame cómo configurar SUNAT, agregar productos o qué te está faltando. Te guiaré paso a paso.'
+      text: 'Soy el asistente de la plataforma. Pregúntame cómo configurar SUNAT, agregar productos o qué te falta. Te digo el siguiente clic según la pantalla en la que estás.'
     }
   ];
   enviando = false;
@@ -81,12 +85,15 @@ export class AsistenteDuenoPanelComponent {
     this.scrollAlFinal();
 
     const historial = this.mensajes.slice(0, -1).filter((x, i) => i > 0);
+    const rutaActual = this.router.url || '/';
+    const tituloPagina = this.title.getTitle() || '';
     this.api
       .chat({
-        mensaje,
+        mensaje: redactarMensajeUsuario(mensaje),
         historial,
-        rutaActual: this.router.url || '/',
-        tituloPagina: this.title.getTitle() || ''
+        rutaActual,
+        tituloPagina,
+        fotoPantalla: capturarFotoPantalla(rutaActual, tituloPagina)
       })
       .subscribe({
         next: (r) => {

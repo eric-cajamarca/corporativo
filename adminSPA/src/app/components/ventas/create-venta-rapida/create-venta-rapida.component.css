@@ -13,6 +13,129 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+/* Modal recuperar: capas por encima del backdrop (Safari iOS) */
+:host .modal-recuperar-provisional.show,
+.modal-recuperar-provisional.show {
+  z-index: 1065 !important;
+  pointer-events: auto !important;
+}
+
+:host .modal-recuperar-provisional .modal-dialog,
+.modal-recuperar-provisional .modal-dialog {
+  pointer-events: auto !important;
+  z-index: 1066;
+  /* Evita desfase táctil del centrado en iOS con barra dinámica */
+  margin: 1.25rem auto;
+  max-width: min(500px, calc(100vw - 1.5rem));
+}
+
+:host .modal-recuperar-provisional .modal-content,
+.modal-recuperar-provisional .modal-content {
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+:host .modal-recuperar-provisional .btn,
+:host .modal-recuperar-provisional .btn-close,
+:host .modal-recuperar-provisional .list-group-item,
+.modal-recuperar-provisional .btn,
+.modal-recuperar-provisional .btn-close,
+.modal-recuperar-provisional .list-group-item {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.pos-topbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.85rem;
+}
+
+.pos-topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.pos-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.pos-topbar-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+}
+
+.pos-topbar-total-monto {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.pos-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+}
+
+.pos-topbar-cobrar {
+  font-weight: 600;
+  padding-left: 0.9rem;
+  padding-right: 0.9rem;
+}
+
+@media (max-width: 767.98px) {
+  .pos-topbar-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pos-topbar-nav {
+    justify-content: space-between;
+  }
+
+  .pos-topbar-total {
+    justify-content: center;
+    padding: 0.15rem 0;
+    border-top: 1px solid #f0f0f0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .pos-topbar-total-monto {
+    font-size: 1.35rem;
+  }
+
+  .pos-topbar-actions {
+    justify-content: stretch;
+  }
+
+  .pos-topbar-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .pos-topbar-cobrar {
+    flex: 1 1 100%;
+  }
+}
+
 .main-content {
   margin-left: 260px;
   margin-top: 64px;
@@ -23,7 +146,7 @@
 .main-content.pos-fullscreen {
   margin-left: 0;
   margin-top: 0;
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - 56px);
 }
 
 .main-content.sidebar-collapsed {
@@ -505,10 +628,4 @@
 
 .venta-rapida-top h5 {
   letter-spacing: 0.02em;
-}
-
-.venta-rapida-total {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
 }

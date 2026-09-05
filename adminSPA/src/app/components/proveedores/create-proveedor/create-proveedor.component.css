@@ -3,6 +3,11 @@
     min-height: 100vh;
     background: #f5f7fa;
   }
+
+  :host.create-proveedor-host-embed {
+    min-height: auto;
+    background: transparent;
+  }
   
   .main-content {
     margin-left: 260px;
@@ -29,7 +34,43 @@
     min-width: 0;
     margin: 0 auto;
   }
-  
-  
-  
-  
+
+  .create-proveedor-embed {
+    margin: 0;
+    padding: 0;
+    min-height: auto;
+    display: block;
+    background: transparent;
+  }
+
+  .create-proveedor-form {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .create-proveedor-form .card {
+    border: none;
+    box-shadow: none;
+    margin-bottom: 0.5rem;
+  }
+
+  .create-proveedor-form .card-header {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .create-proveedor-form .form-group.row {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .create-proveedor-form .form-label {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .create-proveedor-form .input-group {
+    margin-bottom: 0;
+  }
