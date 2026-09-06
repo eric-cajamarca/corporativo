@@ -183,7 +183,7 @@
             <div class="col-md-2">
               <label class="form-label">Cliente</label>
               <div class="input-group">
-                <input type="text" class="form-control" [(ngModel)]="nuevaCobranza.idCliente" name="idCliente" placeholder="ID" readonly>
+                <input type="text" class="form-control" data-asistente-campo="cliente" [(ngModel)]="nuevaCobranza.idCliente" name="idCliente" placeholder="ID" readonly>
                 <button type="button" class="btn btn-outline-primary" (click)="abrirModalBuscarCliente()" title="Buscar cliente por RUC o nombre">
                   <i class="bi bi-search"></i>
                 </button>

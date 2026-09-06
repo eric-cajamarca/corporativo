@@ -31,7 +31,7 @@
         
                                     <label for="ruc">Número de documento</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control"
+                                        <input type="text" class="form-control" data-asistente-campo="proveedor"
                                             placeholder="Ingrese RUC o DNI" name="ruc" [(ngModel)]="compras.ruc">
                                         <button type="button" class="btn btn-primary" (click)="buscar()">
                                             Buscar
@@ -68,7 +68,7 @@
                                         <div>
                                             <label style="width: 300px;">Comprobante</label>
                                             <div class="col-lg-9 col-xl-9">
-                                                <select required name="idComprobante" [(ngModel)]="compras.idComprobante"
+                                                <select required name="idComprobante" data-asistente-campo="comprobante" [(ngModel)]="compras.idComprobante"
                                                     class="form-control">
                                                     <option value="" selected disabled>Seleccionar...</option>
                                                     <option *ngFor="let item of comprobantes" [value]="item.idComprobante">{{

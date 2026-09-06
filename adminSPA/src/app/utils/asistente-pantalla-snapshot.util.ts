@@ -15,6 +15,9 @@ const SENSIBLE_RE =
 
 const EXCLUIR_SEL = '.asistente-panel, .asistente-fab, [data-asistente-excluir], nav.sidebar, app-sidebar, app-topnav';
 
+const RUTAS_SENSIBLES =
+  /\/configuracion|\/whatsapp|\/sesiones|\/login|\/integraciones|\/colaborador/i;
+
 export function redactarMensajeUsuario(texto: string): string {
   let t = String(texto || '');
   t = t.replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, '[certificado]');
@@ -204,7 +207,26 @@ export function claveDeEtiqueta(etiqueta: string): string | null {
   if (/n[°ºo]\s*documento/i.test(e)) return 'cliente';
   if (/^proveedor/i.test(e)) return 'proveedor';
   if (/^descripci[oó]n/i.test(e)) return 'descripcion';
+  if (/tipo de movimiento/i.test(e)) return 'tipo';
+  if (/tipo de documento/i.test(e)) return 'doc';
   return null;
+}
+
+function recolectarCamposMarcados(root: HTMLElement): { clave: string; estado: AsistenteCampoEstado }[] {
+  const out: { clave: string; estado: AsistenteCampoEstado }[] = [];
+  const nodos = root.querySelectorAll<HTMLElement>('[data-asistente-campo]');
+  for (const el of Array.from(nodos)) {
+    if (el.closest(EXCLUIR_SEL)) continue;
+    const clave = recortar(el.getAttribute('data-asistente-campo'), 40).toLowerCase();
+    if (!clave) continue;
+    const control =
+      el.matches('input, select, textarea') ? el : el.querySelector('input, select, textarea');
+    if (!(control instanceof HTMLElement)) continue;
+    const type = control instanceof HTMLInputElement ? control.type : '';
+    const sensible = esEtiquetaSensible(clave, control.getAttribute('name') || '', type);
+    out.push({ clave, estado: estadoControl(control, sensible) });
+  }
+  return out;
 }
 
 function detectarModo(root: HTMLElement): string {
@@ -223,7 +245,8 @@ function inferirFaltantesYListos(
   ruta: string,
   root: HTMLElement,
   campos: AsistenteFotoCampo[],
-  filasCarrito: number
+  filasCarrito: number,
+  marcados: { clave: string; estado: AsistenteCampoEstado }[]
 ): { faltantes: string[]; listos: string[] } {
   const listos = new Set<string>();
   const faltan = new Set<string>();
@@ -235,6 +258,11 @@ function inferirFaltantesYListos(
     if (!clave || campo.estado === 'oculto') continue;
     if (campo.estado === 'lleno') listos.add(clave);
     if (campo.estado === 'vacio' && !listos.has(clave)) faltan.add(clave);
+  }
+  for (const m of marcados) {
+    if (m.estado === 'oculto') continue;
+    if (m.estado === 'lleno') listos.add(m.clave);
+    if (m.estado === 'vacio' && !listos.has(m.clave)) faltan.add(m.clave);
   }
 
   const btnCliente = botonPorTexto(root, /^cliente$/i);
@@ -296,13 +324,27 @@ export function capturarFotoPantalla(ruta: string, tituloPagina = ''): Asistente
     };
   }
 
+  if (RUTAS_SENSIBLES.test(ruta)) {
+    return {
+      ruta: recortar(ruta, 200),
+      pantalla: recortar(tituloPagina),
+      paso: '',
+      modo: '',
+      acciones: [],
+      campos: [],
+      faltantes: [],
+      listos: []
+    };
+  }
+
   const root = raizContenido();
   const heading = root.querySelector('h1, h2, h3, h4, h5');
   const tabActiva = root.querySelector('.nav-link.active, [role="tab"][aria-selected="true"]');
   const acciones = recolectarAcciones(root);
   const campos = recolectarCampos(root);
+  const marcados = recolectarCamposMarcados(root);
   const filasCarrito = contarFilasCarrito(root);
-  const inferido = inferirFaltantesYListos(ruta, root, campos, filasCarrito);
+  const inferido = inferirFaltantesYListos(ruta, root, campos, filasCarrito, marcados);
   const foto: AsistenteFotoPantalla = {
     ruta: recortar(ruta, 200),
     pantalla: recortar((heading && visible(heading) ? heading.textContent : '') || tituloPagina),

@@ -131,7 +131,7 @@
           </div>
           <div class="col-12 mb-3">
             <label class="form-label">Descripción *</label>
-            <input type="text" class="form-control" formControlName="descripcion" [class.is-invalid]="hasError('descripcion')" placeholder="Nombre o descripción del producto">
+            <input type="text" class="form-control" data-asistente-campo="descripcion" formControlName="descripcion" [class.is-invalid]="hasError('descripcion')" placeholder="Nombre o descripción del producto">
             @if (hasError('descripcion')) { <div class="invalid-feedback">{{ getError('descripcion') }}</div> }
           </div>
           <div class="col-md-4 mb-3">

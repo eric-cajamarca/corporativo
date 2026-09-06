@@ -30,7 +30,7 @@ export class AsistenteDuenoPanelComponent {
   mensajes: AsistenteMensaje[] = [
     {
       role: 'model',
-      text: 'Soy el asistente de la plataforma. Pregúntame cómo configurar SUNAT, agregar productos o qué te falta. Te digo el siguiente clic según la pantalla en la que estás.'
+      text: 'Soy el asistente de la plataforma. Pregúntame cómo emitir una boleta, registrar una compra, abrir caja o crear un producto. Te digo primero el menú y luego el siguiente clic.'
     }
   ];
   enviando = false;

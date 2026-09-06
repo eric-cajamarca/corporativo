@@ -42,7 +42,7 @@
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-4">
             <label class="form-label">Tipo de movimiento <span class="text-danger">*</span></label>
-            <select class="form-select" formControlName="tipoMovimiento">
+            <select class="form-select" data-asistente-campo="tipo" formControlName="tipoMovimiento">
               <option value="">-- Seleccione tipo --</option>
               @for (t of tiposMovimiento; track t.codigo) {
                 <option [value]="t.codigo">{{ t.descripcion }}</option>

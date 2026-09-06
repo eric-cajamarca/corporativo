@@ -20,13 +20,17 @@ async function chat(req, res) {
     return res.status(401).json({ message: 'No autorizado.' });
   }
   try {
-    const data = await asistenteDuenoService.chat(idEmpresa, {
-      mensaje: req.body?.mensaje,
-      historial: req.body?.historial,
-      rutaActual: req.body?.rutaActual,
-      tituloPagina: req.body?.tituloPagina,
-      fotoPantalla: req.body?.fotoPantalla
-    });
+    const data = await asistenteDuenoService.chat(
+      idEmpresa,
+      {
+        mensaje: req.body?.mensaje,
+        historial: req.body?.historial,
+        rutaActual: req.body?.rutaActual,
+        tituloPagina: req.body?.tituloPagina,
+        fotoPantalla: req.body?.fotoPantalla
+      },
+      { idUsuario: req.user?.sub || null, rol: req.user?.rol || '' }
+    );
     return res.status(200).json({ status: 200, success: true, data });
   } catch (err) {
     console.error('asistenteDuenoController chat:', err.message);

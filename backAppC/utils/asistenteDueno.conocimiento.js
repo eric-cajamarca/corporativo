@@ -2,6 +2,12 @@
  * Guía del asistente de la plataforma (usuarios logueados).
  * No usar en el bot comercial de WhatsApp.
  */
+const {
+  textoMenu,
+  textoFlujo,
+  resolverFlujo,
+  estaEnRutaFlujo
+} = require('./asistenteDueno.menu');
 const GUIA_EFAFERP = `
 Eres el asistente de la plataforma EFAFERP (ERP de BUSINESS SOFT COMPANY SAC, Perú). Ayudas a usuarios con sesión iniciada (dueño, cajero u operador) a usar el sistema.
 Hablas en español, claro. No inventas menús, pestañas ni botones.
@@ -9,7 +15,8 @@ Hablas en español, claro. No inventas menús, pestañas ni botones.
 Reglas:
 - Nunca pidas ni muestres API keys, certificados, claves SOL, contraseñas, tokens ni valores de campos.
 - No ejecutas cambios: solo guías. El usuario hace clic en las pantallas.
-- Recibes una FOTO de la pantalla (acciones y campos con estado vacio/lleno/oculto, sin values) y un LIBRETO de esa ruta.
+- Enseñas el uso de la plataforma: primero el menú izquierdo, luego el clic en pantalla.
+- Recibes un MAPA DE MENÚ, un FLUJO ACTIVO (tema del chat), una FOTO (vacio/lleno, sin values) y a veces un libreto de la ruta.
 - foto.listos = pasos YA cubiertos. foto.faltantes = lo que aún falta. NUNCA pidas de nuevo un paso que esté en listos.
 - Si el usuario dice «ya está», «ya lo elegí» o «todos los campos ya están», AVANZA al siguiente paso. No repitas el mismo clic.
 - Guía UN solo paso por turno: el que indica SIGUIENTE PASO en el contexto. Luego espera.
@@ -18,7 +25,12 @@ Reglas:
 - Si un control no está en la foto ni en el libreto, di que no lo ves en esta pantalla. No inventes «pestaña Comprobantes», «Modo boleta», «Modo prueba» ni menús que no existan.
 - Si no estás seguro, di que no sabes y sugiere el Centro de ayuda (tutoriales PDF).
 - Cuando indiques otra pantalla, incluye un enlace markdown: [texto](/ruta).
-- Usa la herramienta diagnosticar_empresa si el usuario dice que "no anda", "está mal", SUNAT, productos vacíos o configuración.
+- Recibes una FICHA cada turno (rubro, rol, puede.X, facturación sí/no, caja abierta, GRE). Úsala. No inventes datos que no estén ahí.
+- NUNCA cites ni inventes montos (S/, totales, saldos, costos, cantidades de stock). Si hay crédito o saldo, di que hay pendiente y manda a [Créditos](/creditos) o a la venta. Stock: solo sí/no por sucursal y manda a Kardex/Stock actual.
+- Si puede.X es no, NO enlaces esa ruta. Dile que pida el permiso al administrador. Sin VER_CONFIGURACION no mandes a Facturación SUNAT.
+- "Error al invocar el servicio de SUNAT" no es un código de negocio de SUNAT: falló la llamada (red, URL o certificado). Explícalo con la ficha, sin inventar el CDR.
+- Las consultas (caja, error SUNAT, stock, venta, guías) son DINÁMICAS: usa como máximo 1 o 2, solo si la pregunta lo pide. Nunca llames las 5. Si el contexto ya trae DATO DE CONSULTA, no vuelvas a llamar esa herramienta.
+- Usa diagnosticar_empresa solo si pregunta qué le falta a la empresa o "no anda" de forma general. No uses búsqueda web.
 
 Pantallas (rutas reales):
 - Configuración general y facturación SUNAT: [Configuración](/configuracion) — pestaña Facturación: [Facturación SUNAT](/configuracion?tab=facturacion)
@@ -572,13 +584,17 @@ function clavesDelUltimoAsistente(historial) {
   return keys;
 }
 
-function resolverPasoActual(libreto, foto, texto, historial) {
-  if (!libreto) return null;
-  const modo = (foto && foto.modo) || '';
-  const pasos = pasosVisibles(libreto, modo);
+function resolverPasoActual(libreto, foto, texto, historial, flujo, ruta) {
+  const guia = flujo || libreto;
+  if (!guia) return null;
+  const modo = (flujo && flujo.modoForzado) || (foto && foto.modo) || '';
+  const pasos = pasosVisibles(guia, modo);
   if (!pasos.length) return null;
   const omitir = new Set(((foto && foto.listos) || []).map((x) => String(x).toLowerCase()));
   const faltan = new Set(((foto && foto.faltantes) || []).map((x) => String(x).toLowerCase()));
+  if (flujo && estaEnRutaFlujo(flujo, (foto && foto.ruta) || ruta)) {
+    omitir.add('ir');
+  }
   if (usuarioConfirmoPaso(texto)) {
     clavesDelUltimoAsistente(historial).forEach((k) => omitir.add(k));
     if (/todos los campos/i.test(String(texto || ''))) {
@@ -595,24 +611,32 @@ function resolverPasoActual(libreto, foto, texto, historial) {
   return siguiente || null;
 }
 
-function armarContextoGuia(foto, ruta, titulo, texto, historial) {
-  const lib = resolverLibreto((foto && foto.ruta) || ruta);
-  const modo = (foto && foto.modo) || '';
-  const paso = resolverPasoActual(lib, foto, texto, historial);
+function armarContextoGuia(foto, ruta, titulo, texto, historial, fichaTexto, datoConsulta) {
+  const rutaEff = (foto && foto.ruta) || ruta;
+  const flujo = resolverFlujo(texto, rutaEff, historial);
+  const lib = resolverLibreto(rutaEff);
+  const modo = (flujo && flujo.modoForzado) || (foto && foto.modo) || '';
+  const paso = resolverPasoActual(lib, foto, texto, historial, flujo, rutaEff);
   const listos = ((foto && foto.listos) || []).join(', ') || 'ninguno';
   const siguiente = paso
     ? textoDePaso(paso, modo)
     : 'Los datos visibles ya están. Si falta un producto en el detalle, agrégalo; si no, pulsa el botón de cierre (Cobrar / Registrar venta / Guardar ingreso).';
   return [
+    fichaTexto || '',
+    datoConsulta ? `DATO DE CONSULTA (ya resuelto; no llames esa herramienta otra vez):\n${datoConsulta}` : '',
     `Pantalla actual: ruta="${ruta || '/'}" título="${titulo || ''}".`,
+    textoMenu(),
+    `FLUJO ACTIVO:\n${textoFlujo(flujo)}`,
     foto
       ? `FOTO DE PANTALLA (sin values ni secretos; no inventes botones ausentes de acciones):\n${JSON.stringify(foto)}`
       : 'FOTO DE PANTALLA: no disponible.',
-    `LIBRETO DE ESTA RUTA:\n${textoLibreto(lib, modo)}`,
+    !flujo && lib ? `LIBRETO DE ESTA RUTA:\n${textoLibreto(lib, modo)}` : '',
     `Pasos YA listos (NO los pidas otra vez): ${listos}.`,
     `SIGUIENTE PASO (di solo esto, no el paso anterior):\n${siguiente}`,
-    'Si el usuario acaba de confirmar que ya lo hizo, no repitas ese clic. Un paso por turno.'
-  ].join('\n\n');
+    'Si el usuario no está en la pantalla del flujo, el primer paso es el menú. Si ya está, no pidas volver al menú. Un paso por turno.'
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function parecePedidoPasoAPaso(texto) {
@@ -622,12 +646,16 @@ function parecePedidoPasoAPaso(texto) {
 }
 
 function respuestaDesdeLibreto(ruta, foto, texto, historial) {
-  const lib = resolverLibreto((foto && foto.ruta) || ruta);
-  if (!lib) return null;
-  const paso = resolverPasoActual(lib, foto, texto, historial);
+  const rutaEff = (foto && foto.ruta) || ruta;
+  const flujo = resolverFlujo(texto, rutaEff, historial);
+  const lib = resolverLibreto(rutaEff);
+  const guia = flujo || lib;
+  if (!guia) return null;
+  const paso = resolverPasoActual(lib, foto, texto, historial, flujo, rutaEff);
   if (!paso) return null;
-  const modo = (foto && foto.modo) || '';
-  return `Siguiente paso en **${lib.titulo}**:\n${textoDePaso(paso, modo)}`;
+  const modo = (flujo && flujo.modoForzado) || (foto && foto.modo) || '';
+  const titulo = (flujo && flujo.titulo) || guia.titulo;
+  return `Siguiente paso en **${titulo}**:\n${textoDePaso(paso, modo)}`;
 }
 
 function pareceDiagnostico(texto) {
@@ -636,26 +664,59 @@ function pareceDiagnostico(texto) {
   );
 }
 
-function textoDiagnostico(diag) {
+function textoDiagnostico(diag, ficha) {
+  const puedeCfg = !ficha || !ficha.puede || ficha.puede.configuracion;
+  const enlaceCfg = puedeCfg
+    ? '[Facturación SUNAT](/configuracion?tab=facturacion)'
+    : 'Facturación SUNAT (pida VER_CONFIGURACION al administrador)';
   if (!diag) {
-    return 'No pude leer el estado de la empresa. Revise [Configuración](/configuracion) y [Productos](/productos).';
+    return `No pude leer el estado de la empresa. Revise ${enlaceCfg} y [Productos](/productos).`;
   }
   const lineas = (diag.problemas || []).map((p, i) => `${i + 1}) ${p}`);
   if (!lineas.length) {
-    return 'No veo huecos graves: hay productos, sucursal y facturación básica. Si no emite, revise la URL BillService en [Facturación SUNAT](/configuracion?tab=facturacion).';
+    return `No veo huecos graves: hay productos, sucursal y facturación básica. Si no emite, revise la URL BillService en ${enlaceCfg}.`;
   }
   return [
     'Revisé su empresa. Lo pendiente:',
     ...lineas,
-    'Configuración SUNAT: [Facturación](/configuracion?tab=facturacion). Productos: [Productos](/productos).'
+    `Configuración SUNAT: ${enlaceCfg}. Productos: [Productos](/productos).`
   ].join('\n');
+}
+
+function filtrarEnlacesPorPermiso(texto, ficha) {
+  if (!ficha || !ficha.puede) return String(texto || '');
+  let t = String(texto || '');
+  if (!ficha.puede.configuracion) {
+    t = t.replace(
+      /\[([^\]]+)\]\(\/configuracion[^)]*\)/gi,
+      'esa pantalla de configuración (pida VER_CONFIGURACION al administrador)'
+    );
+  }
+  if (!ficha.puede.caja) {
+    t = t.replace(/\[([^\]]+)\]\(\/caja[^)]*\)/gi, 'Caja (pida VER_CAJA al administrador)');
+  }
+  if (!ficha.puede.creditos) {
+    t = t.replace(/\[([^\]]+)\]\(\/creditos[^)]*\)/gi, 'Créditos (pida VER_CREDITOS al administrador)');
+  }
+  if (!ficha.puede.inventario) {
+    t = t.replace(/\[([^\]]+)\]\(\/inventario[^)]*\)/gi, 'Inventario (pida VER_INVENTARIO al administrador)');
+  }
+  if (!ficha.puede.ventas) {
+    t = t.replace(/\[([^\]]+)\]\(\/ventas[^)]*\)/gi, 'Ventas (pida VER_VENTAS al administrador)');
+    t = t.replace(
+      /\[([^\]]+)\]\(\/facturacion\/(emision-guias|guias-remision|guias-transportista|notas-credito-debito)[^)]*\)/gi,
+      'esa pantalla de facturación (pida permiso al administrador)'
+    );
+  }
+  return t;
 }
 
 function respuestaGuiaLocal(texto, ruta, foto, historial) {
   const t = String(texto || '');
   const desdeLibreto = respuestaDesdeLibreto(ruta, foto, t, historial);
+  const flujoNuevo = resolverFlujo(t, '', []);
   const enPantallaConLibreto = !!resolverLibreto((foto && foto.ruta) || ruta);
-  if (desdeLibreto && (parecePedidoPasoAPaso(t) || usuarioEnFlujo(t))) {
+  if (desdeLibreto && (parecePedidoPasoAPaso(t) || usuarioEnFlujo(t) || (flujoNuevo && flujoNuevo.re.test(t)))) {
     return desdeLibreto;
   }
   const hits = TEMAS_GUIA.filter((tema) => tema.re.test(t));
@@ -700,6 +761,8 @@ module.exports = {
   sanitizarFotoPantalla,
   redactarMensajeUsuario,
   resolverLibreto,
+  resolverFlujo,
   armarContextoGuia,
-  resolverPasoActual
+  resolverPasoActual,
+  filtrarEnlacesPorPermiso
 };

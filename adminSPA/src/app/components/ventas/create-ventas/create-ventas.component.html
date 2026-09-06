@@ -356,7 +356,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Tipo de comprobante</label>
-            <select class="form-select" [(ngModel)]="ventas.idComprobante" (ngModelChange)="cargarDatosComprobantePorId($event)">
+            <select class="form-select" data-asistente-campo="comprobante" [(ngModel)]="ventas.idComprobante" (ngModelChange)="cargarDatosComprobantePorId($event)">
               <option value="" disabled selected>Seleccione...</option>
               <option *ngFor="let c of comprobantes" [value]="c.idComprobante">{{ c.codigo }} - {{ c.nombre }}</option>
             </select>
@@ -467,7 +467,7 @@
           <!-- Razón Social / Nombre -->
           <div class="col-12">
             <label class="form-label">Razón Social / Nombre</label>
-            <input type="text" class="form-control" [value]="getRazonSocialDisplay()" readonly placeholder="Busque por documento para cargar">
+            <input type="text" class="form-control" data-asistente-campo="cliente" [value]="getRazonSocialDisplay()" readonly placeholder="Busque por documento para cargar">
           </div>
 
           <!-- Dirección (solo lectura, datos internos) -->
