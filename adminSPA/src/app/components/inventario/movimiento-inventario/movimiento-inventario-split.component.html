@@ -22,6 +22,21 @@
         <strong>Comprobantes</strong> — {{ textoAyudaComprobantes }}
       </div>
 
+      @if (tieneBorradorLocal) {
+        <div class="alert alert-info border d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-2 mb-3" role="status">
+          <div class="small mb-0">
+            <strong>Borrador local</strong>
+            — este movimiento se guarda solo en este navegador hasta que lo registres.
+            @if (fechaBorradorLocal) {
+              <span class="text-muted">Última actualización: {{ fechaBorradorLocal }}.</span>
+            }
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" (click)="descartarBorradorLocal()">
+            Descartar borrador
+          </button>
+        </div>
+      }
+
       <form [formGroup]="form" (ngSubmit)="registrar()">
         <h6 class="text-muted border-bottom pb-2 mb-3 mov-inv-section-title">Cabecera</h6>
         <div class="row g-3 mb-3">
@@ -156,6 +171,7 @@
                       step="0.01"
                       [(ngModel)]="fila.cantidad"
                       [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onCambioDetalle()"
                     />
                   </td>
                   @if (esEntrada()) {
@@ -167,11 +183,12 @@
                         step="0.01"
                         [(ngModel)]="fila.costoUnitario"
                         [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onCambioDetalle()"
                         placeholder="0"
                       />
                     </td>
                     <td>
-                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" />
+                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" (ngModelChange)="onCambioDetalle()" />
                     </td>
                     <td>
                       <input
@@ -179,6 +196,7 @@
                         class="form-control form-control-sm"
                         [(ngModel)]="fila.numeroLote"
                         [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onCambioDetalle()"
                         placeholder="Opc."
                       />
                     </td>
@@ -226,6 +244,7 @@
                   step="0.01"
                   [(ngModel)]="fila.cantidad"
                   [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="onCambioDetalle()"
                 />
                 @if (esEntrada()) {
                   <div class="row g-2">
@@ -238,12 +257,13 @@
                         step="0.01"
                         [(ngModel)]="fila.costoUnitario"
                         [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onCambioDetalle()"
                         placeholder="0"
                       />
                     </div>
                     <div class="col-6">
                       <label class="form-label small mb-1">F. venc.</label>
-                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" />
+                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" (ngModelChange)="onCambioDetalle()" />
                     </div>
                     <div class="col-12">
                       <label class="form-label small mb-1">Nº lote</label>
@@ -252,6 +272,7 @@
                         class="form-control form-control-sm"
                         [(ngModel)]="fila.numeroLote"
                         [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onCambioDetalle()"
                         placeholder="Opcional"
                       />
                     </div>

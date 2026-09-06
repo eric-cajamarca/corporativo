@@ -120,6 +120,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   readonly buscadorLimiteFilas = 80;
   readonly buscadorInlineMinCaracteres = 2;
   public searchCodigo = '';
+  /** Evita disparar la búsqueda en cada tecla del escáner (debounce). */
+  private busquedaCodigoTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly DEBOUNCE_BUSQUEDA_CODIGO_MS = 180;
   public searchTermInline = '';
   public productosBusquedaInline: any[] = [];
   public buscadorInlineBuscando = false;
@@ -359,6 +362,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   ngOnDestroy(): void {
+    if (this.busquedaCodigoTimer) {
+      clearTimeout(this.busquedaCodigoTimer);
+      this.busquedaCodigoTimer = null;
+    }
     this.ventaProvisionalUi.limpiarAlDestruirComponente();
     this.posKeyboard.desactivar();
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
@@ -1966,17 +1973,35 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   
+  /** Escáner: espera a que termine de teclear; Enter confirma de inmediato. */
+  onInputCodigoProd(): void {
+    if (this.busquedaCodigoTimer) {
+      clearTimeout(this.busquedaCodigoTimer);
+    }
+    this.busquedaCodigoTimer = setTimeout(() => {
+      this.busquedaCodigoTimer = null;
+      this.buscarCodigoProd();
+    }, this.DEBOUNCE_BUSQUEDA_CODIGO_MS);
+  }
+
+  onEnterCodigoProd(event?: Event): void {
+    event?.preventDefault?.();
+    if (this.busquedaCodigoTimer) {
+      clearTimeout(this.busquedaCodigoTimer);
+      this.busquedaCodigoTimer = null;
+    }
+    this.buscarCodigoProd();
+  }
+
   buscarCodigoProd(): void {
       // normalizar input
       const raw = (this.searchCodigo ?? '').toString().trim();
       if (!raw) {
-        iziToast.show({ title: 'ERROR', titleColor: '#FF0000', message: 'Ingrese un código', position: 'topRight' });
         return;
       }
 
       // opcional: exigir mínimo de caracteres para evitar búsquedas insignificantes
       if (raw.length < 5) {
-        // iziToast.show({ title: 'INFO', titleColor: '#007bff', message: 'Ingrese al menos 3 caracteres', position: 'topRight' });
         return;
       }
 
@@ -2019,6 +2044,18 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         const codigo = (item.codigo ?? '').toString().toLowerCase();
         return codigo === term;
       });
+      if (encontrado) {
+        return encontrado;
+      }
+
+      // Códigos de barras numéricos (EAN/UPC, etc.): solo coincidencia exacta.
+      // Evita que al escanear "77585..." se dispare con el prefijo antes de terminar.
+      const esCodigoBarrasNumerico = /^\d+$/.test(term) && term.length >= 8;
+      if (esCodigoBarrasNumerico) {
+        encontrado = fuente.find((item: any) => String(item.idProducto) === term);
+        return encontrado ?? null;
+      }
+
       if (!encontrado) {
         encontrado = fuente.find((item: any) => {
           const codigo = (item.codigo ?? '').toString().toLowerCase();
@@ -2041,6 +2078,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       if (encontrado) {
         this.agregarAlCarrito(encontrado);
         this.searchCodigo = '';
+        setTimeout(() => this.inputCodigoBarra?.nativeElement?.focus(), 0);
       } else {
         iziToast.show({
           title: 'ERROR',
@@ -2050,6 +2088,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
           position: 'topRight',
           message: 'El código no existe.'
         });
+        this.searchCodigo = '';
+        setTimeout(() => this.inputCodigoBarra?.nativeElement?.focus(), 0);
       }
   }
 

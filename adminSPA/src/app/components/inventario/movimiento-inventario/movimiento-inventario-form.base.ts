@@ -1,6 +1,7 @@
-import { Directive, inject, OnInit } from '@angular/core';
+import { Directive, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import {
   MovimientoInventarioService,
   TipoMovimientoItem,
@@ -15,6 +16,7 @@ import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/busc
 import { ProductoCrearModalService, ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { MovimientoInventarioBorradorService } from '../../../services/movimiento-inventario-borrador.service';
 import {
   etiquetaTipoMovimiento,
   MovimientoInventarioCabecera
@@ -23,11 +25,12 @@ import {
   CODIGO_COMPROBANTE_POR_TIPO_MOVIMIENTO,
   FilaDetalle
 } from './movimiento-inventario.constants';
+import { MovimientoInventarioBorradorModo } from '../../../interfaces/movimiento-inventario-borrador.interface';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void; warning: (o: object) => void };
 
 @Directive()
-export abstract class MovimientoInventarioFormBase implements OnInit {
+export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy {
   sidebarState = inject(SidebarStateService);
 
   protected readonly fb = inject(FormBuilder);
@@ -37,6 +40,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   protected readonly comprobanteService = inject(ComprobanteService);
   protected readonly buscadorProductosModal = inject(BuscadorProductosModalService);
   protected readonly productoCrearModal = inject(ProductoCrearModalService);
+  protected readonly borradorService = inject(MovimientoInventarioBorradorService);
   protected readonly router = inject(Router);
 
   form: FormGroup;
@@ -47,6 +51,15 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   movimientosRecientes: MovimientoInventarioCabecera[] = [];
   guardando = false;
   cargandoRecientes = false;
+
+  /** Hay borrador local con contenido (para banner Descartar). */
+  tieneBorradorLocal = false;
+  fechaBorradorLocal = '';
+
+  private formSub?: Subscription;
+  private borradorTimer: ReturnType<typeof setTimeout> | null = null;
+  private saltarSugerenciaComprobante = false;
+  private readonly DEBOUNCE_BORRADOR_MS = 300;
 
   /** Tipos de movimiento permitidos en esta pantalla (códigos API). */
   protected abstract readonly tiposCodigoPermitidos: readonly string[];
@@ -84,14 +97,175 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     this.cargarSucursales();
     this.cargarComprobantesInventario();
     this.cargarMovimientosRecientes();
+    this.formSub = this.form.valueChanges.subscribe(() => this.programarGuardadoBorrador());
     this.form.get('tipoMovimiento')?.valueChanges.subscribe((tipo) => {
       const t = String(tipo || '');
       if (t !== 'TRANSFERENCIA') {
         this.form.patchValue({ idSucursalDestino: '' }, { emitEvent: false });
       }
       this.aplicarComprobanteSugeridoPorTipo(t);
+      this.programarGuardadoBorrador();
     });
-    this.agregarFila();
+
+    const restaurado = this.restaurarBorradorSiExiste();
+    if (!restaurado) {
+      this.agregarFila();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.borradorTimer) {
+      clearTimeout(this.borradorTimer);
+      this.borradorTimer = null;
+    }
+    this.formSub?.unsubscribe();
+  }
+
+  protected get modoBorrador(): MovimientoInventarioBorradorModo {
+    return this.modoIngreso ? 'ingreso' : 'salida';
+  }
+
+  private filaVacia(): FilaDetalle {
+    return {
+      idProducto: '',
+      codigo: '',
+      descripcion: '',
+      cantidad: 0,
+      costoUnitario: 0,
+      fechaVencimiento: '',
+      numeroLote: ''
+    };
+  }
+
+  private construirBorradorActual() {
+    const v = this.form.getRawValue();
+    return {
+      version: 1 as const,
+      modo: this.modoBorrador,
+      fechaActualizacion: new Date().toISOString(),
+      cabecera: {
+        tipoMovimiento: String(v.tipoMovimiento || ''),
+        idSucursal: String(v.idSucursal || ''),
+        idSucursalDestino: String(v.idSucursalDestino || ''),
+        fechaMovimiento: String(v.fechaMovimiento || this.fechaHoy()),
+        idComprobante: String(v.idComprobante || ''),
+        docRelacionado: String(v.docRelacionado || ''),
+        observaciones: String(v.observaciones || '')
+      },
+      filas: this.filas.map((f) => ({
+        idProducto: String(f.idProducto || ''),
+        codigo: String(f.codigo || ''),
+        descripcion: String(f.descripcion || ''),
+        cantidad: Number(f.cantidad) || 0,
+        costoUnitario: Number(f.costoUnitario) || 0,
+        fechaVencimiento: String(f.fechaVencimiento || ''),
+        numeroLote: String(f.numeroLote || '')
+      }))
+    };
+  }
+
+  programarGuardadoBorrador(): void {
+    if (this.borradorTimer) {
+      clearTimeout(this.borradorTimer);
+    }
+    this.borradorTimer = setTimeout(() => {
+      this.borradorTimer = null;
+      this.guardarBorradorLocal();
+    }, this.DEBOUNCE_BORRADOR_MS);
+  }
+
+  /** Llamar tras editar cantidades/costos/lotes en el detalle (ngModel). */
+  onCambioDetalle(): void {
+    this.programarGuardadoBorrador();
+  }
+
+  private guardarBorradorLocal(): void {
+    const borrador = this.construirBorradorActual();
+    if (!this.borradorService.tieneContenidoUtil(borrador)) {
+      this.borradorService.limpiar(this.modoBorrador);
+      this.tieneBorradorLocal = false;
+      this.fechaBorradorLocal = '';
+      return;
+    }
+    this.borradorService.guardar(borrador);
+    this.tieneBorradorLocal = true;
+    this.fechaBorradorLocal = this.formatearFechaBorrador(borrador.fechaActualizacion);
+  }
+
+  private restaurarBorradorSiExiste(): boolean {
+    const data = this.borradorService.leer(this.modoBorrador);
+    if (!data || !this.borradorService.tieneContenidoUtil(data)) {
+      return false;
+    }
+    this.saltarSugerenciaComprobante = true;
+    const c = data.cabecera;
+    this.form.patchValue(
+      {
+        tipoMovimiento: c.tipoMovimiento || '',
+        idSucursal: c.idSucursal || '',
+        idSucursalDestino: c.idSucursalDestino || '',
+        fechaMovimiento: c.fechaMovimiento || this.fechaHoy(),
+        idComprobante: c.idComprobante || '',
+        docRelacionado: c.docRelacionado || '',
+        observaciones: c.observaciones || ''
+      },
+      { emitEvent: false }
+    );
+    this.filas =
+      data.filas.length > 0
+        ? data.filas.map((f) => ({
+            idProducto: f.idProducto || '',
+            codigo: f.codigo || '',
+            descripcion: f.descripcion || '',
+            cantidad: Number(f.cantidad) || 0,
+            costoUnitario: Number(f.costoUnitario) || 0,
+            fechaVencimiento: f.fechaVencimiento || '',
+            numeroLote: f.numeroLote || ''
+          }))
+        : [this.filaVacia()];
+    this.tieneBorradorLocal = true;
+    this.fechaBorradorLocal = this.formatearFechaBorrador(data.fechaActualizacion);
+    setTimeout(() => {
+      this.saltarSugerenciaComprobante = false;
+    }, 0);
+    return true;
+  }
+
+  descartarBorradorLocal(): void {
+    this.borradorService.limpiar(this.modoBorrador);
+    this.tieneBorradorLocal = false;
+    this.fechaBorradorLocal = '';
+    this.saltarSugerenciaComprobante = true;
+    this.form.reset({
+      tipoMovimiento: '',
+      idSucursal: '',
+      idSucursalDestino: '',
+      fechaMovimiento: this.fechaHoy(),
+      idComprobante: '',
+      docRelacionado: '',
+      observaciones: ''
+    });
+    this.filas = [this.filaVacia()];
+    setTimeout(() => {
+      this.saltarSugerenciaComprobante = false;
+    }, 0);
+    iziToast.success({
+      title: 'Borrador',
+      message: 'Borrador local descartado.',
+      position: 'topRight'
+    });
+  }
+
+  private formatearFechaBorrador(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   private fechaLocalYmd(d: Date): string {
@@ -174,6 +348,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
         this.comprobantesInventario = data.filter((c: { codigo?: string }) =>
           permitidos.has(String(c.codigo || '').toUpperCase())
         );
+        if (this.saltarSugerenciaComprobante || this.tieneBorradorLocal) {
+          return;
+        }
         const tipo = String(this.form.get('tipoMovimiento')?.value || '');
         this.aplicarComprobanteSugeridoPorTipo(tipo);
       },
@@ -190,6 +367,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   }
 
   protected aplicarComprobanteSugeridoPorTipo(tipoCodigo: string): void {
+    if (this.saltarSugerenciaComprobante) {
+      return;
+    }
     if (!tipoCodigo || !this.comprobantesInventario.length) {
       return;
     }
@@ -226,15 +406,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   }
 
   agregarFila(): void {
-    this.filas.push({
-      idProducto: '',
-      codigo: '',
-      descripcion: '',
-      cantidad: 0,
-      costoUnitario: 0,
-      fechaVencimiento: '',
-      numeroLote: ''
-    });
+    this.filas.push(this.filaVacia());
+    this.programarGuardadoBorrador();
   }
 
   async abrirBuscadorProductos(): Promise<void> {
@@ -288,6 +461,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     } else {
       fila.cantidad = 1;
     }
+    this.programarGuardadoBorrador();
   }
 
   agregarProductoSeleccionado(p: ProductoSeleccionado): void {
@@ -309,6 +483,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
       this.precargarCostoUnitarioEntrada(fila, p);
     }
     this.productoService.limpiarCacheListaProductos();
+    this.programarGuardadoBorrador();
   }
 
   /** Precarga costo desde último lote (editable por el usuario). */
@@ -330,17 +505,20 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
         const sugerido = Number(res?.costoUnitario ?? 0);
         if (sugerido > 0) {
           fila.costoUnitario = sugerido;
+          this.programarGuardadoBorrador();
           return;
         }
         const catalogo = Number(p?.['cUnitario'] ?? 0);
         if (catalogo > 0) {
           fila.costoUnitario = catalogo;
+          this.programarGuardadoBorrador();
         }
       },
       error: () => {
         const catalogo = Number(p?.['cUnitario'] ?? 0);
         if (catalogo > 0) {
           fila.costoUnitario = catalogo;
+          this.programarGuardadoBorrador();
         }
       }
     });
@@ -348,6 +526,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
 
   quitarFila(index: number): void {
     this.filas.splice(index, 1);
+    this.programarGuardadoBorrador();
   }
 
   /** Descripción mostrada en el detalle (viene del buscador o del alta de producto). */
@@ -443,6 +622,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     this.movimientoService.registrarMovimiento(body).subscribe({
       next: (resp) => {
         this.guardando = false;
+        this.borradorService.limpiar(this.modoBorrador);
+        this.tieneBorradorLocal = false;
+        this.fechaBorradorLocal = '';
         iziToast.success({ title: 'Éxito', message: resp.message || 'Movimiento registrado', position: 'topRight' });
         this.router.navigate(['/inventario']);
       },
