@@ -14,6 +14,8 @@ import { ComprobanteService } from '../../../services/comprobante.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { ProductoCrearModalService, ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
+import { ProductoEditarModalService } from '../../../services/producto-editar-modal.service';
+import { Producto } from '../../../models/producto.models';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { MovimientoInventarioBorradorService } from '../../../services/movimiento-inventario-borrador.service';
@@ -40,6 +42,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
   protected readonly comprobanteService = inject(ComprobanteService);
   protected readonly buscadorProductosModal = inject(BuscadorProductosModalService);
   protected readonly productoCrearModal = inject(ProductoCrearModalService);
+  protected readonly productoEditarModal = inject(ProductoEditarModalService);
   protected readonly borradorService = inject(MovimientoInventarioBorradorService);
   protected readonly router = inject(Router);
 
@@ -429,6 +432,50 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
       this.form.patchValue({ idSucursal: idSuc });
     }
     this.aplicarProductoCreadoAlDetalle(creado);
+  }
+
+  /** Ingresos: abre el modal de catálogo (nombre, marca, etc.), no una etiqueta del movimiento. */
+  async abrirEditarProducto(fila: FilaDetalle): Promise<void> {
+    const id = String(fila?.idProducto || '').trim();
+    if (!id || !this.esEntrada()) {
+      return;
+    }
+    try {
+      const guardo = await this.productoEditarModal.abrir(id);
+      if (!guardo) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    this.productoService.limpiarCacheListaProductos();
+    this.refrescarProductoEnFilas(id);
+  }
+
+  private refrescarProductoEnFilas(idProducto: string): void {
+    this.productoService.obtenerProductoPorId(idProducto).subscribe({
+      next: (res) => {
+        const data = res?.data;
+        const p = data && !Array.isArray(data) ? (data as Producto) : null;
+        if (!p) {
+          return;
+        }
+        const codigo = String(p.Codigo ?? p.codigo ?? '').trim();
+        const descripcion = String(p.descripcion ?? '').trim();
+        for (const f of this.filas) {
+          if (String(f.idProducto) === idProducto) {
+            if (codigo) {
+              f.codigo = codigo;
+            }
+            if (descripcion) {
+              f.descripcion = descripcion;
+            }
+          }
+        }
+        this.programarGuardadoBorrador();
+      },
+      error: () => {}
+    });
   }
 
   aplicarProductoCreadoAlDetalle(creado: ProductoCreadoModalResult): void {

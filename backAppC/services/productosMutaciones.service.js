@@ -109,7 +109,9 @@ async function crearProductoConTransaccion(pool, params) {
           costoUnitario: costoLote,
           cantidadIngresada: cantidad,
           cantidadDisponible: cantidad,
-          idUbicacion: idUbicacion && !Number.isNaN(idUbicacion) ? idUbicacion : null
+          idUbicacion: idUbicacion && !Number.isNaN(idUbicacion) ? idUbicacion : null,
+          numeroLote: lote.numeroLote,
+          fechaVencimiento: lote.fechaVencimiento
         });
       }
 

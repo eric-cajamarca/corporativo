@@ -136,6 +136,23 @@ export class LoteListComponent implements OnInit {
     this.lotesFiltrados = filtrados;
   }
 
+  loteVencido(fechaVencimiento: string | Date | null | undefined): boolean {
+    if (!fechaVencimiento) {
+      return false;
+    }
+    const raw = String(fechaVencimiento).slice(0, 10);
+    if (!raw) {
+      return false;
+    }
+    const venc = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(venc.getTime())) {
+      return false;
+    }
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return venc < hoy;
+  }
+
   /**
    * Abre modal para crear nuevo lote
    */

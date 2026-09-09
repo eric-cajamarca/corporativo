@@ -89,7 +89,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     idSucursal: '',
     costoUnitario: 0,
     cantidadIngresada: 0,
-    ubicacion: ''
+    ubicacion: '',
+    fechaVencimiento: ''
   };
 
   // Precios
@@ -530,7 +531,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         idSucursal: this.loteData.idSucursal,
         costoUnitario: this.loteData.costoUnitario,
         cantidadIngresada: this.loteData.cantidadIngresada,
-        ubicacion: this.loteData.ubicacion
+        ubicacion: this.loteData.ubicacion,
+        fechaVencimiento: String(this.loteData.fechaVencimiento || '').trim().slice(0, 10) || undefined
       } : null,
       precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0,
       idListaPrecio:
@@ -935,8 +937,9 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       fProduccion: fp || undefined,
       cantidadDesdeLote: loteQty > 0 ? loteQty : undefined,
       costoUnitario: costo > 0 ? costo : undefined,
-      fechaVencimiento: fv || undefined,
-      numeroLote: undefined,
+      fechaVencimiento: (this.modoLote() && String(this.loteData.fechaVencimiento || '').trim()
+        ? String(this.loteData.fechaVencimiento).trim().slice(0, 10)
+        : fv) || undefined,
       idSucursalLote:
         this.modoLote() && this.loteData.idSucursal
           ? String(this.loteData.idSucursal)

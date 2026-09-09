@@ -59,7 +59,7 @@ const create = async function (req, res) {
         return res.status(401).send({ success: false, error: 'Unauthorized' });
     }else{
         try {
-        const { idEmpresa } = req.user.empresa;
+        const idEmpresa = req.user.empresa;
         const loteData = { ...req.body, idEmpresa };
         const nuevoLote = await lotesService.create(loteData);
             res.status(200).send({ success: true, data: nuevoLote });

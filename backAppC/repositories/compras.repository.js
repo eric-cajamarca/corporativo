@@ -350,8 +350,7 @@ exports.eliminarCompra = async (pool, idEmpresa, idCompra) => {
                    AND (
                         (c.numeroLote IS NOT NULL AND l.numeroLote = CONVERT(VARCHAR(50), c.numeroLote))
                         OR (
-                            c.numeroLote IS NULL
-                            AND CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
+                            CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
                             AND CONVERT(DECIMAL(18,6), ISNULL(l.costoUnitario, 0)) = CONVERT(DECIMAL(18,6), ISNULL(dc.pUnitario, 0))
                         )
                    )
@@ -393,8 +392,7 @@ exports.eliminarCompra = async (pool, idEmpresa, idCompra) => {
                       AND (
                             (c.numeroLote IS NOT NULL AND l.numeroLote = CONVERT(VARCHAR(50), c.numeroLote))
                             OR (
-                                c.numeroLote IS NULL
-                                AND CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
+                                CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
                                 AND CONVERT(DECIMAL(18,6), ISNULL(l.costoUnitario, 0)) = CONVERT(DECIMAL(18,6), ISNULL(dc.pUnitario, 0))
                             )
                       )

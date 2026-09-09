@@ -9,6 +9,7 @@ export interface Lote {
   cantidadDisponible: number;
   activo?: boolean;
   fechaIngreso?: Date;
+  fechaVencimiento?: string | Date | null;
   // Propiedades extendidas para UI
   nombreProducto?: string;
   codigoProducto?: string;
@@ -22,4 +23,6 @@ export interface LoteCreate {
   idSucursal: string;
   costoUnitario: number;
   cantidadIngresada: number;
+  numeroLote?: string;
+  fechaVencimiento?: string;
 }

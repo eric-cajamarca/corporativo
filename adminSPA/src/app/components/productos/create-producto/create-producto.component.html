@@ -300,6 +300,10 @@
               <input type="text" class="form-control" [(ngModel)]="loteData.ubicacion" [ngModelOptions]="{standalone: true}" placeholder="Ej: A-01-02">
               <small class="text-muted">Pasillo-Estante-Nivel</small>
             </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Fecha de vencimiento (opcional)</label>
+              <input type="date" class="form-control" [(ngModel)]="loteData.fechaVencimiento" [ngModelOptions]="{standalone: true}">
+            </div>
           }
           }
         </div>

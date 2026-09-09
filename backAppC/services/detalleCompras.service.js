@@ -27,6 +27,7 @@ async function obtenerDetallePorCompra(pool, user, idCompra) {
     descripcion: r.descripcion || '',
     fProduccion: r.fProduccion || null,
     fVencimiento: r.fVencimiento || null,
+    numeroLote: r.numeroLote || '',
     idCategoria: r.idCategoria,
     idMarca: r.idMarca,
     categoria: r.categoriaNombre ? { idCategoria: r.idCategoria, nombre: r.categoriaNombre } : undefined,
@@ -68,7 +69,8 @@ async function crearDetalleCompraCompleto(pool, user, body) {
     pUnitario,
     total,
     fechaVencimiento,
-    asignarPorDefecto
+    asignarPorDefecto,
+    numeroLote: numeroLoteBody
   } = body;
   const idUsuario = user.sub || user.idUsuario;
   const idEmpresa = user.empresa;
@@ -122,23 +124,27 @@ async function crearDetalleCompraCompleto(pool, user, body) {
       ingresaStock = metaProd.controlaInventario;
     }
 
+    const numeroLoteProveedor =
+      numeroLoteBody != null && String(numeroLoteBody).trim() !== ''
+        ? String(numeroLoteBody).trim().slice(0, 50)
+        : '';
     let numeroLote = null;
     let idLote = null;
     let idUbParaLote = null;
     if (ingresaStock) {
+      let correlativoCompra = null;
       try {
-        numeroLote = await detalleComprasRepository.obtenerNumeroLoteCompra(transaction, idCompra);
+        correlativoCompra = await detalleComprasRepository.obtenerNumeroLoteCompra(transaction, idCompra);
       } catch (_) {
-        numeroLote = null;
+        correlativoCompra = null;
       }
-      if (numeroLote == null) {
-        numeroLote = await detalleComprasRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
+      if (correlativoCompra == null) {
+        correlativoCompra = await detalleComprasRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
         try {
-          await detalleComprasRepository.actualizarNumeroLoteCompra(transaction, idCompra, numeroLote);
+          await detalleComprasRepository.actualizarNumeroLoteCompra(transaction, idCompra, correlativoCompra);
         } catch (_) {}
-      } else {
-        numeroLote = String(numeroLote);
       }
+      numeroLote = numeroLoteProveedor || String(correlativoCompra);
       idLote = await detalleComprasRepository.insertarLote(transaction, {
         idEmpresa,
         idProducto,

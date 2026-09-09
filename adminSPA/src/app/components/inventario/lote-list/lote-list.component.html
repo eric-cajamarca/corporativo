@@ -67,12 +67,13 @@
       <table class="table table-sm table-hover table-lote-list-responsive">
         <thead class="table-light sticky-top">
           <tr>
-            <th>ID Lote</th>
+            <th>N° lote</th>
             <th>Producto</th>
             <th>Empresa</th>
             <th>Sucursal</th>
             <th>Costo Unit.</th>
             <th>Disponible</th>
+            <th>F. vencimiento</th>
             <th>Fecha Ingreso</th>
             <th class="text-end">Acciones</th>
           </tr>
@@ -80,7 +81,7 @@
         <tbody>
           @if (lotesFiltrados.length === 0) {
             <tr class="fila-vacia">
-              <td colspan="8" class="text-center py-4 text-muted">
+              <td colspan="9" class="text-center py-4 text-muted">
                 <i class="bi bi-box-open fa-2x mb-2"></i>
                 <p class="mb-0">No se encontraron lotes</p>
               </td>
@@ -88,8 +89,8 @@
           } @else {
             @for (lote of lotesFiltrados; track lote.idLote) {
               <tr [class.table-secondary]="lote.activo === false">
-                <td data-label="ID Lote">
-                  <code class="small">{{ lote.idLote | slice:0:8 }}...</code>
+                <td data-label="N° lote">
+                  <span class="fw-semibold">{{ lote.numeroLote || '—' }}</span>
                   @if (lote.activo === false) {
                     <span class="badge bg-secondary ms-1">Inactivo</span>
                   }
@@ -106,6 +107,15 @@
                   }">
                     {{ lote.cantidadDisponible }}
                   </span>
+                </td>
+                <td data-label="F. vencimiento">
+                  @if (lote.fechaVencimiento) {
+                    <small [class.text-danger]="loteVencido(lote.fechaVencimiento)" [class.fw-semibold]="loteVencido(lote.fechaVencimiento)">
+                      {{ lote.fechaVencimiento | date:'dd/MM/yyyy' }}
+                    </small>
+                  } @else {
+                    <small class="text-muted">—</small>
+                  }
                 </td>
                 <td data-label="Fecha Ingreso">
                   <small>{{ lote.fechaIngreso | date:'dd/MM/yyyy' }}</small>

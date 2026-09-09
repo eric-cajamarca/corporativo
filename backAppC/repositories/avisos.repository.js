@@ -1,6 +1,6 @@
 const sql = require('mssql');
 
-/** Comprobantes electrónicos pendientes de envío SUNAT (estado 7). */
+/** Comprobantes electrónicos pendientes de envío SUNAT (estado 7). Excluye ventas anuladas. */
 exports.contarComprobantesPendienteEnvioRepo = async (pool, idEmpresa) => {
   const r = await pool
     .request()
@@ -8,16 +8,18 @@ exports.contarComprobantesPendienteEnvioRepo = async (pool, idEmpresa) => {
     .query(`
       SELECT COUNT(*) AS n
       FROM dbo.ComprobantesElectronicos ce
+      INNER JOIN dbo.Ventas v ON v.idVenta = ce.idVenta AND v.idEmpresa = ce.idEmpresa
       WHERE ce.idEmpresa = @idEmpresa
         AND ce.idEstadoSunat = 7
         AND ce.tipoComprobante IN ('01', '03', '07', '08')
+        AND ISNULL(v.eliminado, 0) = 0
     `);
   return r.recordset && r.recordset[0] ? Number(r.recordset[0].n) || 0 : 0;
 };
 
 /**
- * Comprobantes con respuesta SUNAT distinta de aceptado/observado/pendiente envío.
- * Excluye NULL (borrador sin envío) para no confundir con pendiente.
+ * Comprobantes que requieren acción: rechazado (4) o error de envío (6).
+ * No incluye aceptados, pendiente de envío, ni baja/anulación SUNAT (código 08).
  */
 exports.contarComprobantesSunatNoOkRepo = async (pool, idEmpresa) => {
   const r = await pool
@@ -26,10 +28,13 @@ exports.contarComprobantesSunatNoOkRepo = async (pool, idEmpresa) => {
     .query(`
       SELECT COUNT(*) AS n
       FROM dbo.ComprobantesElectronicos ce
+      INNER JOIN dbo.Ventas v ON v.idVenta = ce.idVenta AND v.idEmpresa = ce.idEmpresa
+      LEFT JOIN dbo.EstadosSunat es ON es.idEstadoSunat = ce.idEstadoSunat
       WHERE ce.idEmpresa = @idEmpresa
-        AND ce.idEstadoSunat IS NOT NULL
-        AND ce.idEstadoSunat NOT IN (1, 2, 3, 7)
         AND ce.tipoComprobante IN ('01', '03', '07', '08')
+        AND ISNULL(v.eliminado, 0) = 0
+        AND ISNULL(es.codigo, '') <> '08'
+        AND ce.idEstadoSunat IN (4, 6)
     `);
   return r.recordset && r.recordset[0] ? Number(r.recordset[0].n) || 0 : 0;
 };

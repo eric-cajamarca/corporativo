@@ -81,6 +81,7 @@ export class UpdateComprasComponent {
     ubicacion: '',
     fproduccion: new Date(),
     fvencimiento: new Date(),
+    numeroLote: '',
   };
   public correlativo: any = '';
   // FORMATO_FECHA = FORMATO_FECHA;
@@ -151,8 +152,15 @@ export class UpdateComprasComponent {
                 element.idCategoria = element.producto.idCategoria;
                 element.descripcion = element.producto.descripcion;
                 element.codigo = element.producto.Codigo ?? element.producto.codigo;
-                element.fProduccion = element.producto.fProduccion;
-                element.fVencimiento = element.producto.fVencimiento;
+                if (!element.fProduccion) {
+                  element.fProduccion = element.producto.fProduccion;
+                }
+                if (!element.fVencimiento) {
+                  element.fVencimiento = element.producto.fVencimiento;
+                }
+                if (element.numeroLote == null) {
+                  element.numeroLote = '';
+                }
               }
               if (element.sucursal) {
                 element.idSucursal = element.sucursal.idSucursal;
@@ -661,7 +669,12 @@ export class UpdateComprasComponent {
     const pUnitario = Number(p.cUnitario ?? p.pUnitario ?? 0);
     const cantidad = 1;
     const total = pUnitario * cantidad;
-    const existe = this.detalleCompras.find((d: any) => d.idProducto === p.idProducto && d.idSucursal === idSucursal);
+    const numeroLote = String(p.numeroLote || '').trim();
+    const existe = this.detalleCompras.find((d: any) =>
+      d.idProducto === p.idProducto
+      && d.idSucursal === idSucursal
+      && String(d.numeroLote || '').trim().toUpperCase() === numeroLote.toUpperCase()
+    );
     if (existe) {
       existe.cantidad = (existe.cantidad || 0) + 1;
       existe.subtotal = existe.total = (existe.cantidad || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
@@ -678,7 +691,8 @@ export class UpdateComprasComponent {
         cUnitario: pUnitario,
         producto: p,
         fProduccion: p.fProduccion,
-        fVencimiento: p.fVencimiento
+        fVencimiento: p.fVencimiento,
+        numeroLote
       });
       this.llenarDetalleCompras();
     }

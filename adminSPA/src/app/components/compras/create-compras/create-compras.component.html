@@ -263,7 +263,7 @@
                                             <th>Cant.</th>
                                             <th>P.Unit.</th>
                                             <th>SubTotal</th>
-                                            <th>F.Prod</th>
+                                            <th>N° lote</th>
                                             <th>F.Venc</th>
         
                                             <th>Sucursal</th>
@@ -283,8 +283,8 @@
                                                 <td style="width: 80px; text-align: right;">{{ item?.cantidad }}</td>
                                                 <td style="width: 8%; text-align: right;">{{ item?.cUnitario | number:'1.2-4' }}</td>
                                                 <td style="width: 80px; text-align: right;">{{ ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}</td>
-                                                <td style="width: 60px; text-align: center;">{{ item?.fproduccion || '-' }}</td>
-                                                <td style="width: 60px; text-align: center;">{{ item?.fvencimiento || '-' }}</td>
+                                                <td style="width: 80px; text-align: center;">{{ item?.numeroLote || '—' }}</td>
+                                                <td style="width: 60px; text-align: center;">{{ item?.fvencimiento || item?.fVencimiento || '-' }}</td>
                                                 <td class="col-sucursal-detalle">{{ textoSucursalDetalle(item) }}</td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm" role="group">
@@ -340,10 +340,10 @@
                                                         <div class="compra-detalle-mobile-card__subtotal small text-muted">
                                                             Subtotal: S/ {{ ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}
                                                         </div>
-                                                        <div class="compra-detalle-mobile-card__dates small text-muted" *ngIf="item?.fproduccion || item?.fvencimiento">
-                                                            <span *ngIf="item?.fproduccion">F. prod: {{ item?.fproduccion }}</span>
-                                                            <span *ngIf="item?.fproduccion && item?.fvencimiento"> · </span>
-                                                            <span *ngIf="item?.fvencimiento">F. venc: {{ item?.fvencimiento }}</span>
+                                                        <div class="compra-detalle-mobile-card__dates small text-muted" *ngIf="item?.numeroLote || item?.fvencimiento || item?.fVencimiento">
+                                                            <span *ngIf="item?.numeroLote">Lote: {{ item?.numeroLote }}</span>
+                                                            <span *ngIf="item?.numeroLote && (item?.fvencimiento || item?.fVencimiento)"> · </span>
+                                                            <span *ngIf="item?.fvencimiento || item?.fVencimiento">F. venc: {{ item?.fvencimiento || item?.fVencimiento }}</span>
                                                         </div>
                                                         <div class="compra-detalle-mobile-card__actions">
                                                             <div class="btn-group btn-group-sm" role="group">
@@ -664,6 +664,18 @@
                                                             <input type="date" class="form-control" name="fVencimiento"
 
                                                                 [(ngModel)]="nuevoProducto.fVencimiento">
+
+                                                        </div>
+
+                                                        <div class="mt-2">
+
+                                                            <label for="numeroLoteLinea">N° de lote (opcional)</label>
+
+                                                            <input type="text" class="form-control" name="numeroLoteLinea" maxlength="50"
+
+                                                                [(ngModel)]="nuevoProducto.numeroLote"
+
+                                                                placeholder="Lote del proveedor">
 
                                                         </div>
 

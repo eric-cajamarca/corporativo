@@ -115,15 +115,17 @@
             @if (esTransferenciaSucursal()) {
               Indique cantidades a enviar desde la sucursal origen; el sistema descuenta allí y crea lote en destino con costo ponderado.
             } @else if (esEntrada()) {
-              Agregue productos y cantidades. Puede indicar costo unitario, fecha de vencimiento y nº de lote.
+              Agregue productos y cantidades. Puede indicar costo, vencimiento y lote. El lápiz edita el producto del catálogo (nombre, marca, etc.).
             } @else {
               Agregue productos y cantidades a dar de baja o transferir.
             }
           </span>
+          
           <div class="d-grid d-sm-flex flex-wrap gap-2 mov-inv-actions">
+            <!--
             <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
               <i class="bi bi-plus-circle me-1"></i> Agregar línea
-            </button>
+            </button> -->
             <button type="button" class="btn btn-sm btn-outline-success" (click)="abrirBuscadorProductos()">
               <i class="bi bi-search me-1"></i> Buscar producto
             </button>
@@ -153,10 +155,23 @@
                 <tr>
                   <td class="mov-inv-celda-producto">
                     @if (fila.idProducto) {
-                      @if (fila.codigo) {
-                        <div class="text-muted small text-uppercase mb-0">{{ fila.codigo }}</div>
-                      }
-                      <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                      <div class="d-flex align-items-start justify-content-between gap-2">
+                        <div class="min-w-0">
+                          @if (fila.codigo) {
+                            <div class="text-muted small text-uppercase mb-0">{{ fila.codigo }}</div>
+                          }
+                          <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                        </div>
+                        @if (esEntrada()) {
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                            (click)="abrirEditarProducto(fila)"
+                            title="Editar producto del catálogo">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                        }
+                      </div>
                     } @else {
                       <span class="text-muted small mov-inv-celda-producto-placeholder">
                         Use <strong>Buscar producto</strong> o <strong>Crear producto</strong> para asignar esta línea.
@@ -226,10 +241,23 @@
                 <label class="form-label small mb-1">Producto <span class="text-danger">*</span></label>
                 <div class="border rounded bg-light px-2 py-2 mb-2 small mov-inv-celda-producto">
                   @if (fila.idProducto) {
-                    @if (fila.codigo) {
-                      <div class="text-muted text-uppercase mb-0">{{ fila.codigo }}</div>
-                    }
-                    <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                      <div class="min-w-0">
+                        @if (fila.codigo) {
+                          <div class="text-muted text-uppercase mb-0">{{ fila.codigo }}</div>
+                        }
+                        <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                      </div>
+                      @if (esEntrada()) {
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                          (click)="abrirEditarProducto(fila)"
+                          title="Editar producto del catálogo">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                      }
+                    </div>
                   } @else {
                     <span class="text-muted mov-inv-celda-producto-placeholder">
                       Use <strong>Buscar producto</strong> o <strong>Crear producto</strong>.

@@ -278,6 +278,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             p.tipoProducto,
             p.fProduccion,
             p.fVencimiento,
+            CONVERT(VARCHAR(19), p.FIngreso, 120) AS fechaIngreso,
             p.estado,
             ISNULL(e.alias, e.nombreComercial) as aliasEmpresa,
             e.razon_Social as razonSocialEmpresa
@@ -328,6 +329,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             p.tipoProducto,
             p.fProduccion,
             p.fVencimiento,
+            CONVERT(VARCHAR(19), p.FIngreso, 120) AS fechaIngreso,
             p.estado,
             ISNULL(e2.alias, e2.nombreComercial) as aliasEmpresa,
             e2.razon_Social as razonSocialEmpresa
@@ -1153,6 +1155,14 @@ exports.insertarProducto = async (transaction, row) => {
 };
 
 exports.insertarLoteInicial = async (transaction, row) => {
+  const numLote =
+    row.numeroLote != null && String(row.numeroLote).trim() !== ''
+      ? String(row.numeroLote).trim().slice(0, 50)
+      : null;
+  const fechaVenc =
+    row.fechaVencimiento != null && String(row.fechaVencimiento).trim() !== ''
+      ? row.fechaVencimiento
+      : null;
   const result = await transaction
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
@@ -1161,10 +1171,12 @@ exports.insertarLoteInicial = async (transaction, row) => {
     .input('costoUnitario', sql.Decimal(18, 6), row.costoUnitario)
     .input('cantidadIngresada', sql.Decimal(18, 2), row.cantidadIngresada)
     .input('cantidadDisponible', sql.Decimal(18, 2), row.cantidadDisponible)
+    .input('fechaVencimiento', sql.DateTime, fechaVenc)
+    .input('numeroLote', sql.VarChar(50), numLote)
     .query(
-      `INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible)
+      `INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, numeroLote)
        OUTPUT INSERTED.idLote
-       VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)`
+       VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @numeroLote)`
     );
   const idLote = result.recordset && result.recordset[0] ? result.recordset[0].idLote : null;
   const idUbicacion = row.idUbicacion != null ? Number(row.idUbicacion) : null;

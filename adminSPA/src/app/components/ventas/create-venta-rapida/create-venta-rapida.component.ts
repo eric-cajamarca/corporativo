@@ -522,8 +522,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     const duplicarDesdeCot = this.route.snapshot.queryParamMap.get('duplicarDesdeCotizacion');
     if (duplicarDesdeCot) {
       this.procesarDuplicarDesdeCotizacionSiCorresponde(duplicarDesdeCot);
-    } else {
-      this.revisarVentasProvisionales();
     }
     this.inicializarVentaRapida();
     this.actualizarIndicadorVentasGuardadas();
@@ -1214,14 +1212,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       },
       error: () => {}
     });
-  }
-
-  /** Tras cargar datos, revisa si hay ventas provisionales y ofrece recuperarlas. */
-  revisarVentasProvisionales(): void {
-    if (!this.ventaProvisionalUi.tieneSesionesGuardadas()) return;
-    this.sesionesGuardadas = this.ventaProvisionalUi.listarSesionesGuardadas();
-    this.mostrarModalRecuperar = true;
-    this.ventaProvisionalUi.abrirModalRecuperar();
   }
 
   /** Recupera una venta provisional por id y cierra el modal. */

@@ -51,7 +51,7 @@ exports.obtenerCinta = async (pool, user) => {
       items.push({
         id: 'cinta-sunat-rechazo',
         severity: 'danger',
-        message: `Hay ${errSunat} comprobante(s) con estado SUNAT distinto de aceptado. Revise ventas y envío SUNAT.`,
+        message: `Hay ${errSunat} comprobante(s) rechazado(s) o con error de envío a SUNAT. Revise ventas.`,
         link: '/ventas',
         linkLabel: 'Ventas',
         dismissible: true,

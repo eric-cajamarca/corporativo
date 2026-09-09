@@ -159,6 +159,7 @@ export class CreateComprasComponent {
     ubicacion: '',
     fproduccion: '',
     fvencimiento: '',
+    numeroLote: '',
   };
   public correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
   public loadButton: boolean = false;
@@ -1140,6 +1141,7 @@ export class CreateComprasComponent {
       this.nuevoProducto.fproduccion ?? this.nuevoProducto.fProduccion ?? '';
     const fvencimiento =
       this.nuevoProducto.fvencimiento ?? this.nuevoProducto.fVencimiento ?? '';
+    const numeroLote = String(this.nuevoProducto.numeroLote ?? '').trim();
     const ubicacion = this.nuevoProducto.ubicacion;
 
     this.nuevoProducto.idProducto = producto['idProducto'];
@@ -1161,6 +1163,7 @@ export class CreateComprasComponent {
     this.nuevoProducto.fProduccion = fproduccion;
     this.nuevoProducto.fvencimiento = fvencimiento;
     this.nuevoProducto.fVencimiento = fvencimiento;
+    this.nuevoProducto.numeroLote = numeroLote;
     this.nuevoProducto.ubicacion = ubicacion;
     this.nuevoProducto.producto = producto;
     this.nuevoProducto.codigoPresentacion = producto['codigoPresentacion'];
@@ -1656,6 +1659,7 @@ export class CreateComprasComponent {
         pUnitario: parseFloat(String(element.cUnitario ?? element.pUnitario ?? 0)),
         total: subtotalDetalle,
         fechaVencimiento: element.fVencimiento || element.fvencimiento || null,
+        numeroLote: String(element.numeroLote || '').trim().slice(0, 50) || null,
         asignarPorDefecto: this.asignarUbicacionPorDefecto,
       };
       if (element.idProducto != null && element.idProducto !== '') {
@@ -2308,10 +2312,12 @@ export class CreateComprasComponent {
     const descripcion = String(creado.descripcion || enCatalogo?.descripcion || '').trim();
     const fproduccion = this.fechaDetalleCompra(creado.fProduccion ?? enCatalogo?.fProduccion);
     const fvencimiento = this.fechaDetalleCompra(creado.fechaVencimiento ?? enCatalogo?.fVencimiento);
+    const numeroLote = String(creado.numeroLote || '').trim().slice(0, 50);
 
     const existe = this.detalleCompras.find(
-      (p: { idProducto?: string }) =>
+      (p: { idProducto?: string; numeroLote?: string }) =>
         String(p.idProducto).toLowerCase() === String(creado.idProducto).toLowerCase()
+        && String(p.numeroLote || '').trim().toUpperCase() === numeroLote.toUpperCase()
     );
     if (existe) {
       existe.cantidad = (Number(existe.cantidad) || 0) + cantidad;
@@ -2339,6 +2345,9 @@ export class CreateComprasComponent {
         existe.fVencimiento = fvencimiento;
         existe.fvencimiento = fvencimiento;
       }
+      if (numeroLote) {
+        existe.numeroLote = numeroLote;
+      }
       this.enriquecerObjetosDetalleCompra(existe);
       existe.subtotal =
         (Number(existe.cantidad) || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
@@ -2359,6 +2368,7 @@ export class CreateComprasComponent {
         fProduccion: fproduccion,
         fVencimiento: fvencimiento,
         fvencimiento,
+        numeroLote,
       };
       if (enCatalogo) {
         linea['categoria'] = enCatalogo.categoria;
@@ -2388,7 +2398,12 @@ export class CreateComprasComponent {
       (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
     const idPresentacion = producto.idPresentacion ?? producto.presentacion?.idPresentacion;
     const pUnitario = Number(producto.cUnitario ?? producto.pUnitario ?? 0);
-    const existe = this.detalleCompras.find((p: { idProducto: any }) => p.idProducto === producto.idProducto);
+    const numeroLote = String(producto.numeroLote || '').trim();
+    const existe = this.detalleCompras.find(
+      (p: { idProducto: any; numeroLote?: string }) =>
+        p.idProducto === producto.idProducto
+        && String(p.numeroLote || '').trim().toUpperCase() === numeroLote.toUpperCase()
+    );
     if (existe) {
       existe.cantidad = (existe.cantidad || 0) + 1;
       existe.subtotal = (existe.cantidad || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
@@ -2405,6 +2420,7 @@ export class CreateComprasComponent {
         cUnitario: pUnitario || producto.cUnitario,
         pUnitario: pUnitario || producto.pUnitario,
         subtotal: pUnitario,
+        numeroLote,
       });
     }
     this.sumarFooterFactura();

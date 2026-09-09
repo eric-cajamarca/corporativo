@@ -11,6 +11,7 @@ import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
 import { ProductoCreate } from '../../../models/producto.models';
+import { tokenizarTerminoBusquedaProducto } from '../../../utils/producto-busqueda.util';
 
 declare var bootstrap: any;
 
@@ -42,9 +43,19 @@ export interface ProductoPreciosFila {
   /** Stock / fila operativa (Lotes); nombre de sucursal activa. */
   idSucursal?: string;
   sucursal?: string;
+  categoria?: string;
+  fechaIngreso?: string | null;
 }
 
 export type PaginaItemPrecios = number | 'ellipsis';
+
+export type FiltroPendientePrecios =
+  | 'todos'
+  | 'ingreso-hoy'
+  | 'ingreso-7'
+  | 'ingreso-30'
+  | 'sin-precio'
+  | 'sin-costo';
 
 @Component({
   selector: 'app-create-precios',
@@ -141,6 +152,7 @@ export class CreatePreciosComponent implements OnInit {
   listaSeleccionada: any = null;
   listaEditar: any = null;
   filtroBusqueda: string = '';
+  filtroPendiente: FiltroPendientePrecios = 'todos';
   simboloMoneda: string = 'S/.';
   
   // Formulario
@@ -219,14 +231,13 @@ export class CreatePreciosComponent implements OnInit {
           nuevoCUnitario:
             p.cUnitario != null && !Number.isNaN(Number(p.cUnitario)) ? Number(p.cUnitario) : 0
         }));
-        this.productosFiltrados = [...this.productos];
-        this.page = 1;
         const idLista = this.obtenerIdListaNumericoSeleccionado();
         if (idLista != null) {
           this.productos.forEach((producto) =>
             this.actualizarPrecioProducto(producto, idLista)
           );
         }
+        this.filtrarProductos();
       },
       error: (error) => {
       }
@@ -264,6 +275,7 @@ export class CreatePreciosComponent implements OnInit {
       this.productos.forEach((p) => {
         p.nuevoPrecio = null;
       });
+      this.filtrarProductos();
       return;
     }
     this.listaSeleccionada = this.listasPrecio.find(
@@ -281,6 +293,9 @@ export class CreatePreciosComponent implements OnInit {
       });
       // Cargar precios para esta lista
       this.cargarPreciosProductos();
+      this.filtrarProductos();
+    } else {
+      this.filtrarProductos();
     }
   }
 
@@ -647,22 +662,93 @@ export class CreatePreciosComponent implements OnInit {
 
   // Funciones auxiliares
   filtrarProductos(): void {
-    if (!this.filtroBusqueda.trim()) {
-      this.productosFiltrados = [...this.productos];
-      this.page = 1;
-      return;
+    const tokens = tokenizarTerminoBusquedaProducto(this.filtroBusqueda);
+    let lista = this.productos.filter((producto) => {
+      if (!this.pasaFiltroPendiente(producto)) {
+        return false;
+      }
+      if (!tokens.length) {
+        return true;
+      }
+      const campos = [
+        producto.codigo,
+        producto.sku,
+        producto.descripcion,
+        producto.marca,
+        producto.categoria,
+        producto.descripcionPres,
+        producto.sucursal
+      ].map((v) => String(v ?? '').toLowerCase());
+      return tokens.every((tok) => campos.some((campo) => campo.includes(tok)));
+    });
+    if (this.filtroPendiente.startsWith('ingreso-')) {
+      lista = [...lista].sort((a, b) =>
+        this.fechaIngresoMs(b) - this.fechaIngresoMs(a)
+      );
     }
-
-    const termino = this.filtroBusqueda.toLowerCase();
-    this.productosFiltrados = this.productos.filter(
-      (producto) =>
-        (producto.descripcion || '').toLowerCase().includes(termino) ||
-        (producto.codigo || '').toLowerCase().includes(termino) ||
-        (producto.sku || '').toLowerCase().includes(termino) ||
-        (producto.marca || '').toLowerCase().includes(termino) ||
-        (producto.sucursal || '').toLowerCase().includes(termino)
-    );
+    this.productosFiltrados = lista;
     this.page = 1;
+  }
+
+  private pasaFiltroPendiente(producto: ProductoPreciosFila): boolean {
+    switch (this.filtroPendiente) {
+      case 'ingreso-hoy':
+        return this.diasDesdeIngreso(producto) === 0;
+      case 'ingreso-7':
+        return this.estaEnRangoIngreso(producto, 7);
+      case 'ingreso-30':
+        return this.estaEnRangoIngreso(producto, 30);
+      case 'sin-precio':
+        return this.productoSinPrecioVenta(producto);
+      case 'sin-costo':
+        return this.productoSinCostoUnitario(producto);
+      default:
+        return true;
+    }
+  }
+
+  private productoSinPrecioVenta(producto: ProductoPreciosFila): boolean {
+    const idLista = this.obtenerIdListaNumericoSeleccionado();
+    if (idLista != null) {
+      const data = producto.precios ? producto.precios[idLista] : undefined;
+      return data == null || data.precio == null || Number(data.precio) <= 0;
+    }
+    const valores = Object.values(producto.precios || {});
+    if (!valores.length) {
+      return true;
+    }
+    return valores.every((v) => v == null || v.precio == null || Number(v.precio) <= 0);
+  }
+
+  private productoSinCostoUnitario(producto: ProductoPreciosFila): boolean {
+    const costo = Number(producto.cUnitario);
+    return producto.cUnitario == null || !Number.isFinite(costo) || costo <= 0;
+  }
+
+  private fechaIngresoMs(producto: ProductoPreciosFila): number {
+    const raw = producto.fechaIngreso;
+    if (!raw) {
+      return 0;
+    }
+    const t = Date.parse(String(raw).replace(' ', 'T'));
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  private diasDesdeIngreso(producto: ProductoPreciosFila): number | null {
+    const ms = this.fechaIngresoMs(producto);
+    if (!ms) {
+      return null;
+    }
+    const ingreso = new Date(ms);
+    const hoy = new Date();
+    const utcIngreso = Date.UTC(ingreso.getFullYear(), ingreso.getMonth(), ingreso.getDate());
+    const utcHoy = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    return Math.floor((utcHoy - utcIngreso) / 86400000);
+  }
+
+  private estaEnRangoIngreso(producto: ProductoPreciosFila, dias: number): boolean {
+    const d = this.diasDesdeIngreso(producto);
+    return d != null && d >= 0 && d <= dias;
   }
 
   validarPrecio(producto: ProductoPreciosFila): void {

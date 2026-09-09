@@ -20,7 +20,8 @@ async function listarPorCompra(pool, idEmpresa, idCompra) {
         RTRIM(LTRIM(ISNULL(p.Codigo, ''))) AS codigo,
         RTRIM(LTRIM(ISNULL(p.descripcion, ''))) AS descripcion,
         CONVERT(VARCHAR(19), p.fProduccion, 120) AS fProduccion,
-        CONVERT(VARCHAR(19), p.fVencimiento, 120) AS fVencimiento,
+        CONVERT(VARCHAR(19), ISNULL(lote.fechaVencimientoLote, p.fVencimiento), 120) AS fVencimiento,
+        lote.numeroLote,
         p.idCategoria,
         p.idMarca,
         cat.nombre AS categoriaNombre,
@@ -35,6 +36,22 @@ async function listarPorCompra(pool, idEmpresa, idCompra) {
       LEFT JOIN Marcas m ON m.idMarca = p.idMarca
       LEFT JOIN Presentacion pr ON pr.idPresentacion = ISNULL(d.idPresentacion, p.idPresentacion)
       LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal AND ISNULL(s.estado, 1) = 1
+      OUTER APPLY (
+        SELECT TOP 1
+          l.numeroLote,
+          l.fechaVencimiento AS fechaVencimientoLote
+        FROM Lotes l
+        WHERE l.idEmpresa = d.idEmpresa
+          AND l.idProducto = d.idProducto
+          AND l.idSucursal = d.idSucursal
+        ORDER BY
+          CASE
+            WHEN CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(d.cantidad, 0))
+             AND CONVERT(DECIMAL(18,6), ISNULL(l.costoUnitario, 0)) = CONVERT(DECIMAL(18,6), ISNULL(d.pUnitario, 0))
+            THEN 0 ELSE 1
+          END,
+          l.fechaIngreso DESC
+      ) lote
       WHERE d.idCompra = @idCompra AND d.idEmpresa = @idEmpresa
       ORDER BY d.idDetalleCompra
     `);

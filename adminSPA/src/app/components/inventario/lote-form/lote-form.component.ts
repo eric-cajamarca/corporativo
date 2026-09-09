@@ -45,7 +45,9 @@ export class LoteFormComponent implements OnInit {
       costoUnitario: [0, [Validators.required, Validators.min(0)]],
       cantidadIngresada: [0, [Validators.required, Validators.min(1)]],
       cantidadDisponible: [0],
-      activo: [true]
+      activo: [true],
+      numeroLote: [''],
+      fechaVencimiento: ['']
     });
   }
 
@@ -114,7 +116,9 @@ export class LoteFormComponent implements OnInit {
             costoUnitario: lote.costoUnitario ?? 0,
             cantidadIngresada: lote.cantidadIngresada ?? 0,
             cantidadDisponible: lote.cantidadDisponible ?? 0,
-            activo: lote.activo !== false && lote.activo !== 0
+            activo: lote.activo !== false && lote.activo !== 0,
+            numeroLote: lote.numeroLote || '',
+            fechaVencimiento: lote.fechaVencimiento ? String(lote.fechaVencimiento).slice(0, 10) : ''
           });
         }
         this.cargando = false;
@@ -151,7 +155,9 @@ export class LoteFormComponent implements OnInit {
       const loteData = {
         costoUnitario: Number(raw.costoUnitario) || 0,
         cantidadDisponible: Number(raw.cantidadDisponible),
-        activo: !!raw.activo
+        activo: !!raw.activo,
+        numeroLote: String(raw.numeroLote || '').trim().slice(0, 50),
+        fechaVencimiento: String(raw.fechaVencimiento || '').trim().slice(0, 10)
       };
 
       this.loteService.actualizar_lote(this.idLote, loteData).subscribe({
@@ -184,7 +190,9 @@ export class LoteFormComponent implements OnInit {
         idProducto: raw.idProducto,
         idSucursal: raw.idSucursal,
         costoUnitario: Number(raw.costoUnitario) || 0,
-        cantidadIngresada: Number(raw.cantidadIngresada) || 0
+        cantidadIngresada: Number(raw.cantidadIngresada) || 0,
+        numeroLote: String(raw.numeroLote || '').trim().slice(0, 50) || undefined,
+        fechaVencimiento: String(raw.fechaVencimiento || '').trim().slice(0, 10) || undefined
       };
 
       this.loteService.crear_lote({

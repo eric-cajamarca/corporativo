@@ -31,6 +31,7 @@ async function getAll(idEmpresa) {
                 l.cantidadDisponible,
                 ISNULL(l.activo, 1) AS activo,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
+                CONVERT(VARCHAR(19), l.fechaVencimiento, 120) AS fechaVencimiento,
                 p.descripcion AS nombreProducto,
                 p.codigo AS codigoProducto,
                 s.nombre AS nombreSucursal,
@@ -65,6 +66,7 @@ async function getAllPorEmpresas(idsEmpresa) {
                 l.cantidadDisponible,
                 ISNULL(l.activo, 1) AS activo,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
+                CONVERT(VARCHAR(19), l.fechaVencimiento, 120) AS fechaVencimiento,
                 p.descripcion AS nombreProducto,
                 p.codigo AS codigoProducto,
                 s.nombre AS nombreSucursal,
@@ -84,7 +86,7 @@ async function getById(idLote, idEmpresa) {
   return withPool(async (pool) => {
     try {
       const req = pool.request().input('idLote', sql.UniqueIdentifier, idLote);
-      const whereEmpresa = idEmpresa ? ' AND idEmpresa = @idEmpresa' : '';
+      const whereEmpresa = idEmpresa ? ' AND l.idEmpresa = @idEmpresa' : '';
       if (idEmpresa) req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
       const result = await req.query(`
                 SELECT 
@@ -95,9 +97,11 @@ async function getById(idLote, idEmpresa) {
                     CONVERT(DECIMAL(18,6), costoUnitario) AS costoUnitario,
                     CONVERT(DECIMAL(18,2), cantidadIngresada) AS cantidadIngresada,
                     CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible,
-                    ISNULL(activo, 1) AS activo
-                FROM Lotes 
-                WHERE idLote = @idLote${whereEmpresa}
+                    ISNULL(activo, 1) AS activo,
+                    l.numeroLote,
+                    CONVERT(VARCHAR(10), l.fechaVencimiento, 23) AS fechaVencimiento
+                FROM Lotes l
+                WHERE l.idLote = @idLote${whereEmpresa}
             `);
       const row = result.recordset && result.recordset[0];
       if (!row) return null;
@@ -109,7 +113,9 @@ async function getById(idLote, idEmpresa) {
         costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
         cantidadIngresada: row.cantidadIngresada != null ? Number(row.cantidadIngresada) : 0,
         cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0,
-        activo: row.activo !== false && row.activo !== 0
+        activo: row.activo !== false && row.activo !== 0,
+        numeroLote: row.numeroLote || '',
+        fechaVencimiento: row.fechaVencimiento || null
       };
     } catch (err) {
       console.error('lotes.repository getById error:', err.message);
@@ -130,6 +136,14 @@ async function getBySucursal(idEmpresa, idSucursal) {
 
 async function create(loteData) {
   const { idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible } = loteData;
+  const numLote =
+    loteData.numeroLote != null && String(loteData.numeroLote).trim() !== ''
+      ? String(loteData.numeroLote).trim().slice(0, 50)
+      : null;
+  const fechaVenc =
+    loteData.fechaVencimiento != null && String(loteData.fechaVencimiento).trim() !== ''
+      ? loteData.fechaVencimiento
+      : null;
 
   return withPool(async (pool) => {
     const result = await pool.request()
@@ -139,9 +153,14 @@ async function create(loteData) {
       .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
       .input('cantidadIngresada', sql.Int, cantidadIngresada)
       .input('cantidadDisponible', sql.Int, cantidadDisponible)
-      .query(`INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible)
-                VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)`);
-    return result;
+      .input('numeroLote', sql.VarChar(50), numLote)
+      .input('fechaVencimiento', sql.DateTime, fechaVenc)
+      .query(`INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, numeroLote, fechaVencimiento)
+                OUTPUT INSERTED.idLote
+                VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @numeroLote, @fechaVencimiento)`);
+    return {
+      idLote: result.recordset && result.recordset[0] ? result.recordset[0].idLote : null
+    };
   });
 }
 
@@ -173,17 +192,30 @@ async function update(idLote, idEmpresa, loteData) {
         ? (loteData.activo === true || loteData.activo === 1 || loteData.activo === '1' || loteData.activo === 'true')
         : existente.activo;
 
+    const numeroLote =
+      loteData.numeroLote != null
+        ? (String(loteData.numeroLote).trim().slice(0, 50) || null)
+        : (existente.numeroLote || null);
+    const fechaVencimiento =
+      loteData.fechaVencimiento != null
+        ? (String(loteData.fechaVencimiento).trim() || null)
+        : existente.fechaVencimiento;
+
     await pool.request()
       .input('idLote', sql.UniqueIdentifier, idLote)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
       .input('cantidadDisponible', sql.Decimal(18, 2), cantidadDisponible)
       .input('activo', sql.Bit, activo ? 1 : 0)
+      .input('numeroLote', sql.VarChar(50), numeroLote)
+      .input('fechaVencimiento', sql.DateTime, fechaVencimiento)
       .query(`
         UPDATE Lotes
         SET costoUnitario = @costoUnitario,
             cantidadDisponible = @cantidadDisponible,
-            activo = @activo
+            activo = @activo,
+            numeroLote = @numeroLote,
+            fechaVencimiento = @fechaVencimiento
         WHERE idLote = @idLote AND idEmpresa = @idEmpresa
       `);
 
@@ -191,7 +223,9 @@ async function update(idLote, idEmpresa, loteData) {
       ...existente,
       costoUnitario,
       cantidadDisponible,
-      activo
+      activo,
+      numeroLote,
+      fechaVencimiento
     };
   });
 }

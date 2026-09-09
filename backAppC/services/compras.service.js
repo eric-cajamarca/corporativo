@@ -261,6 +261,7 @@ exports.crearCompraCompleta = async (idEmpresa, idUsuario, body) => {
                 pUnitario: linea.pUnitario,
                 total: linea.total,
                 fechaVencimiento: linea.fechaVencimiento,
+                numeroLote: linea.numeroLote,
                 asignarPorDefecto: linea.asignarPorDefecto,
                 idUbicacionDestino: linea.idUbicacionDestino ?? linea.idUbicacionCompra
             })

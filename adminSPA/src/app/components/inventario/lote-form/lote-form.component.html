@@ -106,6 +106,27 @@
         }
       </div>
 
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="numeroLote" class="form-label">N° de lote (opcional)</label>
+          <input
+            type="text"
+            id="numeroLote"
+            formControlName="numeroLote"
+            class="form-control"
+            maxlength="50"
+            placeholder="Lote del proveedor">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label for="fechaVencimiento" class="form-label">Fecha de vencimiento (opcional)</label>
+          <input
+            type="date"
+            id="fechaVencimiento"
+            formControlName="fechaVencimiento"
+            class="form-control">
+        </div>
+      </div>
+
       @if (isEditMode) {
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="activo" formControlName="activo">
