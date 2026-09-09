@@ -1,4 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { LotesService } from '../../../services/lotes.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
@@ -9,6 +10,8 @@ import { FormsModule } from '@angular/forms';
 
 declare var iziToast: any;
 
+export type FiltroCaducidadLotes = 'todos' | 'por-vencer' | 'vencidos';
+
 @Component({
   selector: 'app-lote-list',
   standalone: true,
@@ -17,29 +20,29 @@ declare var iziToast: any;
   styleUrl: './lote-list.component.css'
 })
 export class LoteListComponent implements OnInit {
-  // Array que almacena todos los lotes obtenidos del backend
   lotes: Lote[] = [];
   lotesFiltrados: Lote[] = [];
-  
-  // Filtros
+
   filtrosIniciales: any = {};
   filtroProducto = '';
   filtroSucursal = '';
   filtroFechaDesde = '';
   filtroFechaHasta = '';
+  filtroCaducidad: FiltroCaducidadLotes = 'todos';
+  diasPorVencer = 30;
+  conteoPorVencer = 0;
+  conteoVencidos = 0;
   esModoGestora = false;
-  
-  // Bandera para mostrar/ocultar spinner de carga
+
   isLoading = true;
-  
-  // Mensaje de error si falla la consulta
   errorMessage = '';
 
   constructor(
     public activeModal: NgbActiveModal,
     private loteService: LotesService,
     private inventarioModal: InventarioModalService,
-    private gestoresService: GestoresService
+    private gestoresService: GestoresService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -93,6 +96,8 @@ export class LoteListComponent implements OnInit {
       filtrados = filtrados.filter(l => l.idLote && setIds.has(l.idLote));
     }
 
+    this.actualizarConteosCaducidad(filtrados);
+
     const productoFiltro = this.filtrosIniciales?.producto;
     if (productoFiltro) {
       const term = new RegExp(productoFiltro, 'i');
@@ -133,7 +138,121 @@ export class LoteListComponent implements OnInit {
       );
     }
 
+    if (this.filtroCaducidad === 'por-vencer') {
+      filtrados = filtrados.filter((l) => this.esLotePorVencer(l));
+      filtrados = [...filtrados].sort((a, b) => this.fechaVencMs(a) - this.fechaVencMs(b));
+    } else if (this.filtroCaducidad === 'vencidos') {
+      filtrados = filtrados.filter((l) => this.esLoteVencidoConStock(l));
+      filtrados = [...filtrados].sort((a, b) => this.fechaVencMs(a) - this.fechaVencMs(b));
+    }
+
     this.lotesFiltrados = filtrados;
+  }
+
+  setFiltroCaducidad(valor: FiltroCaducidadLotes): void {
+    this.filtroCaducidad = valor;
+    this.aplicarFiltros();
+  }
+
+  private actualizarConteosCaducidad(origen: Lote[]): void {
+    this.conteoPorVencer = origen.filter((l) => this.esLotePorVencer(l)).length;
+    this.conteoVencidos = origen.filter((l) => this.esLoteVencidoConStock(l)).length;
+  }
+
+  private stockDisponible(lote: Lote): number {
+    return Number(lote.cantidadDisponible) || 0;
+  }
+
+  private fechaVencMs(lote: Lote): number {
+    const raw = lote.fechaVencimiento != null ? String(lote.fechaVencimiento).slice(0, 10) : '';
+    if (!raw) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const d = new Date(`${raw}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? Number.MAX_SAFE_INTEGER : d.getTime();
+  }
+
+  diasHastaVencer(fechaVencimiento: string | Date | null | undefined): number | null {
+    if (!fechaVencimiento) {
+      return null;
+    }
+    const raw = String(fechaVencimiento).slice(0, 10);
+    if (!raw) {
+      return null;
+    }
+    const venc = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(venc.getTime())) {
+      return null;
+    }
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return Math.round((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  esLotePorVencer(lote: Lote): boolean {
+    if (this.stockDisponible(lote) <= 0) {
+      return false;
+    }
+    const dias = this.diasHastaVencer(lote.fechaVencimiento);
+    return dias != null && dias >= 0 && dias <= this.diasPorVencer;
+  }
+
+  esLoteVencidoConStock(lote: Lote): boolean {
+    if (this.stockDisponible(lote) <= 0) {
+      return false;
+    }
+    const dias = this.diasHastaVencer(lote.fechaVencimiento);
+    return dias != null && dias < 0;
+  }
+
+  textoDiasCaducidad(lote: Lote): string {
+    const dias = this.diasHastaVencer(lote.fechaVencimiento);
+    if (dias == null) {
+      return '';
+    }
+    if (dias < 0) {
+      return `Vencido hace ${Math.abs(dias)} d`;
+    }
+    if (dias === 0) {
+      return 'Vence hoy';
+    }
+    return `Vence en ${dias} d`;
+  }
+
+  mostrarAccionesCaducidad(lote: Lote): boolean {
+    return this.esLotePorVencer(lote) || this.esLoteVencidoConStock(lote);
+  }
+
+  bajarPrecio(lote: Lote): void {
+    const q = String(lote.codigoProducto || lote.nombreProducto || '').trim();
+    this.navegarCerrandoModal(['/precios'], {
+      q,
+      idProducto: lote.idProducto || ''
+    });
+  }
+
+  darBajaMerma(lote: Lote): void {
+    this.navegarCerrandoModal(['/inventario/salidas'], {
+      tipo: 'SALIDA_MERMA',
+      idProducto: lote.idProducto || '',
+      idSucursal: lote.idSucursal || '',
+      idLote: lote.idLote || '',
+      cantidad: String(this.stockDisponible(lote)),
+      codigo: lote.codigoProducto || '',
+      descripcion: lote.nombreProducto || '',
+      numeroLote: lote.numeroLote || '',
+      fechaVencimiento: lote.fechaVencimiento ? String(lote.fechaVencimiento).slice(0, 10) : '',
+      costoUnitario: String(lote.costoUnitario ?? '')
+    });
+  }
+
+  private navegarCerrandoModal(ruta: string[], queryParams: Record<string, string>): void {
+    try {
+      this.activeModal.dismiss('navigate');
+    } catch {
+      /* abierto como ruta, no como modal */
+    }
+    this.router.navigate(ruta, { queryParams });
   }
 
   loteVencido(fechaVencimiento: string | Date | null | undefined): boolean {
@@ -246,6 +365,8 @@ export class LoteListComponent implements OnInit {
     this.filtroSucursal = '';
     this.filtroFechaDesde = '';
     this.filtroFechaHasta = '';
+    this.filtroCaducidad = 'todos';
+    this.diasPorVencer = 30;
     this.aplicarFiltros();
   }
 

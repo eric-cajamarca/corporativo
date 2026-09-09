@@ -123,6 +123,13 @@ const createAdmin = async (req, res, next) => {
       });
     }
 
+    if (error.message === 'ROL_NO_DISPONIBLE' || error.message === 'ROL_NO_EXISTE') {
+      return res.status(200).json({
+        message: 'El rol seleccionado no es válido.',
+        data: undefined
+      });
+    }
+
     return next(error);
   }
 };
@@ -152,6 +159,13 @@ const updateAdmin = async (req, res, next) => {
       return res.status(403).json({ 
         message: 'No tiene permisos para realizar esta acción', 
         data: undefined 
+      });
+    }
+
+    if (error.message === 'ROL_NO_DISPONIBLE' || error.message === 'ROL_NO_EXISTE') {
+      return res.status(200).json({
+        message: 'El rol seleccionado no es válido.',
+        data: undefined
       });
     }
 

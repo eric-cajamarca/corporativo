@@ -92,6 +92,10 @@ export class IndexConfiguracionComponent implements OnInit {
     permitirVentasNegativas: false,
     controlLotes: true,
     controlVencimiento: true,
+    avisoWhatsappVencimiento: true,
+    /** Destino del aviso diario de caducidad (distinto del WhatsApp vinculado). */
+    celularAvisoCaducidad: '',
+    diasAvisoVencimiento: 30,
     ubicaciones: true,
     productosConImagenes: false
   };
@@ -165,7 +169,7 @@ export class IndexConfiguracionComponent implements OnInit {
   public sistemaGuardando = false;
   public backupEjecutando = false;
   public puedeEditarSistemaOperativo = false;
-  /** Pestaña Sistema: visible solo al superAdmin. */
+  /** Pestaña Sistema: visible según permiso operativo del backend. */
   public mostrarTabSistema = false;
   /** Placeholder UNC para copia secundaria (evita escapado frágil en plantilla). */
   readonly ejemploUncBackupSecundario = '\\\\SERVIDOR\\Compartida\\sql_backups';
@@ -631,6 +635,11 @@ export class IndexConfiguracionComponent implements OnInit {
         );
         this.inventario.controlLotes = true;
         this.inventario.controlVencimiento = String(getVal('INVENTARIO_CONTROL_VENCIMIENTO', 'true')).toLowerCase() === 'true';
+        this.inventario.avisoWhatsappVencimiento = String(getVal('INVENTARIO_AVISO_WHATSAPP_VENCIMIENTO', 'true')).toLowerCase() === 'true';
+        this.inventario.celularAvisoCaducidad = String(
+          getVal('INVENTARIO_CELULAR_AVISO_CADUCIDAD', getVal('VENTAS_CELULAR_ENCARGADO', ''))
+        ).replace(/\D/g, '');
+        this.inventario.diasAvisoVencimiento = parseInt(getVal('INVENTARIO_DIAS_AVISO_VENCIMIENTO', '30'), 10) || 30;
         this.inventario.ubicaciones = String(getVal('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() === 'true';
         const item = lista.find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
         this.inventario.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
@@ -646,6 +655,9 @@ export class IndexConfiguracionComponent implements OnInit {
       { clave: 'INVENTARIO_ALERTA_STOCK_MAXIMO', valor: String(this.inventario.alertaStockMaximo ?? 1000), descripcion: 'Alerta stock máximo general (productos sin umbral propio)', tipoDato: 'NUMBER' },
       { clave: 'INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', valor: this.inventario.permitirVentasNegativas ? 'true' : 'false', descripcion: 'Permitir ventas con stock negativo (mostrar aviso)', tipoDato: 'BOOLEAN' },
       { clave: 'INVENTARIO_CONTROL_VENCIMIENTO', valor: this.inventario.controlVencimiento ? 'true' : 'false', descripcion: 'Mostrar productos próximos a vencer en dashboard', tipoDato: 'BOOLEAN' },
+      { clave: 'INVENTARIO_AVISO_WHATSAPP_VENCIMIENTO', valor: this.inventario.avisoWhatsappVencimiento ? 'true' : 'false', descripcion: 'Enviar un WhatsApp diario con lotes por vencer o vencidos', tipoDato: 'BOOLEAN' },
+      { clave: 'INVENTARIO_CELULAR_AVISO_CADUCIDAD', valor: String(this.inventario.celularAvisoCaducidad || '').replace(/\D/g, '').slice(0, 15), descripcion: 'Celular del vendedor o encargado que recibe el aviso diario de caducidad. Distinto del WhatsApp vinculado.', tipoDato: 'STRING' },
+      { clave: 'INVENTARIO_DIAS_AVISO_VENCIMIENTO', valor: String(this.inventario.diasAvisoVencimiento ?? 30), descripcion: 'Días de anticipación para aviso de caducidad (dashboard y WhatsApp)', tipoDato: 'NUMBER' },
       { clave: 'INVENTARIO_CONTROL_UBICACIONES', valor: this.inventario.ubicaciones ? 'true' : 'false', descripcion: 'Gestionar stock por ubicación (LotesUbicacion); si no, solo Lotes', tipoDato: 'BOOLEAN' },
       { clave: 'PRODUCTOS_CON_IMAGENES', valor: this.inventario.productosConImagenes ? 'true' : 'false', descripcion: 'Manejar productos con imágenes (galería)', tipoDato: 'BOOLEAN' }
     ];
@@ -1131,10 +1143,7 @@ export class IndexConfiguracionComponent implements OnInit {
       next: (res) => {
         const d = res?.data;
         this.puedeEditarSistemaOperativo = !!d?.puedeEditarSistemaOperativo;
-        this.mostrarTabSistema =
-          typeof d?.mostrarTabSistema === 'boolean'
-            ? d.mostrarTabSistema
-            : !!d?.esSuperAdmin;
+        this.mostrarTabSistema = !!d?.mostrarTabSistema;
         if (!this.mostrarTabSistema) {
           return;
         }

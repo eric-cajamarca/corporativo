@@ -29,4 +29,5 @@ export interface FilaDetalle {
   costoUnitario: number;
   fechaVencimiento: string;
   numeroLote: string;
+  idLote?: string;
 }

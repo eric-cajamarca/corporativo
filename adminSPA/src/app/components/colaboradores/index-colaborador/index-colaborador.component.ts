@@ -274,16 +274,25 @@ export class IndexColaboradorComponent implements OnInit {
 
     this.guardandoRol.set(true);
     this.rolService.actualizarRol(this.rolEditando.idRol, { descripcion: this.rolEditando.descripcion }).subscribe({
-      next: () => {
+      next: (response) => {
         this.guardandoRol.set(false);
-        this.rolEditando = null;
-        this.cargarRoles();
-        iziToast.show({
-          title: 'Éxito',
-          titleColor: '#28a745',
-          message: 'Rol actualizado correctamente',
-          position: 'topRight'
-        });
+        if (response.data) {
+          this.rolEditando = null;
+          this.cargarRoles();
+          iziToast.show({
+            title: 'Éxito',
+            titleColor: '#28a745',
+            message: 'Rol actualizado correctamente',
+            position: 'topRight'
+          });
+        } else {
+          iziToast.show({
+            title: 'Error',
+            titleColor: '#dc3545',
+            message: response.message || 'Error al actualizar rol',
+            position: 'topRight'
+          });
+        }
       },
       error: () => {
         this.guardandoRol.set(false);

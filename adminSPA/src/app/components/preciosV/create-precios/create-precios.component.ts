@@ -12,6 +12,7 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
 import { ProductoCreate } from '../../../models/producto.models';
 import { tokenizarTerminoBusquedaProducto } from '../../../utils/producto-busqueda.util';
+import { ActivatedRoute } from '@angular/router';
 
 declare var bootstrap: any;
 
@@ -172,7 +173,8 @@ export class CreatePreciosComponent implements OnInit {
     private _lotesService: LotesService,
     private _sucursalService: SucursalService,
     private _tablasSunatService: TablasSunatService,
-    public sidebarState: SidebarStateService
+    public sidebarState: SidebarStateService,
+    private route: ActivatedRoute
   ) {
     this.formListaPrecio = this.fb.group({
       idLista: [null],
@@ -237,6 +239,7 @@ export class CreatePreciosComponent implements OnInit {
             this.actualizarPrecioProducto(producto, idLista)
           );
         }
+        this.aplicarBusquedaDesdeRuta();
         this.filtrarProductos();
       },
       error: (error) => {
@@ -661,6 +664,21 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   // Funciones auxiliares
+  private aplicarBusquedaDesdeRuta(): void {
+    const q = String(this.route.snapshot.queryParamMap.get('q') || '').trim();
+    const idProducto = String(this.route.snapshot.queryParamMap.get('idProducto') || '').trim();
+    if (idProducto) {
+      const fila = this.productos.find(
+        (p) => String(p.idProducto).toLowerCase() === idProducto.toLowerCase()
+      );
+      this.filtroBusqueda = (fila?.codigo || fila?.sku || fila?.descripcion || q || '').trim();
+      return;
+    }
+    if (q) {
+      this.filtroBusqueda = q;
+    }
+  }
+
   filtrarProductos(): void {
     const tokens = tokenizarTerminoBusquedaProducto(this.filtroBusqueda);
     let lista = this.productos.filter((producto) => {

@@ -65,10 +65,7 @@ interface ApiResponse<T> {
 
 export interface PermisosConfiguracionSistema {
     puedeEditarSistemaOperativo: boolean;
-    /** Visible si empresa principal o rol superAdmin (backend). */
     mostrarTabSistema?: boolean;
-    esEmpresaPrincipal?: boolean;
-    esSuperAdmin?: boolean;
 }
 
 export interface EjecutarBackupAhoraResult {

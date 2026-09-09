@@ -1,5 +1,6 @@
 const rolRepository = require('../repositories/rol.repository');
 const { v4: uuidv4 } = require('uuid');
+const rolReservadoPlataforma = require('../utils/rolReservadoPlataforma.util');
 
 /**
  * Valida si el usuario es administrador
@@ -16,6 +17,7 @@ function validarAdmin(usuario) {
 exports.crearRol = async (pool, descripcion, usuarioAutenticado) => {
   // 1. Validar permisos
   validarAdmin(usuarioAutenticado);
+  await rolReservadoPlataforma.assertNombreRolPermitido(pool, usuarioAutenticado, descripcion);
 
   // 2. Verificar si el rol ya existe
   const rolExiste = await rolRepository.existeRolPorDescripcion(pool, descripcion, usuarioAutenticado.empresa);
@@ -45,10 +47,10 @@ exports.obtenerRoles = async (pool, usuarioAutenticado) => {
 
   // 2. Obtener roles del repository
   const roles = await rolRepository.obtenerRolesPorEmpresa(pool, usuarioAutenticado.empresa);
+  const visibles = await rolReservadoPlataforma.filtrarRolesListables(pool, usuarioAutenticado, roles);
 
-  // 3. Retornar datos
   return {
-    data: roles
+    data: visibles
   };
 }
 
@@ -80,6 +82,7 @@ exports.actualizarRoll = async (pool, )=>{}
 exports.actualizarRol = async (pool, idRol, descripcion, usuarioAutenticado) => {
   // 1. Validar permisos
 //   validarAdmin(usuarioAutenticado);
+  await rolReservadoPlataforma.assertNombreRolPermitido(pool, usuarioAutenticado, descripcion);
 
   // 2. Verificar que no exista OTRO rol con la misma descripción
   const existeOtro = await rolRepository.existeOtroRolConDescripcion(pool, idRol, descripcion, usuarioAutenticado.empresa);

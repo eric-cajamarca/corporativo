@@ -107,7 +107,16 @@
                     }
                   </td>
                   <td class="ge-col-acciones text-end">
-                    <div class="btn-group">
+                    <div class="ge-acciones">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-info"
+                        (click)="abrirUsoPlan(empresa)"
+                        title="Uso del plan">
+                        <i class="bi bi-bar-chart-line"></i>
+                        <span class="ge-uso-btn-label">Uso</span>
+                      </button>
+                      <div class="btn-group">
                       <button
                         type="button"
                         class="btn btn-sm btn-outline-primary dropdown-toggle"
@@ -143,6 +152,7 @@
                           </a>
                         </li>
                       </ul>
+                    </div>
                     </div>
                   </td>
                 </tr>
@@ -210,6 +220,13 @@
               </div>
 
               <div class="ge-card-actions">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-info"
+                  (click)="abrirUsoPlan(empresa)">
+                  <i class="bi bi-bar-chart-line me-1"></i>
+                  Uso del plan
+                </button>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-warning"
@@ -323,6 +340,138 @@
           }
         </div>
       }
+    </div>
+  </div>
+</div>
+
+<!-- Modal uso del plan (super usuario) -->
+<div class="modal fade" id="modalUsoPlan" tabindex="-1" aria-labelledby="modalUsoPlanTitulo">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down ge-uso-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="pe-2 min-w-0">
+          <h5 class="modal-title mb-0" id="modalUsoPlanTitulo">Uso del plan</h5>
+          @if (usoPlanEmpresa) {
+            <div class="small text-muted text-truncate">
+              {{ usoPlanEmpresa.razon_Social }}
+              @if (usoPlanEmpresa.ruc) {
+                <span> · RUC {{ usoPlanEmpresa.ruc }}</span>
+              }
+            </div>
+          }
+        </div>
+        <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        @if (usoPlanCargando()) {
+          <div class="text-center py-4">
+            <span class="spinner-border"></span>
+            <p class="mt-2 mb-0 text-muted">Cargando uso del plan…</p>
+          </div>
+        } @else if (usoPlanError()) {
+          <div class="alert alert-danger mb-0">{{ usoPlanError() }}</div>
+        } @else if (usoPlanEstado; as e) {
+          <p class="small text-muted mb-3">
+            Consumo frente a los límites del contrato
+            @if (e.planCatalogo?.nombre || usoPlanEmpresa?.planSuscripcion) {
+              ({{ e.planCatalogo?.nombre || usoPlanEmpresa?.planSuscripcion }}).
+            }
+          </p>
+          @if (e.limitesUso; as lim) {
+            <div class="ge-uso-row mb-3">
+              <div class="d-flex justify-content-between small">
+                <span>Usuarios (cuentas)</span>
+                <span>{{ lim.usuariosOcupados ?? lim.usuariosActivos }} / {{ lim.maxUsuarios }}</span>
+              </div>
+              <div class="progress ge-uso-bar">
+                <div
+                  class="progress-bar"
+                  [ngClass]="claseBarraUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)"
+                  role="progressbar"
+                  [style.width.%]="pctUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)"></div>
+              </div>
+            </div>
+            <div class="ge-uso-row mb-3">
+              <div class="d-flex justify-content-between small">
+                <span>Sucursales</span>
+                <span>{{ lim.sucursales }} / {{ lim.maxSucursales }}</span>
+              </div>
+              <div class="progress ge-uso-bar">
+                <div
+                  class="progress-bar"
+                  [ngClass]="claseBarraUso(lim.sucursales, lim.maxSucursales)"
+                  role="progressbar"
+                  [style.width.%]="pctUso(lim.sucursales, lim.maxSucursales)"></div>
+              </div>
+            </div>
+            @if (maxProductos(lim) > 0) {
+              <div class="ge-uso-row mb-3">
+                <div class="d-flex justify-content-between small">
+                  <span>Productos activos</span>
+                  <span>{{ usadoProductos(lim) | number: '1.0-0' }} / {{ maxProductos(lim) | number: '1.0-0' }}</span>
+                </div>
+                <div class="progress ge-uso-bar">
+                  <div
+                    class="progress-bar"
+                    [ngClass]="claseBarraUso(usadoProductos(lim), maxProductos(lim))"
+                    role="progressbar"
+                    [style.width.%]="pctUso(usadoProductos(lim), maxProductos(lim))"></div>
+                </div>
+              </div>
+            }
+            <div class="ge-uso-row mb-3">
+              <div class="d-flex justify-content-between small">
+                <span>Direcciones empresa</span>
+                <span>{{ lim.direccionesEmpresa ?? 0 }} / {{ lim.maxDireccionesEmpresa ?? lim.maxSucursales }}</span>
+              </div>
+              <div class="progress ge-uso-bar">
+                <div
+                  class="progress-bar"
+                  [ngClass]="claseBarraUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales)"
+                  role="progressbar"
+                  [style.width.%]="pctUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales)"></div>
+              </div>
+            </div>
+            @if (e.deploymentMode === 'saas') {
+              <div class="pt-3 mt-1 border-top">
+                <div class="d-flex justify-content-between small">
+                  <span>Comprobantes SUNAT aceptados</span>
+                  <span>
+                    {{ usadoComprobantesSunat(lim) | number: '1.0-0' }}
+                    @if (maxComprobantesSunat(lim) > 0) {
+                      <span class="text-muted"> / {{ maxComprobantesSunat(lim) | number: '1.0-0' }}</span>
+                    } @else {
+                      <span class="text-muted"> (sin tope en plan)</span>
+                    }
+                  </span>
+                </div>
+                @if (maxComprobantesSunat(lim) > 0) {
+                  <div class="progress ge-uso-bar mt-1">
+                    <div
+                      class="progress-bar"
+                      [ngClass]="claseBarraSunat(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))"
+                      role="progressbar"
+                      [style.width.%]="pctUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))"></div>
+                  </div>
+                }
+                <div class="small mt-2 mb-0">
+                  <span class="text-muted">Ventas con comprobante:</span>
+                  @if (lim.puedeCrearVentaPorCuotaSunat !== false) {
+                    <span class="text-success"> permitidas</span>
+                  } @else {
+                    <span class="text-danger"> bloqueadas por tope SUNAT</span>
+                  }
+                </div>
+              </div>
+            }
+          } @else {
+            <p class="text-muted mb-0">Esta empresa no tiene límites de plan para mostrar.</p>
+          }
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>

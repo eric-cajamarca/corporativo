@@ -135,7 +135,7 @@
   background: #fff;
   box-shadow: -6px 0 10px -8px rgba(15, 39, 68, 0.28);
   z-index: 1;
-  min-width: 6.5rem;
+  min-width: 9.5rem;
 }
 
 .ge-table thead th.ge-col-acciones {
@@ -329,4 +329,40 @@
 
 .list-group-item:last-child {
   margin-bottom: 0;
+}
+
+.ge-acciones {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ge-uso-btn-label {
+  margin-left: 0.3rem;
+}
+
+.ge-uso-modal {
+  --bs-modal-width: 28rem;
+}
+
+.ge-uso-bar {
+  height: 8px;
+}
+
+.ge-uso-row .small span:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: 0.75rem;
+}
+
+@media (max-width: 575.98px) {
+  .ge-uso-btn-label {
+    display: none;
+  }
+
+  .ge-uso-modal .modal-body {
+    padding: 1rem 1.1rem 1.25rem;
+  }
 }

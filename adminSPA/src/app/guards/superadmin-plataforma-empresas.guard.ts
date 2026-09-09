@@ -2,18 +2,10 @@ import { inject } from '@angular/core';
 import { Router, CanActivateFn } from '@angular/router';
 import { map } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
-import { environment } from '../../environments/environment';
-
-function normalizarGuid(v: string | null | undefined): string {
-  return String(v || '')
-    .trim()
-    .replace(/[{}]/g, '')
-    .toLowerCase();
-}
 
 /**
- * Listado /empresa (plataforma): solo superAdmin y, si environment.empresaPrincipalId está definido,
- * sesión de esa empresa. Debe coincidir con puedeAccesoListadoPlataformaEmpresas en el backend.
+ * Rutas de administración multiempresa: el rol se valida aquí para no pintar la UI;
+ * el backend vuelve a comprobar empresa operadora (EMPRESA_PRINCIPAL_ID).
  */
 export const superAdminPlataformaEmpresasGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
@@ -28,14 +20,6 @@ export const superAdminPlataformaEmpresasGuard: CanActivateFn = () => {
       if (!u || u.rol !== 'superAdmin') {
         router.navigate(['/home']);
         return false;
-      }
-      const esperado = environment.empresaPrincipalId?.trim();
-      if (esperado) {
-        const actual = u.idEmpresa ? normalizarGuid(u.idEmpresa) : '';
-        if (!actual || actual !== normalizarGuid(esperado)) {
-          router.navigate(['/home']);
-          return false;
-        }
       }
       return true;
     })

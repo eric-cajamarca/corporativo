@@ -15,7 +15,6 @@ export interface CuentaBancaria {
 }
 
 export interface CuentasBancariasListResponse {
-  esEmpresaPrincipal: boolean;
   items: CuentaBancaria[];
 }
 

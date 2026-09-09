@@ -26,6 +26,7 @@ function isWhitelistedPublic(pathname, method) {
   if (pathname.startsWith('/api/logout')) return true;
   if (pathname.startsWith('/api/suscripcion/vincular-checkout')) return true;
   if (pathname.startsWith('/api/suscripcion/mi-estado')) return true;
+  if (/^\/api\/suscripcion\/empresas\/[^/]+\/uso-plan$/.test(pathname)) return true;
   if (pathname.startsWith('/api/suscripcion/crear-pago')) return true;
   if (pathname.startsWith('/api/suscripcion/solicitar-upgrade')) return true;
   if (pathname.startsWith('/api/suscripcion/programar-downgrade')) return true;

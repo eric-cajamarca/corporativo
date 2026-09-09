@@ -6,6 +6,8 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { GestoresService, EmpresaGestionada, GestorInfo, BusquedaEmpresaResult, ConfiguracionEmpresa } from '../../../services/gestores.service';
 import { EmpresaFactilizaService, EmpresasServiciosData } from '../../../services/empresa-factiliza.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { SaasSubscriptionService } from '../../../services/saas-subscription.service';
+import { LimitesUsoSuscripcion, MiEstadoSuscripcionResponse } from '../../../models/saas-subscription.model';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 declare var iziToast: any;
@@ -57,6 +59,13 @@ export class IndexEmpresaComponent implements OnInit {
   // Tabs del modal principal
   public activeTab = signal<string>('gestores');
 
+  // Modal uso del plan (super usuario)
+  public usoPlanEmpresa: { idEmpresa: string; razon_Social?: string; ruc?: string; planSuscripcion?: string } | null = null;
+  public usoPlanEstado: MiEstadoSuscripcionResponse | null = null;
+  public usoPlanCargando = signal(false);
+  public usoPlanError = signal<string | null>(null);
+  private usoPlanRequestId = 0;
+
   // Servicios API por empresa (tab en modal)
   public serviciosApiData: EmpresasServiciosData | null = null;
   public asignacionesServiciosApi: Record<string, Record<string, boolean>> = {};
@@ -67,6 +76,7 @@ export class IndexEmpresaComponent implements OnInit {
     public empresaService: EmpresaService,
     public gestoresService: GestoresService,
     private empresaFactilizaService: EmpresaFactilizaService,
+    private saasSubscriptionService: SaasSubscriptionService,
     public sidebarState: SidebarStateService,
     public router: Router,
   ) {}
@@ -686,5 +696,75 @@ export class IndexEmpresaComponent implements OnInit {
       return { texto: 'Sí', clase: 'text-success fw-semibold small' };
     }
     return { texto: '—', clase: 'text-muted small' };
+  }
+
+  abrirUsoPlan(empresa: {
+    idEmpresa: string;
+    razon_Social?: string;
+    ruc?: string;
+    planSuscripcion?: string;
+  }): void {
+    this.usoPlanEmpresa = empresa;
+    this.usoPlanEstado = null;
+    this.usoPlanError.set(null);
+    this.usoPlanCargando.set(true);
+    const reqId = ++this.usoPlanRequestId;
+    const el = document.getElementById('modalUsoPlan');
+    if (el && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+    this.saasSubscriptionService.getUsoPlanEmpresa(empresa.idEmpresa).subscribe({
+      next: (data) => {
+        if (reqId !== this.usoPlanRequestId) return;
+        this.usoPlanEstado = data;
+        this.usoPlanCargando.set(false);
+      },
+      error: (err) => {
+        if (reqId !== this.usoPlanRequestId) return;
+        this.usoPlanCargando.set(false);
+        const msg =
+          (typeof err?.error?.message === 'string' && err.error.message) ||
+          'No se pudo cargar el uso del plan.';
+        this.usoPlanError.set(msg);
+      }
+    });
+  }
+
+  pctUso(actual: number, maximo: number): number {
+    if (!maximo || maximo <= 0) return 0;
+    return Math.min(100, Math.round((100 * actual) / maximo));
+  }
+
+  maxComprobantesSunat(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.maxComprobantesSunatAceptados);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  usadoComprobantesSunat(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.comprobantesSunatAceptados);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  maxProductos(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.maxProductosActivos);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  usadoProductos(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.productosActivos);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  claseBarraUso(actual: number, maximo: number): string {
+    if (!maximo || maximo <= 0) return 'bg-primary';
+    if (actual > maximo) return 'bg-danger';
+    return 'bg-primary';
+  }
+
+  claseBarraSunat(actual: number, maximo: number): string {
+    if (!maximo || maximo <= 0) return 'bg-primary';
+    if (actual >= maximo) return 'bg-danger';
+    if (actual / maximo >= 0.9) return 'bg-warning';
+    return 'bg-primary';
   }
 }

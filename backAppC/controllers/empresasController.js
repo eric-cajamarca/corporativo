@@ -10,7 +10,7 @@ const getEmpresas = async function (req, res, next) {
         return res.status(401).send({ message: 'No autorizado' });
     }
     if (!puedeAccesoListadoPlataformaEmpresas(req)) {
-        return res.status(403).send({ message: 'No tiene permisos para listar empresas de la plataforma' });
+        return res.status(403).send({ message: 'No autorizado' });
     }
     try {
         await withPool(async (pool) => {
@@ -33,7 +33,12 @@ const getEmpresasById = async function (req, res, next) {
                         try {
                 await withPool(async (pool) => {
                     const result = await empresasAdministracionService.obtenerPorId(pool, id);
-                    res.status(200).send({ data: result });
+                    const data = (Array.isArray(result) ? result : []).map((row) => {
+                        if (!row || typeof row !== 'object') return row;
+                        const { esPrincipal, ...rest } = row;
+                        return rest;
+                    });
+                    res.status(200).send({ data });
                 });
             } catch (error) {
                 console.error('Error al obtener los usuarios:', error);
@@ -466,7 +471,7 @@ const cambiar_estado_empresa = async function (req, res, next) {
     return res.status(401).send({ message: 'No autorizado' });
   }
   if (!puedeAccesoListadoPlataformaEmpresas(req)) {
-    return res.status(403).send({ message: 'No tiene permisos para cambiar el estado de empresas de la plataforma' });
+    return res.status(403).send({ message: 'No autorizado' });
   }
   const idEmpresa = req.params['id'];
   if (!idEmpresa) {
@@ -842,7 +847,7 @@ const reset2faEmpresa = async (req, res, next) => {
   }
   if (!puedeAccesoListadoPlataformaEmpresas(req)) {
     return res.status(403).send({
-      message: 'No tiene permisos para restablecer el 2FA de la plataforma.',
+      message: 'No autorizado',
       data: undefined
     });
   }

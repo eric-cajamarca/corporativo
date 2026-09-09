@@ -239,6 +239,46 @@ async function deleted(idLote) {
   });
 }
 
+async function listarCaducidadEmpresa(pool, idEmpresa, fechaHoy, diasVentana) {
+  const dias = Number.isFinite(Number(diasVentana)) ? Math.max(0, parseInt(String(diasVentana), 10)) : 30;
+  const result = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('fechaHoy', sql.Date, fechaHoy)
+    .input('diasVentana', sql.Int, dias)
+    .query(`
+      SELECT
+        l.idLote,
+        l.numeroLote,
+        CONVERT(DECIMAL(18, 2), l.cantidadDisponible) AS cantidadDisponible,
+        CONVERT(VARCHAR(10), l.fechaVencimiento, 23) AS fechaVencimiento,
+        DATEDIFF(DAY, @fechaHoy, CONVERT(DATE, l.fechaVencimiento)) AS dias,
+        RTRIM(LTRIM(ISNULL(p.Codigo, ''))) AS codigo,
+        RTRIM(LTRIM(ISNULL(p.descripcion, ''))) AS descripcion,
+        RTRIM(LTRIM(ISNULL(s.nombre, ''))) AS sucursal
+      FROM Lotes l
+      LEFT JOIN Productos p ON p.idProducto = l.idProducto AND p.idEmpresa = l.idEmpresa
+      LEFT JOIN Sucursal s ON s.idSucursal = l.idSucursal
+      WHERE l.idEmpresa = @idEmpresa
+        AND l.fechaVencimiento IS NOT NULL
+        AND ISNULL(l.activo, 1) = 1
+        AND CONVERT(DECIMAL(18, 2), ISNULL(l.cantidadDisponible, 0)) > 0
+        AND CONVERT(DATE, l.fechaVencimiento) <= DATEADD(DAY, @diasVentana, @fechaHoy)
+      ORDER BY l.fechaVencimiento ASC
+    `);
+  return result.recordset || [];
+}
+
+async function listarEmpresasConLotesCaducidad(pool) {
+  const result = await pool.request().query(`
+    SELECT DISTINCT l.idEmpresa
+    FROM Lotes l
+    WHERE l.fechaVencimiento IS NOT NULL
+      AND ISNULL(l.activo, 1) = 1
+      AND CONVERT(DECIMAL(18, 2), ISNULL(l.cantidadDisponible, 0)) > 0
+  `);
+  return (result.recordset || []).map((r) => r.idEmpresa).filter(Boolean);
+}
+
 async function actualizarCantidadDisponible(idLote, nuevaCantidad) {
   return withPool(async (pool) => {
     const result = await pool.request()
@@ -257,5 +297,7 @@ module.exports = {
   create,
   update,
   deleted,
-  actualizarCantidadDisponible
+  actualizarCantidadDisponible,
+  listarCaducidadEmpresa,
+  listarEmpresasConLotesCaducidad
 };

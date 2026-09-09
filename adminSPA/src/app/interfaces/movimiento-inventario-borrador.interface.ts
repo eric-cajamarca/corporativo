@@ -22,6 +22,7 @@ export interface MovimientoInventarioBorradorFila {
   costoUnitario: number;
   fechaVencimiento: string;
   numeroLote: string;
+  idLote?: string;
 }
 
 export interface MovimientoInventarioBorrador {

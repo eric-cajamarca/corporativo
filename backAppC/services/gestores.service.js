@@ -208,16 +208,10 @@ const obtenerPermisosConfiguracionSistema = async (pool, user) => {
     if (!user || !user.empresa) {
         throw new Error('USUARIO_NO_VALIDO');
     }
-    const esEmpresaPrincipal = await suscripcionCatalogoAdminService.usuarioEsEmpresaPrincipal(pool, user);
-    const esSuperAdminUsuario = suscripcionCatalogoAdminService.esSuperAdmin(user);
     const puedeEditarSistemaOperativo = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
-    /** Pestaña Sistema: solo el dueño de la plataforma (superAdmin de la empresa operadora). */
-    const mostrarTabSistema = puedeEditarSistemaOperativo;
     return {
         puedeEditarSistemaOperativo,
-        mostrarTabSistema,
-        esEmpresaPrincipal,
-        esSuperAdmin: esSuperAdminUsuario
+        mostrarTabSistema: puedeEditarSistemaOperativo
     };
 };
 

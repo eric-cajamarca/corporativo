@@ -1,6 +1,6 @@
 import { Directive, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import {
   MovimientoInventarioService,
@@ -45,6 +45,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
   protected readonly productoEditarModal = inject(ProductoEditarModalService);
   protected readonly borradorService = inject(MovimientoInventarioBorradorService);
   protected readonly router = inject(Router);
+  protected readonly route = inject(ActivatedRoute);
 
   form: FormGroup;
   tiposMovimiento: TipoMovimientoItem[] = [];
@@ -63,6 +64,10 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
   private borradorTimer: ReturnType<typeof setTimeout> | null = null;
   private saltarSugerenciaComprobante = false;
   private readonly DEBOUNCE_BORRADOR_MS = 300;
+  private prefillMerma: Record<string, string> | null = null;
+  private tiposListos = false;
+  private sucursalesListas = false;
+  private prefillMermaAplicado = false;
 
   /** Tipos de movimiento permitidos en esta pantalla (códigos API). */
   protected abstract readonly tiposCodigoPermitidos: readonly string[];
@@ -95,6 +100,70 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     return this.fechaLocalYmd(new Date());
   }
 
+  private leerQueryPrefillMerma(): Record<string, string> | null {
+    if (this.modoIngreso) {
+      return null;
+    }
+    const q = this.route.snapshot.queryParamMap;
+    const idProducto = String(q.get('idProducto') || '').trim();
+    if (!idProducto) {
+      return null;
+    }
+    return {
+      tipo: String(q.get('tipo') || 'SALIDA_MERMA').trim() || 'SALIDA_MERMA',
+      idProducto,
+      idSucursal: String(q.get('idSucursal') || '').trim(),
+      idLote: String(q.get('idLote') || '').trim(),
+      cantidad: String(q.get('cantidad') || '').trim(),
+      codigo: String(q.get('codigo') || '').trim(),
+      descripcion: String(q.get('descripcion') || '').trim(),
+      numeroLote: String(q.get('numeroLote') || '').trim(),
+      fechaVencimiento: String(q.get('fechaVencimiento') || '').trim(),
+      costoUnitario: String(q.get('costoUnitario') || '').trim()
+    };
+  }
+
+  private aplicarPrefillMermaSiListo(): void {
+    if (!this.prefillMerma || this.prefillMermaAplicado || !this.tiposListos || !this.sucursalesListas) {
+      return;
+    }
+    this.prefillMermaAplicado = true;
+    const p = this.prefillMerma;
+    const tipo = this.tiposMovimiento.some((t) => t.codigo === p['tipo'])
+      ? p['tipo']
+      : 'SALIDA_MERMA';
+    const idSucursal =
+      p['idSucursal'] && this.sucursales.some((s) => String(s.idSucursal) === p['idSucursal'])
+        ? p['idSucursal']
+        : String(this.sucursales[0]?.idSucursal || '');
+    const nro = p['numeroLote'] || '';
+    const fv = p['fechaVencimiento'] || '';
+    const obs = [
+      'Baja por vencimiento',
+      nro ? `lote ${nro}` : '',
+      fv ? `f.venc ${fv}` : ''
+    ].filter(Boolean).join('. ');
+    this.form.patchValue({
+      tipoMovimiento: tipo,
+      idSucursal,
+      observaciones: obs
+    });
+    this.filas = [
+      {
+        idProducto: p['idProducto'],
+        codigo: p['codigo'],
+        descripcion: p['descripcion'],
+        cantidad: Number(p['cantidad']) || 0,
+        costoUnitario: Number(p['costoUnitario']) || 0,
+        fechaVencimiento: fv,
+        numeroLote: nro,
+        idLote: p['idLote']
+      }
+    ];
+    this.aplicarComprobanteSugeridoPorTipo(tipo);
+    this.programarGuardadoBorrador();
+  }
+
   ngOnInit(): void {
     this.cargarTipos();
     this.cargarSucursales();
@@ -110,8 +179,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
       this.programarGuardadoBorrador();
     });
 
-    const restaurado = this.restaurarBorradorSiExiste();
-    if (!restaurado) {
+    this.prefillMerma = this.leerQueryPrefillMerma();
+    const restaurado = this.prefillMerma ? false : this.restaurarBorradorSiExiste();
+    if (!restaurado && !this.prefillMerma) {
       this.agregarFila();
     }
   }
@@ -136,7 +206,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
       cantidad: 0,
       costoUnitario: 0,
       fechaVencimiento: '',
-      numeroLote: ''
+      numeroLote: '',
+      idLote: ''
     };
   }
 
@@ -162,7 +233,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         cantidad: Number(f.cantidad) || 0,
         costoUnitario: Number(f.costoUnitario) || 0,
         fechaVencimiento: String(f.fechaVencimiento || ''),
-        numeroLote: String(f.numeroLote || '')
+        numeroLote: String(f.numeroLote || ''),
+        idLote: String(f.idLote || '')
       }))
     };
   }
@@ -223,7 +295,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
             cantidad: Number(f.cantidad) || 0,
             costoUnitario: Number(f.costoUnitario) || 0,
             fechaVencimiento: f.fechaVencimiento || '',
-            numeroLote: f.numeroLote || ''
+            numeroLote: f.numeroLote || '',
+            idLote: f.idLote || ''
           }))
         : [this.filaVacia()];
     this.tieneBorradorLocal = true;
@@ -327,9 +400,13 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         if (this.tiposMovimiento.length === 0) {
           this.tiposMovimiento = fallback;
         }
+        this.tiposListos = true;
+        this.aplicarPrefillMermaSiListo();
       },
       error: () => {
         this.tiposMovimiento = fallback;
+        this.tiposListos = true;
+        this.aplicarPrefillMermaSiListo();
       }
     });
   }
@@ -338,8 +415,14 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     this.sucursalService.obtener_sucursal_todos().subscribe({
       next: (res) => {
         this.sucursales = res?.data || [];
+        this.sucursalesListas = true;
+        this.aplicarPrefillMermaSiListo();
       },
-      error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar sucursales', position: 'topRight' })
+      error: () => {
+        this.sucursalesListas = true;
+        this.aplicarPrefillMermaSiListo();
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar sucursales', position: 'topRight' });
+      }
     });
   }
 
@@ -650,6 +733,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         if (f.costoUnitario != null && f.costoUnitario > 0) item.costoUnitario = Number(f.costoUnitario);
         if (f.fechaVencimiento) item.fechaVencimiento = f.fechaVencimiento;
         if (f.numeroLote) item.numeroLote = f.numeroLote;
+      } else if (f.idLote) {
+        item.idLote = String(f.idLote);
       }
       return item;
     });

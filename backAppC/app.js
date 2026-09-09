@@ -387,6 +387,12 @@ app.listen(PORT, () => {
   } catch (e) {
     console.error('No se pudo iniciar job onboarding automation:', e.message);
   }
+    try {
+    const caducidadWhatsappJob = require('./jobs/caducidadWhatsapp.job');
+    caducidadWhatsappJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job caducidad WhatsApp:', e.message);
+  }
   try {
     const auditoriaOperacionesJob = require('./jobs/auditoriaOperaciones.job');
     auditoriaOperacionesJob.iniciar();

@@ -22,6 +22,45 @@
     </button>
     
     <div class="d-flex gap-2 flex-wrap">
+      <div class="btn-group btn-group-sm" role="group" aria-label="Caducidad">
+        <button
+          type="button"
+          class="btn"
+          [class.btn-primary]="filtroCaducidad === 'todos'"
+          [class.btn-outline-primary]="filtroCaducidad !== 'todos'"
+          (click)="setFiltroCaducidad('todos')">
+          Todos
+        </button>
+        <button
+          type="button"
+          class="btn"
+          [class.btn-warning]="filtroCaducidad === 'por-vencer'"
+          [class.btn-outline-warning]="filtroCaducidad !== 'por-vencer'"
+          (click)="setFiltroCaducidad('por-vencer')"
+          title="Lotes con stock que vencen en el plazo elegido">
+          Por vencer ({{ conteoPorVencer }})
+        </button>
+        <button
+          type="button"
+          class="btn"
+          [class.btn-danger]="filtroCaducidad === 'vencidos'"
+          [class.btn-outline-danger]="filtroCaducidad !== 'vencidos'"
+          (click)="setFiltroCaducidad('vencidos')"
+          title="Lotes con stock ya vencido">
+          Vencidos ({{ conteoVencidos }})
+        </button>
+      </div>
+      @if (filtroCaducidad === 'por-vencer') {
+        <select
+          class="form-select form-select-sm"
+          style="width: 110px;"
+          [(ngModel)]="diasPorVencer"
+          (ngModelChange)="aplicarFiltros()">
+          <option [ngValue]="7">7 días</option>
+          <option [ngValue]="15">15 días</option>
+          <option [ngValue]="30">30 días</option>
+        </select>
+      }
       <input 
         type="text" 
         class="form-control form-control-sm" 
@@ -88,7 +127,10 @@
             </tr>
           } @else {
             @for (lote of lotesFiltrados; track lote.idLote) {
-              <tr [class.table-secondary]="lote.activo === false">
+              <tr
+                [class.table-secondary]="lote.activo === false"
+                [class.table-danger]="esLoteVencidoConStock(lote)"
+                [class.table-warning]="esLotePorVencer(lote) && !esLoteVencidoConStock(lote)">
                 <td data-label="N° lote">
                   <span class="fw-semibold">{{ lote.numeroLote || '—' }}</span>
                   @if (lote.activo === false) {
@@ -113,6 +155,9 @@
                     <small [class.text-danger]="loteVencido(lote.fechaVencimiento)" [class.fw-semibold]="loteVencido(lote.fechaVencimiento)">
                       {{ lote.fechaVencimiento | date:'dd/MM/yyyy' }}
                     </small>
+                    @if (textoDiasCaducidad(lote)) {
+                      <div class="small" [class.text-danger]="esLoteVencidoConStock(lote)">{{ textoDiasCaducidad(lote) }}</div>
+                    }
                   } @else {
                     <small class="text-muted">—</small>
                   }
@@ -140,6 +185,22 @@
                       title="Mover entre Ubicaciones">
                       <i class="bi bi-arrow-repeat"></i>
                     </button>
+                    @if (mostrarAccionesCaducidad(lote)) {
+                      <button
+                        type="button"
+                        class="btn btn-outline-warning"
+                        (click)="bajarPrecio(lote)"
+                        title="Bajar precio / ofertar en gestor de precios">
+                        <i class="bi bi-tag"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        (click)="darBajaMerma(lote)"
+                        title="Dar de baja (salida / merma)">
+                        <i class="bi bi-box-arrow-up"></i>
+                      </button>
+                    }
                     <button 
                       class="btn btn-outline-danger" 
                       (click)="eliminarLote(lote.idLote!)"
@@ -162,6 +223,12 @@
       <small>
         <i class="fas fa-info-circle me-1"></i>
         Mostrando {{ lotesFiltrados.length }} de {{ lotes.length }} lotes
+        @if (filtroCaducidad === 'por-vencer') {
+          · Por vencer en {{ diasPorVencer }} días: oferte o baje precio (etiqueta) o dé de baja (merma)
+        }
+        @if (filtroCaducidad === 'vencidos') {
+          · Vencidos: dé de baja con Salidas / merma. No vender.
+        }
       </small>
     </div>
   }

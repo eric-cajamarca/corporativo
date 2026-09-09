@@ -393,7 +393,7 @@ const guardar_configuracion = async function (req, res) {
         }
         if (esErrorPermisoGestores(error.message)) {
             return res.status(403).json({
-                message: 'No tiene permiso para guardar la configuración (se requiere permiso de configuración o rol administrador/superAdmin).',
+                message: 'No tiene permiso para guardar la configuración.',
                 data: undefined
             });
         }

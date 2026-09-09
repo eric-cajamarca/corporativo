@@ -414,7 +414,8 @@ async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa,
           idEmpresa,
           idSucursal,
           idProducto: item.idProducto,
-          cantidad
+          cantidad,
+          idLote: item.idLote || null
         },
         { controlUbicaciones, idUbicacionSolo: idUbicacionMovSalida }
       );

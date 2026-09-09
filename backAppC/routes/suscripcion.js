@@ -17,6 +17,7 @@ api.post('/suscripcion/vincular-checkout', auth.auth, suscripcionController.vinc
 api.get('/suscripcion/planes-catalogo-editor', auth.optionalAuth, suscripcionController.planesCatalogoEditor);
 api.put('/suscripcion/planes-catalogo/:planCode', auth.auth, suscripcionController.actualizarPlanCatalogo);
 api.get('/suscripcion/mi-estado', auth.auth, suscripcionController.miEstado);
+api.get('/suscripcion/empresas/:idEmpresa/uso-plan', auth.auth, suscripcionController.usoPlanEmpresa);
 api.post('/suscripcion/solicitar-upgrade', auth.auth, suscripcionController.solicitarUpgrade);
 api.post('/suscripcion/programar-downgrade', auth.auth, suscripcionController.programarDowngrade);
 api.post('/suscripcion/cancelar-downgrade', auth.auth, suscripcionController.cancelarDowngrade);

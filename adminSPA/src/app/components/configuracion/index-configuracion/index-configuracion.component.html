@@ -490,6 +490,24 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-md-6">
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="avisoWhatsappVencimiento" [(ngModel)]="inventario.avisoWhatsappVencimiento" name="avisoWhatsappVencimiento" [disabled]="!inventario.controlVencimiento">
+                      <label class="form-check-label" for="avisoWhatsappVencimiento">
+                        Aviso diario WhatsApp de caducidad
+                      </label>
+                    </div>
+                    <label class="form-label" for="celularAvisoCaducidad">Celular del vendedor o encargado</label>
+                    <input type="tel" class="form-control form-control-sm" id="celularAvisoCaducidad" name="celularAvisoCaducidad"
+                      [(ngModel)]="inventario.celularAvisoCaducidad" maxlength="15" placeholder="987654321" autocomplete="tel"
+                      [disabled]="!inventario.controlVencimiento || !inventario.avisoWhatsappVencimiento">
+                    <small class="text-muted">Recibe el aviso diario (desde las 8:00, hora Lima). Debe ser distinto del WhatsApp vinculado. No requiere el bot de clientes.</small>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="diasAvisoVencimiento">Días de anticipación (por vencer)</label>
+                    <input type="number" class="form-control form-control-sm" id="diasAvisoVencimiento" name="diasAvisoVencimiento" min="1" max="90" [(ngModel)]="inventario.diasAvisoVencimiento" [disabled]="!inventario.controlVencimiento">
+                    <small class="text-muted">Lotes que vencen dentro de este plazo entran en el aviso y en Gestión de Lotes.</small>
+                  </div>
                   <div class="col-md-6 d-flex align-items-center">
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="ubicaciones" [(ngModel)]="inventario.ubicaciones" name="ubicaciones">

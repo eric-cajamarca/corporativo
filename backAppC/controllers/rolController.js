@@ -36,6 +36,13 @@ const crear_rol = async function (req, res) {
       });
     }
 
+    if (error.message === 'ROL_NO_DISPONIBLE') {
+      return res.status(200).json({
+        message: 'Ese nombre de rol no está disponible.',
+        data: undefined
+      });
+    }
+
     // Error genérico
     res.status(500).json({
       message: 'Error al crear el rol',
@@ -152,6 +159,13 @@ const actualizar_rol = async function (req, res) {
     if (error.message === 'ROL_DUPLICADO') {
       return res.status(200).json({
         message: 'El rol ya existe',
+        data: undefined
+      });
+    }
+
+    if (error.message === 'ROL_NO_DISPONIBLE') {
+      return res.status(200).json({
+        message: 'Ese nombre de rol no está disponible.',
         data: undefined
       });
     }

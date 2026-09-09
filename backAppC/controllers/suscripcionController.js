@@ -4,6 +4,7 @@ const empresaSuscripcionEstadoService = require('../services/empresaSuscripcionE
 const { isSaas } = require('../config/deployment.config');
 const suscripcionPublicService = require('../services/suscripcionPublic.service');
 const { withPool } = require('../utils/dbPool.util');
+const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 const suscripcionCatalogoAdminService = require('../services/suscripcionCatalogoAdmin.service');
 const suscripcionConciliacionService = require('../services/suscripcionConciliacion.service');
 const suscripcionDowngradeService = require('../services/suscripcionDowngrade.service');
@@ -85,6 +86,30 @@ const miEstado = async (req, res) => {
   } catch (error) {
     console.error('miEstado:', error);
     res.status(500).json({ message: 'Error' });
+  }
+};
+
+const GUID_EMPRESA_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+
+/** Super usuario (empresa principal): uso del plan de cualquier empresa del listado. */
+const usoPlanEmpresa = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+    const idEmpresa = String(req.params.idEmpresa || '').trim();
+    if (!GUID_EMPRESA_RE.test(idEmpresa)) {
+      return res.status(400).json({ message: 'idEmpresa inválido' });
+    }
+    const data = await withPool((pool) => empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa));
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('usoPlanEmpresa:', error);
+    res.status(500).json({ message: 'Error al obtener el uso del plan' });
   }
 };
 
@@ -388,6 +413,7 @@ module.exports = {
   planesCatalogoEditor,
   actualizarPlanCatalogo,
   miEstado,
+  usoPlanEmpresa,
   solicitarUpgrade,
   programarDowngrade,
   cancelarDowngrade,

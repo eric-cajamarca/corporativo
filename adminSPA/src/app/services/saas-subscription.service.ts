@@ -24,6 +24,16 @@ export class SaasSubscriptionService {
       .pipe(map((r) => r.data));
   }
 
+  /** Super usuario: consumo del plan de una empresa del listado. */
+  getUsoPlanEmpresa(idEmpresa: string): Observable<MiEstadoSuscripcionResponse> {
+    return this.http
+      .get<{ data: MiEstadoSuscripcionResponse }>(
+        `${this.baseUrl}suscripcion/empresas/${encodeURIComponent(idEmpresa)}/uso-plan`,
+        { withCredentials: true }
+      )
+      .pipe(map((r) => r.data));
+  }
+
   vincularCheckout(orderNumber: string): Observable<unknown> {
     return this.http.post(
       `${this.baseUrl}suscripcion/vincular-checkout`,

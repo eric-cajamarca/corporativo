@@ -19,7 +19,7 @@ export class CuentasBancariasService {
   listar(): Observable<CuentasBancariasListResponse> {
     return this.http
       .get<{ data: CuentasBancariasListResponse }>(this.baseUrl, { withCredentials: true })
-      .pipe(map((r) => r.data || { esEmpresaPrincipal: false, items: [] }));
+      .pipe(map((r) => r.data || { items: [] }));
   }
 
   crear(payload: CuentaBancariaPayload): Observable<CuentaBancaria> {

@@ -1,6 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
 const cuentasBancariasRepository = require('../repositories/cuentasBancarias.repository');
-const suscripcionRepository = require('../repositories/suscripcion.repository');
 
 function idEmpresaDesdeUser(user) {
   const id = user?.empresa || user?.idEmpresa;
@@ -61,15 +60,7 @@ function validarPayload(body, { esCreacion }) {
 async function listar(pool, user) {
   const idEmpresa = idEmpresaDesdeUser(user);
   const rows = await cuentasBancariasRepository.listarPorEmpresa(pool, idEmpresa);
-  let esEmpresaPrincipal = false;
-  try {
-    const idPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
-    esEmpresaPrincipal =
-      !!idPrincipal && String(idPrincipal).toLowerCase() === String(idEmpresa).toLowerCase();
-  } catch {
-    esEmpresaPrincipal = false;
-  }
-  return { esEmpresaPrincipal, items: rows };
+  return { items: rows };
 }
 
 async function crear(pool, user, body) {

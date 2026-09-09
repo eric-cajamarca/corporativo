@@ -238,7 +238,14 @@ exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSu
  * Query: filas para descontar por prioridad (Lotes + LotesUbicacion + UbicacionesPrioridad).
  * Filtra por idEmpresa (multiempresa), idSucursal opcional, idProducto. Orden: prioridad ASC.
  */
-const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucursalFiltro, idUbicacionFiltro) => {
+const queryFilasPorPrioridad = async (
+  transaction,
+  idEmpresa,
+  idProducto,
+  idSucursalFiltro,
+  idUbicacionFiltro,
+  idLoteFiltro
+) => {
   const req = transaction.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
@@ -256,6 +263,12 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
   if (whereUb) {
     req.input('idUbicacionFiltro', sql.Int, idUbF);
   }
+  const idLoteSolo =
+    idLoteFiltro != null && String(idLoteFiltro).trim() !== '' ? String(idLoteFiltro).trim() : '';
+  const whereLote = idLoteSolo ? ' AND l.idLote = @idLoteFiltro' : '';
+  if (idLoteSolo) {
+    req.input('idLoteFiltro', sql.UniqueIdentifier, idLoteSolo);
+  }
   const rs = await req.query(`
     SELECT
       l.idLote,
@@ -271,6 +284,7 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
       AND ISNULL(l.activo, 1) = 1
       ${whereSucursal}
       ${whereUb}
+      ${whereLote}
     ORDER BY up.prioridad ASC, l.fechaIngreso ASC, l.idLote ASC
   `);
   return rs.recordset || [];
@@ -284,6 +298,10 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
  */
 exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
+  const idLoteSolo =
+    stockData.idLote != null && String(stockData.idLote).trim() !== ''
+      ? String(stockData.idLote).trim()
+      : '';
   const cant = parseFloat(cantidad) || 0;
   if (cant <= 0) return { consumosPorLote: [] };
   if (!idEmpresa || !idProducto) return { consumosPorLote: [] };
@@ -342,11 +360,12 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         idEmpresa,
         idProducto,
         idSucursal,
-        idUbicacionSolo
+        idUbicacionSolo,
+        idLoteSolo || null
       );
       await descontarPorPrioridad(filasSuc);
     }
-    if (!idUbicacionSolo && restante > 0) {
+    if (!idUbicacionSolo && restante > 0 && !idLoteSolo) {
       if (conSucursal) {
         const reqOtras = transaction.request();
         reqOtras.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
@@ -365,7 +384,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         `);
         await descontarPorPrioridad(rsOtras.recordset || []);
       } else {
-        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null, null);
+        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null, null, idLoteSolo || null);
         await descontarPorPrioridad(filasTodas);
       }
     }
@@ -419,15 +438,17 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   reqFallback.input('idProducto', sql.UniqueIdentifier, idProducto);
   const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
   if (conSucursal) reqFallback.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+  const whereLoteSolo = idLoteSolo ? ' AND idLote = @idLoteSolo' : '';
+  if (idLoteSolo) reqFallback.input('idLoteSolo', sql.UniqueIdentifier, idLoteSolo);
   const rsFallback = await reqFallback.query(`
     SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
     FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}${whereLoteSolo}
     ORDER BY ${ORDER_LOTES_FIFO_ASC}
   `);
   await ejecutarDescuentoSoloLotes(rsFallback.recordset || []);
 
-  if (restante > 0 && conSucursal) {
+  if (restante > 0 && conSucursal && !idLoteSolo) {
     const reqFallback2 = transaction.request();
     reqFallback2.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
     reqFallback2.input('idProducto', sql.UniqueIdentifier, idProducto);
@@ -454,7 +475,11 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
       });
       return { consumosPorLote: consumos };
     }
-    throw new Error('Stock insuficiente para el producto en la empresa');
+    throw new Error(
+      idLoteSolo
+        ? 'Stock insuficiente en el lote indicado'
+        : 'Stock insuficiente para el producto en la empresa'
+    );
   }
   return { consumosPorLote: consumos };
 };

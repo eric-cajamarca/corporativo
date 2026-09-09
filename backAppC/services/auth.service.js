@@ -8,6 +8,7 @@ const emailService = require('./email.service');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
+const rolReservadoPlataforma = require('../utils/rolReservadoPlataforma.util');
 
 const LOGIN_INTENTOS_MAX = 5;
 const LOGIN_BLOQUEO_MINUTOS = 30;
@@ -344,6 +345,7 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
   const idEmpresa = usuarioAutenticado.empresa;
 
   await saasPlanLimitesService.assertPuedeCrearUsuarioColaborador(pool, idEmpresa);
+  await rolReservadoPlataforma.assertIdRolAsignable(pool, usuarioAutenticado, idRol);
 
     // 3. Verificar email duplicado
   const emailExiste = await usuarioRepository.checkEmailExists(pool, email, idEmpresa);
@@ -435,6 +437,7 @@ exports.updateAdministrador = async (pool, id, datos, usuarioAutenticado) => {
   if (usuarioAutenticado.rol !== 'Administrador') {
     throw new Error('PERMISO_DENEGADO');
   }
+  await rolReservadoPlataforma.assertIdRolAsignable(pool, usuarioAutenticado, datos.idRol);
 
   // 2. Preparar datos comunes
   const datosActualizacion = {

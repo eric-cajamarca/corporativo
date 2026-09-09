@@ -4,7 +4,7 @@ const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmp
 function errorPlataforma(res, err, fallback) {
   console.error(fallback, err.message);
   if (err.code === 'NO_PRINCIPAL') {
-    return res.status(503).json({ message: 'No hay empresa principal configurada.' });
+    return res.status(503).json({ message: 'El servicio no está disponible en este momento.' });
   }
   if (err.code === 'ESTADO_INVALIDO') {
     return res.status(400).json({ message: 'Estado no válido.' });

@@ -22,6 +22,7 @@ export interface ItemMovimiento {
   costoUnitario?: number;
   fechaVencimiento?: string | null;
   numeroLote?: string | null;
+  idLote?: string | null;
 }
 
 export interface MovimientoRequest {
