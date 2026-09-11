@@ -160,7 +160,13 @@ export class VentasService {
     fechaHasta?: string;
     tipoComprobante?: string;
     idSucursal?: string;
-  }): Observable<{ data: VentaListado[]; total: number; pagina?: number; porPagina?: number }> {
+  }): Observable<{
+    data: VentaListado[];
+    total: number;
+    pagina?: number;
+    porPagina?: number;
+    resumen?: ResumenSunatListado;
+  }> {
     let q = new HttpParams();
     if (params.pagina != null) q = q.set('pagina', String(params.pagina));
     if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
@@ -173,7 +179,13 @@ export class VentasService {
     if (params.idSucursal != null && String(params.idSucursal).trim() !== '') {
       q = q.set('idSucursal', String(params.idSucursal).trim());
     }
-    return this._http.get<{ data: VentaListado[]; total: number; pagina?: number; porPagina?: number }>(
+    return this._http.get<{
+      data: VentaListado[];
+      total: number;
+      pagina?: number;
+      porPagina?: number;
+      resumen?: ResumenSunatListado;
+    }>(
       this.url + 'ventas/listar',
       { withCredentials: true, params: q }
     );
@@ -611,6 +623,13 @@ export interface NotaCreditoDebitoListado {
   codigoComprobante?: string;
   idComprobanteElectronico?: string | null;
   clienteRazonSocial?: string;
+}
+
+export interface ResumenSunatListado {
+  cantidadValidos: number;
+  totalValidos: number;
+  cantidadNoValidos: number;
+  totalNoValidos: number;
 }
 
 export interface VentaListado {

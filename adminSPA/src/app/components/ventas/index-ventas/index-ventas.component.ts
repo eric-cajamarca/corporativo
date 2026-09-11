@@ -6,7 +6,7 @@ import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Subject } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { VentasService, VentaAgrupadaListado, VentaAgrupadaComprobanteListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
+import { VentasService, VentaAgrupadaListado, VentaAgrupadaComprobanteListado, ComprobanteVentaAgrupada, VentaListado, ResumenSunatListado } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { FacturacionService, ComunicacionBajaHistorialItem } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -93,6 +93,8 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   pageSize = 10;
   totalVentasEmpresa = 0;
   totalVentasEmpresaGestora = 0;
+  resumenValidosSunat: { cantidad: number; total: number } = { cantidad: 0, total: 0 };
+  resumenNoValidosSunat: { cantidad: number; total: number } = { cantidad: 0, total: 0 };
 
   filtroFecha = 'all';
   fechaDesde = '';
@@ -188,12 +190,12 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   }
 
   /** Carga VA desde API con los mismos filtros de fecha/búsqueda que los comprobantes hijos. */
-  private cargarVentasAgrupadasGestora(): void {
+  private cargarVentasAgrupadasGestora(resetPagina = true): void {
     this.ventasService.listarVentasAgrupadas(this.buildParamsFiltrosAgrupadasGestora()).subscribe({
       next: (res) => {
         this.ventasConst = res.data ?? [];
         this.ventas = [...this.ventasConst];
-        this.page = 1;
+        if (resetPagina) this.page = 1;
         this.mostrarVentasAgrupadas = this.esGestora || this.ventas.length > 0;
       },
       error: () => {
@@ -228,7 +230,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     return {};
   }
 
-  private buildParamsListadoComprobantes(pagina: number): {
+  private buildParamsListadoComprobantes(pagina: number, porPagina: number = this.pageSize): {
     pagina: number;
     porPagina: number;
     buscar?: string;
@@ -244,7 +246,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       fechaDesde?: string;
       fechaHasta?: string;
       tipoComprobante?: string;
-    } = { pagina, porPagina: this.pageSize, ...fechas };
+    } = { pagina, porPagina, ...fechas };
     const q = (this.filtroBusqueda || '').trim();
     if (q) params.buscar = q;
     const tipo = (this.filtroTipoComprobante || '').trim();
@@ -278,13 +280,12 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
 
   cargarVentas(): void {
     this.loading = true;
-    this.cargarVentasAgrupadasGestora();
+    this.cargarVentasAgrupadasGestora(false);
     if (this.esGestora) {
-      this.cargarComprobantesAgrupadasPaginados(1);
-      this.cargarComprobantesPaginados(1, true);
+      this.cargarComprobantesAgrupadasPaginados(this.pageComprobantesAgrupadas);
+      this.cargarComprobantesPaginados(this.pageCompGestora, true);
     } else {
-      this.page = 1;
-      this.cargarComprobantesPaginados(1);
+      this.cargarComprobantesPaginados(this.page);
     }
   }
 
@@ -300,6 +301,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.ventasEmpresa = res.data ?? [];
         const total = res.total ?? 0;
+        this.aplicarResumenSunatListado(res.resumen);
         if (esGestora) {
           this.totalVentasEmpresaGestora = total;
         } else {
@@ -309,6 +311,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.ventasEmpresa = [];
+        this.aplicarResumenSunatListado(null);
         if (esGestora) {
           this.totalVentasEmpresaGestora = 0;
         } else {
@@ -317,6 +320,17 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
         this.loading = false;
       }
     });
+  }
+
+  private aplicarResumenSunatListado(resumen: ResumenSunatListado | null | undefined): void {
+    this.resumenValidosSunat = {
+      cantidad: Number(resumen?.cantidadValidos) || 0,
+      total: Number(resumen?.totalValidos) || 0
+    };
+    this.resumenNoValidosSunat = {
+      cantidad: Number(resumen?.cantidadNoValidos) || 0,
+      total: Number(resumen?.totalNoValidos) || 0
+    };
   }
 
   /** Carga comprobantes pertenecientes a ventas agrupadas (paginación + filtros). */
@@ -356,7 +370,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
 
   aplicarFiltros(): void {
     if (this.esGestora) {
-      this.cargarVentasAgrupadasGestora();
+      this.cargarVentasAgrupadasGestora(true);
       this.cargarComprobantesAgrupadasPaginados(1);
     }
     this.cargarComprobantesPaginados(1);
@@ -1118,32 +1132,6 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     });
   }
 
-  get resumenValidosSunat(): { cantidad: number; total: number } {
-    let cantidad = 0;
-    let total = 0;
-    for (const v of this.ventasEmpresa) {
-      if (!this.filaFacturadoNetoSunat(v)) continue;
-      cantidad++;
-      const monto = Number(v.total) || 0;
-      const tipo = this.tipoSunatCatalogo(v);
-      if (tipo === '07') total -= monto;
-      else total += monto;
-    }
-    return { cantidad, total };
-  }
-
-  /**
-   * Comprobantes que no forman parte del neto fiscal aceptado: NV/CT, pendientes/rechazo,
-   * y comprobantes electrónicos sin estado aceptado. Excluye eliminados y baja SUNAT (08).
-   */
-  get resumenNoValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventasEmpresa.filter(
-      (v) => !v.eliminado && !this.esComprobanteAnuladoSunat(v) && !this.filaFacturadoNetoSunat(v)
-    );
-    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
-    return { cantidad: list.length, total };
-  }
-
   abrirModalComprobantes(v: VentaAgrupadaListado): void {
     this.ventaAgrupadaSeleccionada = v;
     this.comprobantesVenta = [];
@@ -1241,6 +1229,33 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       return out;
     }
     return {};
+  }
+
+  /** Pagina todos los comprobantes del listado (mismos filtros) y deja solo los válidos para contabilidad. */
+  private obtenerComprobantesParaReporteContabilidad(
+    callback: (items: VentaListado[]) => void,
+    onError: (e: unknown) => void
+  ): void {
+    const acum: VentaListado[] = [];
+    let pagina = 1;
+    const porPagina = 100;
+    const next = (): void => {
+      this.ventasService.listarVentasEmpresaPaginado(this.buildParamsListadoComprobantes(pagina, porPagina)).subscribe({
+        next: (res) => {
+          const chunk = res?.data ?? [];
+          const total = res?.total ?? 0;
+          acum.push(...chunk);
+          if (chunk.length === 0 || acum.length >= total) {
+            callback(acum.filter((v) => this.incluirEnReporteContabilidadSunat(v)));
+          } else {
+            pagina += 1;
+            next();
+          }
+        },
+        error: (err) => onError(err)
+      });
+    };
+    next();
   }
 
   /** Pagina todas las comunicaciones de baja y deja solo estados válidos para contabilidad. */
@@ -1382,30 +1397,37 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   /** Solo empresas no gestoras: PDF con comprobantes 01/03/07/08 aceptados o dados de baja ante SUNAT + RA aceptadas. */
   generarReporteContabilidadPdf(): void {
     if (this.esGestora) return;
-    const comps = this.ventasEmpresa.filter((v) => this.incluirEnReporteContabilidadSunat(v));
     const { fechaDesde, fechaHasta } = this.fechasReporteComunicacionesBaja();
     this.exportandoReporteContabilidad = true;
     this.limpiarEstadoReporteContabilidad();
-    this.obtenerComunicacionesBajaParaReporte(
-      fechaDesde,
-      fechaHasta,
-      (ras) => {
-        if (comps.length === 0 && ras.length === 0) {
-          this.exportandoReporteContabilidad = false;
-          this.toastWarning('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
-          return;
-        }
-        const resumen = `${comps.length} comprobante(s) electrónico(s); ${ras.length} comunicación(es) de baja (RA).`;
-        this.emitirPdfReporteContabilidad(comps, ras, resumen);
+    this.obtenerComprobantesParaReporteContabilidad(
+      (comps) => {
+        this.obtenerComunicacionesBajaParaReporte(
+          fechaDesde,
+          fechaHasta,
+          (ras) => {
+            if (comps.length === 0 && ras.length === 0) {
+              this.exportandoReporteContabilidad = false;
+              this.toastWarning('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
+              return;
+            }
+            const resumen = `${comps.length} comprobante(s) electrónico(s); ${ras.length} comunicación(es) de baja (RA).`;
+            this.emitirPdfReporteContabilidad(comps, ras, resumen);
+          },
+          () => {
+            if (comps.length === 0) {
+              this.exportandoReporteContabilidad = false;
+              this.toastError('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
+              return;
+            }
+            const resumen = `${comps.length} comprobante(s) electrónico(s); RA no incluida (error al cargar el historial).`;
+            this.emitirPdfReporteContabilidad(comps, [], resumen);
+          }
+        );
       },
-      (err) => {
-        if (comps.length === 0) {
-          this.exportandoReporteContabilidad = false;
-          this.toastError('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
-          return;
-        }
-        const resumen = `${comps.length} comprobante(s) electrónico(s); RA no incluida (error al cargar el historial).`;
-        this.emitirPdfReporteContabilidad(comps, [], resumen);
+      () => {
+        this.exportandoReporteContabilidad = false;
+        this.toastError('No se pudieron cargar los comprobantes para el reporte de contabilidad.');
       }
     );
   }

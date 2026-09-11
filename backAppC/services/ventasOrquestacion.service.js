@@ -87,7 +87,7 @@ exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
   } catch (_) {
     idsList = [idempresa];
   }
-  const { rows, total, pagina, porPagina } = await ventasRepository.listarPorIdsEmpresasPaginado(pool, idsList, opts || {});
+  const { rows, total, pagina, porPagina, resumen } = await ventasRepository.listarPorIdsEmpresasPaginado(pool, idsList, opts || {});
   const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
   const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
   let list = rows;
@@ -123,7 +123,7 @@ exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
   } else {
     list = list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
   }
-  return { rows: list, total, pagina, porPagina };
+  return { rows: list, total, pagina, porPagina, resumen };
 };
 
 exports.listarVentasAgrupadas = async (pool, idEmpresa, opts = {}) =>

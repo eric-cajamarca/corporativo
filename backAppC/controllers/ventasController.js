@@ -84,7 +84,13 @@ const obtenerVentas = async function (req, res) {
       optsListado.pagina = pag.pagina;
       optsListado.porPagina = pag.porPagina;
       const result = await withPool((pool) => ventasOrquestacion.obtenerVentasListadoPaginado(pool, idempresa, optsListado));
-      return res.json({ data: result.rows, total: result.total, pagina: result.pagina, porPagina: result.porPagina });
+      return res.json({
+        data: result.rows,
+        total: result.total,
+        pagina: result.pagina,
+        porPagina: result.porPagina,
+        resumen: result.resumen
+      });
     }
     const list = await withPool((pool) => ventasOrquestacion.obtenerVentasListado(pool, idempresa, optsListado));
     res.json({ data: list });

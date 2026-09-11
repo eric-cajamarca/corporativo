@@ -803,6 +803,57 @@ function mapRowVentasListado(r) {
   };
 }
 
+const RESUMEN_SUNAT_VACIO = {
+  cantidadValidos: 0,
+  totalValidos: 0,
+  cantidadNoValidos: 0,
+  totalNoValidos: 0
+};
+
+function mapResumenSunatListado(row) {
+  if (!row) return { ...RESUMEN_SUNAT_VACIO };
+  return {
+    cantidadValidos: Number(row.cantidadValidos) || 0,
+    totalValidos: Number(row.totalValidos) || 0,
+    cantidadNoValidos: Number(row.cantidadNoValidos) || 0,
+    totalNoValidos: Number(row.totalNoValidos) || 0
+  };
+}
+
+/** Mismo criterio que el front: F/B/ND − NC aceptados (1–3), excluye baja SUNAT 08 y anulados. */
+const SQL_VENTAS_LISTADO_RESUMEN_APPLY = `
+  CROSS APPLY (
+    SELECT CASE
+      WHEN LTRIM(RTRIM(ISNULL(ce.tipoComprobante, ''))) IN ('01', '03', '07', '08')
+        THEN LTRIM(RTRIM(ce.tipoComprobante))
+      WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('01', '03')
+        THEN UPPER(LTRIM(RTRIM(c.codigo)))
+      WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7', 'B7') THEN '07'
+      WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F8', 'B8') THEN '08'
+      ELSE NULL
+    END AS tipoSunat
+  ) t
+  CROSS APPLY (
+    SELECT
+      CASE
+        WHEN ISNULL(v.eliminado, 0) = 0
+          AND LTRIM(RTRIM(ISNULL(es.codigo, ''))) <> '08'
+          AND v.idEstadoSunat IN (1, 2, 3)
+          AND t.tipoSunat IS NOT NULL
+        THEN 1 ELSE 0
+      END AS esFacturado,
+      CASE
+        WHEN ISNULL(v.eliminado, 0) = 0
+          AND LTRIM(RTRIM(ISNULL(es.codigo, ''))) <> '08'
+          AND NOT (
+            v.idEstadoSunat IN (1, 2, 3)
+            AND t.tipoSunat IS NOT NULL
+          )
+        THEN 1 ELSE 0
+      END AS esNoFacturado
+  ) f
+`;
+
 function bindFiltrosVentasListado(req, opts = {}) {
   const { likePattern } = require('../utils/paginacion.util');
   let whereExtra = '';
@@ -931,7 +982,7 @@ const SQL_VENTAS_LISTADO_FROM = `
 exports.listarPorIdsEmpresasPaginado = async (pool, idsEmpresa, opts = {}) => {
   const { parsePaginacion } = require('../utils/paginacion.util');
   const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
-  if (ids.length === 0) return { rows: [], total: 0 };
+  if (ids.length === 0) return { rows: [], total: 0, pagina: 1, porPagina: 20, resumen: { ...RESUMEN_SUNAT_VACIO } };
 
   const pag = parsePaginacion(opts);
   const pagina = pag.pagina;
@@ -942,12 +993,20 @@ exports.listarPorIdsEmpresasPaginado = async (pool, idsEmpresa, opts = {}) => {
   const inList = bindUniqueIdentifiersIn(reqCount, ids, 'empPag');
   const whereExtra = bindFiltrosVentasListado(reqCount, opts);
   const countSql = `
-    SELECT COUNT(*) AS total
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN f.esFacturado = 1 THEN 1 ELSE 0 END) AS cantidadValidos,
+      SUM(CASE WHEN f.esFacturado = 1 THEN CASE WHEN t.tipoSunat = '07' THEN -ISNULL(v.total, 0) ELSE ISNULL(v.total, 0) END ELSE 0 END) AS totalValidos,
+      SUM(CASE WHEN f.esNoFacturado = 1 THEN 1 ELSE 0 END) AS cantidadNoValidos,
+      SUM(CASE WHEN f.esNoFacturado = 1 THEN ISNULL(v.total, 0) ELSE 0 END) AS totalNoValidos
     ${SQL_VENTAS_LISTADO_FROM}
+    ${SQL_VENTAS_LISTADO_RESUMEN_APPLY}
     WHERE v.idEmpresa IN (${inList})${whereExtra}
   `;
   const countRes = await reqCount.query(countSql);
-  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+  const countRow = countRes.recordset?.[0];
+  const total = countRow ? Number(countRow.total) || 0 : 0;
+  const resumen = mapResumenSunatListado(countRow);
 
   const reqData = pool.request();
   const inListData = bindUniqueIdentifiersIn(reqData, ids, 'empPagD');
@@ -964,7 +1023,7 @@ exports.listarPorIdsEmpresasPaginado = async (pool, idsEmpresa, opts = {}) => {
   `;
   const dataRes = await reqData.query(dataSql);
   const rows = (dataRes.recordset || []).map(mapRowVentasListado);
-  return { rows, total, pagina, porPagina };
+  return { rows, total, pagina, porPagina, resumen };
 };
 
 /**
