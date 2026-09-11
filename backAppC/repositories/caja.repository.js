@@ -1,6 +1,9 @@
 const sql = require("mssql");
 const { getFechaHoyLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 
+/** Etiqueta de arqueo/caja: FormasPago (Yape, Efectivo…), no condición SUNAT (MediosPago). */
+const SQL_ETIQUETA_MEDIO_MOV_CAJA = `COALESCE(NULLIF(LTRIM(RTRIM(fp.descripcion)), ''), NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')`;
+
 function parseSqlSumImporte(val) {
   if (val == null) return 0;
   const n = Number(val);
@@ -518,7 +521,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
         mc.idMediosPago,
         tmc.nombre AS tipoMovimiento,
         tmc.tipo AS tipoOperacion,
-        COALESCE(fp.descripcion, mp.descripcion) AS medioPago,
+        ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS medioPago,
         mon.simbolo + ' ' + mon.descripcion AS moneda,
         mc.documentoRelacionado,
         mc.observaciones,
@@ -726,9 +729,9 @@ exports.obtenerIdTipoMovimientoEgresoRepo = async (pool, nombrePreferido) => {
   return r.recordset && r.recordset[0] ? r.recordset[0].idTipoMovimientoCaja : null;
 };
 
-/** Registra en caja los movimientos de venta al contado por cada forma de pago. Si ya existían movimientos para idVenta, los elimina y reemplaza (para reflejar cambios de desglose).
- *  FK MovimientosCaja.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago, se valida y se usa un idMediosPago válido como fallback.
- *  compVenta puede ir vacío (se usa S/N en documento). conceptoVentaCaja opcional (ej. cobro VA con comprobante gestora). */
+/** Registra en caja los movimientos de venta al contado por cada forma de pago (catálogo FormasPago: Yape, Efectivo, Cheque…).
+ *  Si ya existían movimientos para idVenta, los elimina y reemplaza.
+ *  La columna se llama idMediosPago por legado; el valor debe ser idFormaPago (igual que recibos de ingreso/egreso). */
 exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   const {
     idApertura,
@@ -750,10 +753,13 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   const idTipoVentaContado = tipoVenta.recordset[0]?.idTipoMovimientoCaja;
   if (!idTipoVentaContado) return;
 
-  const validIdsResult = await req.query("SELECT idMediosPago FROM MediosPago");
-  const validIds = new Set((validIdsResult.recordset || []).map((r) => Number(r.idMediosPago)).filter((n) => !Number.isNaN(n)));
-  const idMediosPagoDefault = validIds.size > 0 ? Math.min(...validIds) : null;
-  if (idMediosPagoDefault == null) return;
+  let validFormas = new Set();
+  try {
+    const formasRes = await req.query("SELECT idFormaPago FROM FormasPago");
+    validFormas = new Set((formasRes.recordset || []).map((r) => Number(r.idFormaPago)).filter((n) => !Number.isNaN(n)));
+  } catch (_) {
+    validFormas = new Set();
+  }
 
   await req
     .input("idVenta", sql.Int, idVenta)
@@ -766,8 +772,13 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
       : "Venta al contado " + compNorm;
   if (concepto.length > 100) concepto = concepto.substring(0, 100);
   for (const pago of detallePago) {
-    let idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
-    if (idMediosPago == null || !validIds.has(idMediosPago)) idMediosPago = idMediosPagoDefault;
+    const rawFp = pago.idFormaPago != null ? Number(pago.idFormaPago) : NaN;
+    const rawMp = pago.idMediosPago != null ? Number(pago.idMediosPago) : NaN;
+    let idFormaCaja = Number.isFinite(rawFp) && validFormas.has(rawFp) ? rawFp : null;
+    if (idFormaCaja == null && Number.isFinite(rawMp) && validFormas.has(rawMp)) {
+      idFormaCaja = rawMp;
+    }
+    if (idFormaCaja == null) continue;
     const monto = Number(pago.monto);
     if (monto <= 0) continue;
     const reqIns = transaction.request();
@@ -779,7 +790,7 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
       .input("idTipoMovimientoCaja", sql.Int, idTipoVentaContado)
       .input("concepto", sql.VarChar(100), concepto)
       .input("monto", sql.Decimal(18, 2), monto)
-      .input("idMediosPago", sql.Int, idMediosPago)
+      .input("idMediosPago", sql.Int, idFormaCaja)
       .input("idMoneda", sql.Int, 1)
       .input("documentoRelacionado", sql.VarChar(20), compNorm.length > 20 ? compNorm.substring(0, 20) : compNorm)
       .input("idVenta", sql.Int, idVenta)
@@ -872,7 +883,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
+      ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS formaPago,
       SUM(mc.monto) AS importe
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
@@ -892,7 +903,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
+      ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS formaPago,
       SUM(mc.monto) AS importe
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
@@ -947,7 +958,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
+      ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS formaPago,
       mc.monto AS importe,
       COALESCE(NULLIF(LTRIM(RTRIM(mc.documentoRelacionado)), ''), v.serie + '-' + v.numero) AS comprobante,
       ISNULL(cl.rSocial, '') AS clienteOrProveedor
@@ -969,7 +980,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
+      ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS formaPago,
       mc.monto AS importe,
       ISNULL(mc.documentoRelacionado, '') AS comprobante,
       ISNULL(mc.concepto, '') AS clienteOrProveedor

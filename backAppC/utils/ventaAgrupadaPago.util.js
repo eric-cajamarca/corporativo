@@ -15,14 +15,23 @@ function mergeDetallePorMedio(rows) {
   for (const r of rows) {
     const mo = round2(Number(r.monto) || 0);
     if (mo <= 0) continue;
-    const raw = r.idMediosPago;
-    const idNum = raw != null && raw !== '' ? Number(raw) : NaN;
-    const key = Number.isFinite(idNum) ? `id:${idNum}` : 'unset';
-    m.set(key, round2((m.get(key) || 0) + mo));
+    const fp = r.idFormaPago != null && r.idFormaPago !== '' ? Number(r.idFormaPago) : NaN;
+    const mp = r.idMediosPago != null && r.idMediosPago !== '' ? Number(r.idMediosPago) : NaN;
+    const key = Number.isFinite(fp) ? `fp:${fp}` : Number.isFinite(mp) ? `mp:${mp}` : 'unset';
+    const prev = m.get(key) || {
+      monto: 0,
+      idFormaPago: Number.isFinite(fp) ? fp : undefined,
+      idMediosPago: Number.isFinite(mp) ? mp : undefined
+    };
+    prev.monto = round2(prev.monto + mo);
+    m.set(key, prev);
   }
-  return [...m.entries()].map(([key, monto]) =>
-    key === 'unset' ? { monto } : { idMediosPago: Number(key.replace(/^id:/, '')), monto }
-  );
+  return [...m.values()].map(({ monto, idFormaPago, idMediosPago }) => {
+    const row = { monto };
+    if (idMediosPago != null) row.idMediosPago = idMediosPago;
+    if (idFormaPago != null) row.idFormaPago = idFormaPago;
+    return row;
+  });
 }
 
 /**
@@ -50,6 +59,7 @@ function repartirDetallePagoEntreComprobantes(lineasComprobante, detallePago) {
   const pool = (detallePago || [])
     .map((p) => ({
       idMediosPago: p.idMediosPago,
+      idFormaPago: p.idFormaPago,
       monto: round2(Number(p.monto) || 0),
     }))
     .filter((p) => p.monto > 0);
@@ -78,7 +88,11 @@ function repartirDetallePagoEntreComprobantes(lineasComprobante, detallePago) {
         poolWork.shift();
         continue;
       }
-      alloc.push({ idMediosPago: bucket.idMediosPago, monto: take });
+      alloc.push({
+        idMediosPago: bucket.idMediosPago,
+        idFormaPago: bucket.idFormaPago,
+        monto: take
+      });
       due = round2(due - take);
       bucket.monto = round2(bucket.monto - take);
       if (bucket.monto <= 0.001) poolWork.shift();

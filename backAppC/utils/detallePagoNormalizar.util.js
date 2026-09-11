@@ -39,6 +39,21 @@ function idMedioSaldoFavor(mpList) {
   return null;
 }
 
+/** Busca MediosPago por texto (exacto, luego uno contenido en el otro: YAPE vs YAPE/PLIN). */
+function findMpByDescripcion(mpList, descripcion) {
+  const nd = normDesc(descripcion);
+  if (!nd) return null;
+  for (const mp of mpList) {
+    if (normDesc(mp.descripcion) === nd) return Number(mp.idMediosPago);
+  }
+  for (const mp of mpList) {
+    const md = normDesc(mp.descripcion);
+    if (!md) continue;
+    if (md.includes(nd) || nd.includes(md)) return Number(mp.idMediosPago);
+  }
+  return null;
+}
+
 /**
  * @param {import('mssql').Transaction|import('mssql').ConnectionPool} conn
  * @param {Array<{ idMediosPago?: number, monto: number }>} detallePago
@@ -74,10 +89,8 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
   if (defaultId == null) return [];
 
   const findMpForForma = (fp) => {
-    const nd = normDesc(fp.descripcion);
-    for (const mp of mpList) {
-      if (normDesc(mp.descripcion) === nd) return Number(mp.idMediosPago);
-    }
+    const mapped = findMpByDescripcion(mpList, fp.descripcion);
+    if (mapped != null) return mapped;
     if (esDescripcionSaldoFavor(fp.descripcion)) {
       const safId = idMedioSaldoFavor(mpList);
       if (safId != null) return safId;
@@ -107,6 +120,12 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
       if (mp && esMedioSaldoFavor(mp)) return rawMp;
     }
 
+    // Texto que el POS ya resolvió (YAPE, EFECTIVO…): no usar el idFormaPago como si fuera MediosPago.
+    if (p.descripcion && !descSaf) {
+      const byDesc = findMpByDescripcion(mpList, p.descripcion);
+      if (byDesc != null) return byDesc;
+    }
+
     // El POS envía idFormaPago (Crédito, Efectivo…). Mapear siempre a MediosPago.
     if (fpExpl && !esDescripcionSaldoFavor(fpExpl.descripcion)) {
       const mapped = findMpForForma(fpExpl);
@@ -116,6 +135,12 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
     // Legacy: un solo campo idMediosPago que en realidad es idFormaPago.
     // Si ese número también es el medio SAF, NO tratar la venta a crédito como saldo a favor.
     if (fpEnSlotMp && mp && esMedioSaldoFavor(mp) && !esDescripcionSaldoFavor(fpEnSlotMp.descripcion) && !descSaf) {
+      const mapped = findMpForForma(fpEnSlotMp);
+      if (mapped != null) return mapped;
+    }
+
+    // Mismo número en ambos catálogos (ej. FormasPago YAPE = 2 y MediosPago CHEQUE = 2).
+    if (mp && fpEnSlotMp && normDesc(mp.descripcion) !== normDesc(fpEnSlotMp.descripcion)) {
       const mapped = findMpForForma(fpEnSlotMp);
       if (mapped != null) return mapped;
     }
@@ -137,7 +162,24 @@ async function normalizarDetallePagoIdMediosPago(conn, detallePago) {
   for (const p of detallePago || []) {
     const monto = round2(Number(p.monto) || 0);
     if (monto <= 0) continue;
-    out.push({ idMediosPago: resolverId(p), monto });
+    const rawFp = p.idFormaPago != null && p.idFormaPago !== "" ? Number(p.idFormaPago) : NaN;
+    let idFormaPago = Number.isFinite(rawFp) && fpById.has(rawFp) ? rawFp : null;
+    if (idFormaPago == null && p.descripcion) {
+      const nd = normDesc(p.descripcion);
+      for (const fp of fpById.values()) {
+        if (normDesc(fp.descripcion) === nd) {
+          idFormaPago = Number(fp.idFormaPago);
+          break;
+        }
+      }
+    }
+    const row = {
+      idMediosPago: resolverId(p),
+      monto,
+      descripcion: p.descripcion != null ? String(p.descripcion) : undefined
+    };
+    if (idFormaPago != null) row.idFormaPago = idFormaPago;
+    out.push(row);
   }
   return out;
 }

@@ -534,12 +534,13 @@ exports.obtenerResumenDiarioRepo = async (pool, idEmpresa, fechaReferencia) => {
       AND CONVERT(DATE, v.fEmision) = @fecha
   `);
 
-  /** Forma de pago igual que arqueo de caja: MovimientosCaja + FormasPago (prioridad) + MediosPago. */
+  /** Forma de pago del POS (FormasPago: Yape, Efectivo…), no condición SUNAT. */
   const pagosPorMedioPromise = baseReq().query(`
     SELECT
-      ISNULL(
+      COALESCE(
         NULLIF(LTRIM(RTRIM(fp.descripcion)), ''),
-        ISNULL(NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')
+        NULLIF(LTRIM(RTRIM(mp.descripcion)), ''),
+        'Sin especificar'
       ) AS medio,
       ISNULL(SUM(mc.monto), 0) AS monto
     FROM MovimientosCaja mc

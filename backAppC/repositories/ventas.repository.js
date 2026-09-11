@@ -570,9 +570,10 @@ exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
           SELECT STUFF((
             SELECT ',' + d.sigla
             FROM (
-              SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(fp2.descripcion, ''))), 3)) AS sigla
+              SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(COALESCE(NULLIF(LTRIM(RTRIM(fp2.descripcion)), ''), mp2.descripcion), ''))), 3)) AS sigla
               FROM MovimientosCaja mc
-              INNER JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
+              LEFT JOIN MediosPago mp2 ON mp2.idMediosPago = mc.idMediosPago
+              LEFT JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
               WHERE mc.idVenta = v.idVenta AND mc.idEmpresa = v.idEmpresa
             ) d
             WHERE NULLIF(LTRIM(RTRIM(d.sigla)), '') IS NOT NULL
@@ -707,9 +708,10 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa, opts = {}) => {
         SELECT STUFF((
           SELECT ',' + d.sigla
           FROM (
-            SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(fp2.descripcion, ''))), 3)) AS sigla
+            SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(COALESCE(NULLIF(LTRIM(RTRIM(fp2.descripcion)), ''), mp2.descripcion), ''))), 3)) AS sigla
             FROM MovimientosCaja mc
-            INNER JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
+            LEFT JOIN MediosPago mp2 ON mp2.idMediosPago = mc.idMediosPago
+            LEFT JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
             WHERE mc.idVenta = v.idVenta AND mc.idEmpresa = v.idEmpresa
           ) d
           WHERE NULLIF(LTRIM(RTRIM(d.sigla)), '') IS NOT NULL

@@ -623,7 +623,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       {
         item: 1,
         idFormaPago: Number(forma.idFormaPago),
-        idMediosPago: Number(forma.idFormaPago),
         descripcion: forma.descripcion || 'PAGO',
         monto: total,
         referencia: 'N/A'
