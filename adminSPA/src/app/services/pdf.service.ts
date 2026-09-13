@@ -23,6 +23,7 @@ export class PdfService {
 
   // Método principal - recibe datos estructurados
   generarPdfVentasDetallado(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -33,6 +34,7 @@ export class PdfService {
   }
 
   generarPdfComprasDetallado(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -43,6 +45,7 @@ export class PdfService {
   }
 
   generarPdfKardex131(datos: Record<string, unknown>, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload: Record<string, unknown> = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -53,6 +56,7 @@ export class PdfService {
   }
 
   generarPdfKardexProducto(datos: Record<string, unknown>, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload: Record<string, unknown> = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -63,6 +67,8 @@ export class PdfService {
   }
 
   generarPdfDinamico(datos: PdfDatosDinamicos, tipo: string = 'reporte', fontSize: number = 10, formato?: 'A4' | 'A5' | 'ticket'): Observable<Blob> {
+    const n = datos && typeof datos['nombreArchivo'] === 'string' ? String(datos['nombreArchivo']) : undefined;
+    this.recordarNombreArchivo(n);
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
       { datos, tipo, fontSize, formato: formato || 'A4' },
@@ -72,6 +78,7 @@ export class PdfService {
 
   /** Genera PDF de comprobante de venta (A4, A5 o ticket). */
   generarPdfComprobanteVenta(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -84,6 +91,7 @@ export class PdfService {
   /** Genera PDF de comprobante de despacho (lista para almacenero: venta, items con ubicaciones). */
   /** Genera PDF de arqueo de caja (ticket, A5, A4). */
   generarPdfArqueoCaja(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
       { datos, tipo: 'arqueo-caja', fontSize: formato === 'ticket' ? 8 : 10, formato },
@@ -93,6 +101,7 @@ export class PdfService {
 
   /** Informe completo de análisis financiero (una sección por hoja A4). */
   generarPdfAnalisisFinanciero(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -104,6 +113,7 @@ export class PdfService {
 
   /** Pack de reportes del módulo Reportes (ventas, compras, inventario, etc.) — una sección por hoja. */
   generarPdfReportesNegocio(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
@@ -114,6 +124,7 @@ export class PdfService {
   }
 
   generarPdfComprobanteDespacho(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    this.recordarNombreArchivo(nombreArchivo);
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     /** Ticket térmico: 11px para legibilidad en recojo / almacén */
@@ -135,20 +146,134 @@ export class PdfService {
   }
 
   descargar(blob: Blob, nombreArchivo = 'documento.pdf'): void {
-    const url = window.URL.createObjectURL(blob);
+    const pdfBlob = this.comoPdfBlob(blob);
+    const url = window.URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = nombreArchivo;
+    a.download = this.sanitizarNombrePdf(nombreArchivo);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   }
 
-  previsualizar(blob: Blob): void {
-    const url = window.URL.createObjectURL(blob);
+  /**
+   * En escritorio abre el PDF en una pestaña.
+   * En móvil el visor nativo, al “Compartir”, manda el link blob: (no el archivo).
+   * Por eso en móvil se usa un visor propio con botón que comparte el PDF.
+   */
+  previsualizar(blob: Blob, nombreArchivo?: string): void {
+    const pdfBlob = this.comoPdfBlob(blob);
+    const nombre = this.sanitizarNombrePdf(nombreArchivo || this.ultimoNombreArchivo || 'documento.pdf');
+    this.ultimoNombreArchivo = nombre;
+    if (this.esDispositivoMovil()) {
+      this.abrirVisorMovil(pdfBlob, nombre);
+      return;
+    }
+    const url = window.URL.createObjectURL(pdfBlob);
     window.open(url, '_blank', 'width=900,height=800,scrollbars=yes,resizable=yes');
     setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+  }
+
+  private ultimoNombreArchivo = 'documento.pdf';
+
+  private recordarNombreArchivo(nombreArchivo?: string): void {
+    if (nombreArchivo && String(nombreArchivo).trim()) {
+      this.ultimoNombreArchivo = this.sanitizarNombrePdf(String(nombreArchivo));
+    }
+  }
+
+  private sanitizarNombrePdf(nombre: string): string {
+    const raw = String(nombre || 'documento.pdf').trim() || 'documento.pdf';
+    const base = raw.replace(/[^\w.\-]+/g, '_').replace(/^\.+/, '');
+    const withExt = /\.pdf$/i.test(base) ? base : `${base}.pdf`;
+    return withExt.slice(0, 80) || 'documento.pdf';
+  }
+
+  private comoPdfBlob(blob: Blob): Blob {
+    if (blob.type && blob.type.toLowerCase().includes('pdf')) return blob;
+    return new Blob([blob], { type: 'application/pdf' });
+  }
+
+  private esDispositivoMovil(): boolean {
+    const ua = navigator.userAgent || '';
+    if (/Android|iPhone|iPad|iPod/i.test(ua)) return true;
+    return navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua);
+  }
+
+  private abrirVisorMovil(pdfBlob: Blob, nombreArchivo: string): void {
+    const existente = document.getElementById('efaf-pdf-visor-movil');
+    if (existente) existente.remove();
+
+    const pdfUrl = window.URL.createObjectURL(pdfBlob);
+    const overlay = document.createElement('div');
+    overlay.id = 'efaf-pdf-visor-movil';
+    overlay.setAttribute('role', 'dialog');
+    overlay.style.cssText =
+      'position:fixed;inset:0;z-index:20000;background:#111;display:flex;flex-direction:column;font-family:system-ui,sans-serif;';
+
+    const barra = document.createElement('div');
+    barra.style.cssText =
+      'display:flex;gap:8px;align-items:center;padding:10px 12px;background:#1f2937;color:#fff;flex-shrink:0;';
+    const titulo = document.createElement('div');
+    titulo.textContent = nombreArchivo;
+    titulo.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;';
+    const btnCompartir = document.createElement('button');
+    btnCompartir.type = 'button';
+    btnCompartir.textContent = 'Compartir';
+    btnCompartir.style.cssText =
+      'border:0;border-radius:8px;background:#22c55e;color:#fff;font-weight:600;padding:8px 12px;font-size:14px;';
+    const btnDescargar = document.createElement('button');
+    btnDescargar.type = 'button';
+    btnDescargar.textContent = 'Descargar';
+    btnDescargar.style.cssText =
+      'border:0;border-radius:8px;background:#3b82f6;color:#fff;font-weight:600;padding:8px 12px;font-size:14px;';
+    const btnCerrar = document.createElement('button');
+    btnCerrar.type = 'button';
+    btnCerrar.textContent = 'Cerrar';
+    btnCerrar.style.cssText =
+      'border:0;border-radius:8px;background:#4b5563;color:#fff;padding:8px 12px;font-size:14px;';
+
+    const iframe = document.createElement('iframe');
+    iframe.src = pdfUrl;
+    iframe.title = nombreArchivo;
+    iframe.style.cssText = 'flex:1;width:100%;border:0;background:#fff;';
+
+    const cerrar = (): void => {
+      overlay.remove();
+      window.URL.revokeObjectURL(pdfUrl);
+    };
+
+    btnCerrar.addEventListener('click', cerrar);
+    btnDescargar.addEventListener('click', () => this.descargar(pdfBlob, nombreArchivo));
+    btnCompartir.addEventListener('click', () => {
+      void this.compartirPdfNativo(pdfBlob, nombreArchivo);
+    });
+
+    barra.appendChild(titulo);
+    barra.appendChild(btnCompartir);
+    barra.appendChild(btnDescargar);
+    barra.appendChild(btnCerrar);
+    overlay.appendChild(barra);
+    overlay.appendChild(iframe);
+    document.body.appendChild(overlay);
+  }
+
+  private async compartirPdfNativo(pdfBlob: Blob, nombreArchivo: string): Promise<void> {
+    const file = new File([pdfBlob], nombreArchivo, { type: 'application/pdf' });
+    const nav = navigator as Navigator & {
+      share?: (data: ShareData & { files?: File[] }) => Promise<void>;
+      canShare?: (data: ShareData & { files?: File[] }) => boolean;
+    };
+    try {
+      if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
+        await nav.share({ files: [file], title: nombreArchivo });
+        return;
+      }
+    } catch (err) {
+      if ((err as DOMException)?.name === 'AbortError') return;
+    }
+    this.descargar(pdfBlob, nombreArchivo);
   }
 }
 

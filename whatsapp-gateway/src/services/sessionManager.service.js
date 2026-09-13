@@ -14,7 +14,6 @@ const config = require('../config');
 const {
   jidToPhone,
   resolveInboundSender,
-  resolveOutboundJid,
   isIndividualChatJid
 } = require('../utils/phone.util');
 const inboundWebhook = require('./inboundWebhook.service');
@@ -27,6 +26,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 function getTenantState(idEmpresa) {
   if (!tenants.has(idEmpresa)) {
     tenants.set(idEmpresa, {
+      idEmpresa,
       sock: null,
       status: 'desconectado',
       qr: null,
@@ -38,13 +38,16 @@ function getTenantState(idEmpresa) {
       lidToPhone: new Map(),
       lidToJid: new Map(),
       phoneToLid: new Map(),
+      lidPersistTimer: null,
       nombreDispositivo: null,
       pendingSaveCreds: null,
       suppressMessageIds: new Set(),
       processedMessageIds: new Set()
     });
   }
-  return tenants.get(idEmpresa);
+  const t = tenants.get(idEmpresa);
+  t.idEmpresa = idEmpresa;
+  return t;
 }
 
 function sessionPath(idEmpresa) {
@@ -53,6 +56,104 @@ function sessionPath(idEmpresa) {
 
 function deviceMetaPath(idEmpresa) {
   return path.join(sessionPath(idEmpresa), 'device-meta.json');
+}
+
+function lidMapsPath(idEmpresa) {
+  return path.join(sessionPath(idEmpresa), 'lid-maps.json');
+}
+
+async function loadLidMaps(idEmpresa, t) {
+  try {
+    const raw = await fs.promises.readFile(lidMapsPath(idEmpresa), 'utf8');
+    const parsed = JSON.parse(raw);
+    for (const [lid, jid] of Object.entries(parsed.lidToJid || {})) {
+      rememberLidMapping(t, lid, jid, false);
+    }
+    for (const [phone, lid] of Object.entries(parsed.phoneToLid || {})) {
+      if (lid && phone) t.phoneToLid.set(String(phone), String(lid));
+    }
+  } catch {
+    /* sin archivo o JSON inválido: se reconstruye al recibir chats */
+  }
+}
+
+function persistLidMaps(t) {
+  const idEmpresa = t?.idEmpresa;
+  if (!idEmpresa) return;
+  const payload = {
+    lidToJid: Object.fromEntries(t.lidToJid),
+    phoneToLid: Object.fromEntries(t.phoneToLid)
+  };
+  fs.promises.writeFile(lidMapsPath(idEmpresa), JSON.stringify(payload), 'utf8').catch((e) => {
+    console.error('sessionManager persistLidMaps:', e.message);
+  });
+}
+
+function schedulePersistLidMaps(t) {
+  if (!t) return;
+  if (t.lidPersistTimer) clearTimeout(t.lidPersistTimer);
+  t.lidPersistTimer = setTimeout(() => persistLidMaps(t), 400);
+}
+
+function normalizeLidJid(value) {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  if (s.endsWith('@lid')) return s;
+  if (s.endsWith('@s.whatsapp.net') || s.endsWith('@g.us')) return '';
+  const base = s.split('@')[0];
+  return base ? `${base}@lid` : '';
+}
+
+/**
+ * JID de envío: WhatsApp actual cifra contra @lid. Si se manda a @s.whatsapp.net
+ * el celular destino muestra "Esperando mensaje..." (no puede descifrar).
+ */
+async function resolveSendJid(sock, number, t) {
+  const raw = String(number || '').trim();
+  if (raw.endsWith('@lid') || raw.endsWith('@g.us')) return raw;
+  const digits = raw.includes('@') ? jidToPhone(raw) : raw.replace(/\D/g, '');
+  if (!digits) throw new Error('Numero de destino invalido');
+  const pnJid = `${digits}@s.whatsapp.net`;
+
+  const cached = t.phoneToLid.get(digits);
+  if (cached) return cached;
+
+  try {
+    const mapper = sock.signalRepository?.lidMapping;
+    if (mapper && typeof mapper.getLIDForPN === 'function') {
+      const lid = await mapper.getLIDForPN(pnJid);
+      const lidJid = normalizeLidJid(lid);
+      if (lidJid) {
+        rememberLidMapping(t, lidJid, pnJid);
+        return lidJid;
+      }
+    }
+  } catch (e) {
+    console.error('sessionManager getLIDForPN:', e.message);
+  }
+
+  try {
+    let info = await sock.onWhatsApp(pnJid);
+    if (!Array.isArray(info) || info.length === 0) {
+      info = await sock.onWhatsApp(digits);
+    }
+    const list = Array.isArray(info) ? info : info ? [info] : [];
+    const hit = list.find((x) => x && (x.exists === true || x.jid || x.lid));
+    if (hit) {
+      const lidJid =
+        normalizeLidJid(hit.lid) || (String(hit.jid || '').endsWith('@lid') ? String(hit.jid) : '');
+      const pn = String(hit.jid || '').endsWith('@s.whatsapp.net') ? String(hit.jid) : pnJid;
+      if (lidJid) {
+        rememberLidMapping(t, lidJid, pn);
+        return lidJid;
+      }
+      if (hit.jid) return String(hit.jid);
+    }
+  } catch (e) {
+    console.error('sessionManager onWhatsApp:', e.message);
+  }
+
+  return pnJid;
 }
 
 function sanitizeDeviceName(name) {
@@ -214,7 +315,7 @@ function shouldForwardInbound(message, t) {
   return inboundSkipReason(message, t) == null;
 }
 
-function rememberLidMapping(t, lid, jid) {
+function rememberLidMapping(t, lid, jid, persist = true) {
   if (!lid || !jid) return;
   t.lidToJid.set(lid, jid);
   const phone = jidToPhone(jid);
@@ -222,6 +323,7 @@ function rememberLidMapping(t, lid, jid) {
     t.lidToPhone.set(lid, phone);
     t.phoneToLid.set(phone, lid);
   }
+  if (persist) schedulePersistLidMaps(t);
 }
 
 function captureLidFromInboundMessage(t, message) {
@@ -404,6 +506,7 @@ async function connectTenant(idEmpresa, options = {}) {
   try {
     const dir = sessionPath(idEmpresa);
     await fs.promises.mkdir(dir, { recursive: true });
+    await loadLidMaps(idEmpresa, t);
     const { state, saveCreds } = await useMultiFileAuthState(dir);
     const { version } = await fetchLatestBaileysVersion();
     const logger = pino({ level: config.logLevel });
@@ -614,9 +717,14 @@ async function sendText(idEmpresa, number, text, options = {}) {
   const t = getTenantState(idEmpresa);
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa, options.skipThrottle === true);
-  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
+  const jid = await resolveSendJid(sock, number, t);
   const sent = await sock.sendMessage(jid, { text: String(text).trim() });
   rememberOutboundMessage(t, sent);
+  const remote = String(sent?.key?.remoteJid || '');
+  if (remote.endsWith('@lid')) {
+    const digits = String(number || '').replace(/\D/g, '') || jidToPhone(number);
+    if (digits) rememberLidMapping(t, remote, `${digits}@s.whatsapp.net`);
+  }
   return { status: 200, success: true, message: 'Mensaje enviado' };
 }
 
@@ -633,7 +741,7 @@ async function sendPresence(idEmpresa, number, type) {
     throw new Error(`presence type invalido: ${type}`);
   }
   const tenant = getTenantState(idEmpresa);
-  const jid = resolveOutboundJid(number, lidMapsForTenant(tenant));
+  const jid = await resolveSendJid(sock, number, tenant);
   // Baileys exige llamar primero a sendPresenceUpdate('available') para "registrarse"
   // como online ante el contacto antes de poder enviar 'composing'/'paused'/'recording'.
   // Lo hacemos solo si el caller pidio 'composing' o 'recording'.
@@ -652,7 +760,7 @@ async function sendReaction(idEmpresa, number, messageId, emoji) {
   const sock = requireConnected(idEmpresa);
   if (!messageId) throw new Error('messageId requerido');
   const t = getTenantState(idEmpresa);
-  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
+  const jid = await resolveSendJid(sock, number, t);
   const text = emoji != null ? String(emoji) : '';
   await sock.sendMessage(jid, {
     react: {
@@ -754,7 +862,7 @@ async function sendMedia(idEmpresa, number, mediatype, media, filename, caption,
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa, options.skipThrottle === true);
   const t = getTenantState(idEmpresa);
-  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
+  const jid = await resolveSendJid(sock, number, t);
   const buffer = await resolveMediaBuffer(media);
   const mt = String(mediatype || 'document').toLowerCase();
   const cap = caption != null && String(caption).trim() !== '' ? String(caption).trim() : undefined;
@@ -778,6 +886,11 @@ async function sendMedia(idEmpresa, number, mediatype, media, filename, caption,
     };
   }
   await sock.sendMessage(jid, payload);
+  const sentRemote = String(jid || '');
+  if (sentRemote.endsWith('@lid')) {
+    const digits = String(number || '').replace(/\D/g, '') || jidToPhone(number);
+    if (digits) rememberLidMapping(t, sentRemote, `${digits}@s.whatsapp.net`);
+  }
   return { status: 200, success: true, message: 'Archivo enviado' };
 }
 
