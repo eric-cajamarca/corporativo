@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './services/auth.service';
@@ -7,6 +7,7 @@ import { ConnectionTimerService } from './services/connection-timer.service';
 import { PwaUpdateService } from './services/pwa-update.service';
 import { environment } from '../environments/environment';
 import { ChatComercialPublicoComponent } from './components/public/chat-comercial-publico/chat-comercial-publico.component';
+import { iniciarAutofocusModales } from './utils/modal-autofocus.util';
 
 @Component({
     selector: 'app-root',
@@ -14,9 +15,10 @@ import { ChatComercialPublicoComponent } from './components/public/chat-comercia
     templateUrl: './app.component.html',
     styleUrl: './app.component.css'
 })
-export class AppComponent {
+export class AppComponent implements OnInit, OnDestroy {
   title = 'adminSPA';
   appVersion = environment.APP_VERSION;
+  private detenerAutofocusModales: (() => void) | null = null;
   constructor(
     private authService: AuthService,
     private sidebarState: SidebarStateService,
@@ -68,5 +70,11 @@ export class AppComponent {
   ngOnInit() {
     this.authService.initialize();
     this.pwaUpdateService.init();
+    this.detenerAutofocusModales = iniciarAutofocusModales();
+  }
+
+  ngOnDestroy(): void {
+    this.detenerAutofocusModales?.();
+    this.detenerAutofocusModales = null;
   }
 }

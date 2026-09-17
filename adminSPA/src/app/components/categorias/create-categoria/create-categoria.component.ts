@@ -1,4 +1,4 @@
-import { Component, Optional } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Optional } from '@angular/core';
 import { CategoriaService } from '../../../services/categoria.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +13,7 @@ declare var iziToast: any;
   templateUrl: './create-categoria.component.html',
   styleUrl: './create-categoria.component.css'
 })
-export class CreateCategoriaComponent {
+export class CreateCategoriaComponent implements AfterViewInit {
 
   public categorias: any = {};
   public token: any = '';
@@ -26,13 +26,16 @@ export class CreateCategoriaComponent {
   constructor(
     private _categoriaService: CategoriaService,
     private _router: Router,
+    private host: ElementRef<HTMLElement>,
     @Optional() public activeModal: NgbActiveModal
   ) { 
     //this.token = this._cookieService.get('token');
     this.esModal = !!this.activeModal;
   }
 
-  ngOnInit(): void {
+  ngAfterViewInit(): void {
+    const campo = this.host.nativeElement.querySelector<HTMLInputElement>('input[name="nombre"]');
+    setTimeout(() => campo?.focus(), 0);
   }
 
   registrar(_registroForm: unknown): void {

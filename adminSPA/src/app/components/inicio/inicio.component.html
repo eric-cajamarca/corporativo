@@ -56,7 +56,7 @@
         [storageKey]="onboardingStorageKey"
         (refrescar)="cargarEstadoOnboarding(false)"
       ></app-onboarding-wizard>
-      @if (mostrarAyudaFacturacion) {
+      @if (mostrarAyudaFacturacion && onboardingProgreso >= 100) {
         <div class="mb-4">
           <app-ayuda-facturacion-sunat
             [mostrarIrAConfigurar]="true"

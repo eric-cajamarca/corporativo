@@ -1,4 +1,4 @@
-import { Component, Optional } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Optional } from '@angular/core';
 import { variosService } from '../../../services/varios.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,7 +12,7 @@ declare var iziToast: any;
   templateUrl: './create-marca.component.html',
   styleUrl: './create-marca.component.css'
 })
-export class CreateMarcaComponent {
+export class CreateMarcaComponent implements AfterViewInit {
   public marca: any = {};
   public token: any = '';
   
@@ -24,13 +24,16 @@ export class CreateMarcaComponent {
   constructor(
     private _marcaService: variosService,
     private _router: Router,
+    private host: ElementRef<HTMLElement>,
     @Optional() public activeModal: NgbActiveModal
   ) { 
     //this.token = this._cookieService.get('token');
     this.esModal = !!this.activeModal;
   }
 
-  ngOnInit(): void {
+  ngAfterViewInit(): void {
+    const campo = this.host.nativeElement.querySelector<HTMLInputElement>('input[name="nombre"]');
+    setTimeout(() => campo?.focus(), 0);
   }
 
   registrar(_registroForm: unknown): void {

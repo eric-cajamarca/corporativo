@@ -71,10 +71,10 @@ async function ejecutarCiclo(pool) {
         tipoEvento: 'BIENVENIDA',
         asunto: `Bienvenido a la plataforma, ${row.razonSocial || 'equipo'}`,
         text:
-          'Bienvenido. Recomendamos completar configuración SUNAT y emitir su primer comprobante dentro de las próximas 24 horas.',
+          'Bienvenido. Para vender hoy: registre un producto y emita su primera venta. La facturación SUNAT puede configurarla después.',
         html: htmlBase(
           'Bienvenido a su nueva cuenta',
-          '<p>Gracias por activar su suscripción. Para empezar rápido:</p><ol><li>Complete configuración SUNAT.</li><li>Registre productos/clientes base.</li><li>Emita su primer comprobante.</li></ol>'
+          '<p>Gracias por activar su suscripción. Para empezar rápido:</p><ol><li>Registre un producto.</li><li>Emita su primera venta.</li></ol><p>La facturación electrónica SUNAT puede configurarla después en <strong>Configuración &gt; Facturación</strong>.</p>'
         ),
         detalle: 'Correo de bienvenida onboarding'
       },

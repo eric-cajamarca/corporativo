@@ -63,6 +63,10 @@
               <i class="fas fa-key"></i>
               <span>Ingresa el código en el siguiente paso para activar e iniciar sesión.</span>
             </div>
+            <div class="detail-item">
+              <i class="fas fa-user-shield"></i>
+              <span>El correo con el que te registraste ya es el administrador: con esa sesión podrás vender.</span>
+            </div>
           </div>
           @if (idEmpresaCreada()) {
             <a [routerLink]="['/verificar-empresa']" [queryParams]="{ idEmpresa: idEmpresaCreada() }" class="btn btn-primary btn-lg me-2">

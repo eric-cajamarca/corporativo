@@ -29,7 +29,7 @@ exports.createUsuario = async (pool, usuarioData) => {
       .input('email', sql.VarChar, usuarioData.email)
       .input('password', sql.Text, usuarioData.password)
       .input('idRol', sql.UniqueIdentifier, usuarioData.idRol)
-      .input('estado', sql.Bit, 0)
+      .input('estado', sql.Bit, usuarioData.estado === 1 || usuarioData.estado === true ? 1 : 0)
       .input('fregistro', sql.Date, usuarioData.fregistro)
       .query(`
         INSERT INTO usuarioWeb 

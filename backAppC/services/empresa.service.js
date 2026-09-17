@@ -7,6 +7,8 @@ const clientesRepository = require('../repositories/clientes.repository');
 const marcaRepository = require('../repositories/marca.repository');
 const cajaRepository = require('../repositories/caja.repository');
 const rubrosRepository = require('../repositories/rubros.repository');
+const usuarioRepository = require('../repositories/usuario.repository');
+const usuarioSucursalRepository = require('../repositories/usuarioSucursal.repository');
 const authService = require('./auth.service');
 
 /** Catálogo inicial de comprobantes por sucursal (alta empresa o al pasar a series propias). */
@@ -1129,32 +1131,210 @@ exports.crearCajaPrincipalPredeterminada = async (pool, idEmpresa, idSucursal) =
     }
 };
 
+function perfilAdminInicial(datos) {
+    const comercial = String(datos?.nombreComercial || datos?.nombre_Comercial || '').trim();
+    if (comercial) {
+        return { nombres: comercial.slice(0, 100), apellidos: 'Admin' };
+    }
+    const rs = String(datos?.razon_Social || datos?.razonSocial || '').trim();
+    if (rs) {
+        const parts = rs.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return {
+                nombres: parts[0].slice(0, 100),
+                apellidos: parts.slice(1).join(' ').slice(0, 100)
+            };
+        }
+        return { nombres: rs.slice(0, 100), apellidos: 'Admin' };
+    }
+    const mail = String(datos?.correo || datos?.email || '').trim();
+    if (mail.includes('@')) {
+        return { nombres: mail.split('@')[0].slice(0, 100), apellidos: 'Admin' };
+    }
+    return { nombres: 'Administrador', apellidos: 'Principal' };
+}
+
+async function obtenerRolAdministradorEmpresa(pool, idEmpresa) {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT TOP 1 idRol
+            FROM Rol
+            WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(descripcion)) = 'Administrador'
+        `);
+    return result.recordset?.[0]?.idRol || null;
+}
+
+async function obtenerSucursalPrincipalEmpresa(pool, idEmpresa) {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT TOP 1 idSucursal
+            FROM Sucursal
+            WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
+            ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fRegistro ASC
+        `);
+    return result.recordset?.[0]?.idSucursal || null;
+}
+
+/**
+ * Crea o activa el colaborador Administrador con el correo del registro.
+ * Idempotente: no duplica si ya hay un admin activo o el email ya existe.
+ */
+exports.crearAdministradorInicial = async (pool, idEmpresa, datosEmpresa = {}) => {
+    const empRes = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT correo, password, razon_Social, nombreComercial
+            FROM Empresas
+            WHERE idEmpresa = @idEmpresa
+        `);
+    const emp = empRes.recordset && empRes.recordset[0] ? empRes.recordset[0] : null;
+    if (!emp) {
+        return { creado: false, motivo: 'empresa_no_encontrada' };
+    }
+
+    const email = String(datosEmpresa.correo || emp.correo || '').trim();
+    const passwordHash = datosEmpresa.passwordHash || emp.password;
+    if (!email || !passwordHash) {
+        return { creado: false, motivo: 'sin_credenciales' };
+    }
+
+    const idRol = await obtenerRolAdministradorEmpresa(pool, idEmpresa);
+    if (!idRol) {
+        return { creado: false, motivo: 'sin_rol_admin' };
+    }
+
+    const idSucursal = datosEmpresa.idSucursal || await obtenerSucursalPrincipalEmpresa(pool, idEmpresa);
+    const emailNorm = email.toLowerCase();
+    const porEmail = await usuarioRepository.buscarPorEmailNormalizado(pool, emailNorm, idEmpresa);
+    const adminActivo = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, idEmpresa);
+
+    let idUsuario = null;
+    let creado = false;
+
+    if (adminActivo && adminActivo.idUsuario) {
+        idUsuario = adminActivo.idUsuario;
+    } else if (porEmail && porEmail.idUsuario) {
+        idUsuario = porEmail.idUsuario;
+        await pool.request()
+            .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idRol', sql.UniqueIdentifier, idRol)
+            .query(`
+                UPDATE UsuarioWeb
+                SET estado = 1, idRol = @idRol
+                WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+            `);
+    } else {
+        const perfil = perfilAdminInicial({ ...emp, ...datosEmpresa, correo: email });
+        idUsuario = uuidv4();
+        await usuarioRepository.createUsuario(pool, {
+            idUsuario,
+            idEmpresa,
+            nombres: perfil.nombres,
+            apellidos: perfil.apellidos,
+            email,
+            password: passwordHash,
+            idRol,
+            estado: 1,
+            fregistro: new Date()
+        });
+        creado = true;
+    }
+
+    if (idUsuario && idSucursal) {
+        try {
+            await usuarioSucursalRepository.asignarUsuarioSucursal(pool, idUsuario, idSucursal, true);
+        } catch (error) {
+            console.error('Error asignando sucursal al administrador inicial:', error.message);
+        }
+    }
+
+    return { creado, idUsuario, idSucursal, email };
+};
+
+/**
+ * Abre la caja principal con monto 0 solo si la empresa nunca tuvo una apertura.
+ */
+exports.abrirCajaInicialSiNuncaAbierta = async (pool, idEmpresa, idUsuario, idCaja = null) => {
+    if (!idUsuario) {
+        return { abierta: false, motivo: 'sin_usuario' };
+    }
+
+    const historial = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT COUNT(*) AS total
+            FROM AperturasCaja ac
+            INNER JOIN Cajas c ON c.idCaja = ac.idCaja AND c.idEmpresa = @idEmpresa
+        `);
+    if ((historial.recordset[0]?.total || 0) > 0) {
+        return { abierta: false, motivo: 'ya_hubo_aperturas' };
+    }
+
+    let cajaId = idCaja;
+    let idSucursal = null;
+    if (!cajaId) {
+        const cajaRes = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query(`
+                SELECT TOP 1 idCaja, idSucursal
+                FROM Cajas
+                WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
+                ORDER BY CASE WHEN nombre = 'Caja Principal' THEN 0 ELSE 1 END
+            `);
+        cajaId = cajaRes.recordset?.[0]?.idCaja || null;
+        idSucursal = cajaRes.recordset?.[0]?.idSucursal || null;
+    }
+    if (!cajaId) {
+        return { abierta: false, motivo: 'sin_caja' };
+    }
+
+    const yaAbierta = await cajaRepository.verificarCajaAbiertaRepo(pool, cajaId);
+    if (yaAbierta) {
+        return { abierta: false, motivo: 'ya_abierta', idCaja: cajaId };
+    }
+
+    await cajaRepository.abrirCajaRepo(
+        pool,
+        { empresa: idEmpresa, sub: idUsuario, sucursal: idSucursal },
+        {
+            idCaja: cajaId,
+            montoInicial: 0,
+            observaciones: 'Apertura inicial automática',
+            fechaApertura: null
+        }
+    );
+    return { abierta: true, idCaja: cajaId };
+};
+
+/**
+ * Garantiza admin del correo de registro + caja abierta la primera vez.
+ */
+exports.asegurarUsuarioAdminYCajaInicial = async (pool, idEmpresa, datosEmpresa = {}) => {
+    const admin = await exports.crearAdministradorInicial(pool, idEmpresa, datosEmpresa);
+    let apertura = { abierta: false, motivo: 'sin_usuario' };
+    if (admin.idUsuario) {
+        apertura = await exports.abrirCajaInicialSiNuncaAbierta(
+            pool,
+            idEmpresa,
+            admin.idUsuario,
+            datosEmpresa.idCaja || null
+        );
+    }
+    return { admin, apertura };
+};
+
 /**
  * Construye pasos del wizard de onboarding para el frontend.
+ * Día 1: producto + primera venta. Usuario, caja y catálogos se crean al registrar.
  */
 function construirPasosOnboarding(flags) {
     return [
         {
-            id: 'empresa',
-            orden: 1,
-            titulo: 'Datos de empresa',
-            descripcion: 'Sube el logo y completa rubro y celular',
-            completo: !!flags.empresaCompleta,
-            ruta: '/editar-empresa',
-            icono: 'bi-building'
-        },
-        {
-            id: 'colaborador',
-            orden: 2,
-            titulo: 'Primer usuario',
-            descripcion: 'Crea un colaborador (recomendado: rol Administrador)',
-            completo: !!flags.tieneColaboradores,
-            ruta: '/colaborador/create',
-            icono: 'bi-person-plus'
-        },
-        {
             id: 'producto',
-            orden: 3,
+            orden: 1,
             titulo: 'Primer producto',
             descripcion: 'Registra al menos un producto para vender',
             completo: !!flags.tieneProductos,
@@ -1162,26 +1342,8 @@ function construirPasosOnboarding(flags) {
             icono: 'bi-box'
         },
         {
-            id: 'caja',
-            orden: 4,
-            titulo: 'Gestionar cajas',
-            descripcion: 'Verifica la Caja Principal o crea la que usarás',
-            completo: !!flags.tieneCajas,
-            ruta: '/caja',
-            icono: 'bi-cash-stack'
-        },
-        {
-            id: 'apertura',
-            orden: 5,
-            titulo: 'Abrir caja',
-            descripcion: 'Para abrir una caja, debes iniciar sesion con el colaborador administrador',
-            completo: !!flags.tieneCajaAbierta,
-            ruta: '/caja?onboarding=apertura',
-            icono: 'bi-unlock'
-        },
-        {
             id: 'venta',
-            orden: 6,
+            orden: 2,
             titulo: 'Primera venta',
             descripcion: 'Registra una venta de prueba (cliente Público en general)',
             completo: !!flags.tieneVentas,
@@ -1220,6 +1382,8 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         categorias: [],
         marcas: [],
         cajaPrincipal: null,
+        administradorInicial: null,
+        aperturaCajaInicial: null,
         clientePublico: null,
         correlativo: null,
         errores: []
@@ -1254,6 +1418,23 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
                 console.error('⚠️ Error creando caja principal:', error.message);
                 resultado.errores.push({ tipo: 'cajaPrincipal', mensaje: error.message });
             }
+        }
+
+        // 2c. Colaborador Administrador (correo del registro) y apertura inicial de caja
+        try {
+            const bootstrap = await exports.asegurarUsuarioAdminYCajaInicial(pool, idEmpresa, {
+                correo: datosEmpresa.correo,
+                passwordHash: datosEmpresa.passwordHash,
+                razon_Social: datosEmpresa.razon_Social,
+                nombreComercial: datosEmpresa.nombreComercial || datosEmpresa.nombre_Comercial,
+                idSucursal: resultado.sucursal?.idSucursal || null,
+                idCaja: resultado.cajaPrincipal?.idCaja || null
+            });
+            resultado.administradorInicial = bootstrap.admin;
+            resultado.aperturaCajaInicial = bootstrap.apertura;
+        } catch (error) {
+            console.error('⚠️ Error creando administrador inicial:', error.message);
+            resultado.errores.push({ tipo: 'administradorInicial', mensaje: error.message });
         }
 
         // 3. Crear comprobantes en la sucursal principal
@@ -1447,6 +1628,12 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             }
         } catch (errMaestros) {
             console.error('obtenerEstadoConfiguracion asegurarDatosMaestros:', errMaestros.message);
+        }
+
+        try {
+            await exports.asegurarUsuarioAdminYCajaInicial(pool, idEmpresa);
+        } catch (errAdminCaja) {
+            console.error('obtenerEstadoConfiguracion admin/caja inicial:', errAdminCaja.message);
         }
 
         // Verificar colaboradores
