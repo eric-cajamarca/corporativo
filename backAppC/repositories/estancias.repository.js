@@ -153,6 +153,23 @@ async function listarActivasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
   return result.recordset;
 }
 
+/** Estancias activas y cerradas que solapan un rango (fechaHasta inclusive). */
+async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
+  const result = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('fechaDesde', sql.DateTime, new Date(`${fechaDesde}T00:00:00`))
+    .input('fechaHasta', sql.DateTime, new Date(`${fechaHasta}T23:59:59`))
+    .query(`
+      ${selectEstanciaBase()}
+      WHERE e.idEmpresa = @idEmpresa
+        AND e.estadoEstancia IN ('activa', 'checkout')
+        AND e.checkIn <= @fechaHasta
+        AND COALESCE(e.checkOutReal, e.checkOutPrevisto) >= @fechaDesde
+      ORDER BY p.codigo, e.checkIn
+    `);
+  return result.recordset;
+}
+
 /** Estancias que solapan un mes calendario en una habitación (activas y cerradas). */
 async function listarHistorialHabitacionMes(pool, idEmpresa, idProductoHabitacion, inicioMes, finMes) {
   const result = await pool.request()
@@ -181,5 +198,6 @@ module.exports = {
   listarReservasConfirmadasHabitacion,
   listarEstanciasActivasHabitacion,
   listarActivasEnRango,
+  listarEnRango,
   listarHistorialHabitacionMes
 };

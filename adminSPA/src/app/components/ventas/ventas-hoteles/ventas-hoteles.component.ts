@@ -9,13 +9,15 @@ import { CreateClientesComponent } from '../../clientes/create-clientes/create-c
 import { ClienteService } from '../../../services/cliente.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { Documento } from '../../../interfaces/documento-interface';
-import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabitacionLinea, type Estancia, type EstadoReserva, type HotelCalendarioData, type HotelCalendarioEvento, type HotelBloqueo, type MotivoBloqueoHotel, type HotelHousekeepingItem, type HotelAnticipo, type HotelReporte, type EstadoLimpiezaHotel, type HotelHistorialHabitacion, type HotelHistorialEstanciaResumen, type HotelHistorialEstanciaDetalle } from '../../../services/hotel.service';
+import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabitacionLinea, type Estancia, type EstadoReserva, type HotelCalendarioData, type HotelCalendarioEvento, type HotelBloqueo, type MotivoBloqueoHotel, type HotelHousekeepingItem, type HotelAnticipo, type HotelReporte, type HotelReporteHabitacion, type EstadoLimpiezaHotel, type HotelHistorialHabitacion, type HotelHistorialEstanciaResumen, type HotelHistorialEstanciaDetalle } from '../../../services/hotel.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
 import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
 import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 import { getFechaHoyLocal, calcularNochesEstadia, fechaHoraClienteAhora } from '../../../utils/fecha-local.util';
+import { PdfService } from '../../../services/pdf.service';
+import { EmpresaService } from '../../../services/empresa.service';
 
 declare var iziToast: { warning: (o: object) => void; success: (o: object) => void; error: (o: object) => void; info?: (o: object) => void };
 
@@ -51,6 +53,8 @@ export class VentasHotelesComponent implements OnInit {
   private productoService = inject(ProductoService);
   private clienteService = inject(ClienteService);
   private documentoService = inject(DocumentoService);
+  private pdfService = inject(PdfService);
+  private empresaService = inject(EmpresaService);
   private router = inject(Router);
   sidebarState = inject(SidebarStateService);
   activeTab = signal<'calendario' | 'reservas' | 'habitaciones' | 'consumo' | 'housekeeping' | 'reportes'>('calendario');
@@ -72,6 +76,7 @@ export class VentasHotelesComponent implements OnInit {
   errorMessage = signal<string | null>(null);
 
   showModalReserva = signal(false);
+  reservaEditando: Reserva | null = null;
   formReserva = {
     idProductoHabitacion: '',
     idCliente: null as number | null,
@@ -146,8 +151,11 @@ export class VentasHotelesComponent implements OnInit {
 
   reporteDesde = '';
   reporteHasta = '';
+  reporteMes = '';
   reporteData: HotelReporte | null = null;
   reporteLoading = signal(false);
+  generandoPdfGeneral = false;
+  generandoPdfHabitaciones = false;
 
   historialHabitacionId = '';
   historialMes = '';
@@ -942,6 +950,7 @@ export class VentasHotelesComponent implements OnInit {
 
   abrirModalNuevaReserva(opciones?: { idProductoHabitacion?: string; checkInHoy?: boolean }): void {
     this.errorMessage.set(null);
+    this.reservaEditando = null;
     this.totalReservaEditadoManual = false;
     this.idDocumentoHuesped = this.ID_DOC_DNI;
     this.numeroDocumentoHuesped = '';
@@ -960,6 +969,28 @@ export class VentasHotelesComponent implements OnInit {
         this.recalcularTotalEstimadoReserva();
       }
     });
+    this.showModalReserva.set(true);
+  }
+
+  abrirModalEditarReserva(reserva: Reserva): void {
+    if (!this.reservaEsConfirmada(reserva)) {
+      iziToast.warning({ title: 'Reserva', message: 'Solo se pueden editar reservas confirmadas.', position: 'topRight' });
+      return;
+    }
+    this.errorMessage.set(null);
+    this.reservaEditando = reserva;
+    this.totalReservaEditadoManual = true;
+    this.idDocumentoHuesped = this.ID_DOC_DNI;
+    this.numeroDocumentoHuesped = '';
+    this.formReserva = {
+      idProductoHabitacion: reserva.idProductoHabitacion,
+      idCliente: reserva.idCliente,
+      nombreHuesped: reserva.nombreHuesped,
+      fechaEntrada: String(reserva.fechaEntrada).slice(0, 10),
+      fechaSalida: String(reserva.fechaSalida).slice(0, 10),
+      total: Number(reserva.total) || 0,
+      codigo: reserva.codigo
+    };
     this.showModalReserva.set(true);
   }
 
@@ -1112,6 +1143,7 @@ export class VentasHotelesComponent implements OnInit {
 
   cerrarModalReserva(): void {
     this.showModalReserva.set(false);
+    this.reservaEditando = null;
     this.totalReservaEditadoManual = false;
   }
 
@@ -1255,7 +1287,8 @@ export class VentasHotelesComponent implements OnInit {
     }
     this.guardandoReserva = true;
     this.errorMessage.set(null);
-    this.hotelService.crearReserva({
+    const editando = this.reservaEditando;
+    const payload = {
       idProductoHabitacion: this.formReserva.idProductoHabitacion,
       idCliente: this.formReserva.idCliente ?? undefined,
       nombreHuesped: this.formReserva.nombreHuesped.trim(),
@@ -1265,17 +1298,36 @@ export class VentasHotelesComponent implements OnInit {
       total: this.formReserva.total ?? 0,
       estado: 'confirmada',
       fechaHoraCliente: fechaHoraClienteAhora()
-    }).subscribe({
-      next: () => {
-        this.cerrarModalReserva();
-        this.cargarDatos();
-        this.guardandoReserva = false;
-      },
-      error: (err) => {
-        this.errorMessage.set(err?.error?.message || 'Error al crear reserva');
-        this.guardandoReserva = false;
+    };
+    const onOk = (): void => {
+      iziToast.success({
+        title: 'OK',
+        message: editando ? 'Reserva actualizada.' : 'Reserva creada.',
+        position: 'topRight'
+      });
+      this.cerrarModalReserva();
+      this.cargarDatos();
+      if (this.activeTab() === 'calendario') this.cargarCalendario();
+      if (this.activeTab() === 'reportes') {
+        this.cargarReporte();
+        this.cargarHistorialHabitacion();
       }
-    });
+      this.guardandoReserva = false;
+    };
+    const onErr = (err: { error?: { message?: string } }): void => {
+      this.errorMessage.set(err?.error?.message || (editando ? 'Error al actualizar reserva' : 'Error al crear reserva'));
+      this.guardandoReserva = false;
+    };
+    if (editando) {
+      this.hotelService.actualizarReserva(editando.idReserva, {
+        ...payload,
+        codigo: this.formReserva.codigo || editando.codigo,
+        estado: 'confirmada',
+        total: this.formReserva.total ?? 0
+      }).subscribe({ next: onOk, error: onErr });
+    } else {
+      this.hotelService.crearReserva(payload).subscribe({ next: onOk, error: onErr });
+    }
   }
 
   estadoReservaClass(estado: EstadoReserva): string {
@@ -1354,15 +1406,24 @@ export class VentasHotelesComponent implements OnInit {
   }
 
   inicializarRangoReporte(): void {
-    const hoy = getFechaHoyLocal();
-    this.reporteDesde = this.sumarDiasLocal(hoy, -30);
-    this.reporteHasta = hoy;
+    this.reporteMes = this.mesActualLocal();
+    this.aplicarMesReporte(false);
     if (!this.historialMes) this.historialMes = this.mesActualLocal();
     if (!this.historialHabitacionId && this.productosHabitacion.length) {
       this.historialHabitacionId = this.productosHabitacion[0].idProducto;
     }
     this.cargarReporte();
     if (this.historialHabitacionId && this.historialMes) this.cargarHistorialHabitacion();
+  }
+
+  aplicarMesReporte(recargar = true): void {
+    if (!this.reporteMes) return;
+    const [y, m] = this.reporteMes.split('-').map(Number);
+    if (!y || !m) return;
+    const last = new Date(y, m, 0).getDate();
+    this.reporteDesde = `${y}-${String(m).padStart(2, '0')}-01`;
+    this.reporteHasta = `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+    if (recargar) this.cargarReporte();
   }
 
   cargarHistorialHabitacion(): void {
@@ -1393,22 +1454,38 @@ export class VentasHotelesComponent implements OnInit {
     return ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   }
 
-  historialCeldasMes(): { fecha: string | null; dia: number | null; ocupado: boolean }[] {
+  historialCeldasMes(): { fecha: string | null; dia: number | null; estado: 'libre' | 'reservado' | 'ocupado' | 'ocupado-pasado' }[] {
     if (!this.historialMes) return [];
     const [anio, mes] = this.historialMes.split('-').map(Number);
     const primerDia = new Date(anio, mes - 1, 1);
     const diasEnMes = new Date(anio, mes, 0).getDate();
     const offset = (primerDia.getDay() + 6) % 7;
-    const ocupadas = new Set(this.historialData?.fechasOcupadas ?? []);
-    const celdas: { fecha: string | null; dia: number | null; ocupado: boolean }[] = [];
+    const ocupadasActivas = new Set(this.historialData?.fechasOcupadasActivas ?? []);
+    const ocupadasPasadas = new Set(this.historialData?.fechasOcupadasPasadas ?? []);
+    const reservadas = new Set(this.historialData?.fechasReservadas ?? []);
+    const celdas: { fecha: string | null; dia: number | null; estado: 'libre' | 'reservado' | 'ocupado' | 'ocupado-pasado' }[] = [];
     for (let i = 0; i < offset; i++) {
-      celdas.push({ fecha: null, dia: null, ocupado: false });
+      celdas.push({ fecha: null, dia: null, estado: 'libre' });
     }
     for (let d = 1; d <= diasEnMes; d++) {
       const fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      celdas.push({ fecha, dia: d, ocupado: ocupadas.has(fecha) });
+      let estado: 'libre' | 'reservado' | 'ocupado' | 'ocupado-pasado' = 'libre';
+      if (ocupadasActivas.has(fecha)) estado = 'ocupado';
+      else if (ocupadasPasadas.has(fecha)) estado = 'ocupado-pasado';
+      else if (reservadas.has(fecha)) estado = 'reservado';
+      celdas.push({ fecha, dia: d, estado });
     }
     return celdas;
+  }
+
+  esHabitacionMasOcupada(hab: HotelReporteHabitacion): boolean {
+    const top = this.reporteData?.destacados?.masOcupada;
+    return !!top && String(top.idProductoHabitacion).toLowerCase() === String(hab.idProductoHabitacion).toLowerCase();
+  }
+
+  esHabitacionMasVentas(hab: HotelReporteHabitacion): boolean {
+    const top = this.reporteData?.destacados?.masVentas;
+    return !!top && String(top.idProductoHabitacion).toLowerCase() === String(hab.idProductoHabitacion).toLowerCase();
   }
 
   abrirDetalleHistorialEstancia(est: HotelHistorialEstanciaResumen): void {
@@ -1452,6 +1529,152 @@ export class VentasHotelesComponent implements OnInit {
         this.errorMessage.set(err?.error?.message || 'Error al cargar reporte');
       }
     });
+  }
+
+  generarPdfReporteGeneral(): void {
+    const d = this.reporteData;
+    if (!d) {
+      iziToast.warning({ title: 'PDF', message: 'Genere el reporte primero.', position: 'topRight' });
+      return;
+    }
+    const periodo = this.labelPeriodoReporte();
+    const topOc = d.destacados.masOcupada;
+    const topVen = d.destacados.masVentas;
+    const columnas = ['Indicador', 'Valor'];
+    const filas = [
+      ['Período', periodo],
+      ['Ocupación', `${d.ocupacion.ocupacionPct}%`],
+      ['Habitaciones ocupadas', `${d.ocupacion.habitacionesOcupadas} de ${d.ocupacion.habitaciones}`],
+      ['Noches ocupadas', String(d.ocupacion.nochesOcupadas)],
+      ['Noches reservadas', String(d.ocupacion.nochesReservadas)],
+      ['Días del período', String(d.ocupacion.dias)],
+      ['Ventas ocupación', this.formatearMoneda(d.ocupacion.ingresoHabitacion)],
+      ['Consumo habitaciones', this.formatearMoneda(d.consumo.ingresoConsumo)],
+      ['Total período', this.formatearMoneda(d.ingresoTotal)],
+      ['Reservas confirmadas', String(d.reservas.confirmadas)],
+      ['Reservas convertidas', String(d.reservas.convertidas)],
+      ['Reservas canceladas', String(d.reservas.cancelaciones)],
+      ['No show', String(d.reservas.noShow)],
+      ['Monto reservas confirmadas', this.formatearMoneda(d.reservas.ingresoConfirmadas)],
+      [
+        'Habitación más ocupada',
+        topOc
+          ? `${topOc.habitacionCodigo} — ${topOc.habitacionDescripcion} (${topOc.nochesOcupadas} noches)`
+          : 'Sin ocupación'
+      ],
+      [
+        'Habitación con más ventas',
+        topVen
+          ? `${topVen.habitacionCodigo} — ${topVen.habitacionDescripcion} (${this.formatearMoneda(topVen.ingresoTotal)})`
+          : 'Sin ventas'
+      ]
+    ];
+    const nombreArchivo = `hotel_reporte_general_${d.fechaDesde}_${d.fechaHasta}.pdf`;
+    this.generandoPdfGeneral = true;
+    this.pdfService.generarPdfDinamico({
+      titulo: `Reporte general hotel — ${periodo}`,
+      empresa: this.payloadEmpresaPdf(),
+      columnas,
+      filas,
+      nombreArchivo
+    }, 'lista-ventas', 10, 'A4').subscribe({
+      next: (blob) => {
+        this.generandoPdfGeneral = false;
+        this.pdfService.previsualizar(blob, nombreArchivo);
+        iziToast.success({ title: 'PDF', message: 'Reporte general generado.', position: 'topRight' });
+      },
+      error: (err: { error?: { error?: string; message?: string } }) => {
+        this.generandoPdfGeneral = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.error || err?.error?.message || 'No se pudo generar el PDF general.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  generarPdfReporteHabitaciones(): void {
+    const d = this.reporteData;
+    if (!d) {
+      iziToast.warning({ title: 'PDF', message: 'Genere el reporte primero.', position: 'topRight' });
+      return;
+    }
+    const periodo = this.labelPeriodoReporte();
+    const columnas = [
+      'Habitación',
+      'Descripción',
+      'Noches ocup.',
+      'Noches res.',
+      'Reservas',
+      'Ocupación (S/)',
+      'Consumo (S/)',
+      'Total (S/)'
+    ];
+    const filas = d.porHabitacion.map((h) => [
+      h.habitacionCodigo,
+      h.habitacionDescripcion,
+      h.nochesOcupadas,
+      h.nochesReservadas,
+      h.reservas,
+      Number(h.ingresoHabitacion).toFixed(2),
+      Number(h.ingresoConsumo).toFixed(2),
+      Number(h.ingresoTotal).toFixed(2)
+    ]);
+    const totOcup = d.porHabitacion.reduce((s, h) => s + (Number(h.ingresoHabitacion) || 0), 0);
+    const totCons = d.porHabitacion.reduce((s, h) => s + (Number(h.ingresoConsumo) || 0), 0);
+    const totNoc = d.porHabitacion.reduce((s, h) => s + (Number(h.nochesOcupadas) || 0), 0);
+    const totResNoc = d.porHabitacion.reduce((s, h) => s + (Number(h.nochesReservadas) || 0), 0);
+    const totRes = d.porHabitacion.reduce((s, h) => s + (Number(h.reservas) || 0), 0);
+    filas.push([
+      'TOTAL',
+      '',
+      totNoc,
+      totResNoc,
+      totRes,
+      totOcup.toFixed(2),
+      totCons.toFixed(2),
+      (totOcup + totCons).toFixed(2)
+    ]);
+    const nombreArchivo = `hotel_reporte_habitaciones_${d.fechaDesde}_${d.fechaHasta}.pdf`;
+    this.generandoPdfHabitaciones = true;
+    this.pdfService.generarPdfDinamico({
+      titulo: `Reporte por habitación — ${periodo}`,
+      empresa: this.payloadEmpresaPdf(),
+      columnas,
+      filas,
+      nombreArchivo
+    }, 'lista-ventas', 8, 'A4').subscribe({
+      next: (blob) => {
+        this.generandoPdfHabitaciones = false;
+        this.pdfService.previsualizar(blob, nombreArchivo);
+        iziToast.success({ title: 'PDF', message: 'Reporte por habitación generado.', position: 'topRight' });
+      },
+      error: (err: { error?: { error?: string; message?: string } }) => {
+        this.generandoPdfHabitaciones = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.error || err?.error?.message || 'No se pudo generar el PDF por habitación.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  private labelPeriodoReporte(): string {
+    if (!this.reporteDesde || !this.reporteHasta) return '';
+    return `${this.reporteDesde} a ${this.reporteHasta}`;
+  }
+
+  private payloadEmpresaPdf(): { logo: string; nombre: string; ruc: string; direccion: string; telefono: string } {
+    const emp = this.empresaService.getEmpresaActual();
+    return {
+      logo: emp?.logo || '',
+      nombre: emp?.nombre || '',
+      ruc: emp?.ruc || '',
+      direccion: emp?.direccion || '',
+      telefono: emp?.telefono || ''
+    };
   }
 
   abrirModalAnticipo(reserva: Reserva): void {

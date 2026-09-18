@@ -154,6 +154,34 @@ async function cancelar(pool, idReserva, idEmpresa) {
         `);
 }
 
+/** Reservas que solapan un rango de fechas (entrada/salida DATE, ambos inclusive en el período). */
+async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta, idProductoHabitacion = null) {
+    const req = pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('fechaDesde', sql.Date, fechaDesde)
+        .input('fechaHasta', sql.Date, fechaHasta);
+    let extra = '';
+    if (idProductoHabitacion) {
+        extra = ' AND r.idProductoHabitacion = @idProductoHabitacion';
+        req.input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion);
+    }
+    const result = await req.query(`
+            SELECT r.idReserva, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
+                   CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
+                   r.estado, r.total,
+                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
+            FROM Reservas r
+            INNER JOIN Productos p ON r.idProductoHabitacion = p.idProducto
+            WHERE r.idEmpresa = @idEmpresa
+              AND r.fechaEntrada <= @fechaHasta
+              AND r.fechaSalida > @fechaDesde
+              ${extra}
+            ORDER BY r.fechaEntrada, p.codigo
+        `);
+    return result.recordset;
+}
+
 /** Reservas confirmadas que intersectan un rango de fechas calendario (DATE). */
 async function listarConfirmadasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
     const result = await pool.request()
@@ -186,5 +214,6 @@ module.exports = {
     eliminar,
     vincularEstancia,
     cancelar,
+    listarEnRango,
     listarConfirmadasEnRango
 };

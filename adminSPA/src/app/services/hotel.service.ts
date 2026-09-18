@@ -142,13 +142,29 @@ export interface HotelAnticipo {
   fRegistro?: string;
 }
 
+export interface HotelReporteHabitacion {
+  idProductoHabitacion: string;
+  habitacionCodigo: string;
+  habitacionDescripcion: string;
+  nochesOcupadas: number;
+  nochesReservadas: number;
+  estancias: number;
+  reservas: number;
+  ingresoHabitacion: number;
+  ingresoReservas: number;
+  ingresoConsumo: number;
+  ingresoTotal: number;
+}
+
 export interface HotelReporte {
   fechaDesde: string;
   fechaHasta: string;
   ocupacion: {
     habitaciones: number;
+    habitacionesOcupadas: number;
     dias: number;
     nochesOcupadas: number;
+    nochesReservadas: number;
     ocupacionPct: number;
     ingresoHabitacion: number;
   };
@@ -158,13 +174,30 @@ export interface HotelReporte {
     noShow: number;
     convertidas: number;
     confirmadas: number;
+    total: number;
+    ingresoConfirmadas: number;
   };
+  destacados: {
+    masOcupada: HotelReporteHabitacion | null;
+    masVentas: HotelReporteHabitacion | null;
+  };
+  porHabitacion: HotelReporteHabitacion[];
   ingresoTotal: number;
 }
 
 export interface HotelHistorialEstanciaResumen extends Estancia {
   totalConsumo: number;
   cantidadConsumos: number;
+}
+
+export interface HotelHistorialReservaResumen {
+  idReserva: string;
+  codigo: string;
+  nombreHuesped: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  estado: EstadoReserva;
+  total: number;
 }
 
 export interface HotelHistorialHabitacion {
@@ -174,9 +207,15 @@ export interface HotelHistorialHabitacion {
   anio: number;
   mes: number;
   totalEstancias: number;
+  totalReservas: number;
   diasOcupados: number;
+  diasReservados: number;
   fechasOcupadas: string[];
+  fechasOcupadasActivas: string[];
+  fechasOcupadasPasadas: string[];
+  fechasReservadas: string[];
   estancias: HotelHistorialEstanciaResumen[];
+  reservas: HotelHistorialReservaResumen[];
 }
 
 export interface HotelHistorialConsumoLinea {

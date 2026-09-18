@@ -28,7 +28,7 @@
           </div>
         </div>
         <a routerLink="/hotel/configuracion" class="btn btn-outline-light btn-sm hotel-btn-config">
-          <i class="fas fa-cog"></i><span class="hotel-btn-config-txt"> Configuración</span>
+          <i class="bi bi-cog"></i><span class="hotel-btn-config-txt"> Configuración</span>
         </a>
       </div>
     </div>
@@ -41,7 +41,7 @@
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'calendario'"
       (click)="setTab('calendario')">
-      <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+      <i class="bi bi-calendar-alt" aria-hidden="true"></i>
       <span class="hotel-tab-txt">Calendario</span>
     </button>
     <button
@@ -49,7 +49,7 @@
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'reservas'"
       (click)="setTab('reservas')">
-      <i class="fas fa-calendar-check" aria-hidden="true"></i>
+      <i class="bi bi-calendar-check" aria-hidden="true"></i>
       <span class="hotel-tab-txt">Reservas</span>
     </button>
     <button
@@ -57,7 +57,7 @@
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'habitaciones'"
       (click)="setTab('habitaciones')">
-      <i class="fas fa-door-open" aria-hidden="true"></i>
+      <i class="bi bi-door-open" aria-hidden="true"></i>
       <span class="hotel-tab-txt">Habitaciones</span>
     </button>
     <button
@@ -65,7 +65,7 @@
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'consumo'"
       (click)="setTab('consumo')">
-      <i class="fas fa-receipt" aria-hidden="true"></i>
+      <i class="bi bi-receipt" aria-hidden="true"></i>
       <span class="hotel-tab-txt hotel-tab-full">Consumo / Ventas</span>
       <span class="hotel-tab-txt hotel-tab-short">Consumo</span>
     </button>
@@ -83,7 +83,7 @@
       class="hotel-tab"
       [class.hotel-tab-active]="activeTab() === 'reportes'"
       (click)="setTab('reportes')">
-      <i class="fas fa-chart-bar" aria-hidden="true"></i>
+      <i class="bi bi-chart-bar" aria-hidden="true"></i>
       <span class="hotel-tab-txt">Reportes</span>
     </button>
   </nav>
@@ -96,15 +96,15 @@
           <h2 class="hotel-section-title mb-0">Calendario de ocupación</h2>
           <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
             <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioSemanaAnterior()">
-              <i class="fas fa-chevron-left"></i>
+              <i class="bi bi-chevron-left"></i>
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioIrHoy()">Hoy</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioSemanaSiguiente()">
-              <i class="fas fa-chevron-right"></i>
+              <i class="bi bi-chevron-right"></i>
             </button>
             <span class="small text-muted">{{ calendarioDesde }} → {{ calendarioHasta }}</span>
             <button type="button" class="btn btn-hotel-primary btn-sm" (click)="abrirModalBloqueo()">
-              <i class="fas fa-ban me-1"></i> Bloquear habitación
+              <i class="bi bi-ban me-1"></i> Bloquear habitación
             </button>
           </div>
         </div>
@@ -233,6 +233,7 @@
                       <td class="text-end fw-semibold" data-label="Total">{{ formatearMoneda(r.total) }}</td>
                       <td class="text-end text-nowrap" data-label="Acciones">
                         @if (reservaEsConfirmada(r)) {
+                          <button type="button" class="btn btn-sm btn-outline-secondary me-1" (click)="abrirModalEditarReserva(r)">Editar</button>
                           <button type="button" class="btn btn-sm btn-success me-1" (click)="abrirModalCheckInDesdeReserva(r)">Check-in</button>
                           <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="abrirModalAnticipo(r)">Anticipo</button>
                           <button type="button" class="btn btn-sm btn-outline-danger" (click)="cancelarReserva(r)">Cancelar</button>
@@ -419,48 +420,176 @@
         <div class="hotel-section-header flex-wrap gap-2">
           <h2 class="hotel-section-title mb-0">Reportes hotel</h2>
           <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <label class="small text-muted mb-0">Mes</label>
+            <input type="month" class="form-control form-control-sm" style="width: auto;" [(ngModel)]="reporteMes" (ngModelChange)="aplicarMesReporte()" />
+            <span class="text-muted">o rango</span>
             <input type="date" class="form-control form-control-sm" [(ngModel)]="reporteDesde" />
             <span class="text-muted">→</span>
             <input type="date" class="form-control form-control-sm" [(ngModel)]="reporteHasta" />
             <button type="button" class="btn btn-hotel-primary btn-sm" (click)="cargarReporte()">Generar</button>
+            @if (reporteData) {
+              <button type="button" class="btn btn-outline-danger btn-sm" (click)="generarPdfReporteGeneral()" [disabled]="generandoPdfGeneral">
+                <i class="bi bi-file-earmark-pdf me-1"></i>{{ generandoPdfGeneral ? 'PDF…' : 'PDF general A4' }}
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm" (click)="generarPdfReporteHabitaciones()" [disabled]="generandoPdfHabitaciones">
+                <i class="bi bi-file-earmark-pdf me-1"></i>{{ generandoPdfHabitaciones ? 'PDF…' : 'PDF por habitación A4' }}
+              </button>
+            }
           </div>
         </div>
         @if (reporteLoading()) {
           <p class="text-muted">Calculando…</p>
         } @else if (reporteData) {
           <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <div class="hotel-stat-card">
                 <div class="hotel-stat-value">{{ reporteData.ocupacion.ocupacionPct }}%</div>
                 <div class="hotel-stat-label">Ocupación</div>
+                <div class="small text-muted mt-1">{{ reporteData.ocupacion.nochesOcupadas }} noches · {{ reporteData.ocupacion.dias }} días</div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ reporteData.ocupacion.habitacionesOcupadas }}/{{ reporteData.ocupacion.habitaciones }}</div>
+                <div class="hotel-stat-label">Habitaciones ocupadas</div>
+                <div class="small text-muted mt-1">{{ reporteData.ocupacion.nochesReservadas }} noches reservadas</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
               <div class="hotel-stat-card">
                 <div class="hotel-stat-value">{{ formatearMoneda(reporteData.ocupacion.ingresoHabitacion) }}</div>
-                <div class="hotel-stat-label">Ingreso habitación</div>
+                <div class="hotel-stat-label">Ventas ocupación</div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <div class="hotel-stat-card">
                 <div class="hotel-stat-value">{{ formatearMoneda(reporteData.consumo.ingresoConsumo) }}</div>
-                <div class="hotel-stat-label">Ingreso consumo</div>
+                <div class="hotel-stat-label">Consumo habitaciones</div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <div class="hotel-stat-card">
                 <div class="hotel-stat-value">{{ formatearMoneda(reporteData.ingresoTotal) }}</div>
                 <div class="hotel-stat-label">Total período</div>
               </div>
             </div>
-            <div class="col-12">
-              <div class="hotel-card p-3">
+            <div class="col-md-9 col-12">
+              <div class="hotel-card p-3 h-100">
                 <strong>Reservas en el período</strong>
                 <div class="small text-muted mt-1">
                   Confirmadas: {{ reporteData.reservas.confirmadas }} ·
                   Convertidas: {{ reporteData.reservas.convertidas }} ·
                   Canceladas: {{ reporteData.reservas.cancelaciones }} ·
                   No show: {{ reporteData.reservas.noShow }}
+                </div>
+                <div class="small mt-1">
+                  Monto reservas confirmadas: <strong>{{ formatearMoneda(reporteData.reservas.ingresoConfirmadas) }}</strong>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="hotel-card p-3 h-100">
+                <strong>Habitación más ocupada</strong>
+                @if (reporteData.destacados.masOcupada; as topOc) {
+                  <div class="mt-1">{{ topOc.habitacionCodigo }} — {{ topOc.habitacionDescripcion }}</div>
+                  <div class="small text-muted">{{ topOc.nochesOcupadas }} noches · {{ formatearMoneda(topOc.ingresoTotal) }}</div>
+                } @else {
+                  <div class="small text-muted mt-1">Sin ocupación en el período.</div>
+                }
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="hotel-card p-3 h-100">
+                <strong>Habitación con más ventas</strong>
+                @if (reporteData.destacados.masVentas; as topVen) {
+                  <div class="mt-1">{{ topVen.habitacionCodigo }} — {{ topVen.habitacionDescripcion }}</div>
+                  <div class="small text-muted">
+                    Ocupación {{ formatearMoneda(topVen.ingresoHabitacion) }} ·
+                    Consumo {{ formatearMoneda(topVen.ingresoConsumo) }} ·
+                    Total {{ formatearMoneda(topVen.ingresoTotal) }}
+                  </div>
+                } @else {
+                  <div class="small text-muted mt-1">Sin ventas de ocupación o consumo en el período.</div>
+                }
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="hotel-card p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <div>
+                    <strong>Reporte por habitación</strong>
+                    <p class="small text-muted mb-0">Incluye estancias y reservas que solapan el período.</p>
+                  </div>
+                  <button type="button" class="btn btn-outline-danger btn-sm" (click)="generarPdfReporteHabitaciones()" [disabled]="generandoPdfHabitaciones">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>{{ generandoPdfHabitaciones ? 'Generando…' : 'PDF A4' }}
+                  </button>
+                </div>
+                <div class="hotel-reporte-hab-desktop table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-0 hotel-table">
+                    <thead>
+                      <tr>
+                        <th>Habitación</th>
+                        <th class="text-end">Noches ocup.</th>
+                        <th class="text-end">Noches res.</th>
+                        <th class="text-end">Reservas</th>
+                        <th class="text-end">Ocupación</th>
+                        <th class="text-end">Consumo</th>
+                        <th class="text-end">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (hab of reporteData.porHabitacion; track hab.idProductoHabitacion) {
+                        <tr>
+                          <td>
+                            <span class="fw-medium">{{ hab.habitacionCodigo }}</span>
+                            <span class="text-muted"> — {{ hab.habitacionDescripcion }}</span>
+                            @if (esHabitacionMasOcupada(hab)) {
+                              <span class="badge bg-success ms-1">Más ocupada</span>
+                            }
+                            @if (esHabitacionMasVentas(hab)) {
+                              <span class="badge bg-primary ms-1">Más ventas</span>
+                            }
+                          </td>
+                          <td class="text-end">{{ hab.nochesOcupadas }}</td>
+                          <td class="text-end">{{ hab.nochesReservadas }}</td>
+                          <td class="text-end">{{ hab.reservas }}</td>
+                          <td class="text-end">{{ formatearMoneda(hab.ingresoHabitacion) }}</td>
+                          <td class="text-end">{{ formatearMoneda(hab.ingresoConsumo) }}</td>
+                          <td class="text-end fw-semibold">{{ formatearMoneda(hab.ingresoTotal) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="hotel-reporte-hab-mobile">
+                  @for (hab of reporteData.porHabitacion; track hab.idProductoHabitacion) {
+                    <article class="hotel-rep-hab-card">
+                      <div class="hotel-rep-hab-head">
+                        <div class="hotel-rep-hab-title">
+                          <strong>{{ hab.habitacionCodigo }}</strong>
+                          <span>{{ hab.habitacionDescripcion }}</span>
+                        </div>
+                        <div class="hotel-rep-hab-badges">
+                          @if (esHabitacionMasOcupada(hab)) {
+                            <span class="badge bg-success">Más ocupada</span>
+                          }
+                          @if (esHabitacionMasVentas(hab)) {
+                            <span class="badge bg-primary">Más ventas</span>
+                          }
+                        </div>
+                      </div>
+                      <div class="hotel-rep-hab-metrics">
+                        <span>{{ hab.nochesOcupadas }} noc. ocup.</span>
+                        <span>{{ hab.nochesReservadas }} noc. res.</span>
+                        <span>{{ hab.reservas }} reservas</span>
+                      </div>
+                      <div class="hotel-rep-hab-montos">
+                        <span>Ocup. {{ formatearMoneda(hab.ingresoHabitacion) }}</span>
+                        <span>Cons. {{ formatearMoneda(hab.ingresoConsumo) }}</span>
+                        <strong>Total {{ formatearMoneda(hab.ingresoTotal) }}</strong>
+                      </div>
+                    </article>
+                  }
                 </div>
               </div>
             </div>
@@ -500,63 +629,105 @@
                   @for (cel of historialCeldasMes(); track $index) {
                     <div class="historial-mes-dia"
                       [class.historial-mes-vacio]="!cel.dia"
-                      [class.historial-mes-ocupado]="cel.ocupado">
+                      [class.historial-mes-reservado]="cel.estado === 'reservado'"
+                      [class.historial-mes-ocupado-activo]="cel.estado === 'ocupado'"
+                      [class.historial-mes-ocupado]="cel.estado === 'ocupado-pasado'">
                       {{ cel.dia ?? '' }}
                     </div>
                   }
                 </div>
                 <div class="small text-muted mt-2 d-flex gap-3 flex-wrap">
-                  <span><span class="historial-leyenda-dot ocupado"></span> Ocupado</span>
+                  <span><span class="historial-leyenda-dot reservado"></span> Reservado</span>
+                  <span><span class="historial-leyenda-dot ocupado-activo"></span> Ocupado ahora</span>
+                  <span><span class="historial-leyenda-dot ocupado"></span> Ocupado (pasado)</span>
                   <span><span class="historial-leyenda-dot libre"></span> Libre</span>
                 </div>
                 <p class="mb-0 mt-2 small">
                   <strong>{{ historialData.totalEstancias }}</strong>
-                  {{ historialData.totalEstancias === 1 ? 'estancia' : 'estancias' }} este mes ·
+                  {{ historialData.totalEstancias === 1 ? 'estancia' : 'estancias' }} ·
                   <strong>{{ historialData.diasOcupados }}</strong>
-                  {{ historialData.diasOcupados === 1 ? 'día ocupado' : 'días ocupados' }}
+                  {{ historialData.diasOcupados === 1 ? 'día ocupado' : 'días ocupados' }} ·
+                  <strong>{{ historialData.diasReservados }}</strong>
+                  {{ historialData.diasReservados === 1 ? 'día reservado' : 'días reservados' }}
                 </p>
               </div>
             </div>
             <div class="col-lg-8">
-              @if (historialData.estancias.length === 0) {
-                <p class="text-muted mb-0">No hay estancias registradas en este mes para esta habitación.</p>
+              @if (historialData.estancias.length === 0 && historialData.reservas.length === 0) {
+                <p class="text-muted mb-0">No hay estancias ni reservas en este mes para esta habitación.</p>
               } @else {
-                <div class="table-responsive">
-                  <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
-                    <thead>
-                      <tr>
-                        <th>Huésped</th>
-                        <th>Check-in</th>
-                        <th>Salida prevista</th>
-                        <th>Salida real</th>
-                        <th>Estado</th>
-                        <th class="text-end">Habitación</th>
-                        <th class="text-end">Consumo</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (est of historialData.estancias; track est.idEstancia) {
+                @if (historialData.estancias.length > 0) {
+                  <h6 class="mb-2">Estancias</h6>
+                  <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
+                      <thead>
                         <tr>
-                          <td data-label="Huésped">{{ est.nombreHuesped }}</td>
-                          <td class="small" data-label="Check-in">{{ formatearFechaHora(est.checkIn) }}</td>
-                          <td class="small" data-label="Salida prevista">{{ formatearFechaHora(est.checkOutPrevisto) }}</td>
-                          <td class="small" data-label="Salida real">{{ formatearFechaHora(est.checkOutReal) }}</td>
-                          <td data-label="Estado">
-                            <span class="badge" [class.bg-success]="est.estadoEstancia === 'activa'" [class.bg-secondary]="est.estadoEstancia === 'checkout'">
-                              {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}
-                            </span>
-                          </td>
-                          <td class="text-end" data-label="Habitación">{{ formatearMoneda(est.totalHabitacion) }}</td>
-                          <td class="text-end" data-label="Consumo">{{ formatearMoneda(est.totalConsumo) }}</td>
-                          <td class="text-end" data-label="Acciones">
-                            <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirDetalleHistorialEstancia(est)">Ver</button>
-                          </td>
+                          <th>Huésped</th>
+                          <th>Check-in</th>
+                          <th>Salida prevista</th>
+                          <th>Salida real</th>
+                          <th>Estado</th>
+                          <th class="text-end">Habitación</th>
+                          <th class="text-end">Consumo</th>
+                          <th></th>
                         </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        @for (est of historialData.estancias; track est.idEstancia) {
+                          <tr>
+                            <td data-label="Huésped">{{ est.nombreHuesped }}</td>
+                            <td class="small" data-label="Check-in">{{ formatearFechaHora(est.checkIn) }}</td>
+                            <td class="small" data-label="Salida prevista">{{ formatearFechaHora(est.checkOutPrevisto) }}</td>
+                            <td class="small" data-label="Salida real">{{ formatearFechaHora(est.checkOutReal) }}</td>
+                            <td data-label="Estado">
+                              <span class="badge" [class.bg-success]="est.estadoEstancia === 'activa'" [class.bg-secondary]="est.estadoEstancia === 'checkout'">
+                                {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}
+                              </span>
+                            </td>
+                            <td class="text-end" data-label="Habitación">{{ formatearMoneda(est.totalHabitacion) }}</td>
+                            <td class="text-end" data-label="Consumo">{{ formatearMoneda(est.totalConsumo) }}</td>
+                            <td class="text-end" data-label="Acciones">
+                              <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirDetalleHistorialEstancia(est)">Ver</button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+                @if (historialData.reservas.length > 0) {
+                  <h6 class="mb-2">Reservas</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Huésped</th>
+                          <th>Entrada</th>
+                          <th>Salida</th>
+                          <th>Estado</th>
+                          <th class="text-end">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (res of historialData.reservas; track res.idReserva) {
+                          <tr>
+                            <td data-label="Código">{{ res.codigo }}</td>
+                            <td data-label="Huésped">{{ res.nombreHuesped }}</td>
+                            <td class="small" data-label="Entrada">{{ res.fechaEntrada }}</td>
+                            <td class="small" data-label="Salida">{{ res.fechaSalida }}</td>
+                            <td data-label="Estado">
+                              <span class="hotel-badge" [ngClass]="estadoReservaClass(res.estado)">
+                                {{ labelEstadoReserva(res.estado) }}
+                              </span>
+                            </td>
+                            <td class="text-end" data-label="Total">{{ formatearMoneda(res.total) }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
               }
             </div>
           </div>
@@ -646,7 +817,7 @@
     <div class="hotel-modal" role="dialog" aria-labelledby="modalReservaTitle">
       <div class="hotel-modal-content">
         <div class="hotel-modal-header">
-          <h3 id="modalReservaTitle" class="hotel-modal-title">Nueva reserva</h3>
+          <h3 id="modalReservaTitle" class="hotel-modal-title">{{ reservaEditando ? 'Editar reserva' : 'Nueva reserva' }}</h3>
           <button type="button" class="hotel-modal-close" (click)="cerrarModalReserva()" aria-label="Cerrar">&times;</button>
         </div>
         <div class="hotel-modal-body">
@@ -722,7 +893,7 @@
         <div class="hotel-modal-footer">
           <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalReserva()">Cancelar</button>
           <button type="button" class="btn btn-hotel-primary" (click)="guardarReserva()" [disabled]="guardandoReserva">
-            {{ guardandoReserva ? 'Guardando…' : 'Guardar reserva' }}
+            {{ guardandoReserva ? 'Guardando…' : (reservaEditando ? 'Guardar cambios' : 'Guardar reserva') }}
           </button>
         </div>
       </div>
@@ -904,6 +1075,7 @@
               <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCheckInWalkIn(habitacionDetalleSeleccionada); cerrarModalDetalle()">Check-in walk-in</button>
             }
             @if (proxDet && !estDet) {
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalEditarReserva(proxDet); cerrarModalDetalle()">Editar reserva</button>
               <button type="button" class="btn btn-outline-danger btn-sm" (click)="cancelarReserva(proxDet)">Cancelar reserva</button>
             }
             <button type="button" class="btn btn-secondary" (click)="cerrarModalDetalle()">Cerrar</button>

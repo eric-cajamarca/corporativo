@@ -109,24 +109,39 @@
 .hk-action-btn{font-size:.62rem;font-weight:600;padding:.35rem .15rem;line-height:1.15;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#475569;white-space:normal;word-break:break-word;min-height:2.1rem;max-width:100%;overflow:hidden}
 .hk-action-btn.active{background:#2563eb;border-color:#2563eb;color:#fff}
 .hk-action-btn:hover:not(.active){background:#f8fafc;border-color:#94a3b8}
-.historial-mes-card{max-width:320px}
+.historial-mes-card{max-width:360px}
 .historial-mes-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .historial-mes-dow{text-align:center;font-size:.7rem;font-weight:600;color:#64748b;padding:2px 0}
 .historial-mes-dia{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:.75rem;border-radius:6px;background:#f1f5f9;color:#334155}
 .historial-mes-dia.historial-mes-vacio{background:0 0}
 .historial-mes-dia.historial-mes-ocupado{background:#fecaca;color:#991b1b;font-weight:600}
+.historial-mes-dia.historial-mes-ocupado-activo{background:#86efac;color:#166534;font-weight:600}
+.historial-mes-dia.historial-mes-reservado{background:#fbbf24;color:#78350f;font-weight:600}
 .historial-leyenda-dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .historial-leyenda-dot.ocupado{background:#fecaca}
+.historial-leyenda-dot.ocupado-activo{background:#86efac}
+.historial-leyenda-dot.reservado{background:#fbbf24}
 .historial-leyenda-dot.libre{background:#f1f5f9;border:1px solid #cbd5e1}
 /* Desktop: lista móvil / labels cortos ocultos */
-.hotel-cal-mobile,.hotel-hab-legend-short,.hotel-tab-short,.hotel-title-mob{display:none}
+.hotel-cal-mobile,.hotel-hab-legend-short,.hotel-tab-short,.hotel-title-mob,.hotel-reporte-hab-mobile{display:none}
+.hotel-rep-hab-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.55rem .7rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.hotel-rep-hab-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.4rem;margin-bottom:.3rem}
+.hotel-rep-hab-title{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.hotel-rep-hab-title strong{font-size:.95rem;color:#0f172a}
+.hotel-rep-hab-title span{font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hotel-rep-hab-badges{display:flex;flex-wrap:wrap;gap:.2rem;flex-shrink:0}
+.hotel-rep-hab-badges .badge{font-size:.62rem}
+.hotel-rep-hab-metrics,.hotel-rep-hab-montos{display:flex;flex-wrap:wrap;gap:.2rem .7rem;font-size:.78rem;color:#475569}
+.hotel-rep-hab-montos{margin-top:.2rem;padding-top:.3rem;border-top:1px dashed #e2e8f0}
+.hotel-rep-hab-montos strong{color:#0f172a;margin-left:auto}
 .hotel-cal-m-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem;margin-bottom:.65rem}
 .hotel-cal-m-head{display:flex;flex-direction:column;gap:.1rem;margin-bottom:.5rem}
 .hotel-cal-m-events{display:flex;flex-wrap:wrap;gap:.4rem}
 .hotel-cal-chip{border:0;border-radius:6px;color:#fff;font-size:.75rem;font-weight:600;padding:.4rem .65rem;min-height:2.25rem;max-width:100%}
 /* Visibilidad móvil (encapsulado; el resto de layout está en ventas-hoteles-mobile.css) */
 @media (max-width:991.98px){
-.hotel-title-desk,.hotel-subtitle,.hotel-btn-config-txt,.hotel-cal-drag-hint,.hotel-hab-legend-full,.hotel-tab-full,.hotel-cal-desktop{display:none!important}
+.hotel-title-desk,.hotel-subtitle,.hotel-btn-config-txt,.hotel-cal-drag-hint,.hotel-hab-legend-full,.hotel-tab-full,.hotel-cal-desktop,.hotel-reporte-hab-desktop{display:none!important}
 .hotel-title-mob,.hotel-hab-legend-short,.hotel-tab-short{display:inline}
 .hotel-cal-mobile{display:block}
+.hotel-reporte-hab-mobile{display:flex;flex-direction:column;gap:.45rem}
 }

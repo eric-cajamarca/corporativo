@@ -560,19 +560,71 @@ function fechaSolo(valor) {
   return String(valor).slice(0, 10);
 }
 
-function calcularFechasOcupadasMes(estancias, anio, mes) {
+function ymdDesdePartes(anio, mes, dia) {
+  return `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+function addDaysYmd(ymd, days) {
+  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return ymdDesdePartes(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+}
+
+function cubreNoche(fecha, ini, finExclusivo) {
+  return Boolean(ini && finExclusivo && fecha >= ini && fecha < finExclusivo);
+}
+
+function nochesEnRango(ini, finExclusivo, rangoDesde, rangoHasta) {
+  if (!ini || !finExclusivo) return 0;
+  let d = ini < rangoDesde ? rangoDesde : ini;
+  const limite = finExclusivo < addDaysYmd(rangoHasta, 1) ? finExclusivo : addDaysYmd(rangoHasta, 1);
+  let n = 0;
+  while (d < limite) {
+    n += 1;
+    d = addDaysYmd(d, 1);
+  }
+  return n;
+}
+
+function idHabKey(id) {
+  return String(id || '').toLowerCase();
+}
+
+function calcularDiasEstadoMes(estancias, reservasConfirmadas, anio, mes) {
   const diasEnMes = new Date(anio, mes, 0).getDate();
-  const fechasOcupadas = new Set();
+  const fechasOcupadasActivas = [];
+  const fechasOcupadasPasadas = [];
+  const fechasReservadas = [];
   for (let d = 1; d <= diasEnMes; d++) {
-    const fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const fecha = ymdDesdePartes(anio, mes, d);
+    let activa = false;
+    let pasada = false;
     for (const e of estancias) {
       const ini = fechaSolo(e.checkIn);
       const fin = fechaSolo(e.checkOutReal || e.checkOutPrevisto);
-      if (!ini || !fin) continue;
-      if (fecha >= ini && fecha < fin) fechasOcupadas.add(fecha);
+      if (!cubreNoche(fecha, ini, fin)) continue;
+      if (String(e.estadoEstancia) === 'activa') activa = true;
+      else pasada = true;
     }
+    if (activa) {
+      fechasOcupadasActivas.push(fecha);
+      continue;
+    }
+    if (pasada) {
+      fechasOcupadasPasadas.push(fecha);
+      continue;
+    }
+    const reservada = reservasConfirmadas.some((r) =>
+      cubreNoche(fecha, fechaSolo(r.fechaEntrada), fechaSolo(r.fechaSalida))
+    );
+    if (reservada) fechasReservadas.push(fecha);
   }
-  return [...fechasOcupadas].sort();
+  return {
+    fechasOcupadasActivas,
+    fechasOcupadasPasadas,
+    fechasReservadas,
+    fechasOcupadas: [...fechasOcupadasActivas, ...fechasOcupadasPasadas].sort()
+  };
 }
 
 async function historialHabitacionMes(pool, idEmpresa, idProductoHabitacion, mesParam) {
@@ -608,7 +660,18 @@ async function historialHabitacionMes(pool, idEmpresa, idProductoHabitacion, mes
     });
   }
 
-  const fechasOcupadas = calcularFechasOcupadasMes(estancias, anio, mes);
+  const inicioYmd = ymdDesdePartes(anio, mes, 1);
+  const finYmd = ymdDesdePartes(anio, mes, new Date(anio, mes, 0).getDate());
+  const reservasMes = await reservasRepository.listarEnRango(
+    pool,
+    idEmpresa,
+    inicioYmd,
+    finYmd,
+    idProductoHabitacion
+  );
+  const reservasConfirmadas = reservasMes.filter((r) => String(r.estado) === 'confirmada');
+  const dias = calcularDiasEstadoMes(estancias, reservasConfirmadas, anio, mes);
+
   return {
     idProductoHabitacion,
     habitacionCodigo: hab.codigo,
@@ -616,9 +679,15 @@ async function historialHabitacionMes(pool, idEmpresa, idProductoHabitacion, mes
     anio,
     mes,
     totalEstancias: estancias.length,
-    diasOcupados: fechasOcupadas.length,
-    fechasOcupadas,
-    estancias
+    totalReservas: reservasMes.length,
+    diasOcupados: dias.fechasOcupadas.length,
+    diasReservados: dias.fechasReservadas.length,
+    fechasOcupadas: dias.fechasOcupadas,
+    fechasOcupadasActivas: dias.fechasOcupadasActivas,
+    fechasOcupadasPasadas: dias.fechasOcupadasPasadas,
+    fechasReservadas: dias.fechasReservadas,
+    estancias,
+    reservas: reservasMes
   };
 }
 
@@ -644,23 +713,141 @@ async function detalleEstanciaHistorial(pool, idEmpresa, idEstancia) {
 
 async function reporteHotel(pool, idEmpresa, fechaDesde, fechaHasta) {
   if (!fechaDesde || !fechaHasta) throw new Error('fechaDesde y fechaHasta requeridos');
+  const desde = String(fechaDesde).slice(0, 10);
+  const hasta = String(fechaHasta).slice(0, 10);
+  if (hasta < desde) throw new Error('La fecha hasta debe ser posterior o igual a la fecha desde');
+
   const habitaciones = await productosRepository.obtenerProductosHabitacionRepo(pool, idEmpresa);
-  const ocupacion = await hotelReportesRepository.reporteOcupacion(
-    pool,
-    idEmpresa,
-    fechaDesde,
-    fechaHasta,
-    habitaciones.length
-  );
-  const consumo = await hotelReportesRepository.reporteConsumo(pool, idEmpresa, fechaDesde, fechaHasta);
-  const reservas = await hotelReportesRepository.reporteReservas(pool, idEmpresa, fechaDesde, fechaHasta);
+  const estancias = await estanciasRepository.listarEnRango(pool, idEmpresa, desde, hasta);
+  const reservasRows = await reservasRepository.listarEnRango(pool, idEmpresa, desde, hasta);
+  const consumo = await hotelReportesRepository.reporteConsumo(pool, idEmpresa, desde, hasta);
+  const consumoPorHabRows = await hotelReportesRepository.reporteConsumoPorHabitacion(pool, idEmpresa, desde, hasta);
+
+  const consumoMap = new Map();
+  for (const row of consumoPorHabRows) {
+    consumoMap.set(idHabKey(row.idProductoHabitacion), row);
+  }
+
+  const porHabitacionMap = new Map();
+  for (const hab of habitaciones) {
+    porHabitacionMap.set(idHabKey(hab.idProducto), {
+      idProductoHabitacion: hab.idProducto,
+      habitacionCodigo: hab.codigo,
+      habitacionDescripcion: hab.descripcion,
+      nochesOcupadas: 0,
+      nochesReservadas: 0,
+      estancias: 0,
+      reservas: 0,
+      ingresoHabitacion: 0,
+      ingresoReservas: 0,
+      ingresoConsumo: Number(consumoMap.get(idHabKey(hab.idProducto))?.ingresoConsumo) || 0,
+      ingresoTotal: 0
+    });
+  }
+
+  const nochesOcupadasSet = new Set();
+  let ingresoHabitacion = 0;
+  for (const e of estancias) {
+    const key = idHabKey(e.idProductoHabitacion);
+    const row = porHabitacionMap.get(key);
+    const ini = fechaSolo(e.checkIn);
+    const fin = fechaSolo(e.checkOutReal || e.checkOutPrevisto);
+    const nochesTotales = nochesEnRango(ini, fin, '0001-01-01', '9999-12-31');
+    const nochesPeriodo = nochesEnRango(ini, fin, desde, hasta);
+    const monto = Number(e.totalHabitacion) || 0;
+    const montoPeriodo = nochesTotales > 0 ? Math.round((monto * nochesPeriodo / nochesTotales) * 100) / 100 : monto;
+    ingresoHabitacion += montoPeriodo;
+    if (row) {
+      row.estancias += 1;
+      row.nochesOcupadas += nochesPeriodo;
+      row.ingresoHabitacion = Math.round((row.ingresoHabitacion + montoPeriodo) * 100) / 100;
+    }
+    let d = ini < desde ? desde : ini;
+    const limite = fin < addDaysYmd(hasta, 1) ? fin : addDaysYmd(hasta, 1);
+    while (d < limite) {
+      nochesOcupadasSet.add(`${key}|${d}`);
+      d = addDaysYmd(d, 1);
+    }
+  }
+
+  const nochesReservadasSet = new Set();
+  let ingresoReservas = 0;
+  const reservasResumen = { confirmadas: 0, convertidas: 0, cancelaciones: 0, noShow: 0, total: 0 };
+  for (const r of reservasRows) {
+    const estado = String(r.estado || '');
+    reservasResumen.total += 1;
+    if (estado === 'confirmada') reservasResumen.confirmadas += 1;
+    else if (estado === 'convertida') reservasResumen.convertidas += 1;
+    else if (estado === 'cancelada') reservasResumen.cancelaciones += 1;
+    else if (estado === 'no_show') reservasResumen.noShow += 1;
+
+    const key = idHabKey(r.idProductoHabitacion);
+    const row = porHabitacionMap.get(key);
+    if (row) row.reservas += 1;
+
+    if (estado !== 'confirmada') continue;
+    const ini = fechaSolo(r.fechaEntrada);
+    const fin = fechaSolo(r.fechaSalida);
+    const nochesTotales = nochesEnRango(ini, fin, '0001-01-01', '9999-12-31');
+    const nochesPeriodo = nochesEnRango(ini, fin, desde, hasta);
+    const monto = Number(r.total) || 0;
+    const montoPeriodo = nochesTotales > 0 ? Math.round((monto * nochesPeriodo / nochesTotales) * 100) / 100 : monto;
+    ingresoReservas += montoPeriodo;
+    if (row) {
+      row.nochesReservadas += nochesPeriodo;
+      row.ingresoReservas = Math.round((row.ingresoReservas + montoPeriodo) * 100) / 100;
+    }
+    let d = ini < desde ? desde : ini;
+    const limite = fin < addDaysYmd(hasta, 1) ? fin : addDaysYmd(hasta, 1);
+    while (d < limite) {
+      if (!nochesOcupadasSet.has(`${key}|${d}`)) nochesReservadasSet.add(`${key}|${d}`);
+      d = addDaysYmd(d, 1);
+    }
+  }
+
+  const porHabitacion = [...porHabitacionMap.values()].map((row) => {
+    row.ingresoTotal = Math.round((row.ingresoHabitacion + row.ingresoConsumo) * 100) / 100;
+    return row;
+  }).sort((a, b) => (b.ingresoTotal - a.ingresoTotal) || (b.nochesOcupadas - a.nochesOcupadas));
+
+  const masOcupada = [...porHabitacion].sort((a, b) =>
+    (b.nochesOcupadas - a.nochesOcupadas) || (b.ingresoTotal - a.ingresoTotal)
+  )[0] || null;
+  const masVentas = [...porHabitacion].sort((a, b) =>
+    (b.ingresoTotal - a.ingresoTotal) || (b.nochesOcupadas - a.nochesOcupadas)
+  )[0] || null;
+
+  const totalHabitaciones = Math.max(1, habitaciones.length);
+  const dias = Math.max(1, nochesEnRango(desde, addDaysYmd(hasta, 1), desde, hasta));
+  const nochesOcupadas = nochesOcupadasSet.size;
+  const capacidad = totalHabitaciones * dias;
+  const ocupacionPct = Math.min(100, Math.round((nochesOcupadas / capacidad) * 10000) / 100);
+  const habitacionesOcupadas = new Set([...nochesOcupadasSet].map((k) => k.split('|')[0])).size;
+
+  ingresoHabitacion = Math.round(ingresoHabitacion * 100) / 100;
+  ingresoReservas = Math.round(ingresoReservas * 100) / 100;
+  reservasResumen.ingresoConfirmadas = ingresoReservas;
+
   return {
-    fechaDesde,
-    fechaHasta,
-    ocupacion,
+    fechaDesde: desde,
+    fechaHasta: hasta,
+    ocupacion: {
+      habitaciones: habitaciones.length,
+      habitacionesOcupadas,
+      dias,
+      nochesOcupadas,
+      nochesReservadas: nochesReservadasSet.size,
+      ocupacionPct,
+      ingresoHabitacion
+    },
     consumo,
-    reservas,
-    ingresoTotal: (ocupacion.ingresoHabitacion || 0) + (consumo.ingresoConsumo || 0)
+    reservas: reservasResumen,
+    destacados: {
+      masOcupada: masOcupada && masOcupada.nochesOcupadas > 0 ? masOcupada : null,
+      masVentas: masVentas && masVentas.ingresoTotal > 0 ? masVentas : null
+    },
+    porHabitacion,
+    ingresoTotal: ingresoHabitacion + (consumo.ingresoConsumo || 0)
   };
 }
 
