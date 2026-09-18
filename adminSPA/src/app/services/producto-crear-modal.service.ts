@@ -7,6 +7,7 @@ export interface ProductoCreadoModalResult {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  marca?: string;
   idCategoria?: number;
   idMarca?: number;
   idPresentacion?: number;

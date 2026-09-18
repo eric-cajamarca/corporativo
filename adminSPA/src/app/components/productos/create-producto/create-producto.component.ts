@@ -908,6 +908,14 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     });
   }
 
+  private nombreMarcaSeleccionada(idMarca: unknown): string | undefined {
+    const id = Number(idMarca);
+    if (!Number.isFinite(id) || id <= 0) return undefined;
+    const nombre = this.marcas.find((m) => Number(m.idMarca) === id)?.nombre;
+    const t = String(nombre || '').trim();
+    return t || undefined;
+  }
+
   /** Payload al cerrar modal (movimiento inventario: rellenar detalle con ingreso/salida según pantalla padre). */
   private buildProductoCreadoModalResult(idProducto: string): ProductoCreadoModalResult {
     const v = this.productoForm.value;
@@ -925,6 +933,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       idProducto,
       codigo: String(v.codigo || ''),
       descripcion: String(v.descripcion || ''),
+      marca: this.nombreMarcaSeleccionada(v.idMarca),
       idCategoria: v.idCategoria != null && String(v.idCategoria).trim() !== ''
         ? Number(v.idCategoria)
         : undefined,

@@ -275,11 +275,11 @@
                             </span>
                           </td>
                         }
-                        <td class="text-end align-middle conteo-col-stock" data-label="Stock sist.">
+                        <td class="text-end align-middle conteo-col-stock conteo-col-stock-sist" data-label="Stock sist.">
                           {{ p.stock | number : '1.0-3' }}
                         </td>
                         @if (sesionInventarioPorUbicacion()) {
-                          <td class="text-end align-middle conteo-col-stock" [attr.data-label]="'Ubic. ' + etiquetaUbicacionSesion()">
+                          <td class="text-end align-middle conteo-col-stock conteo-col-stock-ubic" [attr.data-label]="'Ubic. ' + etiquetaUbicacionSesion()">
                             {{ stockUbicacionConteoProducto(p) | number : '1.0-3' }}
                           </td>
                         }
@@ -291,11 +291,11 @@
                               <span class="text-muted small">—</span>
                             }
                             <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirAsignarSinUbicar(p)">
-                              <i class="bi bi-geo"></i> Asignar
+                              <i class="bi bi-geo"></i><span class="conteo-asignar-txt"> Asignar</span>
                             </button>
                           </div>
                         </td>
-                        <td class="text-end text-nowrap align-middle conteo-col-stock" data-label="Stock real">
+                        <td class="text-end text-nowrap align-middle conteo-col-stock conteo-col-stock-real" data-label="Stock real">
                           @if (srLinea != null) {
                             {{ srLinea | number : '1.0-3' }}
                           } @else {
@@ -303,7 +303,7 @@
                           }
                         </td>
                         <td class="text-end align-middle conteo-col-accion" data-label="">
-                          <button type="button" class="btn btn-sm btn-outline-primary w-100" (click)="elegirProducto(p)">Elegir</button>
+                          <button type="button" class="btn btn-sm btn-outline-primary w-100 conteo-btn-elegir" (click)="elegirProducto(p)">Elegir</button>
                         </td>
                       </tr>
                     } @empty {

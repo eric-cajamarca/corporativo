@@ -25,6 +25,7 @@ export interface FilaDetalle {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  marca?: string;
   cantidad: number;
   costoUnitario: number;
   fechaVencimiento: string;

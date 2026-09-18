@@ -17,6 +17,7 @@ import { ProductoCrearModalService, ProductoCreadoModalResult } from '../../../s
 import { ProductoEditarModalService } from '../../../services/producto-editar-modal.service';
 import { Producto } from '../../../models/producto.models';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
+import { marcaProductoEnLista } from '../../../utils/producto-busqueda.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { MovimientoInventarioBorradorService } from '../../../services/movimiento-inventario-borrador.service';
 import {
@@ -153,6 +154,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         idProducto: p['idProducto'],
         codigo: p['codigo'],
         descripcion: p['descripcion'],
+        marca: p['marca'] || '',
         cantidad: Number(p['cantidad']) || 0,
         costoUnitario: Number(p['costoUnitario']) || 0,
         fechaVencimiento: fv,
@@ -203,6 +205,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
       idProducto: '',
       codigo: '',
       descripcion: '',
+      marca: '',
       cantidad: 0,
       costoUnitario: 0,
       fechaVencimiento: '',
@@ -230,6 +233,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         idProducto: String(f.idProducto || ''),
         codigo: String(f.codigo || ''),
         descripcion: String(f.descripcion || ''),
+        marca: String(f.marca || ''),
         cantidad: Number(f.cantidad) || 0,
         costoUnitario: Number(f.costoUnitario) || 0,
         fechaVencimiento: String(f.fechaVencimiento || ''),
@@ -292,6 +296,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
             idProducto: f.idProducto || '',
             codigo: f.codigo || '',
             descripcion: f.descripcion || '',
+            marca: f.marca || '',
             cantidad: Number(f.cantidad) || 0,
             costoUnitario: Number(f.costoUnitario) || 0,
             fechaVencimiento: f.fechaVencimiento || '',
@@ -545,6 +550,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
         }
         const codigo = String(p.Codigo ?? p.codigo ?? '').trim();
         const descripcion = String(p.descripcion ?? '').trim();
+        const marca = marcaProductoEnLista(p as unknown as Record<string, unknown>);
         for (const f of this.filas) {
           if (String(f.idProducto) === idProducto) {
             if (codigo) {
@@ -553,6 +559,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
             if (descripcion) {
               f.descripcion = descripcion;
             }
+            f.marca = marca;
           }
         }
         this.programarGuardadoBorrador();
@@ -570,6 +577,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     fila.idProducto = String(creado.idProducto);
     fila.codigo = creado.codigo || '';
     fila.descripcion = creado.descripcion || '';
+    fila.marca = String(creado.marca || '').trim();
 
     if (this.esEntrada()) {
       const q =
@@ -591,6 +599,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     } else {
       fila.cantidad = 1;
     }
+    if (!fila.marca && fila.idProducto) {
+      this.refrescarProductoEnFilas(fila.idProducto);
+    }
     this.programarGuardadoBorrador();
   }
 
@@ -606,6 +617,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     fila.descripcion = String(
       p.descripcion || (typeof nombreAlt === 'string' ? nombreAlt : '') || ''
     ).trim();
+    fila.marca = marcaProductoEnLista(p as unknown as Record<string, unknown>);
     if (!fila.cantidad || fila.cantidad <= 0) {
       fila.cantidad = 1;
     }
@@ -659,10 +671,15 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     this.programarGuardadoBorrador();
   }
 
-  /** Descripción mostrada en el detalle (viene del buscador o del alta de producto). */
+  /** Descripción mostrada en el detalle (nombre y marca). */
   descripcionProductoEnFila(f: FilaDetalle): string {
-    const t = (f.descripcion || '').trim();
-    if (t) return t;
+    const nombre = (f.descripcion || '').trim();
+    const marca = (f.marca || '').trim();
+    if (nombre && marca && !nombre.toLowerCase().includes(marca.toLowerCase())) {
+      return `${nombre} - ${marca}`;
+    }
+    if (nombre) return nombre;
+    if (marca) return marca;
     return f.idProducto ? 'Producto' : '';
   }
 

@@ -392,10 +392,6 @@
 .create-ventas-row-stock-alerta td {
   background-color: #fff3cd !important;
 }
-.create-ventas-cart-card-stock-alerta {
-  background-color: #fff3cd;
-  border-color: #ffc107;
-}
 
 /* ---------- MODALES – ESTILO ELEGANTE ---------- */
 .modal-content.shadow-xl {
@@ -448,26 +444,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .create-ventas-touch-btn {
-    min-height: 2.5rem;
-    min-width: 2.5rem;
-  }
-
-  .create-ventas-cart-card {
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  }
-
-  .create-ventas-cart-desc {
-    min-height: 2.5rem;
-    padding: 0.35rem 0.5rem;
-    border-radius: 0.25rem;
   }
 }
 

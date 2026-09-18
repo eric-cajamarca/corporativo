@@ -230,84 +230,95 @@
         <!-- Tarjetas móvil / tablet -->
         <div class="d-lg-none mov-inv-line-cards">
           @for (fila of filas; track $index) {
-            <div class="card mov-inv-line-card mb-3">
-              <div class="card-body py-3">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <span class="badge bg-secondary">Línea {{ $index + 1 }}</span>
-                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFila($index)" [disabled]="filas.length <= 1" title="Quitar">
+            <article class="mov-inv-line-card">
+              <div class="mov-inv-line-head">
+                <div class="mov-inv-line-title min-w-0">
+                  <span class="mov-inv-line-num">#{{ $index + 1 }}</span>
+                  @if (fila.idProducto) {
+                    @if (fila.codigo) {
+                      <span class="mov-inv-line-code">{{ fila.codigo }}</span>
+                    }
+                  } @else {
+                    <span class="text-muted">Sin producto</span>
+                  }
+                </div>
+                <div class="mov-inv-line-actions">
+                  @if (esEntrada() && fila.idProducto) {
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary mov-inv-icon-btn"
+                      (click)="abrirEditarProducto(fila)"
+                      title="Editar producto del catálogo">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  }
+                  <button type="button" class="btn btn-sm btn-outline-danger mov-inv-icon-btn" (click)="quitarFila($index)" [disabled]="filas.length <= 1" title="Quitar">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
-                <label class="form-label small mb-1">Producto <span class="text-danger">*</span></label>
-                <div class="border rounded bg-light px-2 py-2 mb-2 small mov-inv-celda-producto">
-                  @if (fila.idProducto) {
-                    <div class="d-flex align-items-start justify-content-between gap-2">
-                      <div class="min-w-0">
-                        @if (fila.codigo) {
-                          <div class="text-muted text-uppercase mb-0">{{ fila.codigo }}</div>
-                        }
-                        <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
-                      </div>
-                      @if (esEntrada()) {
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-outline-secondary flex-shrink-0"
-                          (click)="abrirEditarProducto(fila)"
-                          title="Editar producto del catálogo">
-                          <i class="bi bi-pencil"></i>
-                        </button>
-                      }
-                    </div>
-                  } @else {
-                    <span class="text-muted mov-inv-celda-producto-placeholder">
-                      Use <strong>Buscar producto</strong> o <strong>Crear producto</strong>.
-                    </span>
-                  }
+              </div>
+              <div class="mov-inv-line-producto">
+                @if (fila.idProducto) {
+                  {{ descripcionProductoEnFila(fila) }}
+                } @else {
+                  <span class="text-muted mov-inv-celda-producto-placeholder">
+                    Use <strong>Buscar producto</strong> o <strong>Crear producto</strong>.
+                  </span>
+                }
+              </div>
+              <div class="mov-inv-line-grid" [class.mov-inv-line-grid-salida]="!esEntrada()">
+                <div class="mov-inv-line-campo">
+                  <label class="mov-inv-line-lbl">Cantidad <span class="text-danger">*</span></label>
+                  <input
+                    type="number"
+                    inputmode="decimal"
+                    class="form-control form-control-sm mov-inv-line-input"
+                    min="0.01"
+                    step="0.01"
+                    [(ngModel)]="fila.cantidad"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onCambioDetalle()"
+                  />
                 </div>
-                <label class="form-label small mb-1">Cantidad <span class="text-danger">*</span></label>
-                <input
-                  type="number"
-                  class="form-control form-control-sm mb-2"
-                  min="0.01"
-                  step="0.01"
-                  [(ngModel)]="fila.cantidad"
-                  [ngModelOptions]="{ standalone: true }"
-                  (ngModelChange)="onCambioDetalle()"
-                />
                 @if (esEntrada()) {
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="form-label small mb-1">Costo unit.</label>
-                      <input
-                        type="number"
-                        class="form-control form-control-sm"
-                        min="0"
-                        step="0.01"
-                        [(ngModel)]="fila.costoUnitario"
-                        [ngModelOptions]="{ standalone: true }"
-                        (ngModelChange)="onCambioDetalle()"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small mb-1">F. venc.</label>
-                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" (ngModelChange)="onCambioDetalle()" />
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label small mb-1">Nº lote</label>
-                      <input
-                        type="text"
-                        class="form-control form-control-sm"
-                        [(ngModel)]="fila.numeroLote"
-                        [ngModelOptions]="{ standalone: true }"
-                        (ngModelChange)="onCambioDetalle()"
-                        placeholder="Opcional"
-                      />
-                    </div>
+                  <div class="mov-inv-line-campo">
+                    <label class="mov-inv-line-lbl">C. unitario</label>
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      class="form-control form-control-sm mov-inv-line-input"
+                      min="0"
+                      step="0.01"
+                      [(ngModel)]="fila.costoUnitario"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onCambioDetalle()"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div class="mov-inv-line-campo">
+                    <label class="mov-inv-line-lbl">F. vencimiento</label>
+                    <input
+                      type="date"
+                      class="form-control form-control-sm mov-inv-line-input"
+                      [(ngModel)]="fila.fechaVencimiento"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onCambioDetalle()"
+                    />
+                  </div>
+                  <div class="mov-inv-line-campo">
+                    <label class="mov-inv-line-lbl">Nº lote</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm mov-inv-line-input"
+                      [(ngModel)]="fila.numeroLote"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onCambioDetalle()"
+                      placeholder="Opcional"
+                    />
                   </div>
                 }
               </div>
-            </div>
+            </article>
           }
         </div>
 

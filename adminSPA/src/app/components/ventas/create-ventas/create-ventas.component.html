@@ -185,10 +185,13 @@
 
               <!-- Detalle en tarjetas (móvil / tablet < lg) -->
               <div *ngIf="carrito.length > 0" class="d-lg-none create-ventas-cart-cards">
-                <div class="create-ventas-cart-card" *ngFor="let item of carrito; let i = index" [class.create-ventas-cart-card-stock-alerta]="lineaCarritoStockInsuficiente(item)">
-                  <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                    <span class="fw-semibold">#{{ i + 1 }} · {{ item.codigo }}</span>
-                    <div class="d-flex gap-1">
+                <article class="create-ventas-cart-card" *ngFor="let item of carrito; let i = index" [class.create-ventas-cart-card-stock-alerta]="lineaCarritoStockInsuficiente(item)">
+                  <div class="create-ventas-cart-card-head">
+                    <div class="create-ventas-cart-card-title">
+                      <span class="create-ventas-cart-item-num">#{{ i + 1 }}</span>
+                      <span class="create-ventas-cart-code">{{ item.codigo }}</span>
+                    </div>
+                    <div class="create-ventas-cart-actions">
                       <button
                         type="button"
                         class="btn btn-outline-secondary btn-sm create-ventas-touch-btn"
@@ -205,25 +208,29 @@
                   <div *ngIf="esGestora" class="mb-2">
                     <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
                   </div>
-                  <div class="small text-muted mb-1">Producto</div>
-                  <input
-                    type="text"
-                    class="form-control form-control-sm create-ventas-cart-desc mb-2"
-                    [(ngModel)]="item.descripcion"
-                    [name]="'desc-m-' + i"
-                    [readonly]="!item.permiteDescripcionEnVenta"
-                    [class.text-muted]="!item.permiteDescripcionEnVenta"
-                    maxlength="500"
-                    autocomplete="off"
-                  />
-                  <div class="row g-2 small mb-2 create-ventas-cart-meta-row">
-                    <div class="col-6">
-                      <span class="text-muted">Marca</span>
-                      <div>{{ marcaColumnaVentas(item) }}</div>
+                  <div class="create-ventas-cart-product-block">
+                    <span class="create-ventas-cart-lbl">Producto</span>
+                    @if (item.permiteDescripcionEnVenta) {
+                      <input
+                        type="text"
+                        class="form-control form-control-sm venta-linea-input venta-linea-input-desc"
+                        [(ngModel)]="item.descripcion"
+                        [name]="'desc-m-' + i"
+                        maxlength="500"
+                        autocomplete="off"
+                      />
+                    } @else {
+                      <div class="create-ventas-cart-product">{{ item.descripcion }}</div>
+                    }
+                  </div>
+                  <div class="create-ventas-cart-meta">
+                    <div>
+                      <span class="create-ventas-cart-lbl">Marca</span>
+                      <div class="create-ventas-cart-meta-val">{{ marcaColumnaVentas(item) }}</div>
                     </div>
-                    <div class="col-6">
-                      <span class="text-muted">U.Medida</span>
-                      <div>
+                    <div>
+                      <span class="create-ventas-cart-lbl">U.Medida</span>
+                      <div class="create-ventas-cart-meta-val">
                         {{ etiquetaUnidadLinea(item) }}
                         @if (item.matizado) {
                           <span class="text-muted"> · matizado</span>
@@ -231,30 +238,56 @@
                       </div>
                     </div>
                   </div>
-                  <div class="row g-2 small align-items-end create-ventas-cart-montos-row">
-                    <div class="col-3">
-                      <span class="text-muted d-block">Cant.</span>
-                      <div contenteditable="true" class="editable d-inline-block min-w-0" (blur)="actualizaCantidad(item, $event)">{{ item?.cantidad }}</div>
+                  <div class="create-ventas-cart-montos">
+                    <div class="create-ventas-cart-campo">
+                      <label class="create-ventas-cart-lbl" [attr.for]="'cant-m-' + i">Cant.</label>
+                      <input
+                        type="text"
+                        inputmode="decimal"
+                        enterkeyhint="done"
+                        autocomplete="off"
+                        class="form-control form-control-sm venta-linea-input"
+                        [id]="'cant-m-' + i"
+                        [name]="'cant-m-' + i"
+                        [ngModel]="item.cantidad"
+                        [ngModelOptions]="{updateOn: 'blur'}"
+                        (ngModelChange)="actualizaCantidad(item, $event)"
+                        (focus)="$any($event.target).select()"
+                        (keydown.enter)="$any($event.target).blur()"
+                      />
                     </div>
-                    <div class="col-5">
-                      <span class="text-muted d-block">P. unit.</span>
-                      <div class="d-flex align-items-center gap-1 flex-nowrap">
-                        <span contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">{{ item.pVenta | number:'1.2-2' }}</span>
-                        <button type="button" class="btn btn-sm btn-outline-primary create-ventas-touch-btn flex-shrink-0" (click)="abrirModalPrecios(item)" title="Otros precios">
+                    <div class="create-ventas-cart-campo">
+                      <label class="create-ventas-cart-lbl" [attr.for]="'precio-m-' + i">P. unit.</label>
+                      <div class="create-ventas-cart-precio-wrap">
+                        <input
+                          type="text"
+                          inputmode="decimal"
+                          enterkeyhint="done"
+                          autocomplete="off"
+                          class="form-control form-control-sm venta-linea-input"
+                          [id]="'precio-m-' + i"
+                          [name]="'precio-m-' + i"
+                          [ngModel]="item.pVenta | number:'1.2-2'"
+                          [ngModelOptions]="{updateOn: 'blur'}"
+                          (ngModelChange)="actualizaPrecio(item, $event)"
+                          (focus)="$any($event.target).select()"
+                          (keydown.enter)="$any($event.target).blur()"
+                        />
+                        <button type="button" class="btn btn-outline-primary btn-sm create-ventas-touch-btn create-ventas-cart-precio-btn" (click)="abrirModalPrecios(item)" title="Otros precios">
                           <i class="bi bi-chevron-down"></i>
                         </button>
                       </div>
                     </div>
-                    <div class="col-4 text-end">
-                      <span class="text-muted d-block">Total</span>
-                      <div class="fw-semibold text-nowrap">S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</div>
+                    <div class="create-ventas-cart-campo create-ventas-cart-campo-total">
+                      <span class="create-ventas-cart-lbl">Total</span>
+                      <div class="create-ventas-cart-total">S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</div>
                     </div>
                   </div>
-                  <div class="small mt-2" *ngIf="item.sucursal">
-                    <span class="text-muted">Sucursal</span>
+                  <div class="create-ventas-cart-sucursal" *ngIf="item.sucursal">
+                    <span class="create-ventas-cart-lbl">Sucursal</span>
                     <div>{{ item.sucursal }}</div>
                   </div>
-                </div>
+                </article>
               </div>
             </div>
             <div class="card-footer text-muted text-end create-ventas-footer-resumen">

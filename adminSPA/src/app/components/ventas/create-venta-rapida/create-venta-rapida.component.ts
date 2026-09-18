@@ -20,6 +20,7 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { esFormaOMedioSaldoFavor, filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
+import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
 import { VentaUnidadMatizadoFlowService } from '../../../services/venta-unidad-matizado-flow.service';
 import { cantidadEnUnidadCompra, etiquetaUnidadCarrito } from '../../../utils/unidad-venta.util';
@@ -110,7 +111,7 @@ interface DocumentoResponse {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
   templateUrl: './create-venta-rapida.component.html',
-  styleUrl: './create-venta-rapida.component.css'
+  styleUrls: ['./create-venta-rapida.component.css', '../venta-detalle-movil.css']
 })
 export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDestroy {
 
@@ -2179,7 +2180,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   actualizaPrecio(item: any, el: any): void {
-    const raw = (el.target?.innerText ?? '').replace(/[^\d.,]/g, '').replace(',', '.').trim();
+    const raw = this.textoEditableEvento(el).replace(/[^\d.,]/g, '').replace(',', '.').trim();
     const nuevo = parseFloat(raw);
     if (!isNaN(nuevo) && nuevo >= 0) {
       item.pVenta = nuevo;
@@ -2258,7 +2259,7 @@ abrirModalPrecios(item: any) {
   }
 
   actualizaCantidad(item: any, el: any) {
-    const raw = (el.target?.innerText ?? '')
+    const raw = this.textoEditableEvento(el)
       .replace(/[^\d.,\-]/g, '')
       .replace(',', '.')
       .trim();
@@ -2270,6 +2271,55 @@ abrirModalPrecios(item: any) {
     reescalarMatizadoPorCantidad(item, item.cantidad);
     this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
+  }
+
+  private textoEditableEvento(el: any): string {
+    if (el == null) return '';
+    if (typeof el === 'string' || typeof el === 'number') return String(el);
+    const target = el?.target ?? el;
+    return String(target?.value ?? target?.innerText ?? '');
+  }
+
+  /** Solo Administrador ve pestaña de compras en historial del producto. */
+  esAdministradorHistorial(): boolean {
+    return String(this.auth.userData()?.rol ?? '').trim() === 'Administrador';
+  }
+
+  /**
+   * Historial de ventas (y compras si admin) del producto de la línea.
+   */
+  abrirModalHistorialProducto(item: { idProducto?: string; codigo?: string; descripcion?: string; pVenta?: number }): void {
+    const idProducto = String(item?.idProducto || '').trim();
+    if (!idProducto) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'El producto de la línea no es válido',
+        position: 'topRight'
+      });
+      return;
+    }
+    const idCliente =
+      this.cliente?.idCliente != null && this.cliente.idCliente !== '' && this.cliente.idCliente !== 0
+        ? this.cliente.idCliente
+        : null;
+
+    this.modalService
+      .open(
+        HistorialProductoModalComponent,
+        { size: 'lg', backdrop: 'static' },
+        {
+          idProducto,
+          codigo: item.codigo || '',
+          descripcion: item.descripcion || '',
+          puedeVerCompras: this.esAdministradorHistorial(),
+          idCliente,
+          precioActual: Number(item.pVenta) || 0
+        }
+      )
+      .subscribe({
+        next: () => {},
+        error: () => {}
+      });
   }
 
   etiquetaUnidadLinea(item: { nombreUnidadVenta?: string; codigoPresentacion?: string; presentacion?: string }): string {

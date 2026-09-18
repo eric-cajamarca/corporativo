@@ -116,7 +116,7 @@ interface DocumentoResponse {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
   templateUrl: './create-ventas.component.html',
-  styleUrl: './create-ventas.component.css'
+  styleUrls: ['./create-ventas.component.css', '../venta-detalle-movil.css']
 })
 export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
@@ -2106,7 +2106,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   actualizaPrecio(item: any, el: any): void {
-    const raw = (el.target?.innerText ?? '').replace(/[^\d.]/g, '').replace(',', '.').trim();
+    const raw = this.textoEditableEvento(el).replace(/[^\d.,]/g, '').replace(',', '.').trim();
     const nuevo = parseFloat(raw);
     if (!isNaN(nuevo) && nuevo >= 0) {
       item.pVenta = nuevo;
@@ -2227,7 +2227,7 @@ abrirModalPrecios(item: any) {
   }
 
   actualizaCantidad(item: any, el: any) {
-    const raw = (el.target?.innerText ?? '')
+    const raw = this.textoEditableEvento(el)
       .replace(/[^\d.,\-]/g, '')
       .replace(',', '.')
       .trim();
@@ -2239,6 +2239,13 @@ abrirModalPrecios(item: any) {
     reescalarMatizadoPorCantidad(item, item.cantidad);
     this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
+  }
+
+  private textoEditableEvento(el: any): string {
+    if (el == null) return '';
+    if (typeof el === 'string' || typeof el === 'number') return String(el);
+    const target = el?.target ?? el;
+    return String(target?.value ?? target?.innerText ?? '');
   }
 
   etiquetaUnidadLinea(item: { nombreUnidadVenta?: string; codigoPresentacion?: string; presentacion?: string }): string {

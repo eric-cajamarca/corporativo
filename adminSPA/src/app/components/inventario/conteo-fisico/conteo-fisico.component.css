@@ -144,7 +144,7 @@
     overflow-x: visible;
   }
 
-  /* Búsqueda: tarjetas en móvil (mismo patrón que stock-actual) */
+  /* Búsqueda: tarjetas compactas en móvil */
   .conteo-stock-table-mobile {
     table-layout: auto;
   }
@@ -154,13 +154,17 @@
   }
 
   .conteo-stock-table-mobile tbody tr {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0.75rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.4rem;
+    row-gap: 0.2rem;
+    margin-bottom: 0.6rem;
+    padding: 0.65rem 0.75rem 0.6rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
   }
 
   .conteo-stock-table-mobile tbody tr.table-active {
@@ -171,27 +175,24 @@
   .conteo-stock-table-mobile tbody td {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
-    width: 100% !important;
+    align-items: center;
+    gap: 0.25rem;
+    width: auto !important;
     max-width: none !important;
-    padding: 0.5rem 0.85rem !important;
+    padding: 0 !important;
     border: none;
-    border-bottom: 1px solid #f1f3f5;
     text-align: left !important;
     vertical-align: middle !important;
   }
 
   .conteo-stock-table-mobile tbody td::before {
     content: attr(data-label);
-    font-weight: 600;
-    color: #6c757d;
-    font-size: 0.7rem;
+    font-weight: 700;
+    color: #94a3b8;
+    font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     flex-shrink: 0;
-    min-width: 4.75rem;
-    padding-top: 0.1rem;
   }
 
   .conteo-stock-table-mobile tbody td[data-label='']::before,
@@ -200,62 +201,158 @@
   }
 
   .conteo-stock-table-mobile tbody td.conteo-col-producto {
+    grid-column: 1 / 3;
+    grid-row: 1;
     flex-direction: column;
-    align-items: stretch;
-    order: -10;
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.65rem !important;
-    border-bottom: 1px solid #e9ecef;
+    align-items: flex-start;
+    gap: 0.1rem;
   }
 
   .conteo-stock-table-mobile tbody td.conteo-col-producto::before {
-    margin-bottom: 0.15rem;
+    display: none;
   }
 
   .conteo-stock-table-mobile .product-desc-clip {
     display: block;
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-    overflow: visible;
-    font-weight: 600;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    font-weight: 700;
     font-size: 0.95rem;
-    line-height: 1.4;
+    line-height: 1.25;
+    color: #0f172a;
     word-break: break-word;
   }
 
-  .conteo-stock-table-mobile .conteo-empresa-valor {
-    overflow: visible;
-    text-overflow: unset;
-    white-space: normal;
-    text-align: right;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .conteo-stock-table-mobile .conteo-marca-valor {
-    overflow: visible;
-    text-overflow: unset;
-    white-space: normal;
-    text-align: right;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .conteo-stock-table-mobile tbody td.conteo-col-stock,
-  .conteo-stock-table-mobile tbody td.conteo-col-sin-ubic {
-    align-items: center;
-  }
-
   .conteo-stock-table-mobile tbody td.conteo-col-accion {
-    border-bottom: none;
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.75rem !important;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-content: flex-end;
+  }
+
+  .conteo-stock-table-mobile .conteo-btn-elegir {
+    width: auto !important;
+    min-height: 2.15rem;
+    padding: 0.25rem 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-codigo {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #0f766e;
+    letter-spacing: 0.02em;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-codigo::before {
+    display: none;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-marca {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-marca::before {
+    content: '·';
+    margin-right: 0.15rem;
+    color: #cbd5e1;
+    font-weight: 700;
+  }
+
+  .conteo-stock-table-mobile .conteo-marca-valor,
+  .conteo-stock-table-mobile .conteo-empresa-valor {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-empresa {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    font-size: 0.75rem;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-stock-sist,
+  .conteo-stock-table-mobile tbody td.conteo-col-stock-real,
+  .conteo-stock-table-mobile tbody td.conteo-col-sin-ubic {
+    grid-row: 3;
+    margin-top: 0.35rem;
+    padding-top: 0.4rem !important;
+    border-top: 1px dashed #e2e8f0;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #0f172a;
+  }
+
+  .conteo-stock-table-mobile tbody tr:has(.conteo-col-empresa) td.conteo-col-stock-sist,
+  .conteo-stock-table-mobile tbody tr:has(.conteo-col-empresa) td.conteo-col-stock-real,
+  .conteo-stock-table-mobile tbody tr:has(.conteo-col-empresa) td.conteo-col-sin-ubic {
+    grid-row: 4;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-stock-sist {
+    grid-column: 1;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-stock-real {
+    grid-column: 2;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-sin-ubic {
+    grid-column: 3;
+    justify-content: flex-end;
+  }
+
+  .conteo-stock-table-mobile tbody td[data-label='Stock sist.']::before {
+    content: 'Sist.';
+  }
+
+  .conteo-stock-table-mobile tbody td[data-label='Stock real']::before {
+    content: 'Real';
+  }
+
+  .conteo-stock-table-mobile tbody td[data-label='Sin ubic.']::before {
+    content: 'Sin';
+  }
+
+  .conteo-stock-table-mobile .conteo-sin-ubic-valor {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.3rem !important;
+    margin-left: 0 !important;
+  }
+
+  .conteo-stock-table-mobile .conteo-sin-ubic-valor .btn {
+    min-height: 1.75rem;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.7rem;
+  }
+
+  .conteo-stock-table-mobile .conteo-asignar-txt {
+    display: none;
+  }
+
+  .conteo-stock-table-mobile tbody td.conteo-col-stock-ubic {
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    font-weight: 600;
   }
 
   .conteo-stock-table-mobile tbody td.conteo-busqueda-empty {
     display: block;
+    grid-column: 1 / -1;
     text-align: center;
-    border-bottom: none;
+    padding: 0.75rem !important;
   }
 
   .conteo-stock-table-mobile tbody td.conteo-busqueda-empty::before {

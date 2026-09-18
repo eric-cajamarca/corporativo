@@ -72,13 +72,18 @@
           <tbody class="font-size-base">
             <tr *ngFor="let item of clientes"  style="cursor: pointer;"
     (click)="elegir(item)">
-              <td data-label="RUC / DNI">{{item.ruc}}</td>
-              <td data-label="Razón social">{{item.rSocial}}</td>
-              <td data-label="Condición">
+              <td data-label="RUC / DNI" class="selector-cell-doc">
+                <span class="selector-doc">{{item.ruc}}</span>
+                <span class="badge bg-success selector-estado-movil" *ngIf="item.estado === true">Activo</span>
+                <span class="badge bg-danger selector-estado-movil" *ngIf="item.estado === false">Inactivo</span>
+              </td>
+              <td data-label="Razón social" class="selector-cell-razon">{{item.rSocial}}</td>
+              <td data-label="Condición"
+                  [class.selector-cell-omit-mobile]="item.condicion !== 'ACTIVO' && item.condicion !== 'INACTIVO'">
                 <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Habido</span>
                 <span class="badge bg-danger" *ngIf="item.condicion === 'INACTIVO'">No habido</span>
               </td>
-              <td data-label="Estado">
+              <td data-label="Estado" class="selector-cell-estado-desktop">
                 <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>
                 <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
               </td>
