@@ -16,6 +16,7 @@ export interface PreloadItemVenta {
 
 export interface PreloadFromHabitacion {
   idEstancia?: string;
+  idGrupo?: string;
   idProductoHabitacion: string;
   habitacionCodigo: string;
   habitacionDescripcion: string;

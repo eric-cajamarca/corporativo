@@ -1,0 +1,130 @@
+    @if (h.activeTab() === 'habitaciones') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Estado de habitaciones</h2>
+        </div>
+        @if (h.gruposActivos.length) {
+          <div class="hotel-grupo-banner">
+            @for (g of h.gruposActivos; track g.idGrupo) {
+              <button type="button" class="hotel-grupo-chip" (click)="h.abrirPanelGrupo(g)">
+                <strong>{{ g.codigo }}</strong> · {{ g.nombre }}
+                · {{ g.totalHabitaciones || 0 }} hab.
+                @if (g.hospedajeFacturado) {
+                  <span class="hotel-badge hotel-badge-completada ms-1">Hospedaje facturado</span>
+                } @else {
+                  <span class="hotel-badge hotel-badge-grupo ms-1">Pendiente factura</span>
+                }
+              </button>
+            }
+          </div>
+        }
+        <p class="text-muted small mb-3 hotel-hab-legend">
+          <span class="hotel-hab-legend-full">Verde: libre · Amarillo: reserva con llegada hoy · Rojo: huésped in-house · Gris: bloqueada o fuera de servicio.
+          Check-in solo si está <strong>limpia</strong> o <strong>en limpieza</strong> (no sucia ni fuera de servicio).</span>
+          <span class="hotel-hab-legend-short">Libre · Reserva hoy · In-house · Bloqueada. Check-in solo limpia / en limpieza.</span>
+        </p>
+        @if (h.errorMessage()) {
+          <div class="alert alert-danger mb-3">{{ h.errorMessage() }}</div>
+        }
+        <div class="hotel-habitaciones-toolbar mb-3">
+          <div class="hotel-habitaciones-filtro-wrap">
+            <i class="fas fa-search hotel-habitaciones-filtro-icon" aria-hidden="true"></i>
+            <input
+              type="search"
+              class="form-control hotel-habitaciones-filtro-input"
+              [(ngModel)]="h.filtroHabitaciones"
+              placeholder="Buscar por nº habitación, estado o huésped…"
+              autocomplete="off"
+              aria-label="Filtrar habitaciones" />
+            @if (h.filtroHabitaciones.trim()) {
+              <button type="button" class="btn btn-sm btn-link hotel-habitaciones-filtro-clear" (click)="h.limpiarFiltroHabitaciones()" title="Limpiar búsqueda">
+                <i class="fas fa-times"></i>
+              </button>
+            }
+          </div>
+          <span class="hotel-habitaciones-filtro-count small text-muted">
+            {{ h.habitacionesFiltradas.length }} / {{ h.productosHabitacion.length }} habitaciones
+          </span>
+        </div>
+        <div class="hotel-rooms-grid-compact">
+          @for (hab of h.habitacionesFiltradas; track hab.idProducto) {
+            @let est = h.getEstanciaActiva(hab.idProducto);
+            @let proxRes = h.getProximaReservaConfirmada(hab.idProducto);
+            @let estado = h.getEstadoHabitacion(hab);
+            <div class="hotel-room-card-compact"
+              [class.hotel-card-ocupada]="estado === 'ocupada'"
+              [class.hotel-card-reservada]="estado === 'reservada'"
+              [class.hotel-card-disponible]="estado === 'disponible'"
+              [class.hotel-card-bloqueada]="estado === 'bloqueada'">
+              <div class="hotel-card-compact-numero">{{ hab.codigo }}</div>
+              @if (!h.getEstanciaActiva(hab.idProducto)) {
+                @let limp = h.getEstadoLimpieza(hab.idProducto);
+                @if (limp !== 'limpia') {
+                  <span class="hotel-badge small mb-1" [class.hotel-badge-sucia]="limp === 'sucia'" [class.hotel-badge-limpieza]="limp === 'en_limpieza'" [class.hotel-badge-fuera]="limp === 'fuera_servicio'">
+                    {{ h.labelEstadoLimpieza(limp) }}
+                  </span>
+                }
+              }
+              @if (estado === 'bloqueada') {
+                <div class="hotel-card-compact-huesped small text-muted">{{ h.motivoNoCheckIn(hab) || 'No disponible' }}</div>
+              } @else if (est) {
+                <div class="hotel-card-compact-huesped small text-truncate" [title]="est.nombreHuesped">{{ est.nombreHuesped }}</div>
+                @if (h.esEstanciaDeGrupo(est)) {
+                  <span class="hotel-badge hotel-badge-grupo small mb-1 text-truncate" [title]="h.chipGrupoEstancia(est)">{{ h.chipGrupoEstancia(est) }}</span>
+                }
+              } @else if (proxRes) {
+                <div class="hotel-card-compact-huesped small text-muted">Reserva {{ proxRes.fechaEntrada }}</div>
+              }
+              <div class="hotel-card-compact-fechas">
+                @if (est) {
+                  <span>In: {{ est.checkIn | slice:0:10 }}</span>
+                  <span class="hotel-card-compact-hora">Registro: {{ h.formatHoraRegistroHuesped(est.checkIn) }}</span>
+                  <span>Sal: {{ est.checkOutPrevisto | slice:0:10 }}</span>
+                } @else if (proxRes) {
+                  <span>Próx: {{ proxRes.fechaEntrada }}</span>
+                } @else {
+                  <span class="text-muted">Libre</span>
+                }
+              </div>
+              <div class="hotel-card-compact-total">{{ h.formatearMoneda(h.getTotalHabitacion(hab)) }}</div>
+              <div class="hotel-mini-cal mb-2" title="Próximos 7 días">
+                @for (d of h.getDiasCalendario().length ? h.getDiasCalendario() : []; track d) {
+                  <span class="hotel-mini-day" [ngClass]="h.miniDiaClase(hab, d)"></span>
+                }
+              </div>
+              <div class="hotel-card-compact-actions">
+                @if (h.puedeRegistrarHuesped(hab) && (estado === 'disponible' || estado === 'reservada')) {
+                  <button type="button" class="btn btn-sm btn-success" (click)="h.abrirModalCheckInWalkIn(hab)" title="Walk-in">Check-in</button>
+                } @else if (!est && !h.puedeRegistrarHuesped(hab) && h.motivoNoCheckIn(hab)) {
+                  <span class="hotel-card-no-checkin small" [title]="h.motivoNoCheckIn(hab)">{{ h.motivoNoCheckIn(hab) }}</span>
+                }
+                @if (estado === 'bloqueada' && h.tieneBloqueoActivo(hab.idProducto)) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="h.abrirModalBloqueo(hab)" title="Ver bloqueo">Bloqueo</button>
+                }
+                @if (estado === 'ocupada') {
+                  @if (est && h.estanciaHabitacionFacturada(est)) {
+                    <span class="hotel-badge hotel-badge-en-curso small">Hab. facturada</span>
+                  }
+                  <button type="button" class="btn btn-sm btn-warning" (click)="h.abrirFacturacionEstancia(hab)" [title]="h.etiquetaBotonCheckout(hab)">{{ h.etiquetaBotonCheckout(hab) }}</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="h.abrirModalAgregarConsumo(hab)">Consumo</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="h.abrirModalFolio(hab)" title="Folio de saldo">Folio</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="h.abrirModalCambiarSalida(hab)" title="Acortar o extender estadía">Estadía</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="h.abrirModalMoverHabitacion(hab)" title="Cambiar de habitación">Mover</button>
+                }
+                <button type="button" class="btn btn-sm btn-hotel-primary" (click)="h.abrirModalDetalle(hab)" title="Ver detalles">Detalles</button>
+              </div>
+            </div>
+          }
+        </div>
+        @if (h.productosHabitacion.length === 0) {
+          <div class="hotel-empty">
+            <p class="mb-0 text-muted">No hay habitaciones. Cree productos con categoría <strong>Habitación</strong> y presentación Servicios (ZZ).</p>
+          </div>
+        } @else if (h.habitacionesFiltradas.length === 0) {
+          <div class="hotel-empty">
+            <p class="mb-0 text-muted">Ninguna habitación coincide con «{{ h.filtroHabitaciones }}».</p>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" (click)="h.limpiarFiltroHabitaciones()">Limpiar filtro</button>
+          </div>
+        }
+      </section>
+    }

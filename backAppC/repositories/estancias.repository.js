@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const hotelGruposRepository = require('./hotelGrupos.repository');
 
 const ESTADOS_RESERVA_ACTIVOS = "('confirmada')";
 
@@ -11,7 +12,10 @@ async function asegurarColumnasFacturacionParcial(pool) {
       ALTER TABLE Estancias ADD habitacionFacturada BIT NOT NULL CONSTRAINT DF_Estancias_habitacionFacturada DEFAULT 0;
     IF COL_LENGTH('dbo.Estancias', 'idVentaHabitacion') IS NULL
       ALTER TABLE Estancias ADD idVentaHabitacion INT NULL;
+    IF COL_LENGTH('dbo.Estancias', 'idGrupo') IS NULL
+      ALTER TABLE Estancias ADD idGrupo UNIQUEIDENTIFIER NULL;
   `);
+  await hotelGruposRepository.asegurarEsquema(pool);
   columnasFacturacionParcialOk = true;
 }
 
@@ -24,11 +28,13 @@ function selectEstanciaBase() {
            CONVERT(VARCHAR(19), e.checkOutReal, 120) AS checkOutReal,
            e.estadoEstancia, e.tarifaNoche, e.totalHabitacion, e.idVenta,
            CAST(ISNULL(e.habitacionFacturada, 0) AS BIT) AS habitacionFacturada,
-           e.idVentaHabitacion,
+           e.idVentaHabitacion, e.idGrupo,
+           g.codigo AS grupoCodigo, g.nombre AS grupoNombre,
            CONVERT(VARCHAR(19), e.fRegistro, 120) AS fRegistro,
            p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
     FROM Estancias e
     INNER JOIN Productos p ON e.idProductoHabitacion = p.idProducto
+    LEFT JOIN HotelGrupos g ON e.idGrupo = g.idGrupo AND g.idEmpresa = e.idEmpresa
   `;
 }
 
@@ -64,6 +70,7 @@ async function obtenerPorId(pool, idEstancia, idEmpresa) {
 }
 
 async function insertar(pool, idEmpresa, payload, idUsuario) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idProductoHabitacion', sql.UniqueIdentifier, payload.idProductoHabitacion)
@@ -75,14 +82,18 @@ async function insertar(pool, idEmpresa, payload, idUsuario) {
     .input('tarifaNoche', sql.Decimal(18, 6), payload.tarifaNoche ?? 0)
     .input('totalHabitacion', sql.Decimal(18, 2), payload.totalHabitacion ?? 0)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario || null)
+    .input('idGrupo', sql.UniqueIdentifier, payload.idGrupo || null)
+    .input('habitacionFacturada', sql.Bit, payload.habitacionFacturada ? 1 : 0)
+    .input('idVentaHabitacion', sql.Int, payload.idVentaHabitacion || null)
     .query(`
       INSERT INTO Estancias
-        (idEmpresa, idProductoHabitacion, idReserva, idCliente, nombreHuesped, checkIn, checkOutPrevisto, tarifaNoche, totalHabitacion, idUsuario)
+        (idEmpresa, idProductoHabitacion, idReserva, idCliente, nombreHuesped, checkIn, checkOutPrevisto,
+         tarifaNoche, totalHabitacion, idUsuario, idGrupo, habitacionFacturada, idVentaHabitacion)
       OUTPUT INSERTED.idEstancia
       VALUES
         (@idEmpresa, @idProductoHabitacion, @idReserva, @idCliente, @nombreHuesped,
          CAST(@checkIn AS DATETIME), CAST(@checkOutPrevisto AS DATETIME),
-         @tarifaNoche, @totalHabitacion, @idUsuario)
+         @tarifaNoche, @totalHabitacion, @idUsuario, @idGrupo, @habitacionFacturada, @idVentaHabitacion)
     `);
   return result.recordset[0]?.idEstancia;
 }

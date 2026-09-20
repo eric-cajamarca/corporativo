@@ -32,6 +32,12 @@ api.get('/hotel/estancias/:idEstancia/historial-detalle', hotelController.detall
 api.put('/hotel/estancias/:idEstancia/salida', hotelController.cambiarSalidaEstancia);
 api.put('/hotel/estancias/:idEstancia/habitacion', hotelController.moverEstancia);
 api.put('/hotel/reservas/:idReserva/mover', hotelController.moverReservaCalendario);
+api.get('/hotel/grupos', hotelController.listarGrupos);
+api.post('/hotel/grupos', hotelController.crearGrupo);
+api.get('/hotel/grupos/:idGrupo', hotelController.obtenerGrupo);
+api.post('/hotel/grupos/:idGrupo/facturar-hospedaje', hotelController.facturarHospedajeGrupoPreload);
+api.post('/hotel/grupos/:idGrupo/facturar-hospedaje/confirmar', hotelController.confirmarFacturaHospedajeGrupo);
+api.post('/hotel/estancias/:idEstancia/salida-operativa', hotelController.salidaOperativaEstancia);
 api.post('/hotel/cerrar-post-venta', hotelController.cerrarPostVenta);
 
 module.exports = api;

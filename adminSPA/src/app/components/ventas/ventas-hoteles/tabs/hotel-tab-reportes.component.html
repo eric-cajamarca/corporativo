@@ -1,0 +1,364 @@
+    @if (h.activeTab() === 'reportes') {
+      <section class="hotel-section">
+        <div class="hotel-section-header flex-wrap gap-2">
+          <h2 class="hotel-section-title mb-0">Reportes hotel</h2>
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <label class="small text-muted mb-0">Mes</label>
+            <input type="month" class="form-control form-control-sm" style="width: auto;" [(ngModel)]="h.reporteMes" (ngModelChange)="h.aplicarMesReporte()" />
+            <span class="text-muted">o rango</span>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="h.reporteDesde" />
+            <span class="text-muted">→</span>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="h.reporteHasta" />
+            <button type="button" class="btn btn-hotel-primary btn-sm" (click)="h.cargarReporte()">Generar</button>
+            @if (h.reporteData) {
+              <button type="button" class="btn btn-outline-danger btn-sm" (click)="h.generarPdfReporteGeneral()" [disabled]="h.generandoPdfGeneral">
+                <i class="bi bi-file-earmark-pdf me-1"></i>{{ h.generandoPdfGeneral ? 'PDF…' : 'PDF general A4' }}
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm" (click)="h.generarPdfReporteHabitaciones()" [disabled]="h.generandoPdfHabitaciones">
+                <i class="bi bi-file-earmark-pdf me-1"></i>{{ h.generandoPdfHabitaciones ? 'PDF…' : 'PDF por habitación A4' }}
+              </button>
+            }
+          </div>
+        </div>
+        @if (h.reporteLoading()) {
+          <p class="text-muted">Calculando…</p>
+        } @else if (h.reporteData) {
+          <div class="row g-3">
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ h.reporteData.ocupacion.ocupacionPct }}%</div>
+                <div class="hotel-stat-label">Ocupación</div>
+                <div class="small text-muted mt-1">{{ h.reporteData.ocupacion.nochesOcupadas }} noches · {{ h.reporteData.ocupacion.dias }} días</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ h.reporteData.ocupacion.habitacionesOcupadas }}/{{ h.reporteData.ocupacion.habitaciones }}</div>
+                <div class="hotel-stat-label">Habitaciones ocupadas</div>
+                <div class="small text-muted mt-1">{{ h.reporteData.ocupacion.nochesReservadas }} noches reservadas</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ h.formatearMoneda(h.reporteData.ocupacion.ingresoHabitacion) }}</div>
+                <div class="hotel-stat-label">Ventas ocupación</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ h.formatearMoneda(h.reporteData.consumo.ingresoConsumo) }}</div>
+                <div class="hotel-stat-label">Consumo habitaciones</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ h.formatearMoneda(h.reporteData.ingresoTotal) }}</div>
+                <div class="hotel-stat-label">Total período</div>
+              </div>
+            </div>
+            <div class="col-md-9 col-12">
+              <div class="hotel-card p-3 h-100">
+                <strong>Reservas en el período</strong>
+                <div class="small text-muted mt-1">
+                  Confirmadas: {{ h.reporteData.reservas.confirmadas }} ·
+                  Convertidas: {{ h.reporteData.reservas.convertidas }} ·
+                  Canceladas: {{ h.reporteData.reservas.cancelaciones }} ·
+                  No show: {{ h.reporteData.reservas.noShow }}
+                </div>
+                <div class="small mt-1">
+                  Monto reservas confirmadas: <strong>{{ h.formatearMoneda(h.reporteData.reservas.ingresoConfirmadas) }}</strong>
+                </div>
+              </div>
+            </div>
+            @if (h.calendariosOcupacionReporte().length) {
+              <div class="col-12">
+                <div class="hotel-card p-3">
+                  <strong>Ocupación por día</strong>
+                  <p class="small text-muted mb-2">Habitaciones in-house / total. El tono más claro son reservas que aún no llegan.</p>
+                  <div class="d-flex flex-wrap gap-3 small mb-3 hotel-occ-legend">
+                    <span><span class="hotel-occ-swatch occ-0"></span> 0</span>
+                    <span><span class="hotel-occ-swatch occ-1"></span> Baja</span>
+                    <span><span class="hotel-occ-swatch occ-2"></span> Media</span>
+                    <span><span class="hotel-occ-swatch occ-3"></span> Alta</span>
+                    <span><span class="hotel-occ-swatch occ-4"></span> Llena</span>
+                    <span><span class="hotel-occ-swatch occ-res"></span> Solo reserva</span>
+                  </div>
+                  @for (cal of h.calendariosOcupacionReporte(); track cal.label) {
+                    <div class="hotel-occ-cal" [class.mb-3]="!$last">
+                      <div class="hotel-occ-cal-title">{{ cal.label }}</div>
+                      <div class="hotel-occ-grid">
+                        @for (dow of h.diasSemanaOcupacion; track dow) {
+                          <div class="hotel-occ-dow">{{ dow }}</div>
+                        }
+                        @for (cel of cal.celdas; track $index) {
+                          @if (cel.tipo === 'vacio') {
+                            <div class="hotel-occ-cell hotel-occ-empty"></div>
+                          } @else if (cel.tipo === 'fuera') {
+                            <div class="hotel-occ-cell hotel-occ-fuera">
+                              <span class="hotel-occ-num">{{ cel.dia }}</span>
+                            </div>
+                          } @else {
+                            <div class="hotel-occ-cell" [ngClass]="h.claseCeldaOcupacion(cel.data)"
+                              [class.hotel-occ-hoy]="cel.data.fecha === h.fechaHoyOcupacion"
+                              [title]="h.tituloCeldaOcupacion(cel.data)">
+                              <span class="hotel-occ-num">{{ cel.dia }}</span>
+                              <span class="hotel-occ-frac">{{ cel.data.ocupadas }}/{{ cel.data.total }}</span>
+                              @if (cel.data.reservadas > 0) {
+                                <span class="hotel-occ-res">+{{ cel.data.reservadas }} res</span>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+            <div class="col-md-6">
+              <div class="hotel-card p-3 h-100">
+                <strong>Habitación más ocupada</strong>
+                @if (h.reporteData.destacados.masOcupada; as topOc) {
+                  <div class="mt-1">{{ topOc.habitacionCodigo }} — {{ topOc.habitacionDescripcion }}</div>
+                  <div class="small text-muted">{{ topOc.nochesOcupadas }} noches · {{ h.formatearMoneda(topOc.ingresoTotal) }}</div>
+                } @else {
+                  <div class="small text-muted mt-1">Sin ocupación en el período.</div>
+                }
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="hotel-card p-3 h-100">
+                <strong>Habitación con más ventas</strong>
+                @if (h.reporteData.destacados.masVentas; as topVen) {
+                  <div class="mt-1">{{ topVen.habitacionCodigo }} — {{ topVen.habitacionDescripcion }}</div>
+                  <div class="small text-muted">
+                    Ocupación {{ h.formatearMoneda(topVen.ingresoHabitacion) }} ·
+                    Consumo {{ h.formatearMoneda(topVen.ingresoConsumo) }} ·
+                    Total {{ h.formatearMoneda(topVen.ingresoTotal) }}
+                  </div>
+                } @else {
+                  <div class="small text-muted mt-1">Sin ventas de ocupación o consumo en el período.</div>
+                }
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="hotel-card p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <div>
+                    <strong>Reporte por habitación</strong>
+                    <p class="small text-muted mb-0">Incluye estancias y reservas que solapan el período.</p>
+                  </div>
+                  <button type="button" class="btn btn-outline-danger btn-sm" (click)="h.generarPdfReporteHabitaciones()" [disabled]="h.generandoPdfHabitaciones">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>{{ h.generandoPdfHabitaciones ? 'Generando…' : 'PDF A4' }}
+                  </button>
+                </div>
+                <div class="hotel-reporte-hab-desktop table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-0 hotel-table">
+                    <thead>
+                      <tr>
+                        <th>Habitación</th>
+                        <th class="text-end">Noches ocup.</th>
+                        <th class="text-end">Noches res.</th>
+                        <th class="text-end">Reservas</th>
+                        <th class="text-end">Ocupación</th>
+                        <th class="text-end">Consumo</th>
+                        <th class="text-end">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (hab of h.reporteData.porHabitacion; track hab.idProductoHabitacion) {
+                        <tr>
+                          <td>
+                            <span class="fw-medium">{{ hab.habitacionCodigo }}</span>
+                            <span class="text-muted"> — {{ hab.habitacionDescripcion }}</span>
+                            @if (h.esHabitacionMasOcupada(hab)) {
+                              <span class="badge bg-success ms-1">Más ocupada</span>
+                            }
+                            @if (h.esHabitacionMasVentas(hab)) {
+                              <span class="badge bg-primary ms-1">Más ventas</span>
+                            }
+                          </td>
+                          <td class="text-end">{{ hab.nochesOcupadas }}</td>
+                          <td class="text-end">{{ hab.nochesReservadas }}</td>
+                          <td class="text-end">{{ hab.reservas }}</td>
+                          <td class="text-end">{{ h.formatearMoneda(hab.ingresoHabitacion) }}</td>
+                          <td class="text-end">{{ h.formatearMoneda(hab.ingresoConsumo) }}</td>
+                          <td class="text-end fw-semibold">{{ h.formatearMoneda(hab.ingresoTotal) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="hotel-reporte-hab-mobile">
+                  @for (hab of h.reporteData.porHabitacion; track hab.idProductoHabitacion) {
+                    <article class="hotel-rep-hab-card">
+                      <div class="hotel-rep-hab-head">
+                        <div class="hotel-rep-hab-title">
+                          <strong>{{ hab.habitacionCodigo }}</strong>
+                          <span>{{ hab.habitacionDescripcion }}</span>
+                        </div>
+                        <div class="hotel-rep-hab-badges">
+                          @if (h.esHabitacionMasOcupada(hab)) {
+                            <span class="badge bg-success">Más ocupada</span>
+                          }
+                          @if (h.esHabitacionMasVentas(hab)) {
+                            <span class="badge bg-primary">Más ventas</span>
+                          }
+                        </div>
+                      </div>
+                      <div class="hotel-rep-hab-metrics">
+                        <span>{{ hab.nochesOcupadas }} noc. ocup.</span>
+                        <span>{{ hab.nochesReservadas }} noc. res.</span>
+                        <span>{{ hab.reservas }} reservas</span>
+                      </div>
+                      <div class="hotel-rep-hab-montos">
+                        <span>Ocup. {{ h.formatearMoneda(hab.ingresoHabitacion) }}</span>
+                        <span>Cons. {{ h.formatearMoneda(hab.ingresoConsumo) }}</span>
+                        <strong>Total {{ h.formatearMoneda(hab.ingresoTotal) }}</strong>
+                      </div>
+                    </article>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <hr class="my-4" />
+
+        <div class="hotel-section-header flex-wrap gap-2 mb-3">
+          <h3 class="hotel-section-title mb-0 h5">Historial por habitación</h3>
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <select class="form-select form-select-sm" style="min-width: 180px;" [(ngModel)]="h.historialHabitacionId">
+              <option value="">Habitación</option>
+              @for (p of h.productosHabitacion; track p.idProducto) {
+                <option [value]="p.idProducto">{{ p.codigo }} — {{ p.descripcion }}</option>
+              }
+            </select>
+            <input type="month" class="form-control form-control-sm" [(ngModel)]="h.historialMes" />
+            <button type="button" class="btn btn-hotel-primary btn-sm" (click)="h.cargarHistorialHabitacion()">Consultar</button>
+          </div>
+        </div>
+
+        @if (h.historialLoading()) {
+          <p class="text-muted">Cargando historial…</p>
+        } @else if (h.historialData) {
+          <div class="row g-3">
+            <div class="col-lg-4">
+              <div class="hotel-card p-3 historial-mes-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <strong>{{ h.labelMesHistorial() }}</strong>
+                  <span class="badge bg-secondary">{{ h.historialData.habitacionCodigo }}</span>
+                </div>
+                <div class="historial-mes-grid">
+                  @for (ds of h.historialDiasSemana(); track ds) {
+                    <div class="historial-mes-dow">{{ ds }}</div>
+                  }
+                  @for (cel of h.historialCeldasMes(); track $index) {
+                    <div class="historial-mes-dia"
+                      [class.historial-mes-vacio]="!cel.dia"
+                      [class.historial-mes-reservado]="cel.estado === 'reservado'"
+                      [class.historial-mes-ocupado-activo]="cel.estado === 'ocupado'"
+                      [class.historial-mes-ocupado]="cel.estado === 'ocupado-pasado'">
+                      {{ cel.dia ?? '' }}
+                    </div>
+                  }
+                </div>
+                <div class="small text-muted mt-2 d-flex gap-3 flex-wrap">
+                  <span><span class="historial-leyenda-dot reservado"></span> Reservado</span>
+                  <span><span class="historial-leyenda-dot ocupado-activo"></span> Ocupado ahora</span>
+                  <span><span class="historial-leyenda-dot ocupado"></span> Ocupado (pasado)</span>
+                  <span><span class="historial-leyenda-dot libre"></span> Libre</span>
+                </div>
+                <p class="mb-0 mt-2 small">
+                  <strong>{{ h.historialData.totalEstancias }}</strong>
+                  {{ h.historialData.totalEstancias === 1 ? 'estancia' : 'estancias' }} ·
+                  <strong>{{ h.historialData.diasOcupados }}</strong>
+                  {{ h.historialData.diasOcupados === 1 ? 'día ocupado' : 'días ocupados' }} ·
+                  <strong>{{ h.historialData.diasReservados }}</strong>
+                  {{ h.historialData.diasReservados === 1 ? 'día reservado' : 'días reservados' }}
+                </p>
+              </div>
+            </div>
+            <div class="col-lg-8">
+              @if (h.historialData.estancias.length === 0 && h.historialData.reservas.length === 0) {
+                <p class="text-muted mb-0">No hay estancias ni reservas en este mes para esta habitación.</p>
+              } @else {
+                @if (h.historialData.estancias.length > 0) {
+                  <h6 class="mb-2">Estancias</h6>
+                  <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
+                      <thead>
+                        <tr>
+                          <th>Huésped</th>
+                          <th>Check-in</th>
+                          <th>Salida prevista</th>
+                          <th>Salida real</th>
+                          <th>Estado</th>
+                          <th class="text-end">Habitación</th>
+                          <th class="text-end">Consumo</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (est of h.historialData.estancias; track est.idEstancia) {
+                          <tr>
+                            <td data-label="Huésped">{{ est.nombreHuesped }}</td>
+                            <td class="small" data-label="Check-in">{{ h.formatearFechaHora(est.checkIn) }}</td>
+                            <td class="small" data-label="Salida prevista">{{ h.formatearFechaHora(est.checkOutPrevisto) }}</td>
+                            <td class="small" data-label="Salida real">{{ h.formatearFechaHora(est.checkOutReal) }}</td>
+                            <td data-label="Estado">
+                              <span class="badge" [class.bg-success]="est.estadoEstancia === 'activa'" [class.bg-secondary]="est.estadoEstancia === 'checkout'">
+                                {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}
+                              </span>
+                            </td>
+                            <td class="text-end" data-label="Habitación">{{ h.formatearMoneda(est.totalHabitacion) }}</td>
+                            <td class="text-end" data-label="Consumo">{{ h.formatearMoneda(est.totalConsumo) }}</td>
+                            <td class="text-end" data-label="Acciones">
+                              <button type="button" class="btn btn-outline-primary btn-sm" (click)="h.abrirDetalleHistorialEstancia(est)">Ver</button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+                @if (h.historialData.reservas.length > 0) {
+                  <h6 class="mb-2">Reservas</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Huésped</th>
+                          <th>Entrada</th>
+                          <th>Salida</th>
+                          <th>Estado</th>
+                          <th class="text-end">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (res of h.historialData.reservas; track res.idReserva) {
+                          <tr>
+                            <td data-label="Código">{{ res.codigo }}</td>
+                            <td data-label="Huésped">{{ res.nombreHuesped }}</td>
+                            <td class="small" data-label="Entrada">{{ res.fechaEntrada }}</td>
+                            <td class="small" data-label="Salida">{{ res.fechaSalida }}</td>
+                            <td data-label="Estado">
+                              <span class="hotel-badge" [ngClass]="h.estadoReservaClass(res.estado)">
+                                {{ h.labelEstadoReserva(res.estado) }}
+                              </span>
+                            </td>
+                            <td class="text-end" data-label="Total">{{ h.formatearMoneda(res.total) }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        }
+      </section>
+    }

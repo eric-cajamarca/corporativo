@@ -1,23 +1,33 @@
 const sql = require('mssql');
+const hotelGruposRepository = require('./hotelGrupos.repository');
 
-/**
- * Lista reservas de una empresa. idProductoHabitacion (producto Servicios ZZ). Siempre filtrar por idEmpresa.
- */
-async function listar(pool, idEmpresa, filtros = {}) {
-    const { estado, idProductoHabitacion } = filtros;
-    let query = `
+function selectReservaBase() {
+    return `
         SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
-               r.idEstancia,
+               r.idEstancia, r.idGrupo,
+               CAST(ISNULL(r.habitacionFacturada, 0) AS BIT) AS habitacionFacturada,
+               r.idVentaHabitacion,
                CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                r.estado, r.total, r.observaciones,
                CONVERT(VARCHAR(19), r.fRegistro, 120) AS fRegistro,
                p.descripcion AS habitacionDescripcion,
-               p.codigo AS habitacionCodigo
+               p.codigo AS habitacionCodigo,
+               g.codigo AS grupoCodigo,
+               g.nombre AS grupoNombre
         FROM Reservas r
         LEFT JOIN Productos p ON r.idProductoHabitacion = p.idProducto
-        WHERE r.idEmpresa = @idEmpresa
+        LEFT JOIN HotelGrupos g ON r.idGrupo = g.idGrupo AND g.idEmpresa = r.idEmpresa
     `;
+}
+
+/**
+ * Lista reservas de una empresa. idProductoHabitacion (producto Servicios ZZ). Siempre filtrar por idEmpresa.
+ */
+async function listar(pool, idEmpresa, filtros = {}) {
+    await hotelGruposRepository.asegurarEsquema(pool);
+    const { estado, idProductoHabitacion } = filtros;
+    let query = `${selectReservaBase()} WHERE r.idEmpresa = @idEmpresa`;
     const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
     if (estado) {
         query += ' AND r.estado = @estado';
@@ -33,21 +43,11 @@ async function listar(pool, idEmpresa, filtros = {}) {
 }
 
 async function obtenerPorId(pool, idReserva, idEmpresa) {
+    await hotelGruposRepository.asegurarEsquema(pool);
     const result = await pool.request()
         .input('idReserva', sql.UniqueIdentifier, idReserva)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query(`
-            SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
-                   r.idEstancia,
-                   CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
-                   CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
-                   r.estado, r.total, r.observaciones,
-                   CONVERT(VARCHAR(19), r.fRegistro, 120) AS fRegistro,
-                   p.descripcion AS habitacionDescripcion, p.codigo AS habitacionCodigo
-            FROM Reservas r
-            LEFT JOIN Productos p ON r.idProductoHabitacion = p.idProducto
-            WHERE r.idReserva = @idReserva AND r.idEmpresa = @idEmpresa
-        `);
+        .query(`${selectReservaBase()} WHERE r.idReserva = @idReserva AND r.idEmpresa = @idEmpresa`);
     return result.recordset[0] || null;
 }
 
@@ -67,9 +67,10 @@ async function siguienteCodigo(pool, idEmpresa) {
 }
 
 async function crear(pool, idEmpresa, payload, idUsuario = null) {
+    await hotelGruposRepository.asegurarEsquema(pool);
     const {
         idProductoHabitacion, idCliente, codigo, nombreHuesped,
-        fechaEntrada, fechaSalida, estado, total, observaciones, fRegistro
+        fechaEntrada, fechaSalida, estado, total, observaciones, fRegistro, idGrupo
     } = payload;
     const req = pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -82,7 +83,8 @@ async function crear(pool, idEmpresa, payload, idUsuario = null) {
         .input('estado', sql.VarChar(20), estado || 'confirmada')
         .input('total', sql.Decimal(18, 2), total ?? 0)
         .input('observaciones', sql.VarChar(500), observaciones || null)
-        .input('idUsuario', sql.UniqueIdentifier, idUsuario);
+        .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+        .input('idGrupo', sql.UniqueIdentifier, idGrupo || null);
     let colRegistro = '';
     let valRegistro = '';
     if (fRegistro) {
@@ -91,9 +93,9 @@ async function crear(pool, idEmpresa, payload, idUsuario = null) {
         valRegistro = ', CAST(@fRegistro AS DATETIME)';
     }
     const result = await req.query(`
-            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario${colRegistro})
+            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario, idGrupo${colRegistro})
             OUTPUT INSERTED.idReserva, INSERTED.codigo
-            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario${valRegistro})
+            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario, @idGrupo${valRegistro})
         `);
     return result.recordset[0];
 }
@@ -181,6 +183,7 @@ async function cancelar(pool, idReserva, idEmpresa) {
 
 /** Reservas que solapan un rango de fechas (entrada/salida DATE, ambos inclusive en el período). */
 async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta, idProductoHabitacion = null) {
+    await hotelGruposRepository.asegurarEsquema(pool);
     const req = pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('fechaDesde', sql.Date, fechaDesde)
@@ -192,12 +195,15 @@ async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta, idProducto
     }
     const result = await req.query(`
             SELECT r.idReserva, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   r.idGrupo,
                    CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                    CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                    r.estado, r.total,
-                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
+                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion,
+                   g.codigo AS grupoCodigo, g.nombre AS grupoNombre
             FROM Reservas r
             INNER JOIN Productos p ON r.idProductoHabitacion = p.idProducto
+            LEFT JOIN HotelGrupos g ON r.idGrupo = g.idGrupo AND g.idEmpresa = r.idEmpresa
             WHERE r.idEmpresa = @idEmpresa
               AND r.fechaEntrada <= @fechaHasta
               AND r.fechaSalida > @fechaDesde
@@ -209,18 +215,22 @@ async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta, idProducto
 
 /** Reservas confirmadas que intersectan un rango de fechas calendario (DATE). */
 async function listarConfirmadasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
+    await hotelGruposRepository.asegurarEsquema(pool);
     const result = await pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('fechaDesde', sql.Date, fechaDesde)
         .input('fechaHasta', sql.Date, fechaHasta)
         .query(`
             SELECT r.idReserva, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   r.idGrupo,
                    CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                    CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                    r.estado, r.total,
-                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
+                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion,
+                   g.codigo AS grupoCodigo, g.nombre AS grupoNombre
             FROM Reservas r
             INNER JOIN Productos p ON r.idProductoHabitacion = p.idProducto
+            LEFT JOIN HotelGrupos g ON r.idGrupo = g.idGrupo AND g.idEmpresa = r.idEmpresa
             WHERE r.idEmpresa = @idEmpresa
               AND r.estado = 'confirmada'
               AND r.fechaEntrada < @fechaHasta

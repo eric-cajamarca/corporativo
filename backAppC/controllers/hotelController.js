@@ -1,5 +1,6 @@
 const { withPool } = require('../utils/dbPool.util');
 const hotelService = require('../services/hotel.service');
+const hotelGruposService = require('../services/hotelGrupos.service');
 const reservasService = require('../services/reservas.service');
 
 async function obtenerConfiguracion(req, res) {
@@ -357,6 +358,90 @@ async function moverReservaCalendario(req, res) {
 }
 
 /** Compatibilidad con flujo MVP anterior (reserva post-venta). */
+async function listarGrupos(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const data = await withPool((pool) => hotelGruposService.listarVigentes(pool, req.user.empresa));
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.listarGrupos:', error);
+    res.status(500).json({ message: error.message || 'Error al listar grupos' });
+  }
+}
+
+async function crearGrupo(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const body = { ...req.body };
+    delete body.idEmpresa;
+    const idUsuario = req.user.idUsuario || req.user.id;
+    const data = await withPool((pool) => hotelGruposService.crear(pool, req.user.empresa, body, idUsuario));
+    res.status(201).json({ data });
+  } catch (error) {
+    console.error('hotel.crearGrupo:', error);
+    res.status(400).json({ message: error.message || 'Error al crear el grupo' });
+  }
+}
+
+async function obtenerGrupo(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const data = await withPool((pool) =>
+      hotelGruposService.obtenerDetalle(pool, req.user.empresa, req.params.idGrupo)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.obtenerGrupo:', error);
+    res.status(400).json({ message: error.message || 'Error al obtener el grupo' });
+  }
+}
+
+async function facturarHospedajeGrupoPreload(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const data = await withPool((pool) =>
+      hotelGruposService.facturarHospedajePreload(pool, req.user.empresa, req.params.idGrupo)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.facturarHospedajeGrupoPreload:', error);
+    res.status(400).json({ message: error.message || 'Error al preparar factura del grupo' });
+  }
+}
+
+async function confirmarFacturaHospedajeGrupo(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const idVenta = Number(req.body?.idVenta);
+    if (!idVenta) return res.status(400).json({ message: 'idVenta requerido' });
+    const data = await withPool((pool) =>
+      hotelGruposService.confirmarFacturaHospedaje(pool, req.user.empresa, req.params.idGrupo, idVenta)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.confirmarFacturaHospedajeGrupo:', error);
+    res.status(400).json({ message: error.message || 'Error al confirmar hospedaje del grupo' });
+  }
+}
+
+async function salidaOperativaEstancia(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const data = await withPool((pool) =>
+      hotelService.salidaOperativaEstancia(
+        pool,
+        req.user.empresa,
+        req.params.idEstancia,
+        req.body?.checkOutReal || req.body?.fechaHoraCliente
+      )
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.salidaOperativaEstancia:', error);
+    res.status(400).json({ message: error.message || 'Error en la salida' });
+  }
+}
+
 async function cerrarPostVenta(req, res) {
   if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
   try {
@@ -393,5 +478,11 @@ module.exports = {
   cambiarSalidaEstancia,
   moverEstancia,
   moverReservaCalendario,
+  listarGrupos,
+  crearGrupo,
+  obtenerGrupo,
+  facturarHospedajeGrupoPreload,
+  confirmarFacturaHospedajeGrupo,
+  salidaOperativaEstancia,
   cerrarPostVenta
 };

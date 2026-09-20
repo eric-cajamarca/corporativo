@@ -1,0 +1,12 @@
+    @if (h.activeTab() === 'consumo') {
+      <section class="hotel-section hotel-section-consumo">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Consumo y facturación</h2>
+          <a [routerLink]="['/ventas/create']" class="btn btn-hotel-primary">
+            <i class="fas fa-plus me-1"></i>
+            Nueva venta / Consumo
+          </a>
+        </div>
+        <app-index-ventas [noShell]="true"></app-index-ventas>
+      </section>
+    }

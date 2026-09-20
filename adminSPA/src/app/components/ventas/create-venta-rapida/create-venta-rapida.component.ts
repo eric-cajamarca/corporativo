@@ -289,6 +289,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Check-out hotel pendiente de confirmar al registrar la venta. */
   private hotelCheckoutIdEstancia: string | null = null;
+  private hotelCheckoutIdGrupo: string | null = null;
 
   /** Comprobantes Factura (01) y Boleta (03) para elegir al liquidar vale */
   get comprobantesFacturaBoleta(): any[] {
@@ -833,6 +834,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     const preload = this.hotelPreloadVentaService.getAndClearPreload();
     if (!preload?.lineas?.length) return;
     this.hotelCheckoutIdEstancia = preload.idEstancia ?? null;
+    this.hotelCheckoutIdGrupo = preload.idGrupo ?? null;
     this.carrito = preload.lineas.map((lin) => {
       const desc = (lin.descripcion ?? '').toString().trim();
       const marca = (lin as { marca?: string }).marca ?? '';
@@ -862,8 +864,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         this.guardarEstadoProvisional();
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
-            title: 'Check-out',
-            message: 'Carrito cargado desde la estancia. Puede quitar líneas; la habitación no se libera hasta facturar todo el saldo.',
+            title: preload.idGrupo ? 'Grupo hotel' : 'Check-out',
+            message: preload.idGrupo
+              ? 'Carrito con el hospedaje del grupo. El consumo de cada habitación se cobra aparte.'
+              : 'Carrito cargado desde la estancia. Puede quitar líneas; la habitación no se libera hasta facturar todo el saldo.',
             position: 'topRight'
           });
         }
@@ -920,21 +924,19 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   /** Cierra estancia solo si ya no queda saldo (habitación + consumo). */
-  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null): void {
+  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null, intento = 0): void {
     if (!this.hotelCheckoutIdEstancia || !idVenta) return;
     const idEstancia = this.hotelCheckoutIdEstancia;
-    const incluyeHabitacion = this.carrito.some((l: { tipoHotel?: string }) =>
-      l.tipoHotel === 'habitacion' || l.tipoHotel === 'recargo'
-    );
+    const incluyeHabitacion = this.carrito.some((l: { tipoHotel?: string }) => l.tipoHotel === 'habitacion');
     const idsConsumo = this.carrito
       .filter((l: { tipoHotel?: string; idConsumoHotel?: string | null }) => l.tipoHotel === 'consumo' && !!l.idConsumoHotel)
       .map((l: { idConsumoHotel?: string | null }) => String(l.idConsumoHotel));
-    this.hotelCheckoutIdEstancia = null;
     this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora(), {
       incluyeHabitacion,
       idsConsumo
     }).subscribe({
       next: (res) => {
+        this.hotelCheckoutIdEstancia = null;
         const msg = res.data?.message;
         if (!msg) return;
         if (res.data?.cerrado) {
@@ -944,9 +946,40 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         }
       },
       error: (err: { error?: { message?: string } }) => {
+        if (intento < 1) {
+          this.confirmarCheckoutHotelSiCorresponde(idVenta, intento + 1);
+          return;
+        }
+        this.hotelCheckoutIdEstancia = null;
         iziToast.warning({
           title: 'Hotel',
           message: err?.error?.message || 'Venta registrada, pero no se pudo actualizar la estancia en hotel.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  private confirmarFacturaGrupoSiCorresponde(idVenta: number | null, intento = 0): void {
+    if (!this.hotelCheckoutIdGrupo || !idVenta) return;
+    const idGrupo = this.hotelCheckoutIdGrupo;
+    this.hotelService.confirmarFacturaHospedajeGrupo(idGrupo, idVenta).subscribe({
+      next: (res) => {
+        this.hotelCheckoutIdGrupo = null;
+        const msg = res.data?.message;
+        if (msg) {
+          iziToast.success({ title: 'Grupo hotel', message: msg, position: 'topRight' });
+        }
+      },
+      error: (err: { error?: { message?: string } }) => {
+        if (intento < 1) {
+          this.confirmarFacturaGrupoSiCorresponde(idVenta, intento + 1);
+          return;
+        }
+        this.hotelCheckoutIdGrupo = null;
+        iziToast.warning({
+          title: 'Grupo hotel',
+          message: err?.error?.message || 'Venta registrada, pero no se marcó el hospedaje del grupo.',
           position: 'topRight'
         });
       }
@@ -3679,7 +3712,9 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
-        if (!this.esGestora) {
+        if (this.hotelCheckoutIdGrupo) {
+          this.confirmarFacturaGrupoSiCorresponde(idVentaPdf);
+        } else if (this.hotelCheckoutIdEstancia) {
           this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
         }
         const abrirPdf =

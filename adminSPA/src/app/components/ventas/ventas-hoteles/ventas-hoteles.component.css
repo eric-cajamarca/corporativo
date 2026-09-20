@@ -36,7 +36,15 @@
 .hotel-badge-cancelada,.hotel-badge-sucia{background:#fee2e2;color:#b91c1c}
 .hotel-badge-default{background:#f1f5f9;color:#64748b}
 .hotel-badge-limpieza{background:#fde68a;color:#92400e}
-.hotel-badge-fuera{background:#e2e8f0;color:#475569}
+.hotel-badge-grupo{background:#ede9fe;color:#5b21b6}
+.hotel-grupo-banner{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+.hotel-grupo-chip{border:1px solid #ddd6fe;background:#f5f3ff;color:#5b21b6;border-radius:8px;padding:.4rem .75rem;font-size:.8125rem;text-align:left}
+.hotel-grupo-chip:hover{background:#ede9fe}
+.hotel-grupo-hab-list{max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:.5rem}
+.hotel-grupo-hab-item{display:flex;align-items:center;gap:.5rem;padding:.35rem .4rem;margin:0;font-size:.875rem}
+.hotel-grupo-hab-item.disabled{opacity:.55}
+.tape-bar-grupo{box-shadow:inset 4px 0 0 #7c3aed}
+.tape-legend.tape-bar-grupo{background:#7c3aed;box-shadow:none}
 .hotel-empty{padding:3rem 2rem;text-align:center}
 .hotel-empty-icon{font-size:3rem;color:#cbd5e1;margin-bottom:1rem}
 .hotel-rooms-grid-compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem}
@@ -130,6 +138,29 @@
 .historial-leyenda-dot.ocupado-activo{background:#86efac}
 .historial-leyenda-dot.reservado{background:#fbbf24}
 .historial-leyenda-dot.libre{background:#f1f5f9;border:1px solid #cbd5e1}
+.hotel-occ-legend{color:#64748b}
+.hotel-occ-swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:middle;border:1px solid rgba(15,23,42,.08)}
+.hotel-occ-cal-title{font-size:.9rem;font-weight:600;text-transform:capitalize;margin-bottom:.5rem;color:#1e293b}
+.hotel-occ-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.hotel-occ-dow{text-align:center;font-size:.7rem;font-weight:600;color:#64748b;padding:2px 0}
+.hotel-occ-cell{min-height:58px;border-radius:8px;padding:4px 4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;border:1px solid transparent}
+.hotel-occ-empty{background:transparent;min-height:0;padding:0}
+.hotel-occ-fuera{background:#f8fafc;color:#94a3b8}
+.hotel-occ-num{font-size:.68rem;font-weight:600;opacity:.85}
+.hotel-occ-frac{font-size:.78rem;font-weight:700}
+.hotel-occ-res{font-size:.58rem;font-weight:600;margin-top:1px;opacity:.9}
+.hotel-occ-hoy{box-shadow:inset 0 0 0 2px #1d4ed8}
+.hotel-occ-swatch.occ-0,.hotel-occ-cell.occ-0{background:#f1f5f9;color:#475569}
+.hotel-occ-swatch.occ-1,.hotel-occ-cell.occ-1{background:#dbeafe;color:#1e3a8a}
+.hotel-occ-swatch.occ-2,.hotel-occ-cell.occ-2{background:#93c5fd;color:#1e3a8a}
+.hotel-occ-swatch.occ-3,.hotel-occ-cell.occ-3{background:#3b82f6;color:#fff}
+.hotel-occ-swatch.occ-4,.hotel-occ-cell.occ-4{background:#1d4ed8;color:#fff}
+.hotel-occ-swatch.occ-res,.hotel-occ-cell.occ-res{background:#fde68a;color:#78350f}
+@media (max-width:575.98px){
+.hotel-occ-cell{min-height:52px;padding:3px 2px}
+.hotel-occ-frac{font-size:.68rem}
+.hotel-occ-res{display:none}
+}
 /* Desktop: lista móvil / labels cortos ocultos */
 .hotel-cal-mobile,.hotel-hab-legend-short,.hotel-tab-short,.hotel-title-mob,.hotel-reporte-hab-mobile{display:none}
 .hotel-rep-hab-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.55rem .7rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}

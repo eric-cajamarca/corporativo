@@ -198,7 +198,10 @@ async function checkInDesdeReserva(pool, idEmpresa, idReserva, body, idUsuario) 
     checkIn: checkInSql,
     checkOutPrevisto: checkOutPrevistoSql,
     tarifaNoche,
-    totalHabitacion
+    totalHabitacion,
+    idGrupo: reserva.idGrupo || null,
+    habitacionFacturada: reserva.habitacionFacturada === true || Number(reserva.habitacionFacturada) === 1,
+    idVentaHabitacion: reserva.idVentaHabitacion || null
   }, idUsuario);
 
   await reservasRepository.vincularEstancia(pool, idReserva, idEmpresa, idEstancia, 'convertida');
@@ -293,10 +296,11 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
   const metaMap = await metadatosProductosPorIds(pool, idEmpresa, idsProductos);
 
   const habitacionFacturada = estancia.habitacionFacturada === true || Number(estancia.habitacionFacturada) === 1;
+  const hospedajeACargoGrupo = !!estancia.idGrupo;
 
   let totalHabitacion = Math.max(0, (Number(estancia.totalHabitacion) || 0) - totalAnticipos);
   const lineas = [];
-  if (!habitacionFacturada) {
+  if (!habitacionFacturada && !hospedajeACargoGrupo) {
     lineas.push(
       lineaPreloadVenta(
         metaMap,
@@ -327,7 +331,7 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
 
   const recargoEarly = Number(cfg.recargoEarlyCheckIn) || 0;
   const recargoLate = Number(cfg.recargoLateCheckOut) || 0;
-  if (!habitacionFacturada && recargoEarly > 0 && esCheckInTemprano(estancia.checkIn, cfg)) {
+  if (!habitacionFacturada && !hospedajeACargoGrupo && recargoEarly > 0 && esCheckInTemprano(estancia.checkIn, cfg)) {
     lineas.push(lineaPreloadVenta(
       metaMap,
       estancia.idProductoHabitacion,
@@ -339,7 +343,7 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
       { tipo: 'recargo' }
     ));
   }
-  if (!habitacionFacturada && recargoLate > 0 && esCheckOutTardio(cfg)) {
+  if (!habitacionFacturada && !hospedajeACargoGrupo && recargoLate > 0 && esCheckOutTardio(cfg)) {
     lineas.push(lineaPreloadVenta(
       metaMap,
       estancia.idProductoHabitacion,
@@ -363,10 +367,26 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
     anticiposTotal: habitacionFacturada ? 0 : totalAnticipos,
     anticipos: habitacionFacturada ? [] : anticipos,
     habitacionFacturada,
-    pendienteHabitacion: !habitacionFacturada,
+    pendienteHabitacion: !habitacionFacturada && !hospedajeACargoGrupo,
     pendienteConsumo: consumos.length > 0,
+    idGrupo: estancia.idGrupo || null,
     lineas
   };
+}
+
+async function vincularVentaEstanciaHotel(conn, idEmpresa, idEstancia, idVenta) {
+  try {
+    await conn.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idEstanciaHotel', sql.UniqueIdentifier, idEstancia)
+      .query(`
+        UPDATE Ventas SET idEstanciaHotel = @idEstanciaHotel
+        WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+      `);
+  } catch (errVentas) {
+    console.error('confirmarCheckoutPostVenta idEstanciaHotel:', errVentas.message);
+  }
 }
 
 async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, fechaHoraCliente, opciones = {}) {
@@ -379,12 +399,17 @@ async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, 
   }
 
   const yaHabitacionFacturada = estancia.habitacionFacturada === true || Number(estancia.habitacionFacturada) === 1;
+  const hospedajeACargoGrupo = !!estancia.idGrupo;
   const parcialDefinido = opciones.incluyeHabitacion != null || Array.isArray(opciones.idsConsumo);
-  let incluyeHabitacion = Boolean(opciones.incluyeHabitacion);
+  let incluyeHabitacion = opciones.incluyeHabitacion === true || opciones.incluyeHabitacion === 1;
   let idsConsumo = Array.isArray(opciones.idsConsumo) ? opciones.idsConsumo.filter(Boolean) : [];
 
+  if (hospedajeACargoGrupo) {
+    incluyeHabitacion = false;
+  }
+
   if (!parcialDefinido) {
-    incluyeHabitacion = !yaHabitacionFacturada;
+    if (!hospedajeACargoGrupo) incluyeHabitacion = !yaHabitacionFacturada;
     const pendientes = await consumoHabitacionRepository.listarPendientesParaCheckout(
       pool, idEmpresa, idEstancia, estancia.idProductoHabitacion
     );
@@ -392,96 +417,130 @@ async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, 
   }
 
   if (!incluyeHabitacion && idsConsumo.length === 0) {
+    const pendientes = await consumoHabitacionRepository.listarPendientesParaCheckout(
+      pool, idEmpresa, idEstancia, estancia.idProductoHabitacion
+    );
     return {
       ok: true,
       cerrado: false,
-      pendienteHabitacion: !yaHabitacionFacturada,
-      pendienteConsumo: true,
+      pendienteHabitacion: !yaHabitacionFacturada && !hospedajeACargoGrupo,
+      pendienteConsumo: pendientes.length > 0,
       message: 'La venta no incluye ítems de la estancia. La habitación sigue ocupada.'
     };
   }
 
-  if (incluyeHabitacion && !yaHabitacionFacturada) {
-    await estanciasRepository.marcarHabitacionFacturada(pool, idEstancia, idEmpresa, idVenta);
-    await hotelAnticiposRepository.marcarAplicadosCheckout(
-      pool,
-      idEmpresa,
-      idEstancia,
-      estancia.idReserva,
-      idVenta
+  const resultado = await ejecutarEnTransaccion(pool, async (tx) => {
+    if (incluyeHabitacion && !yaHabitacionFacturada) {
+      await estanciasRepository.marcarHabitacionFacturada(tx, idEstancia, idEmpresa, idVenta);
+      await hotelAnticiposRepository.marcarAplicadosCheckout(
+        tx,
+        idEmpresa,
+        idEstancia,
+        estancia.idReserva,
+        idVenta
+      );
+    }
+
+    if (idsConsumo.length) {
+      await consumoHabitacionRepository.marcarFacturadosPorIds(
+        tx,
+        idEmpresa,
+        idsConsumo,
+        idEstancia,
+        estancia.idProductoHabitacion
+      );
+    }
+
+    const pendientesRestantes = await consumoHabitacionRepository.listarPendientesParaCheckout(
+      tx, idEmpresa, idEstancia, estancia.idProductoHabitacion
     );
+    const estanciaActual = await estanciasRepository.obtenerPorId(tx, idEstancia, idEmpresa);
+    const habitacionOk = estanciaActual.habitacionFacturada === true || Number(estanciaActual.habitacionFacturada) === 1;
+    const consumoOk = pendientesRestantes.length === 0;
+
+    if (hospedajeACargoGrupo) {
+      return {
+        ok: true,
+        cerrado: false,
+        pendienteHabitacion: false,
+        pendienteConsumo: !consumoOk,
+        message: consumoOk
+          ? 'Consumo facturado. Use Salida para liberar la habitación.'
+          : 'Consumo facturado. La habitación sigue ocupada: falta consumo pendiente.'
+      };
+    }
+
+    if (habitacionOk && consumoOk) {
+      const checkOutRealSql = parseFechaHoraClienteASQL(fechaHoraCliente);
+      await estanciasRepository.cerrarCheckout(tx, idEstancia, idEmpresa, idVenta, checkOutRealSql);
+      await hotelHousekeepingRepository.upsertEstado(
+        tx,
+        idEmpresa,
+        estancia.idProductoHabitacion,
+        'sucia',
+        'Check-out registrado'
+      );
+      return {
+        ok: true,
+        cerrado: true,
+        pendienteHabitacion: false,
+        pendienteConsumo: false,
+        message: 'Check-out completado. Habitación liberada.'
+      };
+    }
+
+    const falta = [];
+    if (!habitacionOk) falta.push('habitación');
+    if (!consumoOk) falta.push('consumo');
+    return {
+      ok: true,
+      cerrado: false,
+      pendienteHabitacion: !habitacionOk,
+      pendienteConsumo: !consumoOk,
+      message: `Factura registrada. La habitación sigue ocupada: falta facturar ${falta.join(' y ')}.`
+    };
+  });
+
+  await vincularVentaEstanciaHotel(pool, idEmpresa, idEstancia, idVenta);
+  return resultado;
+}
+
+async function salidaOperativaEstancia(pool, idEmpresa, idEstancia, fechaHoraCliente) {
+  const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+  if (!estancia) throw new Error('Estancia no encontrada');
+  if (estancia.estadoEstancia !== 'activa') throw new Error('La estancia ya no está activa');
+  if (!estancia.idGrupo) {
+    throw new Error('La salida operativa solo aplica a habitaciones de un grupo. Use check-out con factura.');
   }
 
-  if (idsConsumo.length) {
-    await consumoHabitacionRepository.marcarFacturadosPorIds(
-      pool,
-      idEmpresa,
-      idsConsumo,
-      idEstancia,
-      estancia.idProductoHabitacion
-    );
-  }
-
-  const pendientesRestantes = await consumoHabitacionRepository.listarPendientesParaCheckout(
+  const pendientes = await consumoHabitacionRepository.listarPendientesParaCheckout(
     pool, idEmpresa, idEstancia, estancia.idProductoHabitacion
   );
-  const estanciaActual = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
-  const habitacionOk = estanciaActual.habitacionFacturada === true || Number(estanciaActual.habitacionFacturada) === 1;
-  const consumoOk = pendientesRestantes.length === 0;
+  if (pendientes.length) {
+    throw new Error('Hay consumo pendiente. Cobre los productos de esta habitación antes de la salida.');
+  }
 
-  if (habitacionOk && consumoOk) {
+  await ejecutarEnTransaccion(pool, async (tx) => {
     const checkOutRealSql = parseFechaHoraClienteASQL(fechaHoraCliente);
-    await estanciasRepository.cerrarCheckout(pool, idEstancia, idEmpresa, idVenta, checkOutRealSql);
+    await estanciasRepository.cerrarCheckout(tx, idEstancia, idEmpresa, null, checkOutRealSql);
     await hotelHousekeepingRepository.upsertEstado(
-      pool,
+      tx,
       idEmpresa,
       estancia.idProductoHabitacion,
       'sucia',
-      'Check-out registrado'
+      'Salida de grupo'
     );
-    try {
-      await pool.request()
-        .input('idVenta', sql.Int, idVenta)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idEstanciaHotel', sql.UniqueIdentifier, idEstancia)
-        .query(`
-          UPDATE Ventas SET idEstanciaHotel = @idEstanciaHotel
-          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
-        `);
-    } catch (errVentas) {
-      console.error('confirmarCheckoutPostVenta idEstanciaHotel:', errVentas.message);
-    }
-    return {
-      ok: true,
-      cerrado: true,
-      pendienteHabitacion: false,
-      pendienteConsumo: false,
-      message: 'Check-out completado. Habitación liberada.'
-    };
-  }
+  });
 
-  try {
-    await pool.request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('idEstanciaHotel', sql.UniqueIdentifier, idEstancia)
-      .query(`
-        UPDATE Ventas SET idEstanciaHotel = @idEstanciaHotel
-        WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
-      `);
-  } catch (errVentas) {
-    console.error('confirmarCheckoutPostVenta idEstanciaHotel:', errVentas.message);
-  }
-
-  const falta = [];
-  if (!habitacionOk) falta.push('habitación');
-  if (!consumoOk) falta.push('consumo');
+  const habFact = estancia.habitacionFacturada === true || Number(estancia.habitacionFacturada) === 1;
   return {
     ok: true,
-    cerrado: false,
-    pendienteHabitacion: !habitacionOk,
-    pendienteConsumo: !consumoOk,
-    message: `Factura registrada. La habitación sigue ocupada: falta facturar ${falta.join(' y ')}.`
+    cerrado: true,
+    pendienteHabitacion: !habFact,
+    pendienteConsumo: false,
+    message: habFact
+      ? 'Habitación liberada. El hospedaje ya estaba facturado al grupo.'
+      : 'Habitación liberada. El hospedaje sigue pendiente en la factura del grupo.'
   };
 }
 
@@ -1086,6 +1145,39 @@ async function reporteHotel(pool, idEmpresa, fechaDesde, fechaHasta) {
   ingresoReservas = Math.round(ingresoReservas * 100) / 100;
   reservasResumen.ingresoConfirmadas = ingresoReservas;
 
+  const ocupadasPorDia = new Map();
+  const reservadasPorDia = new Map();
+  for (const key of nochesOcupadasSet) {
+    const fecha = String(key).split('|')[1];
+    if (!fecha) continue;
+    ocupadasPorDia.set(fecha, (ocupadasPorDia.get(fecha) || 0) + 1);
+  }
+  for (const key of nochesReservadasSet) {
+    const fecha = String(key).split('|')[1];
+    if (!fecha) continue;
+    reservadasPorDia.set(fecha, (reservadasPorDia.get(fecha) || 0) + 1);
+  }
+
+  const ocupacionPorDia = [];
+  let cursorDia = desde;
+  const finNoches = addDaysYmd(hasta, 1);
+  const totalHabCal = habitaciones.length;
+  while (cursorDia < finNoches) {
+    const ocupadas = ocupadasPorDia.get(cursorDia) || 0;
+    const reservadas = reservadasPorDia.get(cursorDia) || 0;
+    const ocupacionPctDia = totalHabCal > 0
+      ? Math.min(100, Math.round((ocupadas / totalHabCal) * 10000) / 100)
+      : 0;
+    ocupacionPorDia.push({
+      fecha: cursorDia,
+      ocupadas,
+      reservadas,
+      total: totalHabCal,
+      ocupacionPct: ocupacionPctDia
+    });
+    cursorDia = addDaysYmd(cursorDia, 1);
+  }
+
   return {
     fechaDesde: desde,
     fechaHasta: hasta,
@@ -1098,6 +1190,7 @@ async function reporteHotel(pool, idEmpresa, fechaDesde, fechaHasta) {
       ocupacionPct,
       ingresoHabitacion
     },
+    ocupacionPorDia,
     consumo,
     reservas: reservasResumen,
     destacados: {
@@ -1282,6 +1375,8 @@ module.exports = {
   checkInDesdeReserva,
   checkOutPreload,
   confirmarCheckoutPostVenta,
+  salidaOperativaEstancia,
+  metadatosProductosPorIds,
   consultarDisponibilidad,
   listarCalendario,
   crearBloqueo,

@@ -27,21 +27,23 @@ async function listarPorEmpresa(pool, idEmpresa, filtros = {}) {
 }
 
 async function listarPendientesCheckout(pool, idEmpresa, idEstancia, idReserva) {
-  const req = pool.request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('idEstancia', sql.UniqueIdentifier, idEstancia);
-  let cond = '(a.idEstancia = @idEstancia';
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const conds = [];
+  if (idEstancia) {
+    req.input('idEstancia', sql.UniqueIdentifier, idEstancia);
+    conds.push('a.idEstancia = @idEstancia');
+  }
   if (idReserva) {
     req.input('idReserva', sql.UniqueIdentifier, idReserva);
-    cond += ' OR a.idReserva = @idReserva';
+    conds.push('a.idReserva = @idReserva');
   }
-  cond += ')';
+  if (!conds.length) return [];
   const result = await req.query(`
     SELECT a.idAnticipo, a.monto, a.concepto, a.idReserva, a.idEstancia
     FROM HotelAnticipos a
     WHERE a.idEmpresa = @idEmpresa
       AND a.estado = 'pendiente'
-      AND ${cond}
+      AND (${conds.join(' OR ')})
   `);
   return result.recordset;
 }
@@ -98,6 +100,22 @@ async function marcarAplicadosCheckout(pool, idEmpresa, idEstancia, idReserva, i
   `);
 }
 
+async function marcarAplicadosPorGrupo(pool, idEmpresa, idGrupo, idVenta) {
+  await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idGrupo', sql.UniqueIdentifier, idGrupo)
+    .input('idVenta', sql.Int, idVenta)
+    .query(`
+      UPDATE HotelAnticipos SET estado = 'aplicado', idVenta = @idVenta
+      WHERE idEmpresa = @idEmpresa
+        AND estado = 'pendiente'
+        AND (
+          idReserva IN (SELECT idReserva FROM Reservas WHERE idGrupo = @idGrupo AND idEmpresa = @idEmpresa)
+          OR idEstancia IN (SELECT idEstancia FROM Estancias WHERE idGrupo = @idGrupo AND idEmpresa = @idEmpresa)
+        )
+    `);
+}
+
 async function anular(pool, idAnticipo, idEmpresa) {
   const result = await pool.request()
     .input('idAnticipo', sql.UniqueIdentifier, idAnticipo)
@@ -115,5 +133,6 @@ module.exports = {
   listarPendientesCheckout,
   insertar,
   marcarAplicadosCheckout,
+  marcarAplicadosPorGrupo,
   anular
 };
