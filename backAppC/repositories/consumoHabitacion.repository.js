@@ -174,6 +174,29 @@ async function marcarFacturadosCheckout(pool, idEmpresa, idEstancia, idProductoH
     `);
 }
 
+async function marcarFacturadosPorIds(pool, idEmpresa, idsConsumo, idEstancia, idProductoHabitacion) {
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ids = [...new Set((idsConsumo || []).filter(Boolean).map((id) => String(id)).filter((id) => uuidRe.test(id)))];
+  if (!ids.length) return 0;
+  const req = pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+    .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion);
+  const inClause = ids.map((id, i) => {
+    req.input(`idc${i}`, sql.UniqueIdentifier, id);
+    return `@idc${i}`;
+  }).join(', ');
+  const result = await req.query(`
+    UPDATE ConsumoHabitacion SET estadoConsumo = 'facturado'
+    WHERE idEmpresa = @idEmpresa
+      AND idProductoHabitacion = @idProductoHabitacion
+      AND (idEstancia = @idEstancia OR idEstancia IS NULL)
+      AND idConsumo IN (${inClause})
+      AND ISNULL(estadoConsumo, 'pendiente') = 'pendiente'
+  `);
+  return result.rowsAffected[0] || 0;
+}
+
 async function listarPorEstancia(pool, idEmpresa, idEstancia, idProductoHabitacion, checkIn, checkOut) {
   const req = pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -210,6 +233,26 @@ async function totalConsumoPorEstancia(pool, idEmpresa, idEstancia, idProductoHa
   return { total, lineas: rows.length };
 }
 
+async function reasignarHabitacionPorEstancia(pool, idEmpresa, idEstancia, idProductoAnterior, idProductoNuevo) {
+  await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+    .input('idProductoAnterior', sql.UniqueIdentifier, idProductoAnterior)
+    .input('idProductoNuevo', sql.UniqueIdentifier, idProductoNuevo)
+    .query(`
+      UPDATE ConsumoHabitacion SET idProductoHabitacion = @idProductoNuevo
+      WHERE idEmpresa = @idEmpresa
+        AND (
+          idEstancia = @idEstancia
+          OR (
+            idEstancia IS NULL
+            AND idProductoHabitacion = @idProductoAnterior
+            AND ISNULL(estadoConsumo, 'pendiente') = 'pendiente'
+          )
+        )
+    `);
+}
+
 async function obtenerPorId(pool, idConsumo, idEmpresa) {
   const result = await pool.request()
     .input('idConsumo', sql.UniqueIdentifier, idConsumo)
@@ -234,6 +277,8 @@ module.exports = {
   limpiarPendientesPorEstancia,
   marcarFacturadosPorEstancia,
   marcarFacturadosCheckout,
+  marcarFacturadosPorIds,
+  reasignarHabitacionPorEstancia,
   obtenerPorId,
   listarPorEstancia,
   totalConsumoPorEstancia

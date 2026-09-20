@@ -342,8 +342,14 @@
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalBloqueo(hab)" title="Ver bloqueo">Bloqueo</button>
                 }
                 @if (estado === 'ocupada') {
-                  <button type="button" class="btn btn-sm btn-warning" (click)="generarVenta(hab)" title="Check-out y venta">Check-out</button>
+                  @if (est && estanciaHabitacionFacturada(est)) {
+                    <span class="hotel-badge hotel-badge-en-curso small">Hab. facturada</span>
+                  }
+                  <button type="button" class="btn btn-sm btn-warning" (click)="abrirFacturacionEstancia(hab)" [title]="etiquetaBotonCheckout(hab)">{{ etiquetaBotonCheckout(hab) }}</button>
                   <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalAgregarConsumo(hab)">Consumo</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalFolio(hab)" title="Folio de saldo">Folio</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalCambiarSalida(hab)" title="Acortar o extender estadía">Estadía</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalMoverHabitacion(hab)" title="Cambiar de habitación">Mover</button>
                 }
                 <button type="button" class="btn btn-sm btn-hotel-primary" (click)="abrirModalDetalle(hab)" title="Ver detalles">Detalles</button>
               </div>
@@ -1013,6 +1019,9 @@
           @if (estDet) {
             <div class="hotel-detalle-huesped mb-3 p-3 rounded bg-light">
               <strong>In-house:</strong> {{ estDet.nombreHuesped }} · Check-in: {{ estDet.checkIn | slice:0:16 }} · Salida prev.: {{ estDet.checkOutPrevisto | slice:0:10 }} · Total hab.: {{ estDet.totalHabitacion | number:'1.2-2' }}
+              @if (estanciaHabitacionFacturada(estDet)) {
+                <span class="hotel-badge hotel-badge-en-curso ms-2">Habitación facturada</span>
+              }
             </div>
           } @else if (proxDet) {
             <div class="hotel-detalle-huesped mb-3 p-3 rounded bg-warning-subtle">
@@ -1070,7 +1079,10 @@
               <button type="button" class="btn btn-outline-primary btn-sm" (click)="agregarConsumoDesdeDetalle()">
                 <i class="fas fa-plus me-1"></i>Agregar consumo
               </button>
-              <button type="button" class="btn btn-warning btn-sm" (click)="generarVenta(habitacionDetalleSeleccionada); cerrarModalDetalle()">Check-out / Venta</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalFolio(habitacionDetalleSeleccionada); cerrarModalDetalle()">Folio</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalCambiarSalida(habitacionDetalleSeleccionada); cerrarModalDetalle()">Estadía</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalMoverHabitacion(habitacionDetalleSeleccionada); cerrarModalDetalle()">Mover</button>
+              <button type="button" class="btn btn-warning btn-sm" (click)="abrirFacturacionEstancia(habitacionDetalleSeleccionada); cerrarModalDetalle()">{{ etiquetaBotonCheckout(habitacionDetalleSeleccionada) }}</button>
             } @else {
               <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCheckInWalkIn(habitacionDetalleSeleccionada); cerrarModalDetalle()">Check-in walk-in</button>
             }
@@ -1080,6 +1092,283 @@
             }
             <button type="button" class="btn btn-secondary" (click)="cerrarModalDetalle()">Cerrar</button>
           </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal facturar estancia (todo / solo habitación / solo consumo) -->
+  @if (showModalFacturarEstancia() && habitacionFacturarSeleccionada) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalFacturarEstancia()"></div>
+    <div class="hotel-modal" role="dialog" aria-labelledby="modalFacturarTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalFacturarTitle" class="hotel-modal-title">Facturar {{ habitacionFacturarSeleccionada.codigo }}</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalFacturarEstancia()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          <p class="mb-2">Elija qué documentar ahora. La habitación <strong>no se libera</strong> hasta facturar todo el saldo.</p>
+          <p class="small text-muted mb-3">Pendiente: {{ formatearMoneda(getTotalHabitacion(habitacionFacturarSeleccionada)) }}</p>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-hotel-primary" (click)="elegirModoFacturacion('todo')">
+              Facturar todo (habitación + consumo)
+            </button>
+            @if (facturarPendienteHabitacion) {
+              <button type="button" class="btn btn-outline-primary" (click)="elegirModoFacturacion('habitacion')">
+                Solo habitación
+              </button>
+            }
+            @if (facturarPendienteConsumo) {
+              <button type="button" class="btn btn-outline-primary" (click)="elegirModoFacturacion('consumo')">
+                Solo consumo / productos
+              </button>
+            }
+          </div>
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalFacturarEstancia()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal acortar / extender estadía -->
+  @if (showModalCambiarSalida() && habitacionCambiarSalida) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalCambiarSalida()"></div>
+    <div class="hotel-modal" role="dialog" aria-labelledby="modalCambiarSalidaTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalCambiarSalidaTitle" class="hotel-modal-title">Cambiar estadía — {{ habitacionCambiarSalida.codigo }}</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalCambiarSalida()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+          }
+          @let estSal = getEstanciaActiva(habitacionCambiarSalida.idProducto);
+          @if (estSal) {
+            <p class="small mb-2">Huésped: <strong>{{ estSal.nombreHuesped }}</strong></p>
+            <p class="small text-muted mb-3">Check-in: {{ estSal.checkIn | slice:0:16 }} · Tarifa: {{ formatearMoneda(estSal.tarifaNoche) }} / noche</p>
+            @if (estanciaHabitacionFacturada(estSal)) {
+              <div class="alert alert-warning py-2">La tarifa ya está facturada. No se pueden cambiar las noches.</div>
+            }
+            <div class="mb-3">
+              <label class="form-label">Nueva fecha de salida</label>
+              <input type="date" class="form-control" [(ngModel)]="formCambiarSalida.fechaSalida"
+                [min]="fechaSalidaMinEstancia(estSal)" [disabled]="estanciaHabitacionFacturada(estSal)" />
+            </div>
+            <p class="small mb-0">{{ detalleCambioSalida(estSal) }}</p>
+          }
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalCambiarSalida()">Cancelar</button>
+          <button type="button" class="btn btn-hotel-primary" (click)="guardarCambioSalida()"
+            [disabled]="guardandoCambiarSalida || !puedeGuardarCambioSalida()">
+            {{ guardandoCambiarSalida ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal mover habitación -->
+  @if (showModalMoverHabitacion() && habitacionMoverOrigen) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalMoverHabitacion()"></div>
+    <div class="hotel-modal" role="dialog" aria-labelledby="modalMoverHabTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalMoverHabTitle" class="hotel-modal-title">Mover de {{ habitacionMoverOrigen.codigo }}</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalMoverHabitacion()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+          }
+          @let estMov = getEstanciaActiva(habitacionMoverOrigen.idProducto);
+          @if (estMov) {
+            <p class="small mb-3">Huésped: <strong>{{ estMov.nombreHuesped }}</strong> · Salida: {{ estMov.checkOutPrevisto | slice:0:10 }}</p>
+          }
+          <p class="small text-muted mb-2">La habitación actual quedará sucia. El consumo pendiente se traslada con el huésped.</p>
+          <div class="mb-3">
+            <label class="form-label">Habitación destino</label>
+            <select class="form-select" [(ngModel)]="idHabitacionDestinoMover">
+              <option value="">Seleccione…</option>
+              @for (h of habitacionesDestinoMover(); track h.idProducto) {
+                <option [value]="h.idProducto">{{ h.codigo }} — {{ h.descripcion }}</option>
+              }
+            </select>
+            @if (habitacionesDestinoMover().length === 0) {
+              <small class="text-muted">No hay habitaciones libres y limpias en el período de esta estancia.</small>
+            }
+          </div>
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalMoverHabitacion()">Cancelar</button>
+          <button type="button" class="btn btn-hotel-primary" (click)="guardarMoverHabitacion()"
+            [disabled]="guardandoMoverHabitacion || !idHabitacionDestinoMover">
+            {{ guardandoMoverHabitacion ? 'Moviendo…' : 'Mover huésped' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal folio de saldo -->
+  @if (showModalFolio() && habitacionFolio) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalFolio()"></div>
+    <div class="hotel-modal hotel-modal-lg" role="dialog" aria-labelledby="modalFolioTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalFolioTitle" class="hotel-modal-title">Folio — {{ habitacionFolio.codigo }}</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalFolio()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+          }
+          @if (folioLoading) {
+            <p class="text-muted mb-0">Cargando folio…</p>
+          } @else if (folioData) {
+            <p class="small mb-3">
+              <strong>{{ folioData.nombreHuesped }}</strong>
+              · In: {{ folioData.checkIn | slice:0:16 }}
+              · Sal: {{ folioData.checkOutPrevisto | slice:0:10 }}
+            </p>
+            <div class="hotel-folio-kpis">
+              <div class="hotel-folio-kpi">
+                <span class="hotel-folio-kpi-label">Por facturar</span>
+                <span class="hotel-folio-kpi-val">{{ formatearMoneda(folioData.resumen.saldoPorFacturar) }}</span>
+              </div>
+              <div class="hotel-folio-kpi">
+                <span class="hotel-folio-kpi-label">Crédito por cobrar</span>
+                <span class="hotel-folio-kpi-val">{{ formatearMoneda(folioData.resumen.saldoPorCobrar) }}</span>
+              </div>
+              <div class="hotel-folio-kpi" [class.hotel-folio-kpi-deuda]="folioData.resumen.saldoHuesped > 0">
+                <span class="hotel-folio-kpi-label">Saldo huésped</span>
+                <span class="hotel-folio-kpi-val">{{ formatearMoneda(folioData.resumen.saldoHuesped) }}</span>
+              </div>
+            </div>
+
+            <h6 class="mb-2">Cargos</h6>
+            <table class="table table-sm hotel-table mb-3">
+              <tbody>
+                <tr>
+                  <td>Habitación {{ folioData.cargos.habitacionFacturada ? '(facturada)' : '(pendiente)' }}</td>
+                  <td class="text-end">{{ formatearMoneda(folioData.cargos.habitacion) }}</td>
+                </tr>
+                @for (r of folioData.cargos.recargos; track r.concepto) {
+                  <tr>
+                    <td>{{ r.concepto }}</td>
+                    <td class="text-end">{{ formatearMoneda(r.monto) }}</td>
+                  </tr>
+                }
+                <tr>
+                  <td>Consumo pendiente</td>
+                  <td class="text-end">{{ formatearMoneda(folioData.cargos.consumoPendiente) }}</td>
+                </tr>
+                <tr>
+                  <td>Consumo ya facturado</td>
+                  <td class="text-end">{{ formatearMoneda(folioData.cargos.consumoFacturado) }}</td>
+                </tr>
+                <tr class="fw-semibold">
+                  <td>Total cargos</td>
+                  <td class="text-end">{{ formatearMoneda(folioData.cargos.totalCargos) }}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h6 class="mb-2">Anticipos / señas</h6>
+            <div class="row g-2 align-items-end mb-2">
+              <div class="col-sm-4">
+                <label class="form-label small mb-1">Monto (S/)</label>
+                <input type="number" class="form-control form-control-sm" [(ngModel)]="formFolioAnticipo.monto" min="0.01" step="0.01" />
+              </div>
+              <div class="col-sm-5">
+                <label class="form-label small mb-1">Concepto</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="formFolioAnticipo.concepto" />
+              </div>
+              <div class="col-sm-3">
+                <button type="button" class="btn btn-hotel-primary btn-sm w-100" (click)="guardarAnticipoFolio()" [disabled]="guardandoFolioAnticipo">
+                  {{ guardandoFolioAnticipo ? 'Guardando…' : 'Registrar' }}
+                </button>
+              </div>
+            </div>
+            @if (folioData.anticipos.length) {
+              <table class="table table-sm hotel-table mb-3">
+                <thead>
+                  <tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (a of folioData.anticipos; track a.idAnticipo) {
+                    <tr>
+                      <td>{{ a.fRegistro }}</td>
+                      <td>{{ a.concepto }}</td>
+                      <td class="text-end">{{ formatearMoneda(a.monto) }}</td>
+                      <td>{{ a.estado }}</td>
+                      <td>
+                        @if (a.estado === 'pendiente') {
+                          <button type="button" class="btn btn-link btn-sm text-danger p-0" (click)="anularAnticipoFolio(a)">Anular</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="small text-muted mb-3">Sin anticipos. El pendiente se descuenta al facturar la habitación.</p>
+            }
+            <p class="small text-muted mb-3">Pendientes: {{ formatearMoneda(folioData.anticiposPendientes) }} · Aplicados en factura: {{ formatearMoneda(folioData.anticiposAplicados) }}</p>
+
+            <h6 class="mb-2">Comprobantes, pagos y créditos</h6>
+            @if (folioData.documentos.length) {
+              <table class="table table-sm hotel-table mb-2">
+                <thead>
+                  <tr>
+                    <th>Documento</th>
+                    <th>Tipo</th>
+                    <th class="text-end">Total</th>
+                    <th>Pago</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of folioData.documentos; track d.idVenta) {
+                    <tr>
+                      <td>
+                        {{ d.compVenta }}
+                        <div class="small text-muted">{{ d.fEmision | slice:0:16 }}@if (d.compRelacionado) { · Ref. {{ d.compRelacionado }} }</div>
+                      </td>
+                      <td>{{ etiquetaTipoFolio(d) }}</td>
+                      <td class="text-end">{{ formatearMoneda(d.total) }}</td>
+                      <td>
+                        @if (d.tipo === 'comprobante') {
+                          <span class="hotel-badge" [class.hotel-badge-completada]="d.esPagado" [class.hotel-badge-en-curso]="d.esCredito">{{ d.estadoPago }}</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <p class="small text-muted mb-0">
+                Pagado: {{ formatearMoneda(folioData.resumen.totalPagado) }}
+                · Crédito: {{ formatearMoneda(folioData.resumen.totalCredito) }}
+                · NC: {{ formatearMoneda(folioData.resumen.totalNotasCredito) }}
+                @if (folioData.resumen.totalNotasDebito > 0) {
+                  · ND: {{ formatearMoneda(folioData.resumen.totalNotasDebito) }}
+                }
+              </p>
+            } @else {
+              <p class="small text-muted mb-0">Aún no hay boletas/facturas ligadas a esta estancia. Use Facturar para emitirlas.</p>
+            }
+          }
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalFolio()">Cerrar</button>
+          @if (folioData && folioData.resumen.saldoPorCobrar > 0) {
+            <button type="button" class="btn btn-outline-primary" (click)="irACobrarCredito()">Cobrar crédito</button>
+          }
+          @if (folioData && folioData.resumen.saldoPorFacturar > 0 && habitacionFolio) {
+            <button type="button" class="btn btn-warning" (click)="facturarDesdeFolio()">Facturar saldo</button>
+          }
         </div>
       </div>
     </div>

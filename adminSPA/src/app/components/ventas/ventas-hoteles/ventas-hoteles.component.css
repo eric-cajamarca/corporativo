@@ -77,6 +77,14 @@
 .hotel-modal-title{margin:0;font-size:1.125rem;font-weight:600}
 .hotel-modal-close{background:0 0;border:0;font-size:1.5rem;line-height:1;cursor:pointer;color:#64748b;padding:0 .25rem}
 .hotel-modal-close:hover{color:#1e293b}
+.hotel-folio-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin-bottom:1rem}
+.hotel-folio-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem}
+.hotel-folio-kpi-label{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin-bottom:.2rem}
+.hotel-folio-kpi-val{display:block;font-size:1.1rem;font-weight:700;color:#1e293b}
+.hotel-folio-kpi-deuda{background:#fef3c7;border-color:#f59e0b}
+@media (max-width:575.98px){
+.hotel-folio-kpis{grid-template-columns:1fr}
+}
 .hotel-modal-body{padding:1.25rem}
 .table-row-hover{cursor:pointer}
 .table-row-hover:hover{background:rgba(32,201,151,.12)}

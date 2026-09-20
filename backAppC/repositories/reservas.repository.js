@@ -144,6 +144,31 @@ async function vincularEstancia(pool, idReserva, idEmpresa, idEstancia, estado =
         `);
 }
 
+/** Sincroniza reserva convertida o confirmada tras mover/extender la estancia. */
+async function sincronizarConEstancia(pool, idReserva, idEmpresa, payload) {
+  const req = pool.request()
+    .input('idReserva', sql.UniqueIdentifier, idReserva)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const sets = [];
+  if (payload.idProductoHabitacion) {
+    req.input('idProductoHabitacion', sql.UniqueIdentifier, payload.idProductoHabitacion);
+    sets.push('idProductoHabitacion = @idProductoHabitacion');
+  }
+  if (payload.fechaSalida) {
+    req.input('fechaSalida', sql.Date, payload.fechaSalida);
+    sets.push('fechaSalida = @fechaSalida');
+  }
+  if (payload.total != null) {
+    req.input('total', sql.Decimal(18, 2), payload.total);
+    sets.push('total = @total');
+  }
+  if (!sets.length) return;
+  await req.query(`
+    UPDATE Reservas SET ${sets.join(', ')}
+    WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa
+  `);
+}
+
 async function cancelar(pool, idReserva, idEmpresa) {
     await pool.request()
         .input('idReserva', sql.UniqueIdentifier, idReserva)
@@ -213,6 +238,7 @@ module.exports = {
     actualizar,
     eliminar,
     vincularEstancia,
+    sincronizarConEstancia,
     cancelar,
     listarEnRango,
     listarConfirmadasEnRango

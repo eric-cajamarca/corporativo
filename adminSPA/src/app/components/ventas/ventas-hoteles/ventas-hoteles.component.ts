@@ -9,7 +9,7 @@ import { CreateClientesComponent } from '../../clientes/create-clientes/create-c
 import { ClienteService } from '../../../services/cliente.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { Documento } from '../../../interfaces/documento-interface';
-import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabitacionLinea, type Estancia, type EstadoReserva, type HotelCalendarioData, type HotelCalendarioEvento, type HotelBloqueo, type MotivoBloqueoHotel, type HotelHousekeepingItem, type HotelAnticipo, type HotelReporte, type HotelReporteHabitacion, type EstadoLimpiezaHotel, type HotelHistorialHabitacion, type HotelHistorialEstanciaResumen, type HotelHistorialEstanciaDetalle } from '../../../services/hotel.service';
+import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabitacionLinea, type Estancia, type EstadoReserva, type HotelCalendarioData, type HotelCalendarioEvento, type HotelBloqueo, type MotivoBloqueoHotel, type HotelHousekeepingItem, type HotelAnticipo, type HotelFolio, type HotelFolioDocumento, type HotelReporte, type HotelReporteHabitacion, type EstadoLimpiezaHotel, type HotelHistorialHabitacion, type HotelHistorialEstanciaResumen, type HotelHistorialEstanciaDetalle, type CheckOutPreloadLinea } from '../../../services/hotel.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
@@ -19,7 +19,7 @@ import { getFechaHoyLocal, calcularNochesEstadia, fechaHoraClienteAhora } from '
 import { PdfService } from '../../../services/pdf.service';
 import { EmpresaService } from '../../../services/empresa.service';
 
-declare var iziToast: { warning: (o: object) => void; success: (o: object) => void; error: (o: object) => void; info?: (o: object) => void };
+declare var iziToast: { warning: (o: object) => void; success: (o: object) => void; error: (o: object) => void; info: (o: object) => void };
 
 export interface ProductoParaConsumo {
   idProducto: string;
@@ -162,6 +162,24 @@ export class VentasHotelesComponent implements OnInit {
   historialData: HotelHistorialHabitacion | null = null;
   historialLoading = signal(false);
   showModalHistorialEstancia = signal(false);
+  showModalFacturarEstancia = signal(false);
+  habitacionFacturarSeleccionada: ProductoHabitacion | null = null;
+  facturarPendienteHabitacion = false;
+  facturarPendienteConsumo = false;
+  showModalCambiarSalida = signal(false);
+  habitacionCambiarSalida: ProductoHabitacion | null = null;
+  formCambiarSalida = { fechaSalida: '', tarifaNoche: 0 };
+  guardandoCambiarSalida = false;
+  showModalMoverHabitacion = signal(false);
+  habitacionMoverOrigen: ProductoHabitacion | null = null;
+  idHabitacionDestinoMover = '';
+  guardandoMoverHabitacion = false;
+  showModalFolio = signal(false);
+  habitacionFolio: ProductoHabitacion | null = null;
+  folioData: HotelFolio | null = null;
+  folioLoading = false;
+  formFolioAnticipo = { monto: 0, concepto: 'Seña / anticipo' };
+  guardandoFolioAnticipo = false;
   historialDetalle: HotelHistorialEstanciaDetalle | null = null;
   historialDetalleLoading = signal(false);
 
@@ -542,7 +560,9 @@ export class VentasHotelesComponent implements OnInit {
   }
 
   getConsumoDeHabitacion(idProductoHabitacion: string): ConsumoHabitacionLinea[] {
-    return this.consumoPorHabitacion[idProductoHabitacion] ?? [];
+    return Object.entries(this.consumoPorHabitacion)
+      .filter(([k]) => this.mismoIdProducto(k, idProductoHabitacion))
+      .flatMap(([, v]) => v);
   }
 
   /** Estado tarjeta: ocupada = estancia activa; reservada = llegada hoy; bloqueada = bloqueo o fuera de servicio. */
@@ -640,13 +660,33 @@ export class VentasHotelesComponent implements OnInit {
     return this.normalizarTextoFiltro(partes.filter(Boolean).join(' '));
   }
 
-  /** Total habitación: estancia activa + consumo pendiente. */
+  /** Total pendiente: habitación si aún no se facturó + consumo pendiente. */
   getTotalHabitacion(hab: ProductoHabitacion): number {
     const est = this.getEstanciaActiva(hab.idProducto);
-    const totalHabitacion = est ? Number(est.totalHabitacion) || 0 : 0;
+    const totalHabitacion = est && !this.estanciaHabitacionFacturada(est) ? Number(est.totalHabitacion) || 0 : 0;
     const lineas = this.getConsumoDeHabitacion(hab.idProducto);
     const totalConsumo = lineas.reduce((s, l) => s + l.cantidad * l.pUnitario, 0);
     return totalHabitacion + totalConsumo;
+  }
+
+  estanciaHabitacionFacturada(est: Estancia | null): boolean {
+    if (!est) return false;
+    return est.habitacionFacturada === true || Number(est.habitacionFacturada) === 1;
+  }
+
+  tieneConsumoPendiente(hab: ProductoHabitacion): boolean {
+    return this.getConsumoDeHabitacion(hab.idProducto).length > 0;
+  }
+
+  etiquetaBotonCheckout(hab: ProductoHabitacion): string {
+    const est = this.getEstanciaActiva(hab.idProducto);
+    if (!est) return 'Check-out';
+    const habFact = this.estanciaHabitacionFacturada(est);
+    const cons = this.tieneConsumoPendiente(hab);
+    if (habFact && cons) return 'Facturar consumo';
+    if (!habFact && !cons) return 'Check-out';
+    if (!habFact && cons) return 'Facturar';
+    return 'Check-out';
   }
 
   abrirModalAgregarConsumo(habitacion: ProductoHabitacion): void {
@@ -867,7 +907,279 @@ export class VentasHotelesComponent implements OnInit {
     this.cargarConsumo();
   }
 
-  generarVenta(habitacion: ProductoHabitacion): void {
+  abrirFacturacionEstancia(habitacion: ProductoHabitacion): void {
+    const est = this.getEstanciaActiva(habitacion.idProducto);
+    if (!est) {
+      iziToast.warning({ title: 'Aviso', message: 'No hay estancia activa para facturar.', position: 'topRight' });
+      return;
+    }
+    const habFact = this.estanciaHabitacionFacturada(est);
+    const cons = this.tieneConsumoPendiente(habitacion);
+    if (habFact && !cons) {
+      iziToast.info({ title: 'Hotel', message: 'No queda saldo pendiente. Recargue la lista de habitaciones.', position: 'topRight' });
+      this.cargarDatos();
+      return;
+    }
+    if (habFact && cons) {
+      this.generarVenta(habitacion, 'consumo');
+      return;
+    }
+    if (!habFact && !cons) {
+      this.generarVenta(habitacion, 'habitacion');
+      return;
+    }
+    this.habitacionFacturarSeleccionada = habitacion;
+    this.facturarPendienteHabitacion = !habFact;
+    this.facturarPendienteConsumo = cons;
+    this.showModalFacturarEstancia.set(true);
+  }
+
+  cerrarModalFacturarEstancia(): void {
+    this.showModalFacturarEstancia.set(false);
+    this.habitacionFacturarSeleccionada = null;
+  }
+
+  elegirModoFacturacion(modo: 'todo' | 'habitacion' | 'consumo'): void {
+    const hab = this.habitacionFacturarSeleccionada;
+    this.cerrarModalFacturarEstancia();
+    if (hab) this.generarVenta(hab, modo);
+  }
+
+  abrirModalCambiarSalida(habitacion: ProductoHabitacion): void {
+    const est = this.getEstanciaActiva(habitacion.idProducto);
+    if (!est) {
+      iziToast.warning({ title: 'Aviso', message: 'No hay estancia activa.', position: 'topRight' });
+      return;
+    }
+    this.habitacionCambiarSalida = habitacion;
+    this.formCambiarSalida = {
+      fechaSalida: String(est.checkOutPrevisto || '').slice(0, 10),
+      tarifaNoche: Number(est.tarifaNoche) || 0
+    };
+    this.guardandoCambiarSalida = false;
+    this.errorMessage.set(null);
+    this.showModalCambiarSalida.set(true);
+  }
+
+  cerrarModalCambiarSalida(): void {
+    this.showModalCambiarSalida.set(false);
+    this.habitacionCambiarSalida = null;
+    this.guardandoCambiarSalida = false;
+  }
+
+  fechaSalidaMinEstancia(est: Estancia): string {
+    const entrada = String(est.checkIn || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entrada)) return this.sumarDiasLocal(getFechaHoyLocal(), 1);
+    return this.sumarDiasLocal(entrada, 1);
+  }
+
+  nochesCambioSalida(est: Estancia): number {
+    return calcularNochesEstadia(String(est.checkIn || '').slice(0, 10), this.formCambiarSalida.fechaSalida);
+  }
+
+  totalCambioSalida(est: Estancia): number {
+    const noches = this.nochesCambioSalida(est);
+    const tarifa = Number(est.tarifaNoche) || 0;
+    return Math.round(tarifa * noches * 100) / 100;
+  }
+
+  detalleCambioSalida(est: Estancia): string {
+    const noches = this.nochesCambioSalida(est);
+    if (noches < 1) return 'La salida debe ser al menos el día siguiente al check-in.';
+    const total = this.totalCambioSalida(est);
+    return `${noches} noche(s) · Nuevo total habitación: ${this.formatearMoneda(total)} (antes ${this.formatearMoneda(Number(est.totalHabitacion) || 0)}).`;
+  }
+
+  puedeGuardarCambioSalida(): boolean {
+    const hab = this.habitacionCambiarSalida;
+    if (!hab) return false;
+    const est = this.getEstanciaActiva(hab.idProducto);
+    if (!est || this.estanciaHabitacionFacturada(est)) return false;
+    return this.nochesCambioSalida(est) >= 1;
+  }
+
+  guardarCambioSalida(): void {
+    const hab = this.habitacionCambiarSalida;
+    const est = hab ? this.getEstanciaActiva(hab.idProducto) : null;
+    if (!hab || !est) return;
+    if (this.estanciaHabitacionFacturada(est)) {
+      iziToast.warning({
+        title: 'Hotel',
+        message: 'La tarifa ya fue facturada. No se pueden cambiar las noches.',
+        position: 'topRight'
+      });
+      return;
+    }
+    if (!this.puedeGuardarCambioSalida()) return;
+    this.guardandoCambiarSalida = true;
+    this.errorMessage.set(null);
+    this.hotelService.cambiarSalidaEstancia(est.idEstancia, this.formCambiarSalida.fechaSalida).subscribe({
+      next: () => {
+        this.guardandoCambiarSalida = false;
+        this.cerrarModalCambiarSalida();
+        this.cargarDatos();
+        iziToast.success({ title: 'OK', message: 'Estadía actualizada.', position: 'topRight' });
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.guardandoCambiarSalida = false;
+        this.errorMessage.set(err?.error?.message || 'No se pudo cambiar la salida.');
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo cambiar la salida.', position: 'topRight' });
+      }
+    });
+  }
+
+  abrirModalMoverHabitacion(habitacion: ProductoHabitacion): void {
+    const est = this.getEstanciaActiva(habitacion.idProducto);
+    if (!est) {
+      iziToast.warning({ title: 'Aviso', message: 'No hay estancia activa.', position: 'topRight' });
+      return;
+    }
+    this.habitacionMoverOrigen = habitacion;
+    this.idHabitacionDestinoMover = '';
+    this.guardandoMoverHabitacion = false;
+    this.errorMessage.set(null);
+    this.showModalMoverHabitacion.set(true);
+  }
+
+  cerrarModalMoverHabitacion(): void {
+    this.showModalMoverHabitacion.set(false);
+    this.habitacionMoverOrigen = null;
+    this.idHabitacionDestinoMover = '';
+    this.guardandoMoverHabitacion = false;
+  }
+
+  habitacionesDestinoMover(): ProductoHabitacion[] {
+    const origen = this.habitacionMoverOrigen;
+    if (!origen) return [];
+    return this.productosHabitacion.filter((h) => {
+      if (this.mismoIdProducto(h.idProducto, origen.idProducto)) return false;
+      if (this.getEstanciaActiva(h.idProducto)) return false;
+      const limp = this.getEstadoLimpieza(h.idProducto);
+      return limp !== 'sucia' && limp !== 'fuera_servicio';
+    });
+  }
+
+  guardarMoverHabitacion(): void {
+    const origen = this.habitacionMoverOrigen;
+    const est = origen ? this.getEstanciaActiva(origen.idProducto) : null;
+    if (!origen || !est || !this.idHabitacionDestinoMover) return;
+    this.guardandoMoverHabitacion = true;
+    this.errorMessage.set(null);
+    this.hotelService.moverEstancia(est.idEstancia, this.idHabitacionDestinoMover).subscribe({
+      next: () => {
+        this.guardandoMoverHabitacion = false;
+        this.cerrarModalMoverHabitacion();
+        this.cargarDatos();
+        this.cargarHousekeeping();
+        this.cargarConsumo();
+        iziToast.success({ title: 'OK', message: 'Huésped trasladado. La habitación anterior quedó sucia.', position: 'topRight' });
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.guardandoMoverHabitacion = false;
+        this.errorMessage.set(err?.error?.message || 'No se pudo mover la estancia.');
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo mover la estancia.', position: 'topRight' });
+      }
+    });
+  }
+
+  abrirModalFolio(habitacion: ProductoHabitacion): void {
+    const est = this.getEstanciaActiva(habitacion.idProducto);
+    if (!est) {
+      iziToast.warning({ title: 'Aviso', message: 'No hay estancia activa.', position: 'topRight' });
+      return;
+    }
+    this.habitacionFolio = habitacion;
+    this.folioData = null;
+    this.formFolioAnticipo = { monto: 0, concepto: 'Seña / anticipo' };
+    this.errorMessage.set(null);
+    this.showModalFolio.set(true);
+    this.cargarFolio(est.idEstancia);
+  }
+
+  cerrarModalFolio(): void {
+    this.showModalFolio.set(false);
+    this.habitacionFolio = null;
+    this.folioData = null;
+    this.folioLoading = false;
+  }
+
+  cargarFolio(idEstancia: string): void {
+    this.folioLoading = true;
+    this.hotelService.getFolioEstancia(idEstancia).subscribe({
+      next: (res) => {
+        this.folioData = res.data ?? null;
+        this.folioLoading = false;
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.folioLoading = false;
+        this.folioData = null;
+        this.errorMessage.set(err?.error?.message || 'No se pudo cargar el folio.');
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo cargar el folio.', position: 'topRight' });
+      }
+    });
+  }
+
+  etiquetaTipoFolio(doc: HotelFolioDocumento): string {
+    if (doc.tipo === 'nota_credito') return 'Nota de crédito';
+    if (doc.tipo === 'nota_debito') return 'Nota de débito';
+    return doc.codigoComprobante || 'Comprobante';
+  }
+
+  guardarAnticipoFolio(): void {
+    const folio = this.folioData;
+    const hab = this.habitacionFolio;
+    const est = hab ? this.getEstanciaActiva(hab.idProducto) : null;
+    if (!folio || !est || !(Number(this.formFolioAnticipo.monto) > 0)) {
+      iziToast.warning({ title: 'Aviso', message: 'Indique un monto válido.', position: 'topRight' });
+      return;
+    }
+    this.guardandoFolioAnticipo = true;
+    this.hotelService.registrarAnticipo({
+      idEstancia: est.idEstancia,
+      idReserva: est.idReserva ?? undefined,
+      monto: Number(this.formFolioAnticipo.monto),
+      concepto: this.formFolioAnticipo.concepto
+    }).subscribe({
+      next: () => {
+        this.guardandoFolioAnticipo = false;
+        this.formFolioAnticipo = { monto: 0, concepto: 'Seña / anticipo' };
+        iziToast.success({ title: 'OK', message: 'Anticipo registrado.', position: 'topRight' });
+        this.cargarFolio(est.idEstancia);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.guardandoFolioAnticipo = false;
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar el anticipo.', position: 'topRight' });
+      }
+    });
+  }
+
+  anularAnticipoFolio(a: HotelAnticipo): void {
+    const folio = this.folioData;
+    if (a.estado !== 'pendiente' || !folio) return;
+    if (!confirm('¿Anular este anticipo?')) return;
+    this.hotelService.anularAnticipo(a.idAnticipo).subscribe({
+      next: () => {
+        iziToast.success({ title: 'OK', message: 'Anticipo anulado.', position: 'topRight' });
+        this.cargarFolio(folio.idEstancia);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo anular', position: 'topRight' });
+      }
+    });
+  }
+
+  facturarDesdeFolio(): void {
+    const hab = this.habitacionFolio;
+    this.cerrarModalFolio();
+    if (hab) this.abrirFacturacionEstancia(hab);
+  }
+
+  irACobrarCredito(): void {
+    this.cerrarModalFolio();
+    this.router.navigate(['/caja/ventas-pendientes-pago']);
+  }
+
+  generarVenta(habitacion: ProductoHabitacion, modo: 'todo' | 'habitacion' | 'consumo' = 'todo'): void {
     const est = this.getEstanciaActiva(habitacion.idProducto);
     if (!est) {
       iziToast.warning({ title: 'Aviso', message: 'No hay estancia activa para hacer check-out.', position: 'topRight' });
@@ -876,7 +1188,20 @@ export class VentasHotelesComponent implements OnInit {
     this.hotelService.checkOutPreload(est.idEstancia).subscribe({
       next: (res) => {
         const data = res.data;
-        if (!data?.lineas?.length) return;
+        if (!data) {
+          iziToast.warning({ title: 'Aviso', message: 'No se obtuvo el detalle de check-out.', position: 'topRight' });
+          return;
+        }
+        let lineas: CheckOutPreloadLinea[] = data.lineas ?? [];
+        if (modo === 'habitacion') {
+          lineas = lineas.filter((l) => l.tipo === 'habitacion' || l.tipo === 'recargo' || (!l.tipo && l.idProducto === data.idProductoHabitacion));
+        } else if (modo === 'consumo') {
+          lineas = lineas.filter((l) => l.tipo === 'consumo' || !!l.idConsumo);
+        }
+        if (!lineas.length) {
+          iziToast.warning({ title: 'Aviso', message: 'No hay ítems pendientes para ese tipo de factura.', position: 'topRight' });
+          return;
+        }
         this.preloadVenta.setPreload({
           idEstancia: data.idEstancia ?? est.idEstancia,
           idProductoHabitacion: data.idProductoHabitacion,
@@ -885,11 +1210,10 @@ export class VentasHotelesComponent implements OnInit {
           idCliente: data.idCliente ?? null,
           nombreHuesped: data.nombreHuesped ?? est.nombreHuesped ?? '',
           idReserva: data.idReserva ?? null,
-          lineas: data.lineas
+          lineas
         });
-        if (data?.anticiposTotal && data.anticiposTotal > 0) {
-          const toast = iziToast.info ?? iziToast.warning;
-          toast({
+        if (modo !== 'consumo' && data.anticiposTotal && data.anticiposTotal > 0) {
+          iziToast.info({
             title: 'Anticipos',
             message: `Se descontaron S/ ${Number(data.anticiposTotal).toFixed(2)} de anticipos en el total de habitación.`,
             position: 'topRight'

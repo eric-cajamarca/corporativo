@@ -80,6 +80,8 @@ export interface Estancia {
   tarifaNoche: number;
   totalHabitacion: number;
   idVenta: number | null;
+  habitacionFacturada?: boolean;
+  idVentaHabitacion?: number | null;
   habitacionCodigo: string;
   habitacionDescripcion: string;
 }
@@ -96,6 +98,8 @@ export interface CheckInWalkInPayload {
   fechaHoraCliente?: string;
 }
 
+export type TipoLineaCheckoutHotel = 'habitacion' | 'consumo' | 'recargo';
+
 export interface CheckOutPreloadLinea {
   idProducto: string;
   codigo: string;
@@ -104,6 +108,8 @@ export interface CheckOutPreloadLinea {
   marca?: string;
   cantidad: number;
   pVenta: number;
+  tipo?: TipoLineaCheckoutHotel;
+  idConsumo?: string | null;
 }
 
 export interface CheckOutPreload {
@@ -115,6 +121,9 @@ export interface CheckOutPreload {
   nombreHuesped?: string;
   idReserva: string | null;
   anticiposTotal?: number;
+  habitacionFacturada?: boolean;
+  pendienteHabitacion?: boolean;
+  pendienteConsumo?: boolean;
   lineas: CheckOutPreloadLinea[];
 }
 
@@ -140,6 +149,72 @@ export interface HotelAnticipo {
   idVenta?: number | null;
   estado: 'pendiente' | 'aplicado' | 'anulado';
   fRegistro?: string;
+}
+
+export interface HotelFolioCargoRecargo {
+  concepto: string;
+  monto: number;
+}
+
+export interface HotelFolioLineaConsumo {
+  idConsumo: string;
+  descripcion: string;
+  cantidad: number;
+  pUnitario: number;
+  monto: number;
+  estadoConsumo: string;
+}
+
+export interface HotelFolioDocumento {
+  idVenta: number;
+  compVenta: string;
+  fEmision: string;
+  total: number;
+  tipo: 'comprobante' | 'nota_credito' | 'nota_debito';
+  codigoComprobante: string;
+  idEstadoPago: number;
+  estadoPago: string;
+  esPagado: boolean;
+  esCredito: boolean;
+  compRelacionado?: string | null;
+}
+
+export interface HotelFolio {
+  idEstancia: string;
+  estadoEstancia: string;
+  nombreHuesped: string;
+  habitacionCodigo: string;
+  habitacionDescripcion: string;
+  checkIn: string;
+  checkOutPrevisto: string;
+  habitacionFacturada: boolean;
+  cargos: {
+    habitacion: number;
+    habitacionFacturada: boolean;
+    recargos: HotelFolioCargoRecargo[];
+    totalRecargos: number;
+    consumoPendiente: number;
+    consumoFacturado: number;
+    totalCargos: number;
+    lineasConsumo: HotelFolioLineaConsumo[];
+  };
+  anticipos: HotelAnticipo[];
+  anticiposPendientes: number;
+  anticiposAplicados: number;
+  documentos: HotelFolioDocumento[];
+  resumen: {
+    totalCargos: number;
+    anticiposPendientes: number;
+    anticiposAplicados: number;
+    totalComprobantes: number;
+    totalPagado: number;
+    totalCredito: number;
+    totalNotasCredito: number;
+    totalNotasDebito: number;
+    saldoPorFacturar: number;
+    saldoPorCobrar: number;
+    saldoHuesped: number;
+  };
 }
 
 export interface HotelReporteHabitacion {
@@ -332,11 +407,17 @@ export class HotelService {
   confirmarCheckoutPostVenta(
     idEstancia: string,
     idVenta: number,
-    fechaHoraCliente?: string
-  ): Observable<{ data: { ok: boolean } }> {
-    return this.http.post<{ data: { ok: boolean } }>(
+    fechaHoraCliente?: string,
+    opciones?: { incluyeHabitacion?: boolean; idsConsumo?: string[] }
+  ): Observable<{ data: { ok: boolean; cerrado?: boolean; message?: string; pendienteHabitacion?: boolean; pendienteConsumo?: boolean } }> {
+    return this.http.post<{ data: { ok: boolean; cerrado?: boolean; message?: string; pendienteHabitacion?: boolean; pendienteConsumo?: boolean } }>(
       this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/check-out/confirmar',
-      { idVenta, checkOutReal: fechaHoraCliente },
+      {
+        idVenta,
+        checkOutReal: fechaHoraCliente,
+        incluyeHabitacion: opciones?.incluyeHabitacion,
+        idsConsumo: opciones?.idsConsumo
+      },
       { withCredentials: true }
     );
   }
@@ -497,6 +578,13 @@ export class HotelService {
     );
   }
 
+  getFolioEstancia(idEstancia: string): Observable<{ data: HotelFolio }> {
+    return this.http.get<{ data: HotelFolio }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/folio',
+      { withCredentials: true }
+    );
+  }
+
   getReporteHotel(fechaDesde: string, fechaHasta: string): Observable<{ data: HotelReporte }> {
     const q =
       '?fechaDesde=' + encodeURIComponent(fechaDesde) +
@@ -528,6 +616,22 @@ export class HotelService {
     return this.http.put<{ data: Reserva }>(
       this.url + 'hotel/reservas/' + encodeURIComponent(idReserva) + '/mover',
       body,
+      { withCredentials: true }
+    );
+  }
+
+  cambiarSalidaEstancia(idEstancia: string, fechaSalida: string): Observable<{ data: Estancia }> {
+    return this.http.put<{ data: Estancia }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/salida',
+      { fechaSalida },
+      { withCredentials: true }
+    );
+  }
+
+  moverEstancia(idEstancia: string, idProductoHabitacion: string): Observable<{ data: Estancia }> {
+    return this.http.put<{ data: Estancia }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/habitacion',
+      { idProductoHabitacion },
       { withCredentials: true }
     );
   }

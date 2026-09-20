@@ -46,6 +46,26 @@ async function listarPendientesCheckout(pool, idEmpresa, idEstancia, idReserva) 
   return result.recordset;
 }
 
+async function listarPorEstanciaOReserva(pool, idEmpresa, idEstancia, idReserva) {
+  const req = pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia || null)
+    .input('idReserva', sql.UniqueIdentifier, idReserva || null);
+  const result = await req.query(`
+    SELECT a.idAnticipo, a.idEmpresa, a.idReserva, a.idEstancia, a.monto, a.concepto,
+           a.idVenta, a.estado,
+           CONVERT(VARCHAR(19), a.fRegistro, 120) AS fRegistro
+    FROM HotelAnticipos a
+    WHERE a.idEmpresa = @idEmpresa
+      AND (
+        (@idEstancia IS NOT NULL AND a.idEstancia = @idEstancia)
+        OR (@idReserva IS NOT NULL AND a.idReserva = @idReserva)
+      )
+    ORDER BY a.fRegistro
+  `);
+  return result.recordset;
+}
+
 async function insertar(pool, idEmpresa, payload, idUsuario) {
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -91,6 +111,7 @@ async function anular(pool, idAnticipo, idEmpresa) {
 
 module.exports = {
   listarPorEmpresa,
+  listarPorEstanciaOReserva,
   listarPendientesCheckout,
   insertar,
   marcarAplicadosCheckout,

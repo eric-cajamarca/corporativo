@@ -25,9 +25,12 @@ api.put('/hotel/housekeeping/:idProductoHabitacion', hotelController.actualizarH
 api.get('/hotel/anticipos', hotelController.listarAnticipos);
 api.post('/hotel/anticipos', hotelController.registrarAnticipo);
 api.put('/hotel/anticipos/:idAnticipo/anular', hotelController.anularAnticipo);
+api.get('/hotel/estancias/:idEstancia/folio', hotelController.folioEstancia);
 api.get('/hotel/reportes', hotelController.reporteHotel);
 api.get('/hotel/reportes/historial-habitacion', hotelController.historialHabitacionMes);
 api.get('/hotel/estancias/:idEstancia/historial-detalle', hotelController.detalleEstanciaHistorial);
+api.put('/hotel/estancias/:idEstancia/salida', hotelController.cambiarSalidaEstancia);
+api.put('/hotel/estancias/:idEstancia/habitacion', hotelController.moverEstancia);
 api.put('/hotel/reservas/:idReserva/mover', hotelController.moverReservaCalendario);
 api.post('/hotel/cerrar-post-venta', hotelController.cerrarPostVenta);
 

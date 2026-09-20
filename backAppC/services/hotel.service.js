@@ -7,6 +7,7 @@ const hotelBloqueoRepository = require('../repositories/hotelBloqueo.repository'
 const hotelHousekeepingRepository = require('../repositories/hotelHousekeeping.repository');
 const hotelAnticiposRepository = require('../repositories/hotelAnticipos.repository');
 const hotelReportesRepository = require('../repositories/hotelReportes.repository');
+const hotelFolioRepository = require('../repositories/hotelFolio.repository');
 const productosRepository = require('../repositories/productos.repository');
 const { fechaLocalDesdeDate, parseFechaHoraClienteASQL, sql23ADate } = require('../utils/fechaHoraLocal.util');
 const {
@@ -231,7 +232,7 @@ async function metadatosProductosPorIds(pool, idEmpresa, idsProducto) {
   return map;
 }
 
-function lineaPreloadVenta(metaMap, idProducto, codigo, descripcion, cantidad, pVenta, forzarTexto = false) {
+function lineaPreloadVenta(metaMap, idProducto, codigo, descripcion, cantidad, pVenta, forzarTexto = false, extras = {}) {
   const meta = metaMap.get(String(idProducto).toLowerCase());
   return {
     idProducto,
@@ -240,7 +241,9 @@ function lineaPreloadVenta(metaMap, idProducto, codigo, descripcion, cantidad, p
     codigoPresentacion: meta?.codigoPresentacion ?? '',
     marca: meta?.marca ?? '',
     cantidad,
-    pVenta
+    pVenta,
+    tipo: extras.tipo || 'consumo',
+    idConsumo: extras.idConsumo || null
   };
 }
 
@@ -289,17 +292,24 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
   const idsProductos = [estancia.idProductoHabitacion, ...consumos.map((c) => c.idProducto)];
   const metaMap = await metadatosProductosPorIds(pool, idEmpresa, idsProductos);
 
+  const habitacionFacturada = estancia.habitacionFacturada === true || Number(estancia.habitacionFacturada) === 1;
+
   let totalHabitacion = Math.max(0, (Number(estancia.totalHabitacion) || 0) - totalAnticipos);
-  const lineas = [
-    lineaPreloadVenta(
-      metaMap,
-      estancia.idProductoHabitacion,
-      estancia.habitacionCodigo,
-      estancia.habitacionDescripcion,
-      1,
-      totalHabitacion
-    )
-  ];
+  const lineas = [];
+  if (!habitacionFacturada) {
+    lineas.push(
+      lineaPreloadVenta(
+        metaMap,
+        estancia.idProductoHabitacion,
+        estancia.habitacionCodigo,
+        estancia.habitacionDescripcion,
+        1,
+        totalHabitacion,
+        false,
+        { tipo: 'habitacion' }
+      )
+    );
+  }
   for (const c of consumos) {
     lineas.push(
       lineaPreloadVenta(
@@ -308,14 +318,16 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
         c.productoCodigo,
         c.productoDescripcion,
         Math.max(1, Math.round(Number(c.cantidad) || 0)),
-        Number(c.pUnitario) || 0
+        Number(c.pUnitario) || 0,
+        false,
+        { tipo: 'consumo', idConsumo: c.idConsumo }
       )
     );
   }
 
   const recargoEarly = Number(cfg.recargoEarlyCheckIn) || 0;
   const recargoLate = Number(cfg.recargoLateCheckOut) || 0;
-  if (recargoEarly > 0 && esCheckInTemprano(estancia.checkIn, cfg)) {
+  if (!habitacionFacturada && recargoEarly > 0 && esCheckInTemprano(estancia.checkIn, cfg)) {
     lineas.push(lineaPreloadVenta(
       metaMap,
       estancia.idProductoHabitacion,
@@ -323,10 +335,11 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
       'Recargo early check-in',
       1,
       recargoEarly,
-      true
+      true,
+      { tipo: 'recargo' }
     ));
   }
-  if (recargoLate > 0 && esCheckOutTardio(cfg)) {
+  if (!habitacionFacturada && recargoLate > 0 && esCheckOutTardio(cfg)) {
     lineas.push(lineaPreloadVenta(
       metaMap,
       estancia.idProductoHabitacion,
@@ -334,7 +347,8 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
       'Recargo late check-out',
       1,
       recargoLate,
-      true
+      true,
+      { tipo: 'recargo' }
     ));
   }
 
@@ -346,42 +360,105 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
     idCliente: estancia.idCliente,
     nombreHuesped: estancia.nombreHuesped,
     idReserva: estancia.idReserva,
-    anticiposTotal: totalAnticipos,
-    anticipos,
+    anticiposTotal: habitacionFacturada ? 0 : totalAnticipos,
+    anticipos: habitacionFacturada ? [] : anticipos,
+    habitacionFacturada,
+    pendienteHabitacion: !habitacionFacturada,
+    pendienteConsumo: consumos.length > 0,
     lineas
   };
 }
 
-async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, fechaHoraCliente) {
+async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, fechaHoraCliente, opciones = {}) {
   if (!idVenta) throw new Error('idVenta requerido para confirmar check-out');
+  await estanciasRepository.asegurarColumnasFacturacionParcial(pool);
   const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
   if (!estancia) throw new Error('Estancia no encontrada');
   if (estancia.estadoEstancia !== 'activa') {
     throw new Error('La estancia ya no está activa');
   }
 
-  const checkOutRealSql = parseFechaHoraClienteASQL(fechaHoraCliente);
-  await estanciasRepository.cerrarCheckout(pool, idEstancia, idEmpresa, idVenta, checkOutRealSql);
-  await consumoHabitacionRepository.marcarFacturadosCheckout(
-    pool,
-    idEmpresa,
-    idEstancia,
-    estancia.idProductoHabitacion
+  const yaHabitacionFacturada = estancia.habitacionFacturada === true || Number(estancia.habitacionFacturada) === 1;
+  const parcialDefinido = opciones.incluyeHabitacion != null || Array.isArray(opciones.idsConsumo);
+  let incluyeHabitacion = Boolean(opciones.incluyeHabitacion);
+  let idsConsumo = Array.isArray(opciones.idsConsumo) ? opciones.idsConsumo.filter(Boolean) : [];
+
+  if (!parcialDefinido) {
+    incluyeHabitacion = !yaHabitacionFacturada;
+    const pendientes = await consumoHabitacionRepository.listarPendientesParaCheckout(
+      pool, idEmpresa, idEstancia, estancia.idProductoHabitacion
+    );
+    idsConsumo = pendientes.map((c) => c.idConsumo);
+  }
+
+  if (!incluyeHabitacion && idsConsumo.length === 0) {
+    return {
+      ok: true,
+      cerrado: false,
+      pendienteHabitacion: !yaHabitacionFacturada,
+      pendienteConsumo: true,
+      message: 'La venta no incluye ítems de la estancia. La habitación sigue ocupada.'
+    };
+  }
+
+  if (incluyeHabitacion && !yaHabitacionFacturada) {
+    await estanciasRepository.marcarHabitacionFacturada(pool, idEstancia, idEmpresa, idVenta);
+    await hotelAnticiposRepository.marcarAplicadosCheckout(
+      pool,
+      idEmpresa,
+      idEstancia,
+      estancia.idReserva,
+      idVenta
+    );
+  }
+
+  if (idsConsumo.length) {
+    await consumoHabitacionRepository.marcarFacturadosPorIds(
+      pool,
+      idEmpresa,
+      idsConsumo,
+      idEstancia,
+      estancia.idProductoHabitacion
+    );
+  }
+
+  const pendientesRestantes = await consumoHabitacionRepository.listarPendientesParaCheckout(
+    pool, idEmpresa, idEstancia, estancia.idProductoHabitacion
   );
-  await hotelAnticiposRepository.marcarAplicadosCheckout(
-    pool,
-    idEmpresa,
-    idEstancia,
-    estancia.idReserva,
-    idVenta
-  );
-  await hotelHousekeepingRepository.upsertEstado(
-    pool,
-    idEmpresa,
-    estancia.idProductoHabitacion,
-    'sucia',
-    'Check-out registrado'
-  );
+  const estanciaActual = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+  const habitacionOk = estanciaActual.habitacionFacturada === true || Number(estanciaActual.habitacionFacturada) === 1;
+  const consumoOk = pendientesRestantes.length === 0;
+
+  if (habitacionOk && consumoOk) {
+    const checkOutRealSql = parseFechaHoraClienteASQL(fechaHoraCliente);
+    await estanciasRepository.cerrarCheckout(pool, idEstancia, idEmpresa, idVenta, checkOutRealSql);
+    await hotelHousekeepingRepository.upsertEstado(
+      pool,
+      idEmpresa,
+      estancia.idProductoHabitacion,
+      'sucia',
+      'Check-out registrado'
+    );
+    try {
+      await pool.request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idEstanciaHotel', sql.UniqueIdentifier, idEstancia)
+        .query(`
+          UPDATE Ventas SET idEstanciaHotel = @idEstanciaHotel
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        `);
+    } catch (errVentas) {
+      console.error('confirmarCheckoutPostVenta idEstanciaHotel:', errVentas.message);
+    }
+    return {
+      ok: true,
+      cerrado: true,
+      pendienteHabitacion: false,
+      pendienteConsumo: false,
+      message: 'Check-out completado. Habitación liberada.'
+    };
+  }
 
   try {
     await pool.request()
@@ -396,7 +473,16 @@ async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, 
     console.error('confirmarCheckoutPostVenta idEstanciaHotel:', errVentas.message);
   }
 
-  return { ok: true, idEstancia, idVenta };
+  const falta = [];
+  if (!habitacionOk) falta.push('habitación');
+  if (!consumoOk) falta.push('consumo');
+  return {
+    ok: true,
+    cerrado: false,
+    pendienteHabitacion: !habitacionOk,
+    pendienteConsumo: !consumoOk,
+    message: `Factura registrada. La habitación sigue ocupada: falta facturar ${falta.join(' y ')}.`
+  };
 }
 
 async function consultarDisponibilidad(pool, idEmpresa, idProductoHabitacion, fechaEntrada, fechaSalida) {
@@ -541,6 +627,178 @@ async function anularAnticipo(pool, idEmpresa, idAnticipo) {
   const n = await hotelAnticiposRepository.anular(pool, idAnticipo, idEmpresa);
   if (!n) throw new Error('No se pudo anular el anticipo (ya aplicado o no existe)');
   return { ok: true };
+}
+
+function r2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function mapearDocumentoFolio(row) {
+  const codigo = String(row.codigoComprobante || '').toUpperCase();
+  if (codigo === 'CT') return null;
+  let tipo = 'comprobante';
+  if (hotelFolioRepository.esNotaCredito(codigo)) tipo = 'nota_credito';
+  else if (hotelFolioRepository.esNotaDebito(codigo)) tipo = 'nota_debito';
+  const idEstadoPago = row.idEstadoPago != null ? Number(row.idEstadoPago) : 1;
+  const pagado = tipo === 'comprobante' && idEstadoPago === 2;
+  const credito = tipo === 'comprobante' && idEstadoPago !== 2;
+  return {
+    idVenta: row.idVenta,
+    compVenta: row.compVenta,
+    fEmision: row.fEmision,
+    total: r2(row.total),
+    tipo,
+    codigoComprobante: codigo,
+    idEstadoPago,
+    estadoPago: pagado ? 'Pagado' : (credito ? 'Crédito / pendiente' : (row.estadoPago || '')),
+    esPagado: pagado,
+    esCredito: credito,
+    compRelacionado: row.compRelacionado || null
+  };
+}
+
+async function obtenerFolioEstancia(pool, idEmpresa, idEstancia) {
+  const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+  if (!estancia) throw new Error('Estancia no encontrada');
+
+  const cfg = await obtenerConfig(pool, idEmpresa);
+  const habitacionFacturada = estanciaHabitacionYaFacturada(estancia);
+  const activa = estancia.estadoEstancia === 'activa';
+
+  const recargos = [];
+  const recargoEarly = Number(cfg.recargoEarlyCheckIn) || 0;
+  const recargoLate = Number(cfg.recargoLateCheckOut) || 0;
+  if (!habitacionFacturada && recargoEarly > 0 && esCheckInTemprano(estancia.checkIn, cfg)) {
+    recargos.push({ concepto: 'Recargo early check-in', monto: r2(recargoEarly) });
+  }
+  if (!habitacionFacturada && activa && recargoLate > 0 && esCheckOutTardio(cfg)) {
+    recargos.push({ concepto: 'Recargo late check-out', monto: r2(recargoLate) });
+  }
+  const totalRecargos = r2(recargos.reduce((s, x) => s + x.monto, 0));
+
+  let consumoPendiente = 0;
+  let consumoFacturado = 0;
+  const lineasConsumo = [];
+  try {
+    const ini = checkInEstanciaADate(estancia.checkIn);
+    const fin = checkInEstanciaADate(estancia.checkOutReal || estancia.checkOutPrevisto);
+    const rows = await consumoHabitacionRepository.listarPorEstancia(
+      pool,
+      idEmpresa,
+      idEstancia,
+      estancia.idProductoHabitacion,
+      ini,
+      fin
+    );
+    for (const c of rows) {
+      const monto = r2((Number(c.cantidad) || 0) * (Number(c.pUnitario) || 0));
+      const estado = String(c.estadoConsumo || 'pendiente').toLowerCase();
+      lineasConsumo.push({
+        idConsumo: c.idConsumo,
+        descripcion: c.productoDescripcion,
+        cantidad: Number(c.cantidad) || 0,
+        pUnitario: r2(c.pUnitario),
+        monto,
+        estadoConsumo: estado
+      });
+      if (estado === 'facturado') consumoFacturado += monto;
+      else consumoPendiente += monto;
+    }
+  } catch (err) {
+    console.error('obtenerFolioEstancia consumo:', err);
+  }
+  consumoPendiente = r2(consumoPendiente);
+  consumoFacturado = r2(consumoFacturado);
+
+  const totalHabitacion = r2(estancia.totalHabitacion);
+  const cargoHabitacionPendiente = habitacionFacturada ? 0 : r2(totalHabitacion + totalRecargos);
+  const totalCargos = r2(totalHabitacion + totalRecargos + consumoPendiente + consumoFacturado);
+
+  const anticipos = await hotelAnticiposRepository.listarPorEstanciaOReserva(
+    pool,
+    idEmpresa,
+    idEstancia,
+    estancia.idReserva
+  );
+  const anticiposPendientes = r2(
+    anticipos.filter((a) => a.estado === 'pendiente').reduce((s, a) => s + (Number(a.monto) || 0), 0)
+  );
+  const anticiposAplicados = r2(
+    anticipos.filter((a) => a.estado === 'aplicado').reduce((s, a) => s + (Number(a.monto) || 0), 0)
+  );
+
+  const idsVentaExtra = [estancia.idVenta, estancia.idVentaHabitacion];
+  const ventasRaw = await hotelFolioRepository.listarVentasDeEstancia(pool, idEmpresa, idEstancia, idsVentaExtra);
+  const docsMap = new Map();
+  for (const row of ventasRaw) {
+    const doc = mapearDocumentoFolio(row);
+    if (doc) docsMap.set(Number(doc.idVenta), doc);
+  }
+  const compsVenta = [...docsMap.values()]
+    .filter((d) => d.tipo === 'comprobante')
+    .map((d) => d.compVenta)
+    .filter(Boolean);
+  const notasRaw = await hotelFolioRepository.listarNotasDeComprobantes(pool, idEmpresa, compsVenta);
+  for (const row of notasRaw) {
+    const doc = mapearDocumentoFolio(row);
+    if (doc && !docsMap.has(Number(doc.idVenta))) docsMap.set(Number(doc.idVenta), doc);
+  }
+  const documentos = [...docsMap.values()].sort((a, b) => String(a.fEmision).localeCompare(String(b.fEmision)));
+
+  const totalComprobantes = r2(documentos.filter((d) => d.tipo === 'comprobante').reduce((s, d) => s + d.total, 0));
+  const totalPagado = r2(documentos.filter((d) => d.esPagado).reduce((s, d) => s + d.total, 0));
+  const totalCredito = r2(documentos.filter((d) => d.esCredito).reduce((s, d) => s + d.total, 0));
+  const totalNotasCredito = r2(documentos.filter((d) => d.tipo === 'nota_credito').reduce((s, d) => s + d.total, 0));
+  const totalNotasDebito = r2(documentos.filter((d) => d.tipo === 'nota_debito').reduce((s, d) => s + d.total, 0));
+
+  const saldoPorFacturar = Math.max(0, r2(cargoHabitacionPendiente + consumoPendiente - anticiposPendientes));
+  const saldoPorCobrar = Math.max(0, r2(totalCredito + totalNotasDebito - totalNotasCredito));
+  const saldoHuesped = r2(saldoPorFacturar + saldoPorCobrar);
+
+  return {
+    idEstancia,
+    estadoEstancia: estancia.estadoEstancia,
+    nombreHuesped: estancia.nombreHuesped,
+    habitacionCodigo: estancia.habitacionCodigo,
+    habitacionDescripcion: estancia.habitacionDescripcion,
+    checkIn: estancia.checkIn,
+    checkOutPrevisto: estancia.checkOutPrevisto,
+    habitacionFacturada,
+    cargos: {
+      habitacion: totalHabitacion,
+      habitacionFacturada,
+      recargos,
+      totalRecargos,
+      consumoPendiente,
+      consumoFacturado,
+      totalCargos,
+      lineasConsumo
+    },
+    anticipos: anticipos.map((a) => ({
+      idAnticipo: a.idAnticipo,
+      monto: r2(a.monto),
+      concepto: a.concepto,
+      estado: a.estado,
+      fRegistro: a.fRegistro,
+      idVenta: a.idVenta || null
+    })),
+    anticiposPendientes,
+    anticiposAplicados,
+    documentos,
+    resumen: {
+      totalCargos,
+      anticiposPendientes,
+      anticiposAplicados,
+      totalComprobantes,
+      totalPagado,
+      totalCredito,
+      totalNotasCredito,
+      totalNotasDebito,
+      saldoPorFacturar,
+      saldoPorCobrar,
+      saldoHuesped
+    }
+  };
 }
 
 function parseMesAnio(mesParam) {
@@ -851,6 +1109,147 @@ async function reporteHotel(pool, idEmpresa, fechaDesde, fechaHasta) {
   };
 }
 
+function estanciaHabitacionYaFacturada(estancia) {
+  return estancia?.habitacionFacturada === true || Number(estancia?.habitacionFacturada) === 1;
+}
+
+function checkInEstanciaADate(checkIn) {
+  if (checkIn instanceof Date && !Number.isNaN(checkIn.getTime())) return checkIn;
+  const s = String(checkIn || '').replace('T', ' ').replace('.000', '').trim();
+  return sql23ADate(s);
+}
+
+async function ejecutarEnTransaccion(pool, fn) {
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const out = await fn(transaction);
+    await transaction.commit();
+    return out;
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rb) {
+      console.error('hotel transacción rollback:', rb);
+    }
+    throw error;
+  }
+}
+
+async function cambiarSalidaEstancia(pool, idEmpresa, idEstancia, body) {
+  const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+  if (!estancia) throw new Error('Estancia no encontrada');
+  if (estancia.estadoEstancia !== 'activa') throw new Error('La estancia no está activa');
+  if (!body?.fechaSalida) throw new Error('Fecha de salida requerida');
+
+  const fechaSalidaNueva = String(body.fechaSalida).slice(0, 10);
+  const fechaSalidaActual = String(estancia.checkOutPrevisto || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaSalidaNueva)) {
+    throw new Error('Fecha de salida inválida');
+  }
+  if (estanciaHabitacionYaFacturada(estancia) && fechaSalidaNueva !== fechaSalidaActual) {
+    throw new Error('La tarifa de habitación ya fue facturada. No se puede acortar ni extender la estadía.');
+  }
+
+  const cfg = await obtenerConfig(pool, idEmpresa);
+  const checkOutPrevistoSql = checkOutPrevistoSqlDesdeFechaSalida(fechaSalidaNueva, cfg);
+  const checkIn = checkInEstanciaADate(estancia.checkIn);
+  const checkOutPrevisto = sql23ADate(checkOutPrevistoSql);
+  if (!checkIn || Number.isNaN(checkIn.getTime())) {
+    throw new Error('Check-in de la estancia inválido');
+  }
+  if (!checkOutPrevistoSql || !checkOutPrevisto || checkOutPrevisto <= checkIn) {
+    throw new Error('La fecha de salida debe ser posterior al check-in (mínimo 1 noche)');
+  }
+
+  const fechaEntrada = String(estancia.checkIn).slice(0, 10);
+  const noches = calcularNochesCalendario(fechaEntrada, fechaSalidaNueva);
+  if (noches < 1) throw new Error('La estadía debe tener al menos 1 noche');
+
+  const intervalo = intervaloDesdeEstancia(checkIn, checkOutPrevisto, cfg);
+  await validarDisponibilidadIntervalo(pool, idEmpresa, estancia.idProductoHabitacion, intervalo, {
+    excluirIdEstancia: idEstancia,
+    excluirIdReserva: estancia.idReserva || null
+  });
+
+  const tarifaNoche = Number(estancia.tarifaNoche) || 0;
+  const totalHabitacion = Math.round(tarifaNoche * noches * 100) / 100;
+
+  await ejecutarEnTransaccion(pool, async (tx) => {
+    await estanciasRepository.actualizarSalidaYTotal(
+      tx,
+      idEstancia,
+      idEmpresa,
+      checkOutPrevistoSql,
+      totalHabitacion
+    );
+    if (estancia.idReserva) {
+      await reservasRepository.sincronizarConEstancia(tx, estancia.idReserva, idEmpresa, {
+        fechaSalida: fechaSalidaNueva,
+        total: totalHabitacion
+      });
+    }
+  });
+
+  return estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+}
+
+async function moverEstancia(pool, idEmpresa, idEstancia, body) {
+  const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+  if (!estancia) throw new Error('Estancia no encontrada');
+  if (estancia.estadoEstancia !== 'activa') throw new Error('La estancia no está activa');
+  if (!body?.idProductoHabitacion) throw new Error('Habitación destino requerida');
+
+  const idDestino = String(body.idProductoHabitacion);
+  const idOrigen = String(estancia.idProductoHabitacion);
+  if (idDestino.toLowerCase() === idOrigen.toLowerCase()) {
+    throw new Error('Elija una habitación distinta a la actual');
+  }
+
+  await validarProductoEsHabitacion(pool, idEmpresa, idDestino);
+  await validarHousekeepingParaCheckIn(pool, idEmpresa, idDestino);
+
+  const ocupada = await estanciasRepository.obtenerActivaPorHabitacion(pool, idEmpresa, idDestino);
+  if (ocupada) throw new Error('La habitación destino ya tiene una estancia activa');
+
+  const cfg = await obtenerConfig(pool, idEmpresa);
+  const checkIn = checkInEstanciaADate(estancia.checkIn);
+  const checkOutPrevisto = checkInEstanciaADate(estancia.checkOutPrevisto);
+  if (!checkIn || !checkOutPrevisto || Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOutPrevisto.getTime())) {
+    throw new Error('Intervalo de estancia inválido');
+  }
+  const intervalo = intervaloDesdeEstancia(checkIn, checkOutPrevisto, cfg);
+  await validarDisponibilidadIntervalo(pool, idEmpresa, idDestino, intervalo, {
+    excluirIdEstancia: idEstancia,
+    excluirIdReserva: estancia.idReserva || null
+  });
+
+  await ejecutarEnTransaccion(pool, async (tx) => {
+    await estanciasRepository.actualizarHabitacion(tx, idEstancia, idEmpresa, idDestino);
+    await consumoHabitacionRepository.reasignarHabitacionPorEstancia(
+      tx,
+      idEmpresa,
+      idEstancia,
+      idOrigen,
+      idDestino
+    );
+    if (estancia.idReserva) {
+      await reservasRepository.sincronizarConEstancia(tx, estancia.idReserva, idEmpresa, {
+        idProductoHabitacion: idDestino
+      });
+    }
+    await hotelHousekeepingRepository.upsertEstado(
+      tx,
+      idEmpresa,
+      idOrigen,
+      'sucia',
+      'Huésped trasladado a otra habitación'
+    );
+  });
+
+  return estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
+}
+
 async function moverReservaCalendario(pool, idEmpresa, idReserva, body) {
   const reservasService = require('./reservas.service');
   const reserva = await reservasRepository.obtenerPorId(pool, idReserva, idEmpresa);
@@ -894,8 +1293,11 @@ module.exports = {
   listarAnticipos,
   registrarAnticipo,
   anularAnticipo,
+  obtenerFolioEstancia,
   reporteHotel,
   historialHabitacionMes,
   detalleEstanciaHistorial,
+  cambiarSalidaEstancia,
+  moverEstancia,
   moverReservaCalendario
 };

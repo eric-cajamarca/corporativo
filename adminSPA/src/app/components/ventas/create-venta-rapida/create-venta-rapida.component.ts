@@ -846,7 +846,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         nombreMarca: marca,
         marca,
         cantidad: lin.cantidad,
-        pVenta: lin.pVenta
+        pVenta: lin.pVenta,
+        tipoHotel: lin.tipo,
+        idConsumoHotel: lin.idConsumo ?? null
       };
     });
     this.cargarClienteDesdePreloadHotel(preload);
@@ -861,7 +863,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
             title: 'Check-out',
-            message: 'Carrito cargado desde la estancia. Revise cliente y comprobante.',
+            message: 'Carrito cargado desde la estancia. Puede quitar líneas; la habitación no se libera hasta facturar todo el saldo.',
             position: 'topRight'
           });
         }
@@ -917,16 +919,34 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.cliente.rSocial = nombre;
   }
 
-  /** Cierra estancia y marca consumos facturados solo tras venta exitosa. */
+  /** Cierra estancia solo si ya no queda saldo (habitación + consumo). */
   private confirmarCheckoutHotelSiCorresponde(idVenta: number | null): void {
     if (!this.hotelCheckoutIdEstancia || !idVenta) return;
     const idEstancia = this.hotelCheckoutIdEstancia;
+    const incluyeHabitacion = this.carrito.some((l: { tipoHotel?: string }) =>
+      l.tipoHotel === 'habitacion' || l.tipoHotel === 'recargo'
+    );
+    const idsConsumo = this.carrito
+      .filter((l: { tipoHotel?: string; idConsumoHotel?: string | null }) => l.tipoHotel === 'consumo' && !!l.idConsumoHotel)
+      .map((l: { idConsumoHotel?: string | null }) => String(l.idConsumoHotel));
     this.hotelCheckoutIdEstancia = null;
-    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora()).subscribe({
-      error: (err) => {
+    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora(), {
+      incluyeHabitacion,
+      idsConsumo
+    }).subscribe({
+      next: (res) => {
+        const msg = res.data?.message;
+        if (!msg) return;
+        if (res.data?.cerrado) {
+          iziToast.success({ title: 'Hotel', message: msg, position: 'topRight' });
+        } else {
+          iziToast.warning({ title: 'Hotel', message: msg, position: 'topRight' });
+        }
+      },
+      error: (err: { error?: { message?: string } }) => {
         iziToast.warning({
           title: 'Hotel',
-          message: err?.error?.message || 'Venta registrada, pero no se pudo cerrar la estancia en hotel.',
+          message: err?.error?.message || 'Venta registrada, pero no se pudo actualizar la estancia en hotel.',
           position: 'topRight'
         });
       }

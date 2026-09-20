@@ -93,7 +93,11 @@ async function confirmarCheckoutPostVenta(req, res) {
         req.user.empresa,
         req.params.idEstancia,
         idVenta,
-        req.body?.checkOutReal || req.body?.fechaHoraCliente
+        req.body?.checkOutReal || req.body?.fechaHoraCliente,
+        {
+          incluyeHabitacion: req.body?.incluyeHabitacion,
+          idsConsumo: req.body?.idsConsumo
+        }
       )
     );
     res.status(200).json({ data });
@@ -253,6 +257,19 @@ async function anularAnticipo(req, res) {
   }
 }
 
+async function folioEstancia(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const data = await withPool((pool) =>
+      hotelService.obtenerFolioEstancia(pool, req.user.empresa, req.params.idEstancia)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.folioEstancia:', error);
+    res.status(400).json({ message: error.message || 'Error al cargar el folio' });
+  }
+}
+
 async function reporteHotel(req, res) {
   if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
   try {
@@ -291,6 +308,36 @@ async function detalleEstanciaHistorial(req, res) {
   } catch (error) {
     console.error('hotel.detalleEstanciaHistorial:', error);
     res.status(400).json({ message: error.message || 'Error al cargar detalle de estancia' });
+  }
+}
+
+async function cambiarSalidaEstancia(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const body = { ...req.body };
+    delete body.idEmpresa;
+    const data = await withPool((pool) =>
+      hotelService.cambiarSalidaEstancia(pool, req.user.empresa, req.params.idEstancia, body)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.cambiarSalidaEstancia:', error);
+    res.status(400).json({ message: error.message || 'Error al cambiar la salida' });
+  }
+}
+
+async function moverEstancia(req, res) {
+  if (!req.user?.empresa) return res.status(401).json({ message: 'No autorizado' });
+  try {
+    const body = { ...req.body };
+    delete body.idEmpresa;
+    const data = await withPool((pool) =>
+      hotelService.moverEstancia(pool, req.user.empresa, req.params.idEstancia, body)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('hotel.moverEstancia:', error);
+    res.status(400).json({ message: error.message || 'Error al mover la estancia' });
   }
 }
 
@@ -339,9 +386,12 @@ module.exports = {
   listarAnticipos,
   registrarAnticipo,
   anularAnticipo,
+  folioEstancia,
   reporteHotel,
   historialHabitacionMes,
   detalleEstanciaHistorial,
+  cambiarSalidaEstancia,
+  moverEstancia,
   moverReservaCalendario,
   cerrarPostVenta
 };

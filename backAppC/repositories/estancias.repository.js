@@ -2,6 +2,19 @@ const sql = require('mssql');
 
 const ESTADOS_RESERVA_ACTIVOS = "('confirmada')";
 
+let columnasFacturacionParcialOk = false;
+
+async function asegurarColumnasFacturacionParcial(pool) {
+  if (columnasFacturacionParcialOk) return;
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Estancias', 'habitacionFacturada') IS NULL
+      ALTER TABLE Estancias ADD habitacionFacturada BIT NOT NULL CONSTRAINT DF_Estancias_habitacionFacturada DEFAULT 0;
+    IF COL_LENGTH('dbo.Estancias', 'idVentaHabitacion') IS NULL
+      ALTER TABLE Estancias ADD idVentaHabitacion INT NULL;
+  `);
+  columnasFacturacionParcialOk = true;
+}
+
 function selectEstanciaBase() {
   return `
     SELECT e.idEstancia, e.idEmpresa, e.idProductoHabitacion, e.idReserva, e.idCliente,
@@ -10,6 +23,8 @@ function selectEstanciaBase() {
            CONVERT(VARCHAR(19), e.checkOutPrevisto, 120) AS checkOutPrevisto,
            CONVERT(VARCHAR(19), e.checkOutReal, 120) AS checkOutReal,
            e.estadoEstancia, e.tarifaNoche, e.totalHabitacion, e.idVenta,
+           CAST(ISNULL(e.habitacionFacturada, 0) AS BIT) AS habitacionFacturada,
+           e.idVentaHabitacion,
            CONVERT(VARCHAR(19), e.fRegistro, 120) AS fRegistro,
            p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
     FROM Estancias e
@@ -18,6 +33,7 @@ function selectEstanciaBase() {
 }
 
 async function listarActivas(pool, idEmpresa) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(`${selectEstanciaBase()} WHERE e.idEmpresa = @idEmpresa AND e.estadoEstancia = 'activa' ORDER BY e.checkIn`);
@@ -25,6 +41,7 @@ async function listarActivas(pool, idEmpresa) {
 }
 
 async function obtenerActivaPorHabitacion(pool, idEmpresa, idProductoHabitacion) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
@@ -38,6 +55,7 @@ async function obtenerActivaPorHabitacion(pool, idEmpresa, idProductoHabitacion)
 }
 
 async function obtenerPorId(pool, idEstancia, idEmpresa) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEstancia', sql.UniqueIdentifier, idEstancia)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -92,6 +110,45 @@ async function cerrarCheckout(pool, idEstancia, idEmpresa, idVenta = null, check
       idVenta = COALESCE(@idVenta, idVenta)
     WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
   `);
+}
+
+async function actualizarSalidaYTotal(pool, idEstancia, idEmpresa, checkOutPrevisto, totalHabitacion) {
+  await pool.request()
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('checkOutPrevisto', sql.VarChar(23), checkOutPrevisto)
+    .input('totalHabitacion', sql.Decimal(18, 2), totalHabitacion ?? 0)
+    .query(`
+      UPDATE Estancias SET
+        checkOutPrevisto = CAST(@checkOutPrevisto AS DATETIME),
+        totalHabitacion = @totalHabitacion
+      WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
+    `);
+}
+
+async function actualizarHabitacion(pool, idEstancia, idEmpresa, idProductoHabitacion) {
+  await pool.request()
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
+    .query(`
+      UPDATE Estancias SET idProductoHabitacion = @idProductoHabitacion
+      WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
+    `);
+}
+
+async function marcarHabitacionFacturada(pool, idEstancia, idEmpresa, idVenta) {
+  await asegurarColumnasFacturacionParcial(pool);
+  await pool.request()
+    .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idVenta', sql.Int, idVenta)
+    .query(`
+      UPDATE Estancias SET
+        habitacionFacturada = 1,
+        idVentaHabitacion = COALESCE(idVentaHabitacion, @idVenta)
+      WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
+    `);
 }
 
 async function listarReservasConfirmadasHabitacion(pool, idEmpresa, idProductoHabitacion, excluirIdReserva = null) {
@@ -155,6 +212,7 @@ async function listarActivasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
 
 /** Estancias activas y cerradas que solapan un rango (fechaHasta inclusive). */
 async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('fechaDesde', sql.DateTime, new Date(`${fechaDesde}T00:00:00`))
@@ -172,6 +230,7 @@ async function listarEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
 
 /** Estancias que solapan un mes calendario en una habitación (activas y cerradas). */
 async function listarHistorialHabitacionMes(pool, idEmpresa, idProductoHabitacion, inicioMes, finMes) {
+  await asegurarColumnasFacturacionParcial(pool);
   const result = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
@@ -194,7 +253,11 @@ module.exports = {
   obtenerActivaPorHabitacion,
   obtenerPorId,
   insertar,
+  actualizarSalidaYTotal,
+  actualizarHabitacion,
   cerrarCheckout,
+  marcarHabitacionFacturada,
+  asegurarColumnasFacturacionParcial,
   listarReservasConfirmadasHabitacion,
   listarEstanciasActivasHabitacion,
   listarActivasEnRango,
