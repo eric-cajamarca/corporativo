@@ -4,7 +4,12 @@
       <div>
         <h1 class="content-title mb-1">Kardex</h1>
         <p class="content-subtitle text-muted mb-0">
-          Movimientos de inventario por producto. Sin producto seleccionado puede descargar el Formato 13.1 (inventario permanente valorizado de todos los productos).
+          Movimientos de inventario por producto. Sin producto seleccionado puede descargar el Formato 13.1
+          @if (esBotica) {
+            o el libro DIGEMID de productos controlados / psicotrópicos.
+          } @else {
+            (inventario permanente valorizado de todos los productos).
+          }
         </p>
       </div>
       <a routerLink="/inventario" class="btn btn-outline-secondary">
@@ -42,7 +47,10 @@
                 </button>
               </div>
             } @else {
-              <span class="text-muted small align-self-center">Sin producto: descargue PDF o Excel del Formato 13.1 (todos los productos).</span>
+              <span class="text-muted small align-self-center">
+                Sin producto: descargue PDF o Excel del Formato 13.1
+                @if (esBotica) { o del libro DIGEMID de controlados}.
+              </span>
             }
           </div>
         </div>
@@ -87,6 +95,33 @@
             }
             Excel
           </button>
+          @if (esBotica) {
+            <span class="vr d-none d-md-inline"></span>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              (click)="exportarPdfDigemid()"
+              [disabled]="exportandoCompleto"
+              title="Libro DIGEMID PDF — psicotrópicos y sustancias controladas">
+              @if (exportandoPdfDigemid) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              } @else {
+                <i class="bi bi-file-pdf"></i>
+              }
+              PDF DIGEMID
+            </button>
+            <button
+              class="btn btn-sm btn-outline-success"
+              (click)="exportarExcelDigemid()"
+              [disabled]="exportandoCompleto"
+              title="Libro DIGEMID Excel — psicotrópicos y sustancias controladas">
+              @if (exportandoExcelDigemid) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              } @else {
+                <i class="bi bi-file-excel"></i>
+              }
+              Excel DIGEMID
+            </button>
+          }
         }
         @if (data?.producto) {
           <span class="vr d-none d-md-inline"></span>
@@ -209,13 +244,20 @@
       @if (!data && !cargando && !exportandoCompleto) {
         <p class="text-muted mb-0">
           Seleccione un producto y pulse Buscar para ver el kardex, o descargue el
-          <strong>Excel Formato 13.1</strong> (todos los productos) sin elegir producto.
+          <strong>Formato 13.1</strong> (todos los productos) sin elegir producto.
+          @if (esBotica) {
+            En botica también puede descargar el <strong>libro DIGEMID</strong> de productos marcados como controlados.
+          }
         </p>
       }
       @if (exportandoCompleto) {
         <p class="text-muted mb-0">
           <span class="spinner-border spinner-border-sm me-2"></span>
-          Generando Formato 13.1 de todos los productos… esto puede tardar unos segundos.
+          @if (exportandoDigemid) {
+            Generando libro DIGEMID de productos controlados… esto puede tardar unos segundos.
+          } @else {
+            Generando Formato 13.1 de todos los productos… esto puede tardar unos segundos.
+          }
         </p>
       }
     </div>

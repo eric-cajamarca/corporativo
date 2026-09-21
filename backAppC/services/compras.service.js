@@ -240,6 +240,9 @@ exports.crearCompraCompleta = async (idEmpresa, idUsuario, body) => {
     const comprobanteSunat = body?.comprobanteSunat ?? compra?.comprobanteSunat;
     const { idCompra } = await exports.crearCompra(idEmpresa, idUsuario, { ...compra, comprobanteSunat });
     const userMin = { empresa: idEmpresa, sub: idUsuario, idUsuario, rol: 'Administrador' };
+    const { obtenerRubroEmpresa, esRubroFarmacia } = require('../utils/rubroEmpresa.util');
+    const rubroCompra = await withPool((pool) => obtenerRubroEmpresa(pool, idEmpresa));
+    const exigeLoteBotica = esRubroFarmacia(rubroCompra.codigoRubro, rubroCompra.rubro);
     const resultadosDetalle = [];
     for (const linea of detalles) {
         let idProducto = linea.idProducto;
@@ -250,6 +253,13 @@ exports.crearCompraCompleta = async (idEmpresa, idUsuario, body) => {
         }
         if (!idProducto) {
             throw new Error('Cada línea debe tener idProducto o nuevoProducto');
+        }
+        if (exigeLoteBotica) {
+            const nroLote = String(linea.numeroLote || '').trim();
+            const fv = String(linea.fechaVencimiento || '').trim();
+            if (!nroLote || !fv) {
+                throw new Error('En botica el número de lote y la fecha de vencimiento son obligatorios en cada línea de compra.');
+            }
         }
         const detRes = await withPool((pool) =>
             detalleComprasService.crearDetalleCompraCompleto(pool, userMin, {

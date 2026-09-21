@@ -19,6 +19,9 @@ import { Documento } from '../../../interfaces/documento-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { esFormaOMedioSaldoFavor, filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
+import { RecetaVentaModalService } from '../../../services/receta-venta-modal.service';
+import { RecetaVentaPayload } from '../../../models/receta-venta.model';
+import { etiquetaCondicionVenta, lineasQueRequierenReceta, requiereReceta } from '../../../utils/receta-venta.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
@@ -281,6 +284,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Modal Convertir vale en venta (liquidación). Solo visible si la empresa tiene habilitado vales de despacho (config rubro usaValeDespacho). */
   usaValeDespachoHabilitado = false;
+  recetaPendiente: RecetaVentaPayload | null = null;
   valesParaLiquidar: ValeDespachoListItem[] = [];
   valeSeleccionadoLiquidar: ValeDespachoListItem | null = null;
   idComprobanteLiquidacion: number | null = null;
@@ -334,7 +338,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private ngZone: NgZone,
     private route: ActivatedRoute,
     private router: Router,
-    private posKeyboard: PosKeyboardService
+    private posKeyboard: PosKeyboardService,
+    private recetaVentaModal: RecetaVentaModalService
   ) {}
 
 
@@ -1211,6 +1216,19 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
           marcaCat;
       }
     }
+    if (match.condicionVenta != null && String(match.condicionVenta).trim()) {
+      linea.condicionVenta = match.condicionVenta;
+    }
+    if (match.principioActivo) linea.principioActivo = match.principioActivo;
+    if (match.concentracion) linea.concentracion = match.concentracion;
+  }
+
+  esLineaReceta(item: { condicionVenta?: string | null } | null | undefined): boolean {
+    return requiereReceta(item?.condicionVenta);
+  }
+
+  etiquetaCondicionLinea(item: { condicionVenta?: string | null } | null | undefined): string {
+    return etiquetaCondicionVenta(item?.condicionVenta);
   }
 
   /** Stock numérico del catálogo o null si no aplica. */
@@ -1630,6 +1648,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         return;
       }
       this.carrito = [];
+      this.recetaPendiente = null;
       this.actualizaTotales();
     }
     if (!idNueva) {
@@ -1998,6 +2017,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       const agregado = this.carrito[this.carrito.length - 1];
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
             }
+    this.recetaPendiente = null;
     this.actualizaTotales();
   }
 
@@ -2229,6 +2249,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   eliminarDelCarrito(index: number): void {
     this.carrito.splice(index, 1);
+    this.recetaPendiente = null;
     this.actualizaTotales();
   }
 
@@ -3075,6 +3096,15 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
       return;
     }
+    const lineasReceta = lineasQueRequierenReceta(this.carrito);
+    if (lineasReceta.length > 0 && !this.recetaPendiente) {
+      void this.recetaVentaModal.abrir(lineasReceta).then((receta) => {
+        if (!receta) return;
+        this.recetaPendiente = receta;
+        this.registrarVenta();
+      });
+      return;
+    }
     const lineaAjena = this.carrito.find((ln) => !this.productoPerteneceEmpresaOperativa(ln));
     if (lineaAjena) {
       iziToast.warning({
@@ -3700,10 +3730,12 @@ abrirModalPrecios(item: any) {
       detalles,
       detallePago: detallePago.length > 0 ? detallePago : undefined,
       ...(cuotasCredito && cuotasCredito.length ? { cuotasCredito } : {}),
+      receta: this.recetaPendiente || undefined,
       idApertura
     }).subscribe({
       next: (res: any) => {
         this.loading = false;
+        this.recetaPendiente = null;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
         if (res.avisoStockInsuficiente) {
           iziToast.warning({ title: 'Aviso', message: res.avisoStockInsuficiente, position: 'topRight' });
@@ -4109,6 +4141,7 @@ abrirModalPrecios(item: any) {
 
   limpiarVenta(): void {
     this.carrito = [];
+    this.recetaPendiente = null;
     this.detallePago = [];
     this.cuotasCreditoPlano = [];
     this.pagaCon = 0;

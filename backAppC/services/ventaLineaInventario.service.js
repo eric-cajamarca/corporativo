@@ -19,6 +19,7 @@ async function procesarSalidaInventarioVentaLinea(params) {
     descripcion,
     permitirVentasNegativas,
     controlUbicaciones,
+    usaFefo,
     cache,
     mensajeStockInsuficiente
   } = params;
@@ -52,7 +53,8 @@ async function procesarSalidaInventarioVentaLinea(params) {
     transaction,
     idEmpresa,
     idProducto,
-    idSucursal
+    idSucursal,
+    { usaFefo: usaFefo === true }
   );
 
   let avisoStock = null;
@@ -81,7 +83,7 @@ async function procesarSalidaInventarioVentaLinea(params) {
     const resultadoDescuento = await stockService.descontarDesdeLotes(
       transaction,
       { idEmpresa, idSucursal, idProducto, cantidad: cantidadADescontar },
-      { controlUbicaciones, permitirVentasNegativas }
+      { controlUbicaciones, permitirVentasNegativas, usaFefo: usaFefo === true }
     );
     consumosPorLote = resultadoDescuento?.consumosPorLote || [];
   }

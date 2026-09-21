@@ -91,7 +91,8 @@ function estilosBase() {
   `;
 }
 
-function construirBloqueProducto(prod) {
+function construirBloqueProducto(prod, esDigemid) {
+  const extraCols = esDigemid ? 4 : 0;
   const filasHtml = (prod.filas || [])
     .map(
       (f) => `
@@ -101,6 +102,11 @@ function construirBloqueProducto(prod) {
         <td class="c">${escapeHtml(f.serie)}</td>
         <td class="c">${escapeHtml(f.numero)}</td>
         <td>${escapeHtml(f.tipoOperacion)}</td>
+        ${esDigemid ? `
+        <td>${escapeHtml(f.pacienteNombre || '')}</td>
+        <td>${escapeHtml(f.medicoNombre || '')}</td>
+        <td class="c">${escapeHtml(f.cmp || '')}</td>
+        <td class="c">${escapeHtml(f.numeroReceta || '')}</td>` : ''}
         <td class="r">${fmtNum(f.cantidadEntrada, 3)}</td>
         <td class="r">${fmtNum(f.costoUnitarioEntrada)}</td>
         <td class="r">${fmtNum(f.importeEntrada)}</td>
@@ -116,6 +122,16 @@ function construirBloqueProducto(prod) {
 
   const tot = prod.totales || {};
   const tipoTxt = `${prod.tipoExistencia || '01'} ${prod.tipoExistenciaDescripcion || 'MERCADERIAS'}`;
+  const fichaFar = esDigemid
+    ? `<tr>
+          <td><strong>PRINCIPIO ACTIVO:</strong> ${escapeHtml(prod.principioActivo || '—')}
+            ${prod.concentracion ? ' · ' + escapeHtml(prod.concentracion) : ''}
+            ${prod.formaFarmaceutica ? ' · ' + escapeHtml(prod.formaFarmaceutica) : ''}</td>
+          <td><strong>MARCA / LAB.:</strong> ${escapeHtml(prod.marca || '—')}
+            ${prod.registroSanitario ? ' · RS: ' + escapeHtml(prod.registroSanitario) : ''}</td>
+        </tr>`
+    : '';
+  const colSpanDoc = 5 + extraCols;
 
   return `
     <div class="bloque-producto">
@@ -128,12 +144,18 @@ function construirBloqueProducto(prod) {
           <td><strong>DESCRIPCION:</strong> ${escapeHtml(prod.descripcion || '')}</td>
           <td><strong>UNIDAD DE MEDIDA:</strong> ${escapeHtml(prod.unidadMedida || 'NIU')}</td>
         </tr>
+        ${fichaFar}
       </table>
       <table class="tabla-kardex">
         <thead>
           <tr>
             <th colspan="4">DOCUMENTO</th>
             <th rowspan="2">TIPO DE OPERACION</th>
+            ${esDigemid ? `
+            <th rowspan="2">PACIENTE</th>
+            <th rowspan="2">MEDICO</th>
+            <th rowspan="2">CMP</th>
+            <th rowspan="2">N° RECETA</th>` : ''}
             <th colspan="3">ENTRADAS</th>
             <th colspan="3">SALIDAS</th>
             <th colspan="3">SALDO FINAL</th>
@@ -155,11 +177,11 @@ function construirBloqueProducto(prod) {
           </tr>
         </thead>
         <tbody>
-          ${filasHtml || '<tr><td colspan="14" class="c">Sin movimientos</td></tr>'}
+          ${filasHtml || `<tr><td colspan="${14 + extraCols}" class="c">Sin movimientos</td></tr>`}
         </tbody>
         <tfoot>
           <tr class="fila-total">
-            <td colspan="5" class="r"><strong>TOTAL:</strong></td>
+            <td colspan="${colSpanDoc}" class="r"><strong>TOTAL:</strong></td>
             <td class="r">${fmtSaldo(tot.totalEntradaCantidad, 3)}</td>
             <td></td>
             <td class="r">${fmtSaldo(tot.totalEntradaImporte)}</td>
@@ -181,8 +203,12 @@ function construirHtmlKardex131(datos) {
   const productos = Array.isArray(datos.productos) ? datos.productos : [];
   const fechaDesde = fmtFechaPeriodo(periodo.fechaDesde);
   const fechaHasta = fmtFechaPeriodo(periodo.fechaHasta);
+  const esDigemid = String(datos.tipoLibro || '').toUpperCase() === 'DIGEMID';
+  const titulo = esDigemid
+    ? 'LIBRO DE CONTROL DE PSICOTRÓPICOS Y SUSTANCIAS CONTROLADAS (DIGEMID)'
+    : 'FORMATO 13.1 REGISTRO DE INVENTARIO PERMANENTE VALORIZADO - DETALLE DE INVENTARIO VALORIZADO';
 
-  const bloques = productos.map((p) => construirBloqueProducto(p)).join('');
+  const bloques = productos.map((p) => construirBloqueProducto(p, esDigemid)).join('');
   const sinDatos =
     productos.length === 0
       ? '<p class="sin-datos">No hay productos con movimientos o saldo en el periodo seleccionado.</p>'
@@ -192,12 +218,12 @@ function construirHtmlKardex131(datos) {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Formato 13.1 Kardex</title>
+  <title>${esDigemid ? 'Libro DIGEMID controlados' : 'Formato 13.1 Kardex'}</title>
   <style>${estilosBase()}</style>
 </head>
 <body>
   ${construirEncabezadoEmpresa(empresa)}
-  <div class="titulo-formato">FORMATO 13.1 REGISTRO DE INVENTARIO PERMANENTE VALORIZADO - DETALLE DE INVENTARIO VALORIZADO</div>
+  <div class="titulo-formato">${titulo}</div>
   <table class="meta-empresa">
     <tr><td><strong>PERIODO:</strong> ${escapeHtml(fechaDesde)} AL ${escapeHtml(fechaHasta)}</td></tr>
     <tr><td><strong>RUC:</strong> ${escapeHtml(empresa.ruc || '')}</td></tr>

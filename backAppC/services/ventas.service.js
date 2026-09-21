@@ -30,7 +30,8 @@ const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = re
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const ventasDetalleReporteRepository = require('../repositories/ventasDetalleReporte.repository');
 const usuarioSucursalRepository = require('../repositories/usuarioSucursal.repository');
-const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
+const recetaVentaService = require('./recetaVenta.service');
+const { obtenerRubroEmpresa, esRubroFarmacia } = require('../utils/rubroEmpresa.util');
 
 /**
  * idDireccionClientes del body para persistir en Ventas (DireccionClientes del mismo contexto).
@@ -331,13 +332,17 @@ const obtenerMapaProductosEmpresa = async (transaction, idsProducto) => {
     return `@${key}`;
   });
   const rs = await request.query(`
-    SELECT idProducto, idEmpresa
+    SELECT idProducto, idEmpresa,
+      LTRIM(RTRIM(ISNULL(condicionVenta, 'LIBRE'))) AS condicionVenta
     FROM Productos
     WHERE idProducto IN (${params.join(', ')})
   `);
   const mapa = new Map();
   for (const row of (rs.recordset || [])) {
-    mapa.set(String(row.idProducto), row.idEmpresa);
+    mapa.set(String(row.idProducto), {
+      idEmpresa: row.idEmpresa,
+      condicionVenta: row.condicionVenta || 'LIBRE'
+    });
   }
   return mapa;
 };
@@ -593,6 +598,8 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const permitirVentasNegativas = leerPermitirVentasNegativas(getConfig);
     const controlUbicaciones = interpretarBooleanoConfig(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true'), true);
     const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+    const rubroEmp = await obtenerRubroEmpresa(pool, user.empresa);
+    const usaFefo = esRubroFarmacia(rubroEmp.codigoRubro, rubroEmp.rubro);
 
     let idSucursalEmpresa = venta.idSucursal || null;
     if (!idSucursalEmpresa) {
@@ -638,13 +645,15 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const dets = [];
     for (const det of detalles) {
       const idProducto = String(det.idProducto);
-      const idEmpProd = mapaProductos.get(idProducto);
+      const metaProd = mapaProductos.get(idProducto);
+      const idEmpProd = metaProd?.idEmpresa;
       if (!idEmpProd || String(idEmpProd).toLowerCase() !== idEmpresaJwt) {
         throw new Error(`Producto ${det.descripcion || idProducto} no pertenece a su empresa.`);
       }
       dets.push({
         ...det,
         idEmpresaProducto: idEmpProd,
+        condicionVenta: metaProd.condicionVenta || 'LIBRE',
         idSucursalEmpresa: det.idSucursalEmpresa || det.idSucursal || null
       });
     }
@@ -774,6 +783,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         descripcion: det.descripcion,
         permitirVentasNegativas,
         controlUbicaciones,
+        usaFefo,
         cache: metaInventarioCache
       });
       if (salida.avisoStock) {
@@ -793,6 +803,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       det._costoUnitario = salida.costoUnitarioProm;
       det._costoTotal = salida.costoTotalLinea;
       det._cantEntregada = cantEntregada;
+      det._consumosPorLote = salida.consumosPorLote || [];
 
       await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
         transaction,
@@ -823,6 +834,19 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         idComprobante: idComprobanteDestino
       });
     }
+
+    await recetaVentaService.assertYRegistrarRecetaVenta(transaction, {
+      idEmpresa: user.empresa,
+      idVenta,
+      receta: payload.receta || null,
+      idUsuario: idUsuarioEmpresa,
+      lineas: dets.map((d) => ({
+        idProducto: d.idProducto,
+        condicionVenta: d.condicionVenta,
+        cantidad: d.cantidad,
+        consumosPorLote: d._consumosPorLote
+      }))
+    });
 
     if (!esNotaVenta) {
       await facturacionRepository.registrarComprobanteElectronicoPorVentaRepo(
@@ -968,7 +992,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const detallesPorEmpresa = new Map();
     for (const det of detalles) {
       const idProducto = String(det.idProducto);
-      const idEmpresaProducto = mapaProductos.get(idProducto);
+      const metaProd = mapaProductos.get(idProducto);
+      const idEmpresaProducto = metaProd?.idEmpresa;
       if (!idEmpresaProducto || !empresasPermitidas.has(idEmpresaProducto)) {
         throw new Error(`Producto ${det.descripcion || idProducto} pertenece a una empresa no autorizada.`);
       }
@@ -977,7 +1002,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         idSucursalEmpresa = null;
       }
       const arr = detallesPorEmpresa.get(String(idEmpresaProducto)) || [];
-      arr.push({ ...det, idEmpresaProducto, idSucursalEmpresa });
+      arr.push({ ...det, idEmpresaProducto, idSucursalEmpresa, condicionVenta: metaProd.condicionVenta || 'LIBRE' });
       detallesPorEmpresa.set(String(idEmpresaProducto), arr);
     }
 
@@ -1058,7 +1083,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       await ventasRepository.insertarDetalleVentaAgrupada(transaction, {
         idVentaAgrupada,
         idProducto: det.idProducto,
-        idEmpresaProducto: mapaProductos.get(String(det.idProducto)),
+        idEmpresaProducto: mapaProductos.get(String(det.idProducto))?.idEmpresa,
         aliasEmpresa: det.aliasEmpresa || null,
         sucursal: det.sucursal || null,
         cantidad: Number(det.cantidad) || 0,
@@ -1097,6 +1122,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
 
       for (const detsPart of porSucursal.values()) {
         const idSucursalEmpresa = detsPart[0].idSucursalEmpresa;
+        const rubroDestino = await obtenerRubroEmpresa(transaction, idEmpresaProducto);
+        const usaFefoDestino = esRubroFarmacia(rubroDestino.codigoRubro, rubroDestino.rubro);
 
         const idUsuarioEmpresa = await asegurarUsuarioEmpresaDestino(
           transaction, idEmpresaProducto, user.empresa, user
@@ -1217,6 +1244,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           descripcion: det.descripcion || det.aliasEmpresa,
           permitirVentasNegativas: permitirNegativoLinea,
           controlUbicaciones: flagsInvProducto.controlUbicaciones,
+          usaFefo: usaFefoDestino,
           cache: metaInventarioCachePart
         });
         if (salida.avisoStock) {
@@ -1236,6 +1264,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         det._costoUnitario = salida.costoUnitarioProm;
         det._costoTotal = salida.costoTotalLinea;
         det._cantEntregada = cantEntregada;
+        det._consumosPorLote = salida.consumosPorLote || [];
 
         await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
           transaction,
@@ -1266,6 +1295,19 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           idComprobante: idComprobanteDestino
         });
       }
+
+      await recetaVentaService.assertYRegistrarRecetaVenta(transaction, {
+        idEmpresa: idEmpresaProducto,
+        idVenta,
+        receta: payload.receta || null,
+        idUsuario: idUsuarioEmpresa,
+        lineas: detsPart.map((d) => ({
+          idProducto: d.idProducto,
+          condicionVenta: d.condicionVenta,
+          cantidad: d.cantidad,
+          consumosPorLote: d._consumosPorLote
+        }))
+      });
 
       if (!esNotaVenta) {
         await facturacionRepository.registrarComprobanteElectronicoPorVentaRepo(

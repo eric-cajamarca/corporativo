@@ -40,6 +40,8 @@ import { CreateProveedorComponent } from '../../proveedores/create-proveedor/cre
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { AuthService } from '../../../services/auth.service';
 import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
+import { EmpresaService } from '../../../services/empresa.service';
+import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -161,6 +163,7 @@ export class CreateComprasComponent {
     fvencimiento: '',
     numeroLote: '',
   };
+  public esBotica = false;
   public correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
   public loadButton: boolean = false;
   public marcas: any = [];
@@ -197,6 +200,7 @@ export class CreateComprasComponent {
     private _router: Router,
     private modalService: NgbModal,
     private auth: AuthService,
+    private empresaService: EmpresaService,
 
     // consultarxml
     private fb: FormBuilder,
@@ -221,6 +225,15 @@ export class CreateComprasComponent {
 
   ngOnInit(): void {
     this.initData();
+    this.empresaService.refreshEmpresaFromApi().subscribe({
+      next: (emp) => {
+        this.esBotica = esRubroFarmacia(emp?.codigoRubro, emp?.rubro);
+      },
+      error: () => {
+        const actual = this.empresaService.getEmpresaActual();
+        this.esBotica = esRubroFarmacia(actual?.codigoRubro, actual?.rubro);
+      }
+    });
   }
 
   //  onFileChange(event: any) {
@@ -1342,6 +1355,9 @@ export class CreateComprasComponent {
       this.nuevoProducto.codigo != '' &&
       this.nuevoProducto.descripcion != ''
     ) {
+      if (!this.validarLoteBoticaLinea(this.nuevoProducto, true)) {
+        return;
+      }
       this.detalleCompras.push(this.nuevoProducto);
       
       try {
@@ -1870,7 +1886,61 @@ export class CreateComprasComponent {
       this.loadButton = false;
       return false;
     }
+    if (!this.validarLotesBoticaDetalle()) {
+      return false;
+    }
     return true;
+  }
+
+  private lineaTieneLoteYVencimiento(linea: {
+    numeroLote?: string;
+    fechaVencimiento?: string;
+    fVencimiento?: string;
+    fvencimiento?: string;
+  }): boolean {
+    const lote = String(linea?.numeroLote || '').trim();
+    const fv = String(linea?.fechaVencimiento || linea?.fVencimiento || linea?.fvencimiento || '').trim();
+    return !!lote && !!fv;
+  }
+
+  private validarLoteBoticaLinea(linea: {
+    numeroLote?: string;
+    fechaVencimiento?: string;
+    fVencimiento?: string;
+    fvencimiento?: string;
+  }, avisar: boolean): boolean {
+    if (!this.esBotica) return true;
+    if (this.lineaTieneLoteYVencimiento(linea)) return true;
+    if (avisar) {
+      iziToast.show({
+        title: 'ERROR',
+        titleColor: '#FF0000',
+        color: '#FFF',
+        class: 'text-danger',
+        position: 'topRight',
+        message: 'En botica el número de lote y la fecha de vencimiento son obligatorios.',
+      });
+    }
+    return false;
+  }
+
+  private validarLotesBoticaDetalle(): boolean {
+    if (!this.esBotica) return true;
+    const incompleta = (this.detalleCompras || []).find(
+      (l: { numeroLote?: string; fVencimiento?: string; fvencimiento?: string; fechaVencimiento?: string; descripcion?: string }) =>
+        !this.lineaTieneLoteYVencimiento(l)
+    );
+    if (!incompleta) return true;
+    iziToast.show({
+      title: 'ERROR',
+      titleColor: '#FF0000',
+      color: '#FFF',
+      class: 'text-danger',
+      position: 'topRight',
+      message: 'En botica cada línea debe tener número de lote y fecha de vencimiento.',
+    });
+    this.loadButton = false;
+    return false;
   }
 
   /**
@@ -2313,6 +2383,9 @@ export class CreateComprasComponent {
     const fproduccion = this.fechaDetalleCompra(creado.fProduccion ?? enCatalogo?.fProduccion);
     const fvencimiento = this.fechaDetalleCompra(creado.fechaVencimiento ?? enCatalogo?.fVencimiento);
     const numeroLote = String(creado.numeroLote || '').trim().slice(0, 50);
+    if (!this.validarLoteBoticaLinea({ numeroLote, fVencimiento: fvencimiento }, true)) {
+      return;
+    }
 
     const existe = this.detalleCompras.find(
       (p: { idProducto?: string; numeroLote?: string }) =>
@@ -2399,6 +2472,12 @@ export class CreateComprasComponent {
     const idPresentacion = producto.idPresentacion ?? producto.presentacion?.idPresentacion;
     const pUnitario = Number(producto.cUnitario ?? producto.pUnitario ?? 0);
     const numeroLote = String(producto.numeroLote || '').trim();
+    if (!this.validarLoteBoticaLinea({
+      numeroLote,
+      fVencimiento: producto.fVencimiento || producto.fvencimiento || producto.fechaVencimiento
+    }, true)) {
+      return;
+    }
     const existe = this.detalleCompras.find(
       (p: { idProducto: any; numeroLote?: string }) =>
         p.idProducto === producto.idProducto

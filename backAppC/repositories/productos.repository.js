@@ -62,7 +62,9 @@ const construirFiltroTokensBusqueda = (request, tokens, aliasMarca, aliasCategor
       p.codigo LIKE @${p} OR
       p.descripcion LIKE @${p} OR
       ${aliasMarca}.nombre LIKE @${p} OR
-      ${aliasCategoria}.nombre LIKE @${p}
+      ${aliasCategoria}.nombre LIKE @${p} OR
+      ISNULL(p.principioActivo, '') LIKE @${p} OR
+      ISNULL(p.codigoEan, '') LIKE @${p}
     )`);
   });
   return ` AND (${conds.join(' AND ')}) `;
@@ -211,7 +213,15 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
       estado: !!(producto.estado === true || producto.estado === 1),
       precios: preciosProducto,
       aliasEmpresa: producto.aliasEmpresa || '',
-      razonSocialEmpresa: producto.razonSocialEmpresa || ''
+      razonSocialEmpresa: producto.razonSocialEmpresa || '',
+      principioActivo: producto.principioActivo || '',
+      concentracion: producto.concentracion || '',
+      formaFarmaceutica: producto.formaFarmaceutica || '',
+      registroSanitario: producto.registroSanitario || '',
+      laboratorio: producto.laboratorio || '',
+      condicionVenta: producto.condicionVenta || 'LIBRE',
+      codigoEan: producto.codigoEan || '',
+      controlado: !!(producto.controlado === true || producto.controlado === 1)
     };
   });
 };
@@ -281,7 +291,15 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             CONVERT(VARCHAR(19), p.FIngreso, 120) AS fechaIngreso,
             p.estado,
             ISNULL(e.alias, e.nombreComercial) as aliasEmpresa,
-            e.razon_Social as razonSocialEmpresa
+            e.razon_Social as razonSocialEmpresa,
+            LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
+            LTRIM(RTRIM(ISNULL(p.concentracion, ''))) AS concentracion,
+            LTRIM(RTRIM(ISNULL(p.formaFarmaceutica, ''))) AS formaFarmaceutica,
+            LTRIM(RTRIM(ISNULL(p.registroSanitario, ''))) AS registroSanitario,
+            LTRIM(RTRIM(ISNULL(p.laboratorio, ''))) AS laboratorio,
+            LTRIM(RTRIM(ISNULL(p.condicionVenta, 'LIBRE'))) AS condicionVenta,
+            LTRIM(RTRIM(ISNULL(p.codigoEan, ''))) AS codigoEan,
+            ISNULL(p.controlado, 0) AS controlado
         FROM (
           SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad
           FROM Lotes
@@ -332,7 +350,15 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             CONVERT(VARCHAR(19), p.FIngreso, 120) AS fechaIngreso,
             p.estado,
             ISNULL(e2.alias, e2.nombreComercial) as aliasEmpresa,
-            e2.razon_Social as razonSocialEmpresa
+            e2.razon_Social as razonSocialEmpresa,
+            LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
+            LTRIM(RTRIM(ISNULL(p.concentracion, ''))) AS concentracion,
+            LTRIM(RTRIM(ISNULL(p.formaFarmaceutica, ''))) AS formaFarmaceutica,
+            LTRIM(RTRIM(ISNULL(p.registroSanitario, ''))) AS registroSanitario,
+            LTRIM(RTRIM(ISNULL(p.laboratorio, ''))) AS laboratorio,
+            LTRIM(RTRIM(ISNULL(p.condicionVenta, 'LIBRE'))) AS condicionVenta,
+            LTRIM(RTRIM(ISNULL(p.codigoEan, ''))) AS codigoEan,
+            ISNULL(p.controlado, 0) AS controlado
         FROM Productos p
         INNER JOIN Categorias c2 ON p.idCategoria = c2.idCategoria
         INNER JOIN Presentacion pr2 ON p.idPresentacion = pr2.idPresentacion
@@ -463,6 +489,14 @@ exports.buscarProductosVentaRepo = async (
         pr.descripcion AS descripcionPres,
         p.cUnitario,
         p.tipoProducto,
+        LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
+        LTRIM(RTRIM(ISNULL(p.concentracion, ''))) AS concentracion,
+        LTRIM(RTRIM(ISNULL(p.formaFarmaceutica, ''))) AS formaFarmaceutica,
+        LTRIM(RTRIM(ISNULL(p.registroSanitario, ''))) AS registroSanitario,
+        LTRIM(RTRIM(ISNULL(p.laboratorio, ''))) AS laboratorio,
+        LTRIM(RTRIM(ISNULL(p.condicionVenta, 'LIBRE'))) AS condicionVenta,
+        LTRIM(RTRIM(ISNULL(p.codigoEan, ''))) AS codigoEan,
+        ISNULL(p.controlado, 0) AS controlado,
         p.fProduccion,
         p.fVencimiento,
         p.estado,
@@ -508,7 +542,11 @@ exports.buscarProductosVentaRepo = async (
         l.idEmpresa,
         l.idSucursal,
         s.nombre AS sucursal,
-        SUM(l.cantidadDisponible) AS stock
+        SUM(l.cantidadDisponible) AS stock,
+        CONVERT(VARCHAR(10), MIN(CASE
+          WHEN l.fechaVencimiento IS NOT NULL
+            AND CONVERT(DATE, l.fechaVencimiento) >= CONVERT(DATE, GETDATE())
+          THEN l.fechaVencimiento END), 23) AS fechaVencimientoLote
       FROM Lotes l
       INNER JOIN Sucursal s ON l.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
       WHERE l.idEmpresa IN (${inClauseEmp2})
@@ -530,7 +568,8 @@ exports.buscarProductosVentaRepo = async (
         ...base,
         idSucursal: row.idSucursal,
         sucursal: row.sucursal,
-        stock: row.stock
+        stock: row.stock,
+        fechaVencimientoLote: row.fechaVencimientoLote || null
       });
       if (filas.length >= top) break;
     }
@@ -909,7 +948,15 @@ exports.obtenerProductoPorIdRepo = async (pool, idProducto, idEmpresa) => {
           p.alertaMaximo,
           CONVERT(VARCHAR(19), p.FIngreso, 120) as fechaIngreso,
           CONVERT(VARCHAR(19), p.fProduccion, 120) as fechaProduccion,
-          CONVERT(VARCHAR(19), p.fVencimiento, 120) as fechaVencimiento
+          CONVERT(VARCHAR(19), p.fVencimiento, 120) as fechaVencimiento,
+          LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
+          LTRIM(RTRIM(ISNULL(p.concentracion, ''))) AS concentracion,
+          LTRIM(RTRIM(ISNULL(p.formaFarmaceutica, ''))) AS formaFarmaceutica,
+          LTRIM(RTRIM(ISNULL(p.registroSanitario, ''))) AS registroSanitario,
+          LTRIM(RTRIM(ISNULL(p.laboratorio, ''))) AS laboratorio,
+          LTRIM(RTRIM(ISNULL(p.condicionVenta, 'LIBRE'))) AS condicionVenta,
+          LTRIM(RTRIM(ISNULL(p.codigoEan, ''))) AS codigoEan,
+          ISNULL(p.controlado, 0) AS controlado
         FROM Productos p
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
@@ -1139,17 +1186,29 @@ exports.insertarProducto = async (transaction, row) => {
     .input('revisadoSunat', sql.Bit, row.revisadoSunat ? 1 : 0)
     .input('anexoSunatSugerido', sql.VarChar(5), row.anexoSunatSugerido || null)
     .input('codigoSunatSugerido', sql.VarChar(8), row.codigoSunatSugerido || null)
+    .input('principioActivo', sql.VarChar(150), row.principioActivo || null)
+    .input('concentracion', sql.VarChar(40), row.concentracion || null)
+    .input('formaFarmaceutica', sql.VarChar(80), row.formaFarmaceutica || null)
+    .input('registroSanitario', sql.VarChar(30), row.registroSanitario || null)
+    .input('laboratorio', sql.VarChar(120), row.laboratorio || null)
+    .input('condicionVenta', sql.VarChar(20), row.condicionVenta || 'LIBRE')
+    .input('codigoEan', sql.VarChar(14), row.codigoEan || null)
+    .input('controlado', sql.Bit, row.controlado ? 1 : 0)
     .query(
       `INSERT INTO Productos (
         idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion,
         cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas,
         facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta,
-        codigoProductoSunat, requiereCodigoSunat, revisadoSunat, anexoSunatSugerido, codigoSunatSugerido
+        codigoProductoSunat, requiereCodigoSunat, revisadoSunat, anexoSunatSugerido, codigoSunatSugerido,
+        principioActivo, concentracion, formaFarmaceutica, registroSanitario, laboratorio,
+        condicionVenta, codigoEan, controlado
       ) VALUES (
         @idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion,
         @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas,
         @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta,
-        @codigoProductoSunat, @requiereCodigoSunat, @revisadoSunat, @anexoSunatSugerido, @codigoSunatSugerido
+        @codigoProductoSunat, @requiereCodigoSunat, @revisadoSunat, @anexoSunatSugerido, @codigoSunatSugerido,
+        @principioActivo, @concentracion, @formaFarmaceutica, @registroSanitario, @laboratorio,
+        @condicionVenta, @codigoEan, @controlado
       )`
     );
 };
@@ -1444,6 +1503,38 @@ exports.actualizarProductoFlexible = async (conn, detalle) => {
   if (detalle.codigoSunatSugerido !== undefined) {
     request.input('codigoSunatSugerido', sql.VarChar(8), detalle.codigoSunatSugerido || null);
     updateSql += ', codigoSunatSugerido = @codigoSunatSugerido';
+  }
+  if (detalle.principioActivo !== undefined) {
+    request.input('principioActivo', sql.VarChar(150), detalle.principioActivo || null);
+    updateSql += ', principioActivo = @principioActivo';
+  }
+  if (detalle.concentracion !== undefined) {
+    request.input('concentracion', sql.VarChar(40), detalle.concentracion || null);
+    updateSql += ', concentracion = @concentracion';
+  }
+  if (detalle.formaFarmaceutica !== undefined) {
+    request.input('formaFarmaceutica', sql.VarChar(80), detalle.formaFarmaceutica || null);
+    updateSql += ', formaFarmaceutica = @formaFarmaceutica';
+  }
+  if (detalle.registroSanitario !== undefined) {
+    request.input('registroSanitario', sql.VarChar(30), detalle.registroSanitario || null);
+    updateSql += ', registroSanitario = @registroSanitario';
+  }
+  if (detalle.laboratorio !== undefined) {
+    request.input('laboratorio', sql.VarChar(120), detalle.laboratorio || null);
+    updateSql += ', laboratorio = @laboratorio';
+  }
+  if (detalle.condicionVenta !== undefined) {
+    request.input('condicionVenta', sql.VarChar(20), detalle.condicionVenta || 'LIBRE');
+    updateSql += ', condicionVenta = @condicionVenta';
+  }
+  if (detalle.codigoEan !== undefined) {
+    request.input('codigoEan', sql.VarChar(14), detalle.codigoEan || null);
+    updateSql += ', codigoEan = @codigoEan';
+  }
+  if (detalle.controlado !== undefined) {
+    request.input('controlado', sql.Bit, detalle.controlado ? 1 : 0);
+    updateSql += ', controlado = @controlado';
   }
   updateSql += ' WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa';
   return request.query(updateSql);

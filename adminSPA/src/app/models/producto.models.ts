@@ -34,6 +34,14 @@ export interface Producto {
   revisadoSunat?: boolean;
   anexoSunatSugerido?: string | null;
   codigoSunatSugerido?: string | null;
+  principioActivo?: string | null;
+  concentracion?: string | null;
+  formaFarmaceutica?: string | null;
+  registroSanitario?: string | null;
+  laboratorio?: string | null;
+  condicionVenta?: string | null;
+  codigoEan?: string | null;
+  controlado?: boolean;
 }
 
 export interface CatalogoProductoSunatItem {
@@ -89,6 +97,14 @@ export interface ProductoCreate {
   revisadoSunat?: boolean;
   anexoSunatSugerido?: string | null;
   codigoSunatSugerido?: string | null;
+  principioActivo?: string | null;
+  concentracion?: string | null;
+  formaFarmaceutica?: string | null;
+  registroSanitario?: string | null;
+  laboratorio?: string | null;
+  condicionVenta?: string | null;
+  codigoEan?: string | null;
+  controlado?: boolean;
   /** Empresa gestora: crear el producto en esta empresa gestionada. */
   idEmpresaDestino?: string;
 }

@@ -219,7 +219,15 @@
                       </td>
                       <td>{{ p.codigo }}</td>
                       <td>{{ marcaColumnaVentas(p) }}</td>
-                      <td>{{ p.descripcion }}</td>
+                      <td>
+                        {{ p.descripcion }}
+                        @if (p.principioActivo) {
+                          <div class="small text-muted">{{ p.principioActivo }}@if (p.concentracion) { · {{ p.concentracion }} }</div>
+                        }
+                        @if (esLineaReceta(p)) {
+                          <span class="badge text-bg-warning">{{ etiquetaCondicionLinea(p) }}</span>
+                        }
+                      </td>
                       <td>{{ etiquetaUnidadLinea(p) }}</td>
                       <td class="text-end">S/ {{ p.pVenta | number:'1.2-2' }}</td>
                       <td class="text-end">{{ p.stock }}</td>
@@ -291,6 +299,12 @@
                           maxlength="500"
                           autocomplete="off"
                         />
+                        @if (item.principioActivo) {
+                          <div class="small text-muted">{{ item.principioActivo }}@if (item.concentracion) { · {{ item.concentracion }} }</div>
+                        }
+                        @if (esLineaReceta(item)) {
+                          <span class="badge text-bg-warning">{{ etiquetaCondicionLinea(item) }}</span>
+                        }
                       </td>
                       <td style="width: 60px; text-align: center;">
                         {{ etiquetaUnidadLinea(item) }}
@@ -379,6 +393,12 @@
                       />
                     } @else {
                       <div class="create-ventas-cart-product">{{ item.descripcion }}</div>
+                    }
+                    @if (item.principioActivo) {
+                      <div class="small text-muted">{{ item.principioActivo }}@if (item.concentracion) { · {{ item.concentracion }} }</div>
+                    }
+                    @if (esLineaReceta(item)) {
+                      <span class="badge text-bg-warning">{{ etiquetaCondicionLinea(item) }}</span>
                     }
                   </div>
                   <div class="create-ventas-cart-meta">

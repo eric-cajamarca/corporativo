@@ -1,6 +1,6 @@
 const sql = require('mssql');
 
-const CODIGOS_RUBRO_ACTIVOS = new Set(['GEN', 'GRF', 'HOTEL', 'PINT']);
+const CODIGOS_RUBRO_ACTIVOS = new Set(['GEN', 'GRF', 'HOTEL', 'PINT', 'FAR']);
 const CODIGOS_COMERCIO = new Set(['GEN', 'FERR', 'RETAIL', null, '']);
 const CODIGOS_PINTURA = new Set(['PINT', 'PINTURA', 'PINTURAS']);
 
@@ -29,6 +29,14 @@ function esRubroPintura(codigoRubro, rubroTexto) {
   return /\bpintur/.test(rubro);
 }
 
+function esRubroFarmacia(codigoRubro, rubroTexto) {
+  const codigo = String(codigoRubro || '').trim().toUpperCase();
+  if (codigo === 'FAR' || codigo === 'FARMACIA' || codigo === 'BOTICA') return true;
+  if (codigo) return false;
+  const rubro = String(rubroTexto || '').trim().toLowerCase();
+  return /\b(farmacia|botica|droguer)/.test(rubro);
+}
+
 function esRubroComercio(codigoRubro) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
   return !codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL';
@@ -36,7 +44,7 @@ function esRubroComercio(codigoRubro) {
 
 function normalizarCodigoRubroVentas(codigoRubro) {
   const codigo = String(codigoRubro || '').trim().toUpperCase();
-      if (!codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL' || codigo === 'PINT') return 'GEN';
+      if (!codigo || codigo === 'GEN' || codigo === 'FERR' || codigo === 'RETAIL' || codigo === 'PINT' || codigo === 'FAR') return 'GEN';
   if (codigo === 'GRF' || codigo === 'GRIFO') return 'GRF';
   if (codigo === 'HOTEL') return 'HOTEL';
   return 'GEN';
@@ -66,6 +74,7 @@ module.exports = {
   esRubroGrifo,
   esRubroHotel,
   esRubroPintura,
+  esRubroFarmacia,
   esRubroComercio,
   normalizarCodigoRubroVentas,
   obtenerRubroEmpresa

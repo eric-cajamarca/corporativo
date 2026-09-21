@@ -6,8 +6,8 @@ exports.descontarStock = async (transaction, stockData) => {
 };
 
 /** Obtiene stock disponible (suma Lotes.cantidadDisponible) por producto/empresa/sucursal. */
-exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSucursal) => {
-  return await stockRepository.obtenerStockDisponible(transaction, idEmpresa, idProducto, idSucursal);
+exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSucursal, opciones = {}) => {
+  return await stockRepository.obtenerStockDisponible(transaction, idEmpresa, idProducto, idSucursal, opciones);
 };
 
 /** Descuenta stock desde Lotes (y opcionalmente LotesUbicacion por prioridad). opciones.controlUbicaciones = false para solo Lotes. */

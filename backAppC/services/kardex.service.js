@@ -76,7 +76,11 @@ function mapProductoFormato131(kardex, fechaDesde) {
       importeSalida: esSalida ? importeSalida : 0,
       saldoCantidad: f.saldoCantidad || 0,
       saldoCostoUnitario: f.saldoPUnitario || 0,
-      saldoImporte: f.saldoImporte || 0
+      saldoImporte: f.saldoImporte || 0,
+      pacienteNombre: f.pacienteNombre || '',
+      medicoNombre: f.medicoNombre || '',
+      cmp: f.cmp || '',
+      numeroReceta: f.numeroReceta || ''
     });
   }
 
@@ -92,6 +96,12 @@ function mapProductoFormato131(kardex, fechaDesde) {
     tipoExistencia: kardex.producto.tipoExistencia || '01',
     tipoExistenciaDescripcion: kardex.producto.tipoExistenciaDescripcion || 'MERCADERIAS',
     unidadMedida: kardex.producto.unidadMedida || 'NIU',
+    controlado: !!kardex.producto.controlado,
+    principioActivo: kardex.producto.principioActivo || '',
+    concentracion: kardex.producto.concentracion || '',
+    formaFarmaceutica: kardex.producto.formaFarmaceutica || '',
+    registroSanitario: kardex.producto.registroSanitario || '',
+    marca: kardex.producto.marca || '',
     filas,
     totales: {
       totalEntradaCantidad,
@@ -127,12 +137,14 @@ exports.obtenerKardex = async (idEmpresa, idProducto, fechaDesde, fechaHasta) =>
 };
 
 /**
- * Kardex completo de todos los productos (Formato 13.1 SUNAT).
+ * Kardex completo de productos (Formato 13.1 SUNAT o libro DIGEMID de controlados).
+ * @param {{ soloControlados?: boolean }} [opciones]
  */
-exports.obtenerKardexCompleto = async (idEmpresa, fechaDesde, fechaHasta) => {
+exports.obtenerKardexCompleto = async (idEmpresa, fechaDesde, fechaHasta, opciones = {}) => {
   if (!idEmpresa) {
     throw new Error('idEmpresa es obligatorio');
   }
+  const soloControlados = opciones.soloControlados === true;
   const { y, m } = partesAhoraApp();
   const desde = fechaDesde || `${y}-${m}-01`;
   const hasta = fechaHasta || getFechaHoyApp();
@@ -140,7 +152,7 @@ exports.obtenerKardexCompleto = async (idEmpresa, fechaDesde, fechaHasta) => {
   return withPool(async (pool) => {
     const [cabecera, productos] = await Promise.all([
       kardexRepository.obtenerCabeceraEmpresaKardex(pool, idEmpresa),
-      kardexRepository.listarProductosParaKardex(pool, idEmpresa)
+      kardexRepository.listarProductosParaKardex(pool, idEmpresa, { soloControlados })
     ]);
 
     if (!cabecera) {
@@ -180,6 +192,7 @@ exports.obtenerKardexCompleto = async (idEmpresa, fechaDesde, fechaHasta) => {
         fechaDesde: desde,
         fechaHasta: hasta
       },
+      tipoLibro: soloControlados ? 'DIGEMID' : '13.1',
       productos: productosFormato
     };
   });

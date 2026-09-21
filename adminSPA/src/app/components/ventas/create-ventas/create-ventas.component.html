@@ -133,6 +133,12 @@
                           maxlength="500"
                           autocomplete="off"
                         />
+                        @if (item.principioActivo) {
+                          <div class="small text-muted">{{ item.principioActivo }}@if (item.concentracion) { · {{ item.concentracion }} }</div>
+                        }
+                        @if (esLineaReceta(item)) {
+                          <span class="badge text-bg-warning">{{ etiquetaCondicionLinea(item) }}</span>
+                        }
                       </td>
                       <td style="width: 60px; text-align: center;">
                         {{ etiquetaUnidadLinea(item) }}
@@ -221,6 +227,12 @@
                       />
                     } @else {
                       <div class="create-ventas-cart-product">{{ item.descripcion }}</div>
+                    }
+                    @if (item.principioActivo) {
+                      <div class="small text-muted">{{ item.principioActivo }}@if (item.concentracion) { · {{ item.concentracion }} }</div>
+                    }
+                    @if (esLineaReceta(item)) {
+                      <span class="badge text-bg-warning">{{ etiquetaCondicionLinea(item) }}</span>
                     }
                   </div>
                   <div class="create-ventas-cart-meta">

@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
 import type { ReporteVentasDetalladoData } from '../models/reporte-ventas-detallado.model';
+import type { RecetaVentaPayload } from '../models/receta-venta.model';
 
 /** Línea de cobro: el POS puede enviar idFormaPago y/o idMediosPago (crédito vs saldo a favor). */
 export interface DetallePagoApiLinea {
@@ -60,6 +61,7 @@ export interface VentaCompletaPayload {
   detallePago?: DetallePagoApiLinea[];
   /** Plan de cuotas (factura/boleta a crédito); la suma de montos debe coincidir con el total al crédito en detallePago. */
   cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
+  receta?: RecetaVentaPayload | null;
   idApertura?: string;
 }
 

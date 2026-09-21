@@ -19,6 +19,9 @@ import { ProductoCreadoModalResult } from '../../../services/producto-crear-moda
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { esProductoServicio } from '../../../utils/producto-servicio.util';
+import { EmpresaService } from '../../../services/empresa.service';
+import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
+import { FORMAS_FARMACEUTICAS } from '../../../utils/formas-farmaceuticas.util';
 
 declare var iziToast: any;
 
@@ -80,7 +83,9 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   guardando = signal<boolean>(false);
   cargandoDatos = signal<boolean>(true);
   
-  // Tabs y modo
+  /** Rubro botica: muestra pestaña farmacéutico. */
+  esBotica = false;
+  readonly formasFarmaceuticas = FORMAS_FARMACEUTICAS;
   activeTab = signal<string>('basico');
   modoLote = signal<boolean>(false);
 
@@ -133,6 +138,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     private preciosService: PreciosService,
     private modalService: NgbModal,
     private router: Router,
+    private empresaService: EmpresaService,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
   ) {
@@ -154,6 +160,15 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.initForm();
     this.cargarEmpresasGestionadas();
+    this.empresaService.refreshEmpresaFromApi().subscribe({
+      next: (emp) => {
+        this.esBotica = esRubroFarmacia(emp?.codigoRubro, emp?.rubro);
+      },
+      error: () => {
+        const actual = this.empresaService.getEmpresaActual();
+        this.esBotica = esRubroFarmacia(actual?.codigoRubro, actual?.rubro);
+      }
+    });
     this.productoForm.get('useCorrelativo')?.valueChanges.subscribe(() => {
       this.onCheckboxChangeCorrelativo();
     });
@@ -205,6 +220,14 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       revisadoSunat: [false],
       anexoSunatSugerido: [''],
       codigoSunatSugerido: [''],
+      principioActivo: [''],
+      concentracion: [''],
+      formaFarmaceutica: [''],
+      registroSanitario: [''],
+      laboratorio: [''],
+      condicionVenta: ['LIBRE'],
+      codigoEan: [''],
+      controlado: [false],
 
       // Precio
       idListaPrecio: [null]
@@ -427,8 +450,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     this.activeTab.set(tab);
   }
 
-  /** Orden de pestañas antes de galería (solo flujo creación en modal). */
-  private readonly tabsCreacionOrden = ['basico', 'inventario', 'precios'] as const;
+  private get tabsCreacionOrden(): string[] {
+    const base = ['basico', 'inventario', 'precios'];
+    return this.esBotica ? [...base, 'farmaceutico'] : base;
+  }
 
   irSiguienteTabCreacion(): void {
     const tab = this.activeTab();
@@ -462,7 +487,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    const idx = this.tabsCreacionOrden.indexOf(tab as (typeof this.tabsCreacionOrden)[number]);
+    const idx = this.tabsCreacionOrden.indexOf(tab);
     if (idx >= 0 && idx < this.tabsCreacionOrden.length - 1) {
       this.activeTab.set(this.tabsCreacionOrden[idx + 1]);
     }
@@ -551,6 +576,14 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       revisadoSunat: !!v.revisadoSunat,
       anexoSunatSugerido: v.anexoSunatSugerido ? String(v.anexoSunatSugerido).trim() : null,
       codigoSunatSugerido: v.codigoSunatSugerido ? String(v.codigoSunatSugerido).trim() : null,
+      principioActivo: v.principioActivo ? String(v.principioActivo).trim() : null,
+      concentracion: v.concentracion ? String(v.concentracion).trim() : null,
+      formaFarmaceutica: v.formaFarmaceutica ? String(v.formaFarmaceutica).trim() : null,
+      registroSanitario: v.registroSanitario ? String(v.registroSanitario).trim() : null,
+      laboratorio: v.laboratorio ? String(v.laboratorio).trim() : null,
+      condicionVenta: v.condicionVenta || 'LIBRE',
+      codigoEan: v.codigoEan ? String(v.codigoEan).trim() : null,
+      controlado: !!v.controlado,
       ...(this.esModoGestora && this.idEmpresaSeleccionada
         ? { idEmpresaDestino: this.idEmpresaSeleccionada }
         : {})

@@ -19,6 +19,14 @@
           Precios
         </button>
       </li>
+      @if (esBotica) {
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeTab() === 'farmaceutico'" (click)="cambiarTab('farmaceutico')">
+            <i class="fas fa-pills me-1"></i>
+            Farmacéutico
+          </button>
+        </li>
+      }
       @if (idProductoCreado) {
         <li class="nav-item">
           <button class="nav-link" [class.active]="activeTab() === 'galeria'" (click)="cambiarTab('galeria')">
@@ -146,7 +154,7 @@
             @if (hasError('idCategoria')) { <div class="invalid-feedback">{{ getError('idCategoria') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
-            <label class="form-label">Marca *</label>
+            <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }} *</label>
             <div class="input-group">
               <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')" (focus)="recargarMarcas()">
                 <option value="">Seleccione...</option>
@@ -374,6 +382,57 @@
               } @else {
                 <i class="fas fa-save me-1"></i>
               }
+              Guardar producto
+            </button>
+          </div>
+        }
+      }
+      @if (activeTab() === 'farmaceutico' && esBotica) {
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Principio activo</label>
+            <input type="text" class="form-control" formControlName="principioActivo" maxlength="150" placeholder="Ej. Paracetamol" />
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label">Concentración</label>
+            <input type="text" class="form-control" formControlName="concentracion" maxlength="40" placeholder="Ej. 500 mg" />
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label">Forma farmacéutica</label>
+            <select class="form-select" formControlName="formaFarmaceutica">
+              <option value="">Seleccionar...</option>
+              @for (f of formasFarmaceuticas; track f) {
+                <option [value]="f">{{ f }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Registro sanitario</label>
+            <input type="text" class="form-control" formControlName="registroSanitario" maxlength="30" placeholder="Ej. EE-05432" />
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Condición de venta</label>
+            <select class="form-select" formControlName="condicionVenta">
+              <option value="LIBRE">Libre</option>
+              <option value="RECETA">Receta simple</option>
+              <option value="RETENIDA">Receta retenida</option>
+              <option value="ESPECIAL">Receta especial</option>
+            </select>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Código EAN</label>
+            <input type="text" class="form-control" formControlName="codigoEan" maxlength="14" placeholder="Código de barras" />
+          </div>
+          <div class="col-md-4 mb-3 d-flex align-items-end">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" formControlName="controlado" id="controladoCreate" />
+              <label class="form-check-label" for="controladoCreate">Controlado (psicotrópico)</label>
+            </div>
+          </div>
+        </div>
+        @if (esModal) {
+          <div class="d-flex justify-content-end mt-3 pt-3 border-top">
+            <button type="button" class="btn btn-primary" (click)="guardarProducto()" [disabled]="guardando()">
               Guardar producto
             </button>
           </div>

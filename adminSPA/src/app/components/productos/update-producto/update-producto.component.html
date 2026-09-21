@@ -50,30 +50,36 @@
 
         <div class="col-md-4">
           <label class="form-label">Categoría *</label>
-          <select
-            class="form-select"
-            formControlName="idCategoria"
-            [class.is-invalid]="hasError('idCategoria')">
-            <option value="">Seleccione...</option>
-            @for (cat of categorias; track cat.idCategoria) {
-              <option [value]="cat.idCategoria">{{ cat.nombre }}</option>
-            }
-          </select>
+          <div class="input-group">
+            <select
+              class="form-select"
+              formControlName="idCategoria"
+              [class.is-invalid]="hasError('idCategoria')">
+              <option value="">Seleccione...</option>
+              @for (cat of categorias; track cat.idCategoria) {
+                <option [value]="cat.idCategoria">{{ cat.nombre }}</option>
+              }
+            </select>
+            <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaCategoria()">Crear</button>
+          </div>
           @if (hasError('idCategoria')) {
             <div class="invalid-feedback">{{ getError('idCategoria') }}</div>
           }
         </div>
         <div class="col-md-4">
-          <label class="form-label">Marca *</label>
-          <select
-            class="form-select"
-            formControlName="idMarca"
-            [class.is-invalid]="hasError('idMarca')">
-            <option value="">Seleccione...</option>
-            @for (marca of marcas; track marca.idMarca) {
-              <option [value]="marca.idMarca">{{ marca.nombre }}</option>
-            }
-          </select>
+          <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }} *</label>
+          <div class="input-group">
+            <select
+              class="form-select"
+              formControlName="idMarca"
+              [class.is-invalid]="hasError('idMarca')">
+              <option value="">Seleccione...</option>
+              @for (marca of marcas; track marca.idMarca) {
+                <option [value]="marca.idMarca">{{ marca.nombre }}</option>
+              }
+            </select>
+            <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaMarca()">Crear</button>
+          </div>
           @if (hasError('idMarca')) {
             <div class="invalid-feedback">{{ getError('idMarca') }}</div>
           }
@@ -200,6 +206,52 @@
           </div>
         </div>
       </div>
+      @if (esBotica) {
+        <hr />
+        <h6 class="mb-3"><i class="bi bi-capsule me-1"></i> Farmacéutico</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Principio activo</label>
+            <input type="text" class="form-control" formControlName="principioActivo" maxlength="150" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Concentración</label>
+            <input type="text" class="form-control" formControlName="concentracion" maxlength="40" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Forma farmacéutica</label>
+            <select class="form-select" formControlName="formaFarmaceutica">
+              <option value="">Seleccionar...</option>
+              @for (f of formasFarmaceuticas; track f) {
+                <option [value]="f">{{ f }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Registro sanitario</label>
+            <input type="text" class="form-control" formControlName="registroSanitario" maxlength="30" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Condición de venta</label>
+            <select class="form-select" formControlName="condicionVenta">
+              <option value="LIBRE">Libre</option>
+              <option value="RECETA">Receta simple</option>
+              <option value="RETENIDA">Receta retenida</option>
+              <option value="ESPECIAL">Receta especial</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Código EAN</label>
+            <input type="text" class="form-control" formControlName="codigoEan" maxlength="14" />
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" formControlName="controlado" id="controladoEdit" />
+              <label class="form-check-label" for="controladoEdit">Controlado</label>
+            </div>
+          </div>
+        </div>
+      }
     </form>
   }
 </div>

@@ -658,8 +658,7 @@
                                                         <div>
 
                                                             <label for="fVencimiento">Fecha de
-
-                                                                Vencimiento</label>
+                                                                Vencimiento <ng-container *ngIf="esBotica">(*)</ng-container></label>
 
                                                             <input type="date" class="form-control" name="fVencimiento"
 
@@ -669,7 +668,7 @@
 
                                                         <div class="mt-2">
 
-                                                            <label for="numeroLoteLinea">N° de lote (opcional)</label>
+                                                            <label for="numeroLoteLinea">N° de lote <ng-container *ngIf="esBotica">(*)</ng-container><ng-container *ngIf="!esBotica">(opcional)</ng-container></label>
 
                                                             <input type="text" class="form-control" name="numeroLoteLinea" maxlength="50"
 
