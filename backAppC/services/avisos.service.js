@@ -59,6 +59,22 @@ exports.obtenerCinta = async (pool, user) => {
       });
     }
 
+    const cfgFact = await avisosRepository.obtenerAlertaConfigFacturacionRepo(pool, idEmpresa);
+    if (cfgFact && (cfgFact.faltaCertificado || pend > 0 || errSunat > 0)) {
+      const msg = cfgFact.faltaCertificado
+        ? 'Falta el certificado digital o su clave en Configuración > Facturación. Los envíos a SUNAT no se completarán hasta corregirlo.'
+        : 'La configuración de facturación electrónica está incompleta (envío directo o Facturador). Revise Configuración > Facturación.';
+      items.push({
+        id: 'cinta-sunat-config',
+        severity: 'danger',
+        message: msg,
+        link: '/configuracion',
+        linkLabel: 'Configuración',
+        dismissible: true,
+        dismissKey: 'cinta-sunat-config'
+      });
+    }
+
     const cuotasMan = await avisosRepository.contarCuotasCreditoPorVencerMananaRepo(pool, idEmpresa);
     if (cuotasMan > 0) {
       items.push({

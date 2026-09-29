@@ -29,6 +29,7 @@ const facturacionRepo     = require("../repositories/facturacion.repository");
 const vehiculosRepo       = require("../repositories/vehiculos.repository");
 const { descifrar }       = require("../utils/cifradoClaveCertificado.util");
 const { normalizarRucSunatGre } = require("../utils/rucSunatGre.util");
+const { getFechaHoyLocal, getNowLocalISOString } = require("../utils/fechaHoraLocal.util");
 const firmaXmlSunat       = require("./firmaXmlSunat.service");
 
 const MSG_GRE31_SIN_VEHICULOS =
@@ -342,13 +343,51 @@ function normalizarModalidadTransporteGre(val) {
 }
 
 /** Placa del vehículo principal (alias en otros módulos; secundaria solo si principal vacía). */
+function normalizarPlacaGre(val) {
+  return String(val || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 function placaPrincipalVehiculoGre(d) {
   if (!d || typeof d !== "object") return "";
-  const a = String(d.placaVehiculo || "").trim();
+  const a = normalizarPlacaGre(d.placaVehiculo);
   if (a) return a;
-  const b = String(d.placaPrincipal || d.placa || "").trim();
+  const b = normalizarPlacaGre(d.placaPrincipal || d.placa);
   if (b) return b;
-  return String(d.placaSecundaria || "").trim();
+  return normalizarPlacaGre(d.placaSecundaria);
+}
+
+function assertPlacaGreSinGuion(raw, etiqueta) {
+  const s = String(raw || "").trim();
+  if (!s) return;
+  if (s.includes("-")) {
+    throw new Error(`${etiqueta} no debe incluir guion. Use formato ABC123.`);
+  }
+  const n = normalizarPlacaGre(s);
+  if (n.length < 5) {
+    throw new Error(`${etiqueta} inválida (mínimo 5 caracteres, sin guion).`);
+  }
+}
+
+function assertFechaHoraTrasladoGre(fechaYmd, horaRaw) {
+  const hoy = getFechaHoyLocal();
+  const fecha = String(fechaYmd || "").trim().slice(0, 10);
+  if (!fecha) {
+    throw new Error("La fecha de inicio de traslado es requerida (formato YYYY-MM-DD).");
+  }
+  if (fecha < hoy) {
+    throw new Error("La fecha de inicio de traslado no puede ser anterior al día de emisión.");
+  }
+  const hora = String(horaRaw || "").trim();
+  if (fecha === hoy && hora) {
+    const hmm = /^\d{2}:\d{2}/.test(hora) ? hora.slice(0, 5) : "";
+    const ahora = String(getNowLocalISOString() || "").slice(11, 16);
+    if (hmm && ahora && hmm > ahora) {
+      throw new Error("La hora de traslado no puede ser posterior a la hora de emisión.");
+    }
+  }
 }
 
 /** Ubigeo INEI: 6 dígitos (se ignoran separadores). Acepta un 0 inicial de más p. ej. "0220901". */
@@ -577,6 +616,8 @@ function validarDatosGuiaMinimosEnvio(d) {
   if (!String(d.numDocDestinatario || "").trim()) {
     throw new Error("Falta documento del destinatario en los datos de la guía.");
   }
+  if (d.placaVehiculo != null) d.placaVehiculo = normalizarPlacaGre(d.placaVehiculo);
+  if (d.placaSecundaria != null) d.placaSecundaria = normalizarPlacaGre(d.placaSecundaria);
   const tipoDocGuia = String(d.tipoDocumento || "09").trim();
   if (tipoDocGuia === "09" || tipoDocGuia === "31") {
     if (!ubigeoValidoGre(d.ubigeoDestino)) {
@@ -1114,6 +1155,13 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
   }
   const fechaYmd = normalizarFechaEmisionGreYmd(datos.fechaEmision);
   if (!fechaYmd) throw new Error("La fecha de inicio de traslado es requerida (formato YYYY-MM-DD).");
+  assertFechaHoraTrasladoGre(fechaYmd, datos.horaInicioTraslado);
+  if (!datos.vehiculoM1L) {
+    assertPlacaGreSinGuion(datos.placaVehiculo || datos.placaPrincipal || datos.placa, "La placa del vehículo principal");
+    if (String(datos.placaSecundaria || "").trim()) {
+      assertPlacaGreSinGuion(datos.placaSecundaria, "La placa secundaria");
+    }
+  }
   if (!datos.dirOrigen) throw new Error("La dirección de origen es requerida.");
   if (!datos.dirDestino) throw new Error("La dirección de destino es requerida.");
   if (!datos.nomDestinatario) throw new Error("Los datos del destinatario son requeridos.");
@@ -1154,8 +1202,8 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
     numDocDestinatario: datos.numDocDestinatario || "",
     nomDestinatario: datos.nomDestinatario || "",
     telefonoDestinatario: datos.telefonoDestinatario || "",
-    placaVehiculo: datos.placaVehiculo || "",
-    placaSecundaria: datos.placaSecundaria || "",
+    placaVehiculo: normalizarPlacaGre(datos.placaVehiculo),
+    placaSecundaria: normalizarPlacaGre(datos.placaSecundaria),
     vehiculoM1L: Boolean(datos.vehiculoM1L),
     tipoDocRemitente: String(datos.tipoDocRemitente || "").trim(),
     numDocRemitente: String(datos.numDocRemitente || "").trim(),
@@ -1241,6 +1289,13 @@ exports.registrarGuiaService = async (pool, user, datos) => {
   }
   const fechaYmd = normalizarFechaEmisionGreYmd(datos.fechaEmision);
   if (!fechaYmd) throw new Error("La fecha de inicio de traslado es requerida (formato YYYY-MM-DD).");
+  assertFechaHoraTrasladoGre(fechaYmd, datos.horaInicioTraslado);
+  if (!datos.vehiculoM1L) {
+    assertPlacaGreSinGuion(datos.placaVehiculo || datos.placaPrincipal || datos.placa, "La placa del vehículo principal");
+    if (String(datos.placaSecundaria || "").trim()) {
+      assertPlacaGreSinGuion(datos.placaSecundaria, "La placa secundaria");
+    }
+  }
   if (!datos.dirOrigen)       throw new Error("La dirección de origen es requerida.");
   if (!datos.dirDestino)      throw new Error("La dirección de destino es requerida.");
   if (!datos.nomDestinatario) throw new Error("Los datos del destinatario son requeridos.");
@@ -1287,8 +1342,8 @@ exports.registrarGuiaService = async (pool, user, datos) => {
     numDocRemitente: String(datos.numDocRemitente || "").trim(),
     nomRemitente: String(datos.nomRemitente || "").trim(),
     idVehiculoEmpresa: String(datos.idVehiculoEmpresa || "").trim() || null,
-    placaVehiculo      : datos.placaVehiculo || "",
-    placaSecundaria    : datos.placaSecundaria || "",
+    placaVehiculo      : normalizarPlacaGre(datos.placaVehiculo),
+    placaSecundaria    : normalizarPlacaGre(datos.placaSecundaria),
     vehiculoM1L        : Boolean(datos.vehiculoM1L), // Vehículo categoría M1 o L (exime conductor y placa)
     tipoDocConductor   : datos.tipoDocConductor || "",
     numeroDocConductor : datos.numeroDocConductor || "",

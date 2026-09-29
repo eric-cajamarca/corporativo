@@ -605,3 +605,16 @@
 .venta-rapida-top h5 {
   letter-spacing: 0.02em;
 }
+
+.create-ventas-carga-dropdown .dropdown-menu {
+  min-width: 11rem;
+  z-index: 2000;
+}
+
+.create-ventas-icon-btn {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

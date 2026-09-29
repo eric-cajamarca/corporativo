@@ -12,6 +12,64 @@ const { nombreArchivoComprobante } = require('../utils/facturadorSunat.util');
 const CARPETA_XML_FIRMADOS_SUNAT = path.join(process.cwd(), 'xml_firmados_sunat');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 const { ymdLima, minutosDesdeMedianocheLima, parseHoraEnvioSunat } = require('../utils/limaSunat.util');
+const {
+  esFalloInfraestructuraSunat,
+  esErrorConfiguracionFacturacion,
+  diagnosticoConfigEnvioSunat
+} = require('../utils/sunatEnvioReintentos.util');
+const seguridadAlertasService = require('./seguridadAlertas.service');
+
+function configEnvioParaRepo(config) {
+  return {
+    rutaCarpetaFacturadorSunat: config?.rutaCarpetaFacturadorSunat,
+    urlFacturadorSunat: config?.urlFacturadorSunat,
+    envioDirectoSunat: config?.envioDirectoSunat,
+    urlEnvio: config?.urlEnvio,
+    usuarioSunat: config?.usuarioSunat,
+    claveSunat: config?.claveSunat
+  };
+}
+
+function avisarConfigFacturacionIncompleta(pool, idEmpresa, detalle) {
+  seguridadAlertasService.runSafeAlert(
+    () => seguridadAlertasService.notificarConfigFacturacionIncompleta(pool, { idEmpresa, detalle }),
+    'config_facturacion_sunat'
+  );
+}
+
+/**
+ * Tras un envío fallido: reintento diferido (infra), aviso de config, o error definitivo (no reintenta).
+ */
+async function aplicarResultadoFalloEnvioService(pool, idEmpresa, idComprobanteElectronico, result, err) {
+  if (result?.ok) return { tipo: 'ok' };
+  const mensaje =
+    (result && (result.mensaje || result.error || result.descripcionRespuesta)) ||
+    (err && err.message) ||
+    '';
+  if (result?.errorConfig === true || esErrorConfiguracionFacturacion(result, err) || esErrorConfiguracionFacturacion(mensaje)) {
+    avisarConfigFacturacionIncompleta(pool, idEmpresa, mensaje || 'Configuración de facturación incompleta');
+    return { tipo: 'config', mensaje };
+  }
+  if (result?.quedarPendiente === true || esFalloInfraestructuraSunat(result, err)) {
+    try {
+      await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, idComprobanteElectronico, idEmpresa);
+    } catch (eReg) {
+      console.error('facturacion.service: registrarFalloIntentoEnvio', eReg.message);
+    }
+    return { tipo: 'reintento', mensaje };
+  }
+  try {
+    await FacturacionRepository.marcarErrorEnvioDefinitivoRepo(pool, idComprobanteElectronico, idEmpresa, {
+      codigoRespuesta: result?.codigoRespuesta || null,
+      descripcionRespuesta: mensaje || 'Error al enviar a SUNAT'
+    });
+  } catch (eMark) {
+    console.error('facturacion.service: marcarErrorEnvioDefinitivo', eMark.message);
+  }
+  return { tipo: 'error', mensaje };
+}
+
+exports.aplicarResultadoFalloEnvioService = aplicarResultadoFalloEnvioService;
 
 exports.obtenerConfiguracionFacturacionService = async (pool, user) => {
   if (!user) {
@@ -100,8 +158,9 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
   }
 
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
-  const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
-  if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
+  const diag = diagnosticoConfigEnvioSunat(config);
+  if (!diag.ok) {
+    avisarConfigFacturacionIncompleta(pool, user.empresa, diag.mensaje);
     throw new Error("CONFIG_FACTURADOR_INCOMPLETA");
   }
 
@@ -110,16 +169,12 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
     user,
     idComprobanteElectronico,
     facturadorSunatService,
-    {
-      rutaCarpetaFacturadorSunat: config.rutaCarpetaFacturadorSunat,
-      urlFacturadorSunat: config.urlFacturadorSunat,
-      envioDirectoSunat: config.envioDirectoSunat,
-      urlEnvio: config.urlEnvio,
-      usuarioSunat: config.usuarioSunat,
-      claveSunat: config.claveSunat
-    },
+    configEnvioParaRepo(config),
     opciones
   );
+  if (result && !result.ok) {
+    await aplicarResultadoFalloEnvioService(pool, user.empresa, idComprobanteElectronico, result, null);
+  }
   return result;
 };
 
@@ -325,17 +380,19 @@ exports.obtenerEstadosSunatService = async (pool, user) => {
 
 /**
  * Envía un lote de comprobantes pendientes (idEstadoSunat = 7) de una empresa.
+ * No reenvía los que ya quedaron con error de negocio (pasan a idEstadoSunat = 6).
  * @param {object} [opts]
  * @param {boolean} [opts.manual] - true = sin filtro modo2/modo3 (envío manual / botón lote)
- * @param {null|'modo2'|'modo3'} [opts.filtroProgramacion] - si no es manual, filtra por programación en BD
+ * @param {null|'modo1'|'modo2'|'modo3'} [opts.filtroProgramacion] - si no es manual, filtra por programación en BD
  */
 exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
   const manual = opts.manual === true;
   const filtroProgramacion = manual ? null : opts.filtroProgramacion || null;
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
-  const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
-  if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
-    return { enviados: 0, errores: 0, reintentosProgramados: 0, total: 0, mensaje: "Configure envío directo SUNAT o ruta del Facturador" };
+  const diag = diagnosticoConfigEnvioSunat(config);
+  if (!diag.ok) {
+    avisarConfigFacturacionIncompleta(pool, idEmpresa, diag.mensaje);
+    return { enviados: 0, errores: 0, reintentosProgramados: 0, total: 0, errorConfig: true, mensaje: diag.mensaje };
   }
 
   const excluirBoletas = config?.useResumenDiarioBoletas === true;
@@ -354,34 +411,43 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
         { empresa: idEmpresa },
         ce.idComprobanteElectronico,
         facturadorSunatService,
-        {
-          rutaCarpetaFacturadorSunat: config.rutaCarpetaFacturadorSunat,
-          urlFacturadorSunat: config.urlFacturadorSunat,
-          envioDirectoSunat: config.envioDirectoSunat,
-          urlEnvio: config.urlEnvio,
-          usuarioSunat: config.usuarioSunat,
-          claveSunat: config.claveSunat
-        }
+        configEnvioParaRepo(config)
       );
       if (result?.ok) {
         enviados++;
-      } else if (result?.quedarPendiente) {
+        continue;
+      }
+      const clasif = await aplicarResultadoFalloEnvioService(pool, idEmpresa, ce.idComprobanteElectronico, result, null);
+      if (clasif.tipo === "reintento") {
         reintentosProgramados++;
-        try {
-          await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
-        } catch (_) {
-          /* ignore */
-        }
+      } else if (clasif.tipo === "config") {
+        return {
+          enviados,
+          errores,
+          reintentosProgramados,
+          total: pendientes.length,
+          errorConfig: true,
+          mensaje: clasif.mensaje
+        };
       } else {
         errores++;
       }
     } catch (err) {
       console.error("facturacion.service: error enviando comprobante", ce.idComprobanteElectronico, err.message);
-      errores++;
-      try {
-        await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
-      } catch (_) {
-        /* ignore */
+      const clasif = await aplicarResultadoFalloEnvioService(pool, idEmpresa, ce.idComprobanteElectronico, null, err);
+      if (clasif.tipo === "reintento") {
+        reintentosProgramados++;
+      } else if (clasif.tipo === "config") {
+        return {
+          enviados,
+          errores,
+          reintentosProgramados,
+          total: pendientes.length,
+          errorConfig: true,
+          mensaje: clasif.mensaje
+        };
+      } else {
+        errores++;
       }
     }
   }
@@ -390,7 +456,8 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
 };
 
 /**
- * Ejecuta el envío automático para empresas con envioAutomatico = 1 y modo 2 o 3.
+ * Ejecuta el envío automático para empresas modo 1 (reintentos), 2 y 3.
+ * Modo 1: pendientes con fechaProximoReintento vencida (conexión / SUNAT sin respuesta).
  * Modo 2: pendientes con fechaElegibleEnvio vencida. Modo 3: una ola diaria desde hora configurada (Lima).
  */
 exports.ejecutarEnvioAutomaticoService = async (pool) => {
@@ -404,7 +471,9 @@ exports.ejecutarEnvioAutomaticoService = async (pool) => {
       let filtroProgramacion = null;
       let actualizarOla = false;
 
-      if (modo === 2) {
+      if (modo === 1) {
+        filtroProgramacion = "modo1";
+      } else if (modo === 2) {
         filtroProgramacion = "modo2";
       } else if (modo === 3) {
         const { horas, minutos } = parseHoraEnvioSunat(emp.horaEnvioSunat);

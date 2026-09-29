@@ -34,7 +34,7 @@ function verificarIntegracion(proveedor) {
         const row = result.recordset[0];
         if (!row || !row.habilitado) {
           return res.status(403).json({
-            message: `La integración ${proveedor} no está habilitada para tu empresa. Configúrala en integraciones.`
+            message: `La integración ${proveedor} no está habilitada para tu empresa. Comunícate con soporte.`
           });
         }
         next();

@@ -82,9 +82,12 @@ async function crearCliente(pool, user, body) {
   if (existente) {
     return { ...existente, existente: true };
   }
-  const esSujetoCredito =
-    sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
   const linea = lineaCredito != null && !isNaN(Number(lineaCredito)) ? Math.max(0, Number(lineaCredito)) : 0;
+  const esSujetoCredito =
+    linea > 0 ||
+    sujetoCredito === true ||
+    sujetoCredito === 1 ||
+    String(sujetoCredito).toLowerCase() === 'true';
   await clientesRepository.insertar(pool, {
     idEmpresa,
     idDocumento,
@@ -161,9 +164,12 @@ async function actualizarCliente(pool, user, idCliente, body) {
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = body;
-  const esSujetoCredito =
-    sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
   const linea = lineaCredito != null && !isNaN(Number(lineaCredito)) ? Math.max(0, Number(lineaCredito)) : 0;
+  const esSujetoCredito =
+    linea > 0 ||
+    sujetoCredito === true ||
+    sujetoCredito === 1 ||
+    String(sujetoCredito).toLowerCase() === 'true';
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   const updateResult = await clientesRepository.actualizarEnEmpresas(pool, ids, {
     idCliente,

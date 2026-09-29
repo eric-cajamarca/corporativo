@@ -24,7 +24,7 @@ const notaCreditoCobranzaService = require("../services/notaCreditoCobranza.serv
 const bajaSunatStockService = require("../services/bajaSunatStock.service");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
-const { esFalloInfraestructuraSunat } = require("../utils/sunatEnvioReintentos.util");
+const { esFalloInfraestructuraSunat, esErrorConfiguracionFacturacion } = require("../utils/sunatEnvioReintentos.util");
 const {
   validarItemsCodigoProductoSunatEmision
 } = require("../services/codigoProductoSunatEmision.service");
@@ -319,7 +319,7 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
   return { mensaje: "Configuración actualizada exitosamente" };
 };
 
-/** Empresas con job programado: modos 2 o 3, envío automático ON y Facturador o envío directo válido. */
+/** Empresas para el job: modos 2/3 con envío automático, o modo 1 (reintento tras cobro si SUNAT no respondió). */
 exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
   try {
     const result = await pool.request().query(`
@@ -328,8 +328,10 @@ exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
              ISNULL(modoEnvioSunat, 2) AS modoEnvioSunat, horaEnvioSunat, fechaUltimaOlaEnvioProgramado,
              ISNULL(useResumenDiarioBoletas, 0) AS useResumenDiarioBoletas
       FROM ConfiguracionFacturacionElectronica
-      WHERE envioAutomatico = 1
-        AND ISNULL(modoEnvioSunat, 2) IN (2, 3)
+      WHERE (
+          (envioAutomatico = 1 AND ISNULL(modoEnvioSunat, 2) IN (2, 3))
+          OR ISNULL(modoEnvioSunat, 2) = 1
+        )
         AND (
           (rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(rutaCarpetaFacturadorSunat)) <> '')
           OR (ISNULL(envioDirectoSunat, 0) = 1 AND urlEnvio IS NOT NULL AND LTRIM(RTRIM(urlEnvio)) <> '' AND usuarioSunat IS NOT NULL AND claveSunat IS NOT NULL)
@@ -361,10 +363,22 @@ exports.actualizarFechaUltimaOlaEnvioProgramadoRepo = async (pool, idEmpresa, fe
     `);
 };
 
-/** Tras confirmar cobro: marca pago y ventana de envío (modo 2). Modo 3 solo marca pago. */
+/** Tras confirmar cobro: modo 1 marca pago; modo 2 marca pago y ventana; modo 3 solo marca pago. */
 exports.marcarPagoComprobantesElectronicosPorVentaRepo = async (pool, idVenta, idEmpresa, opts = {}) => {
   const modo = Number(opts.modoEnvioSunat) || 2;
   const minutos = Math.max(1, Number(opts.minutosEspera) || 10);
+  if (modo === 1) {
+    await pool
+      .request()
+      .input("idVenta", sql.Int, idVenta)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        UPDATE ComprobantesElectronicos
+        SET fechaConfirmacionPago = SYSUTCDATETIME()
+        WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+      `);
+    return;
+  }
   if (modo === 2) {
     await pool
       .request()
@@ -455,6 +469,54 @@ exports.registrarFalloIntentoEnvioRepo = async (pool, idComprobanteElectronico, 
           fechaProximoReintento = DATEADD(MINUTE, 15, SYSUTCDATETIME())
       WHERE idComprobanteElectronico = @id AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
     `);
+};
+
+/** Marca error definitivo (idEstadoSunat = 6) solo si sigue pendiente. No reintenta. */
+exports.marcarErrorEnvioDefinitivoRepo = async (pool, idComprobanteElectronico, idEmpresa, resultado = {}) => {
+  const nowStr = getNowLocalSQLString();
+  const descripcion = resultado.descripcionRespuesta != null
+    ? String(resultado.descripcionRespuesta).slice(0, 500)
+    : "Error al enviar a SUNAT";
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const upd = await transaction
+      .request()
+      .input("id", sql.UniqueIdentifier, idComprobanteElectronico)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("fechaRespuesta", sql.VarChar(23), nowStr)
+      .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
+      .input("descripcionRespuesta", sql.VarChar(500), descripcion)
+      .input("idEstadoSunat", sql.Int, 6)
+      .query(`
+        UPDATE ComprobantesElectronicos
+        SET fechaRespuesta = @fechaRespuesta,
+            codigoRespuesta = @codigoRespuesta,
+            descripcionRespuesta = @descripcionRespuesta,
+            idEstadoSunat = @idEstadoSunat,
+            intentosEnvio = ISNULL(intentosEnvio, 0) + 1,
+            ultimoIntento = @fechaRespuesta
+        WHERE idComprobanteElectronico = @id AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+      `);
+    if (upd.rowsAffected && upd.rowsAffected[0] > 0) {
+      await transaction
+        .request()
+        .input("id", sql.UniqueIdentifier, idComprobanteElectronico)
+        .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+        .input("idEstadoSunat", sql.Int, 6)
+        .query(`
+          UPDATE Ventas SET idEstadoSunat = @idEstadoSunat
+          WHERE idVenta = (SELECT idVenta FROM ComprobantesElectronicos WHERE idComprobanteElectronico = @id)
+            AND idEmpresa = @idEmpresa
+        `);
+    }
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 };
 
 exports.validarVentaEmpresaRepo = async (pool, idVenta, idEmpresa) => {
@@ -1081,8 +1143,9 @@ exports.obtenerXmlComprobanteRepo = async (pool, idComprobanteElectronico, idEmp
 };
 
 /** Lista comprobantes pendientes de envío (idEstadoSunat = 7) por empresa, para envío automático o por lotes.
- * @param {object} opciones - { excluirBoletas: boolean, filtroProgramacion: null|'modo2'|'modo3' }
- * filtroProgramacion null = manual / compatibilidad (solo pendiente).
+ * @param {object} opciones - { excluirBoletas: boolean, filtroProgramacion: null|'modo1'|'modo2'|'modo3' }
+ * filtroProgramacion null = manual / compatibilidad (solo pendiente, sin error persistido).
+ * modo1 = reintento diferido (fechaProximoReintento vencida) tras fallo de conexión/SUNAT.
  * modo2 = cobro confirmado y fechaElegibleEnvio vencida.
  * modo3 = cobro confirmado (envío en hora fija por job).
  */
@@ -1090,7 +1153,10 @@ exports.listarPendientesEnvioRepo = async (pool, idEmpresa, limite = 500, opcion
   const excluirBoletas = opciones.excluirBoletas === true;
   const filtro = opciones.filtroProgramacion || null;
   let extra = "";
-  if (filtro === "modo2") {
+  if (filtro === "modo1") {
+    extra = ` AND ce.fechaProximoReintento IS NOT NULL AND ce.fechaProximoReintento <= SYSUTCDATETIME()
+      AND ISNULL(ce.intentosEnvio, 0) < ISNULL(ce.maxIntentosEnvio, 10) `;
+  } else if (filtro === "modo2") {
     extra = ` AND ce.fechaElegibleEnvio IS NOT NULL AND ce.fechaElegibleEnvio <= SYSUTCDATETIME()
       AND (ce.fechaProximoReintento IS NULL OR ce.fechaProximoReintento <= SYSUTCDATETIME())
       AND ISNULL(ce.intentosEnvio, 0) < ISNULL(ce.maxIntentosEnvio, 10) `;
@@ -1784,9 +1850,23 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
   }
   const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
   const certBase64 = configFirma?.certificadoDigital;
-  const claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
+  let claveCert = null;
+  try {
+    claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
+  } catch (err) {
+    console.error("[SUNAT] Error al descifrar clave certificado:", err.message);
+    return {
+      ok: false,
+      errorConfig: true,
+      mensaje: err.message || "Error al descifrar la clave del certificado"
+    };
+  }
   if (!certBase64 || !claveCert) {
-    return { ok: false, mensaje: "Configure certificado digital y clave en Configuración > Facturación" };
+    return {
+      ok: false,
+      errorConfig: true,
+      mensaje: "Configure certificado digital y clave en Configuración > Facturación"
+    };
   }
   const nombreArchivo = nombreArchivoComprobante({
     ruc: comp.rucEmpresa,
@@ -1828,7 +1908,11 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
     xml = firmaXmlSunat.firmarXmlUbl(xml, Buffer.from(certBase64, "base64"), claveCert);
   } catch (err) {
     console.error("[SUNAT] Error al firmar XML:", err);
-    return { ok: false, mensaje: err.message || "Error al firmar XML con el certificado" };
+    return {
+      ok: false,
+      errorConfig: true,
+      mensaje: err.message || "Error al firmar XML con el certificado"
+    };
   }
   await exports.persistirHashXmlComprobanteElectronicoRepo(pool, idComprobanteElectronico, xml);
   return { xml, nombreBase: base };
@@ -1883,7 +1967,12 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
   const tieneClave = !!(config.claveSunat != null && String(config.claveSunat).trim() !== "");
   if (usaEnvioDirecto && tieneUrl && tieneUsuario && tieneClave) {
     const signed = await exports.generarYFirmarXmlComprobanteRepo(pool, user, idComprobanteElectronico);
-    if (signed.ok === false) return signed;
+    if (signed.ok === false) {
+      return {
+        ...signed,
+        errorConfig: signed.errorConfig === true || esErrorConfiguracionFacturacion(signed.mensaje)
+      };
+    }
     const { xml, nombreBase } = signed;
     try {
       if (!fs.existsSync(CARPETA_XML_FIRMADOS)) fs.mkdirSync(CARPETA_XML_FIRMADOS, { recursive: true });
@@ -1957,6 +2046,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
   if (!config.rutaCarpetaFacturadorSunat) {
     return {
       ok: false,
+      errorConfig: true,
       mensaje: "Configure la carpeta del Facturador SUNAT o active Envío directo con URL, usuario y clave SOL"
     };
   }
@@ -1993,7 +2083,17 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     }
     const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
     const certBase64 = configFirma?.certificadoDigital;
-    const claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
+    let claveCert = null;
+    try {
+      claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
+    } catch (err) {
+      console.error("[SUNAT] Error al descifrar clave certificado:", err.message);
+      return {
+        ok: false,
+        errorConfig: true,
+        mensaje: err.message || "Error al descifrar la clave del certificado"
+      };
+    }
     if (certBase64 && claveCert) {
       try {
         const certificadoBuffer = Buffer.from(certBase64, "base64");
@@ -2002,6 +2102,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
         console.error("firmaXmlSunat:", err);
         return {
           ok: false,
+          errorConfig: true,
           mensaje: err.message || "Error al firmar XML con el certificado"
         };
       }

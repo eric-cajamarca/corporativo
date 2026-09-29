@@ -458,11 +458,18 @@
             <div class="row g-2">
               <div class="col-md-3">
                 <label class="form-label">Fecha inicio traslado</label>
-                <input type="date" class="form-control form-control-sm" [(ngModel)]="guia.fechaInicioTraslado">
+                <input type="date" class="form-control form-control-sm"
+                       [min]="fechaMinTraslado"
+                       [(ngModel)]="guia.fechaInicioTraslado"
+                       (ngModelChange)="onFechaTrasladoChange()">
               </div>
               <div class="col-md-2">
                 <label class="form-label">Hora</label>
-                <input type="time" class="form-control form-control-sm" [(ngModel)]="guia.horaInicioTraslado" step="1">
+                <input type="time" class="form-control form-control-sm"
+                       [attr.max]="horaMaxTraslado"
+                       [(ngModel)]="guia.horaInicioTraslado"
+                       (ngModelChange)="onHoraTrasladoChange()"
+                       step="60">
               </div>
               <div class="col-md-2">
                 <label class="form-label">Unidad de peso</label>
@@ -491,11 +498,17 @@
               <div class="col-12"><hr class="my-1"><span class="small fw-bold">Transporte privado: vehículo y conductor</span></div>
               <div class="col-md-2">
                 <label class="form-label">Placa principal</label>
-                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaVehiculo" placeholder="ABC-123">
+                <input type="text" class="form-control form-control-sm"
+                       [(ngModel)]="guia.placaVehiculo"
+                       (ngModelChange)="onPlacaVehiculoChange($event)"
+                       maxlength="8" placeholder="ABC123" autocomplete="off">
               </div>
               <div class="col-md-2">
                 <label class="form-label">Placa secundaria</label>
-                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaSecundaria" placeholder="Opcional">
+                <input type="text" class="form-control form-control-sm"
+                       [(ngModel)]="guia.placaSecundaria"
+                       (ngModelChange)="onPlacaSecundariaChange($event)"
+                       maxlength="8" placeholder="Opcional" autocomplete="off">
               </div>
               <div class="col-md-2">
                 <label class="form-label">Tipo doc. conductor</label>
@@ -550,11 +563,18 @@
               </div>
               <div class="col-md-2">
                 <label class="form-label">Placa vehículo principal <span class="text-danger">*</span></label>
-                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaVehiculo" placeholder="SUNAT 2566" title="Obligatorio para GRE; se puede rellenar al elegir transportista si tiene placa registrada">
+                <input type="text" class="form-control form-control-sm"
+                       [(ngModel)]="guia.placaVehiculo"
+                       (ngModelChange)="onPlacaVehiculoChange($event)"
+                       maxlength="8" placeholder="ABC123"
+                       title="Obligatorio para GRE, sin guion (ABC123). Se puede rellenar al elegir transportista.">
               </div>
               <div class="col-md-2">
                 <label class="form-label">Placa secundaria</label>
-                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaSecundaria" placeholder="Opcional">
+                <input type="text" class="form-control form-control-sm"
+                       [(ngModel)]="guia.placaSecundaria"
+                       (ngModelChange)="onPlacaSecundariaChange($event)"
+                       maxlength="8" placeholder="Opcional">
               </div>
             </div>
 

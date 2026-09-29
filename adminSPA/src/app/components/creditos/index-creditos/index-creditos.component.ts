@@ -8,7 +8,9 @@ import { CreditosService } from '../../../services/creditos.service';
 import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../services/caja-operacion-context.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { CajaService } from '../../../services/caja.service';
-import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { DocumentoService } from '../../../services/documento.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
+import { filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -81,7 +83,8 @@ export class IndexCreditosComponent implements OnInit {
   };
 
   public cajas: any[] = [];
-  public mediosPago: any[] = [];
+  /** FormasPago (Efectivo, Yape…), igual que nueva venta / recibo de ingreso. No usar MediosPago SUNAT. */
+  public formasPago: FormaPago[] = [];
   public pagoCuota = {
     idCuota: '',
     montoPagado: 0,
@@ -116,7 +119,7 @@ export class IndexCreditosComponent implements OnInit {
     private clienteService: ClienteService,
     private cajaService: CajaService,
     private cajaOpCtx: CajaOperacionContextService,
-    private tablasSunat: TablasSunatService,
+    private documentoService: DocumentoService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -144,10 +147,20 @@ export class IndexCreditosComponent implements OnInit {
         });
       }
     });
-    this.tablasSunat.obtener_medios_pago().subscribe({
-      next: (r) => { this.mediosPago = r.data || []; },
-      error: () => {}
+    this.documentoService.getFormasPago().subscribe({
+      next: (r) => {
+        this.formasPago = filtrarSinSaldoFavor(r.data || []);
+      },
+      error: () => { this.formasPago = []; }
     });
+  }
+
+  private idFormaPagoEfectivo(): number | null {
+    const efectivo = this.formasPago.find((f) =>
+      String(f.descripcion || '').toUpperCase().includes('EFECTIVO')
+    );
+    if (efectivo?.idFormaPago != null) return Number(efectivo.idFormaPago);
+    return this.formasPago.length ? Number(this.formasPago[0].idFormaPago) : null;
   }
 
   private esCajaMultiEmpresa(): boolean {
@@ -446,8 +459,8 @@ export class IndexCreditosComponent implements OnInit {
       iziToast.warning({ title: 'Aviso', message: 'Seleccione cuotas pendientes para cobrar.' });
       return;
     }
-    if (this.pagoCuota.idMediosPago == null && this.mediosPago.length > 0) {
-      this.pagoCuota.idMediosPago = this.mediosPago[0].idMediosPago;
+    if (this.pagoCuota.idMediosPago == null && this.formasPago.length > 0) {
+      this.pagoCuota.idMediosPago = this.idFormaPagoEfectivo();
     }
     this.loading = true;
     this.creditosService
@@ -510,7 +523,7 @@ export class IndexCreditosComponent implements OnInit {
       deudaTotal: 0,
       aptoCreditos: '—',
       importeCancelar: 0,
-      idMediosPago: this.mediosPago.length ? this.mediosPago[0].idMediosPago : null,
+      idMediosPago: this.idFormaPagoEfectivo(),
       idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       observaciones: ''
     };
@@ -633,7 +646,7 @@ export class IndexCreditosComponent implements OnInit {
       iziToast.warning({ title: 'Aviso', message: 'Agregue comprobantes al detalle e ingrese importes a pagar en cada fila.' });
       return;
     }
-    if (this.nuevaCobranza.idMediosPago == null && this.mediosPago.length > 0) {
+    if (this.nuevaCobranza.idMediosPago == null && this.formasPago.length > 0) {
       iziToast.warning({ title: 'Aviso', message: 'Seleccione la forma de pago.' });
       return;
     }
@@ -709,7 +722,7 @@ export class IndexCreditosComponent implements OnInit {
       idCuota: cuota.idCuota,
       montoPagado: cuota.saldoPendiente ?? 0,
       formaPago: '',
-      idMediosPago: this.mediosPago.length ? this.mediosPago[0].idMediosPago : null,
+      idMediosPago: this.idFormaPagoEfectivo(),
       idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       referencia: '',
       observaciones: ''

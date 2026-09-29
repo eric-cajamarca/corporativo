@@ -51,7 +51,7 @@
     border-radius: 0.75rem;
     background: #fff;
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
-    overflow: hidden;
+    overflow: visible;
   }
 
   .table-clientes-responsive tbody td {
@@ -127,5 +127,15 @@
   .table-clientes-responsive tbody td[data-label="Acciones"] {
     padding-top: 0.15rem;
     padding-bottom: 0.75rem;
+    overflow: visible;
   }
+}
+
+.table-responsive {
+  overflow: visible;
+}
+
+.td-acciones-dropdown {
+  overflow: visible;
+  position: relative;
 }

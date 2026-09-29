@@ -7,6 +7,27 @@ function normalizarIdsEmpresaCreditos(idEmpresas) {
   return arr.map((x) => String(x).trim()).filter(Boolean);
 }
 
+/**
+ * MovimientosCaja.idMediosPago guarda idFormaPago (legado). Igual que nueva venta / recibo de ingreso.
+ * No mapear contra MediosPago (catálogo SUNAT Contado/Crédito): el ID choca y el arqueo muestra Cheque.
+ */
+async function resolveIdFormaPagoCaja(transaction, idEnviado) {
+  const res = await transaction.request().query("SELECT idFormaPago, descripcion FROM FormasPago");
+  const rows = res.recordset || [];
+  const n = idEnviado != null ? Number(idEnviado) : NaN;
+  const ids = new Set(rows.map((r) => Number(r.idFormaPago)).filter(Number.isFinite));
+  if (Number.isFinite(n) && ids.has(n)) return n;
+  const efectivo = rows.find((r) =>
+    String(r.descripcion || "")
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .includes("EFECTIVO")
+  );
+  if (efectivo) return Number(efectivo.idFormaPago);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Lista créditos de una o varias empresas. Si idCliente viene vacío/null, devuelve todos; si es número, filtra por ese cliente. */
 exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
   const idsEmp = normalizarIdsEmpresaCreditos(idEmpresas);
@@ -352,14 +373,18 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
     const cuotaResult = await request
       .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
       .query(`
-        SELECT idCredito, numeroCuota, montoCuota, saldoPendiente, fechaVencimiento
-        FROM CuotasCredito
-        WHERE idCuota = @idCuota
+        SELECT cu.idCredito, cu.numeroCuota, cu.montoCuota, cu.saldoPendiente, cu.fechaVencimiento,
+               ISNULL(c.rSocial, '') AS cliente
+        FROM CuotasCredito cu
+        LEFT JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito
+        LEFT JOIN Clientes c ON c.idCliente = cc.idCliente
+        WHERE cu.idCuota = @idCuota
       `);
 
     const cuota = cuotaResult.recordset[0];
     let numeroReciboCobranza = datos.numeroRecibo || null;
     const fechaPagoSql = resolveFechaHoraClienteSql(datos.fechaPago);
+    const idFormaPagoCaja = await resolveIdFormaPagoCaja(transaction, datos.idMediosPago);
 
     if (datos.idApertura && cuota) {
       const tipoIngreso = await request.query("SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I'");
@@ -372,14 +397,21 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
             "RI",
             datos.idApertura
           );
+          const nombreCliente = String(cuota.cliente || "").trim();
+          const glosaCobranza = "Cobranza crédito - Cuota " + (cuota.numeroCuota || "");
+          const observacionesCobranza = [
+            nombreCliente ? "Recibido de: " + nombreCliente : "",
+            "Glosa: " + glosaCobranza
+          ].filter(Boolean).join(" | ");
           await CajaRepository.registrarMovimientoRepo(transaction, user, {
             idApertura: datos.idApertura,
             idTipoMovimientoCaja,
-            concepto: "Cobranza crédito - Cuota " + (cuota.numeroCuota || ""),
+            concepto: glosaCobranza,
             monto: datos.montoPagado,
-            idMediosPago: datos.idMediosPago || null,
+            idMediosPago: idFormaPagoCaja,
             idMoneda: datos.idMoneda || 1,
             documentoRelacionado,
+            observaciones: observacionesCobranza,
             fechaMovimiento: fechaPagoSql
           });
           numeroReciboCobranza = documentoRelacionado;
@@ -408,18 +440,13 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
         `);
     }
 
-    const idMediosPagoVal = datos.idMediosPago != null ? Number(datos.idMediosPago) : null;
-    const validIdsResult = await request.query("SELECT idMediosPago FROM MediosPago");
-    const validIds = new Set((validIdsResult.recordset || []).map((r) => Number(r.idMediosPago)).filter((n) => !Number.isNaN(n)));
-    const idMediosPagoFinal = idMediosPagoVal != null && validIds.has(idMediosPagoVal) ? idMediosPagoVal : (validIds.size ? Math.min(...validIds) : null);
-
     const requestPago = transaction.request();
     await requestPago
       .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
       .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
       .input("idUsuarioPago", sql.UniqueIdentifier, user.sub)
       .input("montoPagado", sql.Decimal(18, 2), datos.montoPagado)
-      .input("idMediosPago", sql.Int, idMediosPagoFinal)
+      .input("idMediosPago", sql.Int, idFormaPagoCaja)
       .input("idMoneda", sql.Int, datos.idMoneda || 1)
       .input("numeroRecibo", sql.VarChar, numeroReciboCobranza || datos.numeroRecibo || null)
       .input("observaciones", sql.VarChar, datos.observaciones || null)

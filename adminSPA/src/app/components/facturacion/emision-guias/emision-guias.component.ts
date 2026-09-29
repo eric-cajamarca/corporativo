@@ -26,6 +26,9 @@ declare const iziToast: any;
   styleUrl: './emision-guias.component.css'
 })
 export class EmisionGuiasComponent implements OnInit {
+  /** Popper fixed evita que el menú Acciones quede recortado por .table-responsive / overflow. */
+  readonly dropdownPopperConfig = JSON.stringify({ strategy: 'fixed' });
+
   sidebarState = inject(SidebarStateService);
   private facturacionService = inject(FacturacionService);
   private empresaService     = inject(EmpresaService);

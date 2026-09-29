@@ -29,7 +29,7 @@ import {
   payloadMatizadoParaApi,
   reescalarMatizadoPorCantidad
 } from '../../../utils/matizado-venta.util';
-import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
+import { ComprobantePdfData, VentaListado, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
   marcaProductoEnLista,
@@ -97,6 +97,7 @@ import {
 import { validarAntesDeCobrarGestora } from '../../../utils/gestora-venta-validacion.util';
 import { esProductoServicio } from '../../../utils/producto-servicio.util';
 import { PosKeyboardService } from '../../../services/pos-keyboard.service';
+import { parseLineaCredito, parseSujetoCredito } from '../../../utils/cliente-credito.util';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -260,9 +261,16 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   alertaValidacionTemprana: PosAlertaTemprana | null = null;
   mostrarAyudaAtajosPos = false;
 
-  /** Modal Cargar desde cotización */
+  /** Modal cargar venta o cotización en esta pantalla */
+  tipoBusquedaDocumento: 'venta' | 'cotizacion' = 'cotizacion';
   cotizacionesParaCargar: CotizacionListado[] = [];
   loadingCotizaciones = false;
+  ventasParaCargar: VentaListado[] = [];
+  loadingVentasModal = false;
+  filtroBusquedaDocumento = '';
+  paginaVentasModal = 1;
+  totalVentasModal = 0;
+  private busquedaVentasModalTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Empresa gestora: venta corporativa con comprobante VA. */
   esGestora = false;
@@ -366,6 +374,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     if (this.busquedaCodigoTimer) {
       clearTimeout(this.busquedaCodigoTimer);
       this.busquedaCodigoTimer = null;
+    }
+    if (this.busquedaVentasModalTimer) {
+      clearTimeout(this.busquedaVentasModalTimer);
+      this.busquedaVentasModalTimer = null;
     }
     this.ventaProvisionalUi.limpiarAlDestruirComponente();
     this.posKeyboard.desactivar();
@@ -896,8 +908,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
             correo: row['correo'] ?? '',
             celular: row['celular'] ?? '',
             condicion: row['condicion'] ?? 'ACTIVO',
-            sujetoCredito: row['sujetoCredito'] === true || row['sujetoCredito'] === 1,
-            lineaCredito: row['lineaCredito'] != null && !isNaN(Number(row['lineaCredito'])) ? Number(row['lineaCredito']) : undefined
+            sujetoCredito: parseSujetoCredito(row['sujetoCredito'], row['lineaCredito']),
+            lineaCredito: parseLineaCredito(row['lineaCredito'])
           };
           this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
             next: (dirRes) => this.aplicarPrimeraDireccionClienteAlContexto(dirRes),
@@ -1034,61 +1046,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.limpiarQueryDuplicarDesdeVenta();
       return;
     }
-    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
-      next: (res) => {
-        const data: ComprobantePdfData | null = res.data ?? null;
-        const items = data?.items;
-        if (!data?.venta || !Array.isArray(items) || items.length === 0) {
-          if (typeof iziToast !== 'undefined') {
-            iziToast.warning({
-              title: 'Duplicar',
-              message: 'No se encontró detalle para duplicar.',
-              position: 'topRight'
-            });
-          }
-          this.limpiarQueryDuplicarDesdeVenta();
-          return;
-        }
-        this.limpiarVenta();
-        this.carrito = this.mapearItemsPdfACarrito(items, data.venta);
-        if (data.venta.idSucursal != null && String(data.venta.idSucursal).trim() !== '') {
-          this.ventas.idSucursal = String(data.venta.idSucursal);
-        }
-        this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
-          next: (pr: any) => {
-            if (pr?.data) {
-              this.stockSucursales_const = pr.data;
-            }
-            this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
-            this.actualizaTotales();
-            this.guardarEstadoProvisional();
-            if (typeof iziToast !== 'undefined') {
-              iziToast.success({
-                title: 'Duplicado',
-                message: 'Carrito cargado desde el comprobante. Indique cliente, tipo de comprobante y forma de pago.',
-                position: 'topRight'
-              });
-            }
-            this.limpiarQueryDuplicarDesdeVenta();
-          },
-          error: () => {
-            this.actualizaTotales();
-            this.guardarEstadoProvisional();
-            this.limpiarQueryDuplicarDesdeVenta();
-          }
-        });
-      },
-      error: () => {
-        if (typeof iziToast !== 'undefined') {
-          iziToast.error({
-            title: 'Duplicar',
-            message: 'No se pudo cargar el comprobante para duplicar.',
-            position: 'topRight'
-          });
-        }
-        this.limpiarQueryDuplicarDesdeVenta();
-      }
-    });
+    this.cargarVentaEnCarrito(idVenta, { alFinalizar: () => this.limpiarQueryDuplicarDesdeVenta() });
   }
 
   private mapearItemsPdfACarrito(
@@ -2414,8 +2372,8 @@ abrirModalPrecios(item: any) {
             correo: row.correo ?? '',
             celular: row.celular ?? '',
             condicion: row.condicion ?? 'ACTIVO',
-            sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
-            lineaCredito: row.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : undefined
+            sujetoCredito: parseSujetoCredito(row.sujetoCredito, row.lineaCredito),
+            lineaCredito: parseLineaCredito(row.lineaCredito)
           };
                     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
             next: (dirRes) => {
@@ -2480,8 +2438,8 @@ abrirModalPrecios(item: any) {
       correo: e.correo ?? '',
       celular: e.celular ?? '',
       condicion: e.condicion ?? 'ACTIVO',
-      sujetoCredito: e.sujetoCredito === true || e.sujetoCredito === 1,
-      lineaCredito: e.lineaCredito != null && !isNaN(Number(e.lineaCredito)) ? Number(e.lineaCredito) : undefined
+      sujetoCredito: parseSujetoCredito(e.sujetoCredito, e.lineaCredito),
+      lineaCredito: parseLineaCredito(e.lineaCredito)
     };
     const modalEl = document.getElementById('clientesModal');
     const modalInst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
@@ -2634,8 +2592,8 @@ abrirModalPrecios(item: any) {
       correo: row.correo ?? '',
       celular: row.celular ?? '',
       condicion: row.condicion ?? 'ACTIVO',
-      sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
-      lineaCredito: row.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : undefined
+      sujetoCredito: parseSujetoCredito(row.sujetoCredito, row.lineaCredito),
+      lineaCredito: parseLineaCredito(row.lineaCredito)
     };
     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
       next: (dirRes) => {
@@ -2733,8 +2691,8 @@ abrirModalPrecios(item: any) {
           return;
         }
         this.editClienteCreditoForm = {
-          sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
-          lineaCredito: row.lineaCredito != null ? Number(row.lineaCredito) : 0
+          sujetoCredito: parseSujetoCredito(row.sujetoCredito, row.lineaCredito),
+          lineaCredito: parseLineaCredito(row.lineaCredito)
         };
         this.loadingEditClienteCredito = false;
         const el = document.getElementById('modalEditarClienteCredito');
@@ -2760,16 +2718,16 @@ abrirModalPrecios(item: any) {
       correo: this.cliente.correo ?? '',
       celular: this.cliente.celular ?? '',
       condicion: this.cliente.condicion ?? 'ACTIVO',
-      sujetoCredito: this.editClienteCreditoForm.sujetoCredito,
-      lineaCredito: Math.max(0, Number(this.editClienteCreditoForm.lineaCredito) || 0)
+      sujetoCredito: parseSujetoCredito(this.editClienteCreditoForm.sujetoCredito, this.editClienteCreditoForm.lineaCredito),
+      lineaCredito: parseLineaCredito(this.editClienteCreditoForm.lineaCredito)
     };
     this._clienteService.editar_cliente(id, payload).subscribe({
       next: (res: any) => {
         this.loadingEditClienteCredito = false;
         const row = res?.data?.[0] ?? res?.data;
         if (row) {
-          this.cliente.sujetoCredito = row.sujetoCredito === true || row.sujetoCredito === 1;
-          this.cliente.lineaCredito = row.lineaCredito != null ? Number(row.lineaCredito) : 0;
+          this.cliente.sujetoCredito = parseSujetoCredito(row.sujetoCredito, row.lineaCredito);
+          this.cliente.lineaCredito = parseLineaCredito(row.lineaCredito);
         } else {
           this.cliente.sujetoCredito = payload.sujetoCredito;
           this.cliente.lineaCredito = payload.lineaCredito;
@@ -3279,16 +3237,11 @@ abrirModalPrecios(item: any) {
 
   /** Valida sujeto a crédito y línea de crédito; si es válido, envía la venta. */
   validarYEnviarVentaAlCredito(idCliente: number, totalCredit: number): void {
-    const tieneDatosCredito = this.cliente.sujetoCredito !== undefined && this.cliente.lineaCredito !== undefined;
-    if (tieneDatosCredito) {
-      this.evaluarCreditoYEnviar(this.cliente.sujetoCredito, this.cliente.lineaCredito, idCliente, totalCredit);
-      return;
-    }
     this._clienteService.obtener_cliente_id(idCliente).subscribe({
       next: (res: any) => {
         const row = (res?.data && res.data[0]) ? res.data[0] : res?.data;
-        const sujetoCredito = row?.sujetoCredito === true || row?.sujetoCredito === 1;
-        const lineaCredito = row?.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : 0;
+        const sujetoCredito = parseSujetoCredito(row?.sujetoCredito, row?.lineaCredito);
+        const lineaCredito = parseLineaCredito(row?.lineaCredito);
         this.cliente.sujetoCredito = sujetoCredito;
         this.cliente.lineaCredito = lineaCredito;
         this.evaluarCreditoYEnviar(sujetoCredito, lineaCredito, idCliente, totalCredit);
@@ -3303,8 +3256,9 @@ abrirModalPrecios(item: any) {
     if (!sujetoCredito) {
       iziToast.warning({
         title: 'Cliente no sujeto a crédito',
-        message: 'Este cliente no está habilitado para ventas al crédito. Edite el cliente y marque "Sujeto a crédito" con una línea de crédito mayor a 0.'
+        message: 'Este cliente no está habilitado para ventas al crédito. Use Editar cliente o Línea de crédito, marque "Sujeto a crédito" y asigne una línea mayor a 0.'
       });
+      this.abrirModalEditarClienteCredito();
       return;
     }
     this.creditosService.obtenerCreditosCliente(String(idCliente)).subscribe({
@@ -3934,6 +3888,8 @@ abrirModalPrecios(item: any) {
           this.cliente.celular = item.celular ?? '';
           this.cliente.ruc = item.ruc != null ? String(item.ruc) : this.cliente.ruc;
           this.cliente.idDocumento = String(item.idDocumento ?? this.cliente.idDocumento);
+          this.cliente.sujetoCredito = parseSujetoCredito(item.sujetoCredito, item.lineaCredito);
+          this.cliente.lineaCredito = parseLineaCredito(item.lineaCredito);
         }
         this._clienteService.obtener_direccionesCliente_idCliente(id).subscribe({
           next: (dirRes) => {
@@ -3974,6 +3930,31 @@ abrirModalPrecios(item: any) {
     });
   }
 
+  get cotizacionesFiltradasModal(): CotizacionListado[] {
+    const q = (this.filtroBusquedaDocumento || '').trim().toLowerCase();
+    if (!q) return this.cotizacionesParaCargar;
+    return this.cotizacionesParaCargar.filter((c) => {
+      const serie = String(c.serieNumero || `${c.serie || ''}-${c.numero || ''}`).toLowerCase();
+      const cliente = String(c.clienteRazonSocial || '').toLowerCase();
+      const ruc = String(c.clienteRuc || '').toLowerCase();
+      return serie.includes(q) || cliente.includes(q) || ruc.includes(q);
+    });
+  }
+
+  abrirModalBuscarDocumento(tipo: 'venta' | 'cotizacion'): void {
+    this.tipoBusquedaDocumento = tipo;
+    this.filtroBusquedaDocumento = '';
+    if (tipo === 'venta') {
+      this.cargarVentasParaModal(1);
+    } else {
+      this.abrirModalCotizacion();
+    }
+    const modalEl = document.getElementById('modalCotizacion');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
   abrirModalCotizacion(): void {
     this.cotizacionesParaCargar = [];
     this.loadingCotizaciones = true;
@@ -3984,6 +3965,109 @@ abrirModalPrecios(item: any) {
       },
       error: () => {
         this.loadingCotizaciones = false;
+      }
+    });
+  }
+
+  cargarVentasParaModal(pagina = 1): void {
+    this.loadingVentasModal = true;
+    this.paginaVentasModal = pagina;
+    this.ventasService.listarVentasEmpresaPaginado({
+      pagina,
+      porPagina: 40,
+      buscar: (this.filtroBusquedaDocumento || '').trim() || undefined
+    }).subscribe({
+      next: (res) => {
+        this.ventasParaCargar = res.data ?? [];
+        this.totalVentasModal = res.total ?? 0;
+        this.loadingVentasModal = false;
+      },
+      error: () => {
+        this.ventasParaCargar = [];
+        this.totalVentasModal = 0;
+        this.loadingVentasModal = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudieron cargar las ventas.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  onFiltroBusquedaDocumento(): void {
+    if (this.tipoBusquedaDocumento !== 'venta') return;
+    if (this.busquedaVentasModalTimer) {
+      clearTimeout(this.busquedaVentasModalTimer);
+    }
+    this.busquedaVentasModalTimer = setTimeout(() => this.cargarVentasParaModal(1), 300);
+  }
+
+  cargarVentaDesdeModal(idVenta: number): void {
+    this.cargarVentaEnCarrito(idVenta, { cerrarModal: true });
+  }
+
+  private cargarVentaEnCarrito(idVenta: number, opts?: { cerrarModal?: boolean; alFinalizar?: () => void }): void {
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const data: ComprobantePdfData | null = res.data ?? null;
+        const items = data?.items;
+        if (!data?.venta || !Array.isArray(items) || items.length === 0) {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.warning({
+              title: 'Aviso',
+              message: 'No se encontró detalle para cargar.',
+              position: 'topRight'
+            });
+          }
+          opts?.alFinalizar?.();
+          return;
+        }
+        this.limpiarVenta();
+        this.carrito = this.mapearItemsPdfACarrito(items, data.venta);
+        if (data.venta.idSucursal != null && String(data.venta.idSucursal).trim() !== '') {
+          this.ventas.idSucursal = String(data.venta.idSucursal);
+        }
+        if (data.venta.idCliente != null) {
+          this.cliente.idCliente = data.venta.idCliente;
+          this.cliente.rSocial = String(data.cliente?.rSocial ?? data.cliente?.razonSocial ?? '').trim();
+          if (data.cliente?.ruc != null) {
+            this.cliente.ruc = String(data.cliente.ruc);
+          }
+        }
+        const finalizar = () => {
+          this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+          this.actualizaTotales();
+          this.guardarEstadoProvisional();
+          if (opts?.cerrarModal) {
+            cerrarModalCotizacionSiCorresponde(true);
+          }
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({
+              title: 'Venta cargada',
+              message: 'Se cargó el comprobante en esta pantalla. Revise cliente, tipo de comprobante y forma de pago.',
+              position: 'topRight'
+            });
+          }
+          opts?.alFinalizar?.();
+        };
+        this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+          next: (pr: any) => {
+            if (pr?.data) {
+              this.stockSucursales_const = pr.data;
+            }
+            finalizar();
+          },
+          error: () => finalizar()
+        });
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudo cargar el comprobante.',
+            position: 'topRight'
+          });
+        }
+        opts?.alFinalizar?.();
       }
     });
   }

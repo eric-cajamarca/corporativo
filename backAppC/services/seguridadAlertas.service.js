@@ -32,8 +32,12 @@ const THROTTLE_MS_ERRORES_SISTEMA = parseInt(process.env.ALERT_SYSTEM_THROTTLE_M
 /** Throttle por empresa para avisos de replay de refresh (mismo orden de magnitud que login fallido). */
 const THROTTLE_MS_REFRESH_REPLAY = parseInt(process.env.ALERT_REFRESH_REPLAY_THROTTLE_MS, 10) || 15 * 60 * 1000;
 
+/** Throttle por empresa: falta certificado o configuración de facturación SUNAT. */
+const THROTTLE_MS_CONFIG_FACTURACION = parseInt(process.env.ALERT_CONFIG_SUNAT_THROTTLE_MS, 10) || 60 * 60 * 1000;
+
 let ultimoAlertaSistema = 0;
 const ultimoAlertaRefreshReplayPorEmpresa = new Map();
+const ultimoAlertaConfigFacturacionPorEmpresa = new Map();
 
 function soloDigitos(num) {
   if (num == null || num === '') return '';
@@ -819,6 +823,40 @@ exports.notificarErrorSistemaDesdeRequest = async (pool, err, req) => {
   const path = req && req.originalUrl ? req.originalUrl : '';
   const msg = err && err.message ? err.message : String(err);
   await exports.notificarErrorSistema(pool, `${req?.method || ''} ${path}\n${msg.slice(0, 400)}`);
+};
+
+/**
+ * Falta certificado o configuración de facturación: WhatsApp al dueño de la plataforma (throttled por empresa).
+ */
+exports.notificarConfigFacturacionIncompleta = async (pool, params) => {
+  const { idEmpresa, detalle } = params || {};
+  if (!idEmpresa) return;
+  const key = String(idEmpresa).toLowerCase();
+  const now = Date.now();
+  const ult = ultimoAlertaConfigFacturacionPorEmpresa.get(key) || 0;
+  if (now - ult < THROTTLE_MS_CONFIG_FACTURACION) return;
+  ultimoAlertaConfigFacturacionPorEmpresa.set(key, now);
+
+  const numeroDev = await obtenerNumeroDev(pool);
+  if (numeroDev.length < 9) return;
+
+  let razon = '';
+  let ruc = '';
+  try {
+    const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
+    razon = emp ? String(emp.razon_Social || emp.nombreComercial || '').trim() : '';
+    ruc = emp ? String(emp.ruc || '').trim() : '';
+  } catch (err) {
+    console.error('notificarConfigFacturacionIncompleta empresa:', err.message);
+  }
+
+  const det = String(detalle || 'Falta certificado o configuración de envío SUNAT').slice(0, 400);
+  const texto =
+    `[EFAF] Configuración SUNAT incompleta\n` +
+    `Empresa: ${razon || idEmpresa}${ruc ? `  RUC ${ruc}` : ''}\n` +
+    `${det}\n` +
+    `Revise Configuración > Facturación.`;
+  await enviarTextoPlataforma(pool, numeroDev, texto);
 };
 
 // =============================================================================

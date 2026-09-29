@@ -30,7 +30,11 @@
 
 .card {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.table-responsive {
+  overflow: visible;
 }
 
 .card-body {
@@ -153,6 +157,8 @@
   justify-content: flex-end;
   gap: 0.25rem;
   flex-wrap: nowrap;
+  overflow: visible;
+  position: relative;
 }
 
 .eg-acciones .btn {

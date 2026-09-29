@@ -87,14 +87,16 @@
                 <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>
                 <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
               </td>
-              <td data-label="Acciones" (click)="$event.stopPropagation()" *ngIf="!modoSelector">
+              <td data-label="Acciones" class="td-acciones-dropdown" (click)="$event.stopPropagation()" *ngIf="!modoSelector">
                 
                 <div class="btn-group" >
                   <button type="button" class="btn btn-primary btn-sm dropdown-toggle"
-                          data-bs-toggle="dropdown" (click)="$event.stopPropagation()">
+                          data-bs-toggle="dropdown"
+                          [attr.data-bs-popper-config]="dropdownPopperConfig"
+                          (click)="$event.stopPropagation()">
                     Opciones
                   </button>
-                  <ul class="dropdown-menu" (click)="$event.stopPropagation()">
+                  <ul class="dropdown-menu dropdown-menu-end" (click)="$event.stopPropagation()">
                     <li><a class="dropdown-item" data-bs-toggle="modal"
                           [attr.data-bs-target]="'#update-'+item.idCliente">Cambiar estado</a></li>
                     <li><a class="dropdown-item" href="javascript:void(0)" (click)="abrirEditarClienteModal(item.idCliente)">Editar</a></li>

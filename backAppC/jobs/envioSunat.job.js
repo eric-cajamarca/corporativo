@@ -1,6 +1,6 @@
 /**
  * Job en segundo plano: envío automático a SUNAT cada X minutos.
- * Solo procesa empresas con envioAutomatico = 1 y ruta del Facturador configurada.
+ * Modo 2/3: empresas con envioAutomatico. Modo 1: reintenta pendientes si SUNAT no respondió o falló la conexión.
  * Evita solapamiento: si un ciclo aún corre, el siguiente tick se omite.
  */
 

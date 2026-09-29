@@ -32,6 +32,12 @@ import {
   ProveedorGreListado,
   SeleccionarProveedorGreModalComponent
 } from '../seleccionar-proveedor-gre-modal/seleccionar-proveedor-gre-modal.component';
+import { getFechaHoyLocal, getHoraLocalAhora } from '../../../utils/fecha-local.util';
+import {
+  normalizarPlacaGuia,
+  placaGuiaTieneGuion,
+  validarFechaHoraPlacaTraslado
+} from '../../../utils/guia-traslado-validacion.util';
 
 declare const iziToast: any;
 
@@ -273,7 +279,7 @@ export class GuiasRemisionComponent implements OnInit {
     motivoTraslado: '',           // codigoSunat: 01, 02, 04, 08, 09, 13
     descripcionMotivo: '',
     modalidadTransporte: '02',    // 01 Público, 02 Privado
-    fechaInicioTraslado: '',
+    fechaInicioTraslado: getFechaHoyLocal(),
     horaInicioTraslado: '',       // HH:mm
     cantidadPeso: null as number | null,
     unidadMedidaPeso: 'KGM',   // KGM = Kilogramo, TNE = Tonelada
@@ -434,11 +440,15 @@ export class GuiasRemisionComponent implements OnInit {
     this.guia.descripcionMotivo = d.descripcionMotivo || '';
     this.guia.modalidadTransporte = d.modalidadTransporte === '01' ? '01' : '02';
     this.guia.fechaInicioTraslado = (d.fechaEmision || g.fechaEmision || '').slice(0, 10);
+    if (!this.guia.fechaInicioTraslado || this.guia.fechaInicioTraslado < getFechaHoyLocal()) {
+      this.guia.fechaInicioTraslado = getFechaHoyLocal();
+    }
     this.guia.horaInicioTraslado = d.horaInicioTraslado || '';
+    this.onHoraTrasladoChange();
     this.guia.cantidadPeso = d.cantidadPeso ?? null;
     this.guia.unidadMedidaPeso = d.unidadMedidaPeso || 'KGM';
-    this.guia.placaVehiculo = d.placaVehiculo || '';
-    this.guia.placaSecundaria = d.placaSecundaria || '';
+    this.guia.placaVehiculo = normalizarPlacaGuia(d.placaVehiculo);
+    this.guia.placaSecundaria = normalizarPlacaGuia(d.placaSecundaria);
     this.guia.tipoDocConductor = d.tipoDocConductor || '1';
     this.guia.numeroDocConductor = d.numeroDocConductor || '';
     this.guia.nombreConductor = d.nombreConductor || '';
@@ -1615,7 +1625,7 @@ export class GuiasRemisionComponent implements OnInit {
     if (t) {
       this.guia.rucTransportista = t.documento || t.ruc || '';
       this.guia.razonSocialTransportista = [t.nombres, t.apellidos].filter(Boolean).join(' ') || t.razonSocial || '';
-      const placaT = (t.placa || '').toString().trim();
+      const placaT = normalizarPlacaGuia(t.placa);
       if (placaT) {
         this.guia.placaVehiculo = placaT;
       }
@@ -1714,6 +1724,67 @@ export class GuiasRemisionComponent implements OnInit {
     });
   }
 
+  get fechaMinTraslado(): string {
+    return getFechaHoyLocal();
+  }
+
+  get horaMaxTraslado(): string | null {
+    const fecha = String(this.guia.fechaInicioTraslado || '').slice(0, 10);
+    if (fecha === getFechaHoyLocal()) {
+      return getHoraLocalAhora().slice(0, 5);
+    }
+    return null;
+  }
+
+  onFechaTrasladoChange(): void {
+    const hoy = getFechaHoyLocal();
+    const fecha = String(this.guia.fechaInicioTraslado || '').slice(0, 10);
+    if (fecha && fecha < hoy) {
+      this.guia.fechaInicioTraslado = hoy;
+      iziToast.warning({
+        title: 'Fecha',
+        message: 'No se permite una fecha anterior al día de emisión.',
+        position: 'topRight'
+      });
+    }
+    this.onHoraTrasladoChange();
+  }
+
+  onHoraTrasladoChange(): void {
+    const fecha = String(this.guia.fechaInicioTraslado || '').slice(0, 10);
+    const hora = String(this.guia.horaInicioTraslado || '').trim();
+    if (!hora || fecha !== getFechaHoyLocal()) return;
+    const ahora = getHoraLocalAhora().slice(0, 5);
+    const horaHmm = hora.length >= 5 ? hora.slice(0, 5) : hora;
+    if (horaHmm > ahora) {
+      this.guia.horaInicioTraslado = ahora;
+      iziToast.warning({
+        title: 'Hora',
+        message: 'La hora no puede ser posterior a la hora de emisión.',
+        position: 'topRight'
+      });
+    }
+  }
+
+  onPlacaVehiculoChange(valor: string): void {
+    this.guia.placaVehiculo = this.aplicarPlacaSinGuion(valor);
+  }
+
+  onPlacaSecundariaChange(valor: string): void {
+    this.guia.placaSecundaria = this.aplicarPlacaSinGuion(valor);
+  }
+
+  private aplicarPlacaSinGuion(valor: string): string {
+    if (placaGuiaTieneGuion(valor)) {
+      iziToast.warning({
+        title: 'Placa',
+        message: 'La placa no debe incluir guion. Use formato ABC123.',
+        position: 'topRight'
+      });
+    }
+    return normalizarPlacaGuia(valor);
+  }
+
   guardarGuia(): void {
     // Validaciones previas al envío
     if (!this.comprobanteOrigen) {
@@ -1740,6 +1811,18 @@ export class GuiasRemisionComponent implements OnInit {
       iziToast.warning({ title: 'Campo requerido', message: 'Indique la fecha de inicio de traslado.', position: 'topRight' });
       return;
     }
+    const errTraslado = validarFechaHoraPlacaTraslado({
+      fechaInicioTraslado: this.guia.fechaInicioTraslado,
+      horaInicioTraslado: this.guia.horaInicioTraslado || '',
+      placaVehiculo: this.guia.placaVehiculo,
+      placaSecundaria: this.guia.placaSecundaria
+    });
+    if (errTraslado) {
+      iziToast.warning({ title: 'Datos de traslado', message: errTraslado, position: 'topRight' });
+      return;
+    }
+    this.guia.placaVehiculo = normalizarPlacaGuia(this.guia.placaVehiculo);
+    this.guia.placaSecundaria = normalizarPlacaGuia(this.guia.placaSecundaria);
     if (!this.direccionOrigenSeleccionada?.direccion) {
       iziToast.warning({ title: 'Campo requerido', message: 'Seleccione la dirección de origen.', position: 'topRight' });
       return;

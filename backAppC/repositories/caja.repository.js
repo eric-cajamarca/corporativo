@@ -500,7 +500,9 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
     .input("fechaHasta", sql.DateTime, filtros.fechaHasta || null)
     .input("tipoMovimiento", sql.Char(1), filtros.tipoMovimiento || null);
 
-  const result = await request.query(`
+  let result;
+  try {
+    result = await request.query(`
       SELECT
         mc.idMovimientoCaja,
         mc.idEmpresa,
@@ -526,7 +528,63 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
         mc.documentoRelacionado,
         mc.observaciones,
         ISNULL(mc.eliminado, 0) AS eliminado,
-        LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, ''))) AS usuario
+        LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, ''))) AS usuario,
+        NULLIF(LTRIM(RTRIM(cliCob.rSocial)), '') AS clienteRecibo
+      FROM MovimientosCaja mc
+      ${joinAperturaCaja}
+      INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+      LEFT JOIN Empresas e ON e.idEmpresa = mc.idEmpresa
+      LEFT JOIN Concepto conc ON mc.idConcepto = conc.idConcepto
+      LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+      LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
+      INNER JOIN Moneda mon ON mc.idMoneda = mon.idMoneda
+      LEFT JOIN UsuarioWeb uw ON mc.idUsuario = uw.idUsuario
+      OUTER APPLY (
+        SELECT TOP 1 c.rSocial
+        FROM PagosCuotas pc
+        INNER JOIN CuotasCredito cu ON cu.idCuota = pc.idCuota
+        INNER JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito
+        INNER JOIN Clientes c ON c.idCliente = cc.idCliente
+        WHERE pc.numeroRecibo = mc.documentoRelacionado
+          AND pc.idEmpresa = mc.idEmpresa
+      ) cliCob
+      ${whereClause}
+      ORDER BY mc.fechaMovimiento DESC
+    `);
+  } catch (err) {
+    const code = err.number ?? err.originalError?.number;
+    const msg = err.message || err.originalError?.message || '';
+    if (code !== 208 && !/PagosCuotas|CuotasCredito|CreditosClientes/.test(msg)) {
+      throw err;
+    }
+    result = await request.query(`
+      SELECT
+        mc.idMovimientoCaja,
+        mc.idEmpresa,
+        ISNULL(NULLIF(LTRIM(RTRIM(e.alias)), ''), e.razon_Social) AS empresaMovimiento,
+        mc.idApertura,
+        mc.idTipoMovimientoCaja,
+        mc.fechaMovimiento,
+        mc.concepto,
+        mc.idConcepto,
+        ISNULL(
+          conc.descripcion,
+          ISNULL(
+            mc.concepto,
+            CASE WHEN tmc.nombre = 'APERTURA_CAJA' THEN 'Apertura de caja' ELSE REPLACE(tmc.nombre, '_', ' ') END
+          )
+        ) AS conceptoCatalogoDescripcion,
+        mc.monto,
+        mc.idMediosPago,
+        tmc.nombre AS tipoMovimiento,
+        tmc.tipo AS tipoOperacion,
+        ${SQL_ETIQUETA_MEDIO_MOV_CAJA} AS medioPago,
+        mon.simbolo + ' ' + mon.descripcion AS moneda,
+        mc.documentoRelacionado,
+        mc.observaciones,
+        ISNULL(mc.eliminado, 0) AS eliminado,
+        LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, ''))) AS usuario,
+        CAST(NULL AS VARCHAR(200)) AS clienteRecibo
       FROM MovimientosCaja mc
       ${joinAperturaCaja}
       INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
@@ -539,6 +597,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
       ${whereClause}
       ORDER BY mc.fechaMovimiento DESC
     `);
+  }
 
   return result.recordset;
 };

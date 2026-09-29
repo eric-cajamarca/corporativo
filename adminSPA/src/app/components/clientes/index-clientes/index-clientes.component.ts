@@ -24,6 +24,9 @@ export class IndexClientesComponent implements OnDestroy {
   @Input() modoSelector = false;
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
 
+  /** Popper fixed evita que Opciones quede recortado por .table-responsive / overflow. */
+  readonly dropdownPopperConfig = JSON.stringify({ strategy: 'fixed' });
+
   public clientes: Array<any> = [];
   /** Catálogo completo cargado desde índice Redis (GET /clientes). */
   private clientesCatalogo: Array<any> = [];

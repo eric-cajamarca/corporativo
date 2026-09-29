@@ -32,26 +32,6 @@ exports.procesarTrasConfirmarPago = async (pool, idVenta, idEmpresa) => {
   const modo = Number(config.modoEnvioSunat) || 2;
   const minutos = Math.max(1, Number(config.minutosEnvioAutomatico) || 10);
 
-  if (modo === 1) {
-    const ids = await FacturacionRepository.listarIdsComprobantePendientePorVentaRepo(pool, idVenta, idEmpresa);
-    for (const idCE of ids) {
-      try {
-        const result = await facturacionService.enviarComprobanteSunatPorEmpresaService(pool, idEmpresa, idCE);
-        if (!result?.ok) {
-          await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, idCE, idEmpresa);
-        }
-      } catch (e) {
-        console.error("sunatPostPago envío inmediato:", idCE, e.message);
-        try {
-          await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, idCE, idEmpresa);
-        } catch (_) {
-          /* ignore */
-        }
-      }
-    }
-    return;
-  }
-
   try {
     await FacturacionRepository.marcarPagoComprobantesElectronicosPorVentaRepo(pool, idVenta, idEmpresa, {
       modoEnvioSunat: modo,
@@ -59,6 +39,35 @@ exports.procesarTrasConfirmarPago = async (pool, idVenta, idEmpresa) => {
     });
   } catch (err) {
     console.error("sunatPostPago: marcarPago", err.message);
+  }
+
+  if (modo !== 1) return;
+
+  const ids = await FacturacionRepository.listarIdsComprobantePendientePorVentaRepo(pool, idVenta, idEmpresa);
+  for (const idCE of ids) {
+    try {
+      await facturacionService.enviarComprobanteSunatPorEmpresaService(pool, idEmpresa, idCE);
+    } catch (e) {
+      console.error("sunatPostPago envío inmediato:", idCE, e.message);
+      const errorConfig = e && e.message === "CONFIG_FACTURADOR_INCOMPLETA";
+      try {
+        await facturacionService.aplicarResultadoFalloEnvioService(
+          pool,
+          idEmpresa,
+          idCE,
+          errorConfig
+            ? {
+                ok: false,
+                errorConfig: true,
+                mensaje: "Configure certificado digital o la facturación electrónica en Configuración > Facturación"
+              }
+            : null,
+          e
+        );
+      } catch (eReg) {
+        console.error("sunatPostPago aplicar fallo:", eReg.message);
+      }
+    }
   }
 };
 

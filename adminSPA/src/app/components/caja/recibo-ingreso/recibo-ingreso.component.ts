@@ -304,6 +304,10 @@ export class ReciboIngresoComponent implements OnInit {
     if (esSaldoAnterior && !recibidoDe) {
       glosa = obs || 'Saldo del día anterior';
     }
+    const recibidoDeFinal = recibidoDe
+      || (m.recibidoDe || '').toString().trim()
+      || (m.clienteRecibo || m.cliente || m.rSocial || '').toString().trim()
+      || (esSaldoAnterior ? '—' : (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : ''));
     return {
       idMovimientoCaja: m.idMovimientoCaja,
       empresaMovimiento: m.empresaMovimiento,
@@ -317,7 +321,7 @@ export class ReciboIngresoComponent implements OnInit {
       observaciones: m.observaciones,
       usuario: m.usuario,
       glosa,
-      recibidoDe: recibidoDe || (esSaldoAnterior ? '—' : (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : '')),
+      recibidoDe: recibidoDeFinal,
       eliminado: m.eliminado === true || m.eliminado === 1
     };
   }
