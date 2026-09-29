@@ -64,6 +64,10 @@ async function actualizarEstadoYPlan(pool, idEmpresa, patch) {
     sets.push('fechaFin = @fechaFin');
     req.input('fechaFin', sql.DateTime2, patch.fechaFin);
   }
+  if (patch.fechaInicio !== undefined) {
+    sets.push('fechaInicio = @fechaInicio');
+    req.input('fechaInicio', sql.DateTime, patch.fechaInicio);
+  }
   if (patch.idCheckoutOrigen !== undefined) {
     sets.push('idCheckoutOrigen = @idCheckoutOrigen');
     req.input('idCheckoutOrigen', sql.UniqueIdentifier, patch.idCheckoutOrigen);
@@ -82,6 +86,51 @@ async function actualizarEstadoYPlan(pool, idEmpresa, patch) {
   }
   if (sets.length === 0) return;
   await req.query(`UPDATE EmpresaSuscripcion SET ${sets.join(', ')} WHERE idEmpresa = @idEmpresa`);
+}
+
+/**
+ * Aplica un checkout pagado solo si esa orden aún no es el origen de la suscripción.
+ * Evita que Culqi + perfil + webhook + admin sumen el período dos veces.
+ * @returns {number} filas actualizadas (0 = este checkout ya estaba aplicado)
+ */
+async function aplicarPagoCheckoutSiNuevo(pool, idEmpresa, patch) {
+  const req = pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('planCode', sql.VarChar(30), patch.planCode)
+    .input('billingCycle', sql.VarChar(10), patch.billingCycle)
+    .input('estado', sql.VarChar(30), patch.estado)
+    .input('fechaFin', sql.DateTime2, patch.fechaFin)
+    .input('idCheckoutOrigen', sql.UniqueIdentifier, patch.idCheckoutOrigen)
+    .input('migracionDemoPendiente', sql.Bit, patch.migracionDemoPendiente ? 1 : 0)
+    .input('planCodePendiente', sql.VarChar(30), patch.planCodePendiente)
+    .input('billingCyclePendiente', sql.VarChar(10), patch.billingCyclePendiente);
+
+  const sets = [
+    'planCode = @planCode',
+    'billingCycle = @billingCycle',
+    'estado = @estado',
+    'fechaFin = @fechaFin',
+    'idCheckoutOrigen = @idCheckoutOrigen',
+    'migracionDemoPendiente = @migracionDemoPendiente',
+    'planCodePendiente = @planCodePendiente',
+    'billingCyclePendiente = @billingCyclePendiente'
+  ];
+  if (patch.fechaInicio !== undefined) {
+    sets.push('fechaInicio = @fechaInicio');
+    req.input('fechaInicio', sql.DateTime, patch.fechaInicio);
+  }
+
+  const r = await req.query(`
+    UPDATE EmpresaSuscripcion
+    SET ${sets.join(', ')}
+    WHERE idEmpresa = @idEmpresa
+      AND (
+        idCheckoutOrigen IS NULL
+        OR idCheckoutOrigen <> @idCheckoutOrigen
+      )
+  `);
+  return r.rowsAffected[0] || 0;
 }
 
 /**
@@ -249,6 +298,7 @@ module.exports = {
   obtenerDatosAvisoPorEmpresa,
   insertar,
   actualizarEstadoYPlan,
+  aplicarPagoCheckoutSiNuevo,
   aplicarPlanesPendientesAlVencer,
   marcarVencidas,
   incrementarContadorComprobantesSunatAceptados,

@@ -1,8 +1,18 @@
+const sql = require('mssql');
 const { v4: uuidv4 } = require('uuid');
 const { isEnterprise, isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 const saasPlanesService = require('./saasPlanes.service');
+
+function mismoGuid(a, b) {
+  if (!a || !b) return false;
+  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+}
+
+function checkoutYaAplicadoASuscripcion(existente, idCheckout) {
+  return mismoGuid(existente?.idCheckoutOrigen, idCheckout);
+}
 
 /**
  * Tras crear empresa: fila de suscripción según modo y opciones de registro.
@@ -106,7 +116,8 @@ function baseNuevaVigencia(existente, planCodePagado, ahora) {
 }
 
 /**
- * Vincula un pago Culqi ya confirmado (checkout PAGADO) con la empresa del usuario logueado.
+ * Vincula un pago ya confirmado (checkout PAGADO) con la empresa.
+ * El mismo idCheckout no vuelve a sumar vigencia (Culqi, webhook, admin o perfil).
  */
 async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
   const chk = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
@@ -116,38 +127,67 @@ async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
     throw new Error('CHECKOUT_YA_VINCULADO');
   }
 
-  await suscripcionCheckoutRepository.vincularEmpresaCliente(pool, orderNumber, idEmpresa);
+  const existentePre = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+  if (checkoutYaAplicadoASuscripcion(existentePre, chk.idCheckout)) {
+    if (!chk.idEmpresaCliente) {
+      await suscripcionCheckoutRepository.vincularEmpresaCliente(pool, orderNumber, idEmpresa);
+    }
+    return existentePre;
+  }
 
-  const existente = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
-  const ahora = new Date();
-  const fechaFin = saasPlanesService.fechaFinDesdePlan(
-    chk.planCode,
-    chk.billingCycle,
-    baseNuevaVigencia(existente, chk.planCode, ahora)
-  );
-  if (!existente) {
-    await empresaSuscripcionRepository.insertar(pool, {
-      idSuscripcion: uuidv4(),
-      idEmpresa,
-      planCode: chk.planCode,
-      billingCycle: chk.billingCycle,
-      estado: 'ACTIVA',
-      fechaInicio: ahora,
-      fechaFin,
-      idCheckoutOrigen: chk.idCheckout,
-      migracionDemoPendiente: false
-    });
-  } else {
-    await empresaSuscripcionRepository.actualizarEstadoYPlan(pool, idEmpresa, {
-      planCode: chk.planCode,
-      billingCycle: chk.billingCycle,
-      estado: 'ACTIVA',
-      fechaFin,
-      idCheckoutOrigen: chk.idCheckout,
-      migracionDemoPendiente: false,
-      planCodePendiente: null,
-      billingCyclePendiente: null
-    });
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    await suscripcionCheckoutRepository.vincularEmpresaCliente(transaction, orderNumber, idEmpresa);
+
+    const existente = await empresaSuscripcionRepository.obtenerPorEmpresa(transaction, idEmpresa);
+    if (checkoutYaAplicadoASuscripcion(existente, chk.idCheckout)) {
+      await transaction.commit();
+      return existente;
+    }
+
+    const ahora = new Date();
+    const fechaFin = saasPlanesService.fechaFinDesdePlan(
+      chk.planCode,
+      chk.billingCycle,
+      baseNuevaVigencia(existente, chk.planCode, ahora)
+    );
+    if (!existente) {
+      await empresaSuscripcionRepository.insertar(transaction, {
+        idSuscripcion: uuidv4(),
+        idEmpresa,
+        planCode: chk.planCode,
+        billingCycle: chk.billingCycle,
+        estado: 'ACTIVA',
+        fechaInicio: ahora,
+        fechaFin,
+        idCheckoutOrigen: chk.idCheckout,
+        migracionDemoPendiente: false
+      });
+    } else {
+      const cambiaPlan =
+        String(existente.planCode || '').trim().toLowerCase() !==
+        String(chk.planCode || '').trim().toLowerCase();
+      await empresaSuscripcionRepository.aplicarPagoCheckoutSiNuevo(transaction, idEmpresa, {
+        planCode: chk.planCode,
+        billingCycle: chk.billingCycle,
+        estado: 'ACTIVA',
+        fechaFin,
+        fechaInicio: cambiaPlan ? ahora : undefined,
+        idCheckoutOrigen: chk.idCheckout,
+        migracionDemoPendiente: false,
+        planCodePendiente: null,
+        billingCyclePendiente: null
+      });
+    }
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (rbErr) {
+      console.error('contexto: vincularCheckoutPagado rollback', rbErr);
+    }
+    throw err;
   }
   return empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
 }

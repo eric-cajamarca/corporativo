@@ -64,6 +64,14 @@ export class MiSuscripcionComponent implements OnInit {
           r.deploymentMode === 'saas' &&
           this.orderNumber.trim()
         ) {
+          if (this.checkoutYaAplicado(r, this.orderNumber)) {
+            this.autoVinculoEjecutado = true;
+            this.orderNumber = '';
+            this.vinculoOk.set(true);
+            this.vinculoMsg.set('Plan actualizado correctamente con su pago.');
+            void this.router.navigate(['/cuenta', 'suscripcion'], { replaceUrl: true });
+            return;
+          }
           this.intentarVinculoAutomatico();
         }
       },
@@ -75,9 +83,9 @@ export class MiSuscripcionComponent implements OnInit {
   }
 
   /**
-   * Tras pagar en Culqi el backend solo marca SuscripcionCheckoutPendiente como PAGADO;
-   * EmpresaSuscripcion se actualiza aquí. Antes el formulario "Vincular" solo se mostraba en PENDIENTE_PAGO,
-   * no en DEMO: las cuentas demo nunca vinculaban y el plan quedaba en demo.
+   * Respaldo: si el pago quedó PAGADO pero aún no se aplicó a EmpresaSuscripcion
+   * (p. ej. Culqi sin empresa en la orden), el backend aplica una sola vez.
+   * Si el checkout ya es el origen de la suscripción, no se vuelve a llamar.
    */
   private intentarVinculoAutomatico(): void {
     this.autoVinculoEjecutado = true;
@@ -197,6 +205,24 @@ export class MiSuscripcionComponent implements OnInit {
 
   onSidebarToggle(collapsed: boolean): void {
     this.sidebarState.setCollapsed(collapsed);
+  }
+
+  /** El backend ya aplicó esta orden: no reenviar vincular (evita un POST innecesario). */
+  private checkoutYaAplicado(estado: MiEstadoSuscripcionResponse, orderNumber: string): boolean {
+    const on = orderNumber.trim().toLowerCase();
+    const s = estado.suscripcion;
+    if (!on || !s) return false;
+    const plan = (s.planCode || '').trim().toLowerCase();
+    if (!plan || PLANES_SIN_RENOVACION.has(plan)) return false;
+    const st = (s.estado || '').trim().toUpperCase();
+    if (st !== 'ACTIVA') return false;
+    const ordenes = estado.checkoutsOrden || [];
+    return ordenes.some(
+      (o) =>
+        (o.orderNumber || '').trim().toLowerCase() === on &&
+        (o.estado || '').trim().toUpperCase() === 'PAGADO' &&
+        (o.planCode || '').trim().toLowerCase() === plan
+    );
   }
 
   etiquetaCiclo(ciclo: string | null | undefined): string {
