@@ -164,7 +164,15 @@ exports.kardexCompleto = async (req, res) => {
     }
     const fechaDesde = req.query.fechaDesde || null;
     const fechaHasta = req.query.fechaHasta || null;
-    const resultado = await kardexService.obtenerKardexCompleto(req.user.empresa, fechaDesde, fechaHasta);
+    const soloControlados =
+      String(req.query.soloControlados || '').trim() === '1' ||
+      String(req.query.soloControlados || '').toLowerCase() === 'true';
+    const resultado = await kardexService.obtenerKardexCompleto(
+      req.user.empresa,
+      fechaDesde,
+      fechaHasta,
+      { soloControlados }
+    );
     return res.status(200).json(resultado);
   } catch (error) {
     console.error('inventarioController kardexCompleto:', error);

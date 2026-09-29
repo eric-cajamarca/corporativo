@@ -7,7 +7,7 @@ const productosMutacionesService = require('../services/productosMutaciones.serv
 const productoHistorialService = require('../services/productoHistorial.service');
 const catalogoProductoSunatService = require('../services/catalogoProductoSunat.service');
 const productoSunatMatchService = require('../services/productoSunatMatch.service');
-const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
+const recetaVentaService = require('../services/recetaVenta.service');
 
 function parseRequiereCodigoSunat(valor) {
   if (valor === true || valor === 1 || valor === '1' || valor === 'true') return 1;
@@ -345,6 +345,7 @@ const crear_producto = async (req, res) => {
     revisadoSunat: revisadoSunat === true || revisadoSunat === 1 || revisadoSunat === 'true' ? 1 : 0,
     anexoSunatSugerido: anexoSunatSugerido != null ? String(anexoSunatSugerido).trim() || null : null,
     codigoSunatSugerido: codigoSunatSugerido != null ? String(codigoSunatSugerido).trim() || null : null,
+    ...recetaVentaService.camposFichaProductoDesdeBody(req.body),
   };
 
   const usarCorrelativo =
@@ -534,6 +535,7 @@ const actualizar_producto = async function (req, res) {
   if (codigoSunatSugerido !== undefined) {
     detalle.codigoSunatSugerido = codigoSunatSugerido != null ? String(codigoSunatSugerido).trim() || null : null;
   }
+  Object.assign(detalle, recetaVentaService.camposFichaProductoDesdeBody(req.body));
 
   try {
     const productos = await withPool(async (pool) => {

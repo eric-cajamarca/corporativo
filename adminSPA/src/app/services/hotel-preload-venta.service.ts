@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import type { TipoLineaCheckoutHotel } from './hotel.service';
 
 /** Item para prellenar el carrito de create-ventas desde consumo habitación */
 export interface PreloadItemVenta {
@@ -9,10 +10,13 @@ export interface PreloadItemVenta {
   marca?: string;
   cantidad: number;
   pVenta: number;
+  tipo?: TipoLineaCheckoutHotel;
+  idConsumo?: string | null;
 }
 
 export interface PreloadFromHabitacion {
   idEstancia?: string;
+  idGrupo?: string;
   idProductoHabitacion: string;
   habitacionCodigo: string;
   habitacionDescripcion: string;

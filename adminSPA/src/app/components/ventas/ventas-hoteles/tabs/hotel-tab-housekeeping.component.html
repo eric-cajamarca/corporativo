@@ -1,0 +1,37 @@
+    @if (h.activeTab() === 'housekeeping') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Housekeeping</h2>
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="h.cargarHousekeeping()">Actualizar</button>
+        </div>
+        @if (h.housekeepingLoading()) {
+          <p class="text-muted">Cargando…</p>
+        } @else {
+          <div class="hotel-rooms-grid-housekeeping">
+            @for (hab of h.productosHabitacion; track hab.idProducto) {
+              @let limpieza = h.getEstadoLimpieza(hab.idProducto);
+              <div class="hk-room-card">
+                <div class="hk-room-header">
+                  <span class="hk-room-code">{{ hab.codigo }}</span>
+                  <span class="hotel-badge hk-room-badge" [class.hotel-badge-sucia]="limpieza === 'sucia'"
+                    [class.hotel-badge-limpieza]="limpieza === 'en_limpieza'"
+                    [class.hotel-badge-limpia]="limpieza === 'limpia'"
+                    [class.hotel-badge-fuera]="limpieza === 'fuera_servicio'">
+                    {{ h.labelEstadoLimpieza(limpieza) }}
+                  </span>
+                </div>
+                <p class="hk-room-desc" [title]="hab.descripcion">{{ hab.descripcion }}</p>
+                <div class="hk-room-actions">
+                  @for (st of h.estadosLimpieza; track st.value) {
+                    <button type="button" class="hk-action-btn"
+                      [class.active]="limpieza === st.value"
+                      [title]="st.label"
+                      (click)="h.cambiarEstadoLimpieza(hab, st.value)">{{ st.labelCorto }}</button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }

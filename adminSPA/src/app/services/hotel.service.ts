@@ -27,6 +27,11 @@ export interface Reserva {
   idProductoHabitacion: string;
   idCliente: number | null;
   idEstancia?: string | null;
+  idGrupo?: string | null;
+  grupoCodigo?: string | null;
+  grupoNombre?: string | null;
+  habitacionFacturada?: boolean;
+  idVentaHabitacion?: number | null;
   codigo: string;
   nombreHuesped: string;
   fechaEntrada: string;
@@ -80,6 +85,11 @@ export interface Estancia {
   tarifaNoche: number;
   totalHabitacion: number;
   idVenta: number | null;
+  habitacionFacturada?: boolean;
+  idVentaHabitacion?: number | null;
+  idGrupo?: string | null;
+  grupoCodigo?: string | null;
+  grupoNombre?: string | null;
   habitacionCodigo: string;
   habitacionDescripcion: string;
 }
@@ -96,6 +106,8 @@ export interface CheckInWalkInPayload {
   fechaHoraCliente?: string;
 }
 
+export type TipoLineaCheckoutHotel = 'habitacion' | 'consumo' | 'recargo';
+
 export interface CheckOutPreloadLinea {
   idProducto: string;
   codigo: string;
@@ -104,6 +116,8 @@ export interface CheckOutPreloadLinea {
   marca?: string;
   cantidad: number;
   pVenta: number;
+  tipo?: TipoLineaCheckoutHotel;
+  idConsumo?: string | null;
 }
 
 export interface CheckOutPreload {
@@ -115,6 +129,10 @@ export interface CheckOutPreload {
   nombreHuesped?: string;
   idReserva: string | null;
   anticiposTotal?: number;
+  habitacionFacturada?: boolean;
+  pendienteHabitacion?: boolean;
+  pendienteConsumo?: boolean;
+  idGrupo?: string | null;
   lineas: CheckOutPreloadLinea[];
 }
 
@@ -142,29 +160,137 @@ export interface HotelAnticipo {
   fRegistro?: string;
 }
 
+export interface HotelFolioCargoRecargo {
+  concepto: string;
+  monto: number;
+}
+
+export interface HotelFolioLineaConsumo {
+  idConsumo: string;
+  descripcion: string;
+  cantidad: number;
+  pUnitario: number;
+  monto: number;
+  estadoConsumo: string;
+}
+
+export interface HotelFolioDocumento {
+  idVenta: number;
+  compVenta: string;
+  fEmision: string;
+  total: number;
+  tipo: 'comprobante' | 'nota_credito' | 'nota_debito';
+  codigoComprobante: string;
+  idEstadoPago: number;
+  estadoPago: string;
+  esPagado: boolean;
+  esCredito: boolean;
+  compRelacionado?: string | null;
+}
+
+export interface HotelFolio {
+  idEstancia: string;
+  estadoEstancia: string;
+  nombreHuesped: string;
+  habitacionCodigo: string;
+  habitacionDescripcion: string;
+  checkIn: string;
+  checkOutPrevisto: string;
+  habitacionFacturada: boolean;
+  cargos: {
+    habitacion: number;
+    habitacionFacturada: boolean;
+    recargos: HotelFolioCargoRecargo[];
+    totalRecargos: number;
+    consumoPendiente: number;
+    consumoFacturado: number;
+    totalCargos: number;
+    lineasConsumo: HotelFolioLineaConsumo[];
+  };
+  anticipos: HotelAnticipo[];
+  anticiposPendientes: number;
+  anticiposAplicados: number;
+  documentos: HotelFolioDocumento[];
+  resumen: {
+    totalCargos: number;
+    anticiposPendientes: number;
+    anticiposAplicados: number;
+    totalComprobantes: number;
+    totalPagado: number;
+    totalCredito: number;
+    totalNotasCredito: number;
+    totalNotasDebito: number;
+    saldoPorFacturar: number;
+    saldoPorCobrar: number;
+    saldoHuesped: number;
+  };
+}
+
+export interface HotelReporteHabitacion {
+  idProductoHabitacion: string;
+  habitacionCodigo: string;
+  habitacionDescripcion: string;
+  nochesOcupadas: number;
+  nochesReservadas: number;
+  estancias: number;
+  reservas: number;
+  ingresoHabitacion: number;
+  ingresoReservas: number;
+  ingresoConsumo: number;
+  ingresoTotal: number;
+}
+
 export interface HotelReporte {
   fechaDesde: string;
   fechaHasta: string;
   ocupacion: {
     habitaciones: number;
+    habitacionesOcupadas: number;
     dias: number;
     nochesOcupadas: number;
+    nochesReservadas: number;
     ocupacionPct: number;
     ingresoHabitacion: number;
   };
+  ocupacionPorDia?: HotelReporteOcupacionDia[];
   consumo: { ingresoConsumo: number; lineasFacturadas: number };
   reservas: {
     cancelaciones: number;
     noShow: number;
     convertidas: number;
     confirmadas: number;
+    total: number;
+    ingresoConfirmadas: number;
   };
+  destacados: {
+    masOcupada: HotelReporteHabitacion | null;
+    masVentas: HotelReporteHabitacion | null;
+  };
+  porHabitacion: HotelReporteHabitacion[];
   ingresoTotal: number;
+}
+
+export interface HotelReporteOcupacionDia {
+  fecha: string;
+  ocupadas: number;
+  reservadas: number;
+  total: number;
+  ocupacionPct: number;
 }
 
 export interface HotelHistorialEstanciaResumen extends Estancia {
   totalConsumo: number;
   cantidadConsumos: number;
+}
+
+export interface HotelHistorialReservaResumen {
+  idReserva: string;
+  codigo: string;
+  nombreHuesped: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  estado: EstadoReserva;
+  total: number;
 }
 
 export interface HotelHistorialHabitacion {
@@ -174,9 +300,15 @@ export interface HotelHistorialHabitacion {
   anio: number;
   mes: number;
   totalEstancias: number;
+  totalReservas: number;
   diasOcupados: number;
+  diasReservados: number;
   fechasOcupadas: string[];
+  fechasOcupadasActivas: string[];
+  fechasOcupadasPasadas: string[];
+  fechasReservadas: string[];
   estancias: HotelHistorialEstanciaResumen[];
+  reservas: HotelHistorialReservaResumen[];
 }
 
 export interface HotelHistorialConsumoLinea {
@@ -232,6 +364,9 @@ export interface HotelCalendarioEvento {
   total?: number;
   habitacionCodigo?: string;
   habitacionDescripcion?: string;
+  idGrupo?: string | null;
+  grupoCodigo?: string | null;
+  grupoNombre?: string | null;
 }
 
 export interface HotelCalendarioData {
@@ -293,11 +428,62 @@ export class HotelService {
   confirmarCheckoutPostVenta(
     idEstancia: string,
     idVenta: number,
-    fechaHoraCliente?: string
-  ): Observable<{ data: { ok: boolean } }> {
-    return this.http.post<{ data: { ok: boolean } }>(
+    fechaHoraCliente?: string,
+    opciones?: { incluyeHabitacion?: boolean; idsConsumo?: string[] }
+  ): Observable<{ data: { ok: boolean; cerrado?: boolean; message?: string; pendienteHabitacion?: boolean; pendienteConsumo?: boolean } }> {
+    return this.http.post<{ data: { ok: boolean; cerrado?: boolean; message?: string; pendienteHabitacion?: boolean; pendienteConsumo?: boolean } }>(
       this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/check-out/confirmar',
-      { idVenta, checkOutReal: fechaHoraCliente },
+      {
+        idVenta,
+        checkOutReal: fechaHoraCliente,
+        incluyeHabitacion: opciones?.incluyeHabitacion,
+        idsConsumo: opciones?.idsConsumo
+      },
+      { withCredentials: true }
+    );
+  }
+
+  salidaOperativaEstancia(
+    idEstancia: string,
+    fechaHoraCliente?: string
+  ): Observable<{ data: { ok: boolean; cerrado?: boolean; message?: string; pendienteHabitacion?: boolean; pendienteConsumo?: boolean } }> {
+    return this.http.post<{ data: { ok: boolean; cerrado?: boolean; message?: string } }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/salida-operativa',
+      { checkOutReal: fechaHoraCliente },
+      { withCredentials: true }
+    );
+  }
+
+  listarGrupos(): Observable<{ data: HotelGrupo[] }> {
+    return this.http.get<{ data: HotelGrupo[] }>(this.url + 'hotel/grupos', { withCredentials: true });
+  }
+
+  crearGrupo(body: HotelGrupoCrearPayload): Observable<{ data: HotelGrupoDetalle }> {
+    return this.http.post<{ data: HotelGrupoDetalle }>(this.url + 'hotel/grupos', body, { withCredentials: true });
+  }
+
+  obtenerGrupo(idGrupo: string): Observable<{ data: HotelGrupoDetalle }> {
+    return this.http.get<{ data: HotelGrupoDetalle }>(
+      this.url + 'hotel/grupos/' + encodeURIComponent(idGrupo),
+      { withCredentials: true }
+    );
+  }
+
+  facturarHospedajeGrupo(idGrupo: string): Observable<{ data: HotelGrupoFacturaPreload }> {
+    return this.http.post<{ data: HotelGrupoFacturaPreload }>(
+      this.url + 'hotel/grupos/' + encodeURIComponent(idGrupo) + '/facturar-hospedaje',
+      {},
+      { withCredentials: true }
+    );
+  }
+
+  confirmarFacturaHospedajeGrupo(
+    idGrupo: string,
+    idVenta: number
+  ): Observable<{ data: { ok: boolean; yaFacturado?: boolean; message?: string } }> {
+    return this.http.post<{ data: { ok: boolean; yaFacturado?: boolean; message?: string } }>(
+      this.url + 'hotel/grupos/' + encodeURIComponent(idGrupo) + '/facturar-hospedaje/confirmar',
+      { idVenta },
       { withCredentials: true }
     );
   }
@@ -458,6 +644,13 @@ export class HotelService {
     );
   }
 
+  getFolioEstancia(idEstancia: string): Observable<{ data: HotelFolio }> {
+    return this.http.get<{ data: HotelFolio }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/folio',
+      { withCredentials: true }
+    );
+  }
+
   getReporteHotel(fechaDesde: string, fechaHasta: string): Observable<{ data: HotelReporte }> {
     const q =
       '?fechaDesde=' + encodeURIComponent(fechaDesde) +
@@ -493,10 +686,89 @@ export class HotelService {
     );
   }
 
+  cambiarSalidaEstancia(idEstancia: string, fechaSalida: string): Observable<{ data: Estancia }> {
+    return this.http.put<{ data: Estancia }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/salida',
+      { fechaSalida },
+      { withCredentials: true }
+    );
+  }
+
+  moverEstancia(idEstancia: string, idProductoHabitacion: string): Observable<{ data: Estancia }> {
+    return this.http.put<{ data: Estancia }>(
+      this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/habitacion',
+      { idProductoHabitacion },
+      { withCredentials: true }
+    );
+  }
+
   /** Tras facturar desde habitación: limpia consumo y cierra reserva vigente. */
   cerrarPostVenta(body: { idProductoHabitacion: string; idVenta: number; idReserva?: string | null }): Observable<{ data: { ok: boolean } }> {
     return this.http.post<{ data: { ok: boolean } }>(this.url + 'hotel/cerrar-post-venta', body, { withCredentials: true });
   }
+}
+
+export interface HotelGrupo {
+  idGrupo: string;
+  idEmpresa?: string;
+  idCliente: number | null;
+  codigo: string;
+  nombre: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  hospedajeFacturado: boolean;
+  idVentaHospedaje?: number | null;
+  estado: 'activo' | 'cerrado' | 'cancelado';
+  clienteNombre?: string | null;
+  totalHabitaciones?: number;
+  reservasPendientes?: number;
+  inHouse?: number;
+}
+
+export interface HotelGrupoHabitacion {
+  idReserva: string;
+  idProductoHabitacion: string;
+  codigo: string;
+  nombreHuesped: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  estado: EstadoReserva;
+  total: number;
+  habitacionFacturada?: boolean;
+  habitacionCodigo: string;
+  habitacionDescripcion: string;
+  idEstancia?: string | null;
+  estadoEstancia?: string | null;
+  checkIn?: string | null;
+  totalEstancia?: number | null;
+  estanciaHabitacionFacturada?: boolean;
+}
+
+export interface HotelGrupoDetalle extends HotelGrupo {
+  habitaciones: HotelGrupoHabitacion[];
+}
+
+export interface HotelGrupoCrearPayload {
+  idCliente: number;
+  nombre: string;
+  nombreHuesped?: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  idsProductoHabitacion: string[];
+  observaciones?: string | null;
+  fechaHoraCliente?: string;
+}
+
+export interface HotelGrupoFacturaPreload {
+  idGrupo: string;
+  codigo: string;
+  nombre: string;
+  idCliente: number | null;
+  nombreHuesped?: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+  totalHabitaciones: number;
+  lineas: CheckOutPreloadLinea[];
 }
 
 export interface ConsumoHabitacionLinea {

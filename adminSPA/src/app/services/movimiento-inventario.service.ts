@@ -262,11 +262,16 @@ export class MovimientoInventarioService {
     });
   }
 
-  /** Formato 13.1: kardex valorizado de todos los productos */
-  obtenerKardexCompleto(fechaDesde: string, fechaHasta: string): Observable<KardexCompletoResponse> {
+  /** Formato 13.1 o libro DIGEMID (soloControlados). */
+  obtenerKardexCompleto(
+    fechaDesde: string,
+    fechaHasta: string,
+    opciones?: { soloControlados?: boolean }
+  ): Observable<KardexCompletoResponse> {
     let params = new HttpParams();
     if (fechaDesde) params = params.set('fechaDesde', fechaDesde);
     if (fechaHasta) params = params.set('fechaHasta', fechaHasta);
+    if (opciones?.soloControlados) params = params.set('soloControlados', '1');
     return this.http.get<KardexCompletoResponse>(this.baseUrl + 'kardex-completo', {
       params,
       withCredentials: true
@@ -339,6 +344,12 @@ export interface KardexCompletoProducto {
   tipoExistencia: string;
   tipoExistenciaDescripcion: string;
   unidadMedida: string;
+  controlado?: boolean;
+  principioActivo?: string;
+  concentracion?: string;
+  formaFarmaceutica?: string;
+  registroSanitario?: string;
+  marca?: string;
   filas: {
     fecha: string;
     tipoDocumento: string;
@@ -354,6 +365,10 @@ export interface KardexCompletoProducto {
     saldoCantidad: number;
     saldoCostoUnitario: number;
     saldoImporte: number;
+    pacienteNombre?: string;
+    medicoNombre?: string;
+    cmp?: string;
+    numeroReceta?: string;
   }[];
   totales: {
     totalEntradaCantidad: number;
@@ -381,5 +396,6 @@ export interface KardexCompletoResponse {
     fechaDesde: string;
     fechaHasta: string;
   };
+  tipoLibro?: string;
   productos: KardexCompletoProducto[];
 }

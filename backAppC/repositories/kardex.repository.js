@@ -74,6 +74,23 @@ const FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA = `
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const round2 = (n) => Math.round(n * 100) / 100;
 
+let farSchemaCache = null;
+
+async function obtenerEsquemaFarmacia(pool) {
+  if (farSchemaCache) return farSchemaCache;
+  const r = await pool.request().query(`
+    SELECT
+      CASE WHEN COL_LENGTH('Productos', 'controlado') IS NOT NULL THEN 1 ELSE 0 END AS tieneControlado,
+      CASE WHEN OBJECT_ID(N'dbo.RecetaVenta', N'U') IS NOT NULL THEN 1 ELSE 0 END AS tieneRecetaVenta
+  `);
+  const row = (r.recordset && r.recordset[0]) || {};
+  farSchemaCache = {
+    tieneControlado: Number(row.tieneControlado) === 1,
+    tieneRecetaVenta: Number(row.tieneRecetaVenta) === 1
+  };
+  return farSchemaCache;
+}
+
 /**
  * Obtiene datos para el kardex de un producto en un rango de fechas.
  * Fuentes: Compras (DetalleCompras), Ventas (DetalleVenta), MovimientosInventario.
@@ -85,6 +102,36 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
   req.input('fechaDesde', sql.DateTime, fechaDesde);
   req.input('fechaHasta', sql.DateTime, fechaHasta);
+
+  const esquemaFar = await obtenerEsquemaFarmacia(pool);
+  const selectFichaFar = esquemaFar.tieneControlado
+    ? `ISNULL(p.controlado, 0) AS controlado,
+               LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
+               LTRIM(RTRIM(ISNULL(p.concentracion, ''))) AS concentracion,
+               LTRIM(RTRIM(ISNULL(p.formaFarmaceutica, ''))) AS formaFarmaceutica,
+               LTRIM(RTRIM(ISNULL(p.registroSanitario, ''))) AS registroSanitario,
+               LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca`
+    : `CAST(0 AS BIT) AS controlado,
+               CAST('' AS VARCHAR(1)) AS principioActivo,
+               CAST('' AS VARCHAR(1)) AS concentracion,
+               CAST('' AS VARCHAR(1)) AS formaFarmaceutica,
+               CAST('' AS VARCHAR(1)) AS registroSanitario,
+               CAST('' AS VARCHAR(1)) AS marca`;
+  const joinMarca = esquemaFar.tieneControlado
+    ? 'LEFT JOIN Marcas m ON m.idMarca = p.idMarca'
+    : '';
+  const selectReceta = esquemaFar.tieneRecetaVenta
+    ? `LTRIM(RTRIM(ISNULL(rv.pacienteNombre, ''))) AS pacienteNombre,
+               LTRIM(RTRIM(ISNULL(rv.medicoNombre, ''))) AS medicoNombre,
+               LTRIM(RTRIM(ISNULL(rv.cmp, ''))) AS cmp,
+               LTRIM(RTRIM(ISNULL(rv.numeroReceta, ''))) AS numeroReceta`
+    : `CAST('' AS VARCHAR(1)) AS pacienteNombre,
+               CAST('' AS VARCHAR(1)) AS medicoNombre,
+               CAST('' AS VARCHAR(1)) AS cmp,
+               CAST('' AS VARCHAR(1)) AS numeroReceta`;
+  const joinReceta = esquemaFar.tieneRecetaVenta
+    ? 'LEFT JOIN RecetaVenta rv ON rv.idEmpresa = v.idEmpresa AND rv.idVenta = v.idVenta'
+    : '';
 
   const [
     productoResult,
@@ -103,9 +150,11 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       .query(`
         SELECT p.idProducto, p.codigo, p.descripcion,
                ISNULL(pr.codigo, 'NIU') AS unidadMedida,
-               ISNULL(pr.descripcion, 'UNIDAD') AS unidadDescripcion
+               ISNULL(pr.descripcion, 'UNIDAD') AS unidadDescripcion,
+               ${selectFichaFar}
         FROM Productos p
         LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
+        ${joinMarca}
         WHERE p.idEmpresa = @idEmpresa AND p.idProducto = @idProducto
       `),
     pool.request()
@@ -140,10 +189,12 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
                0 AS cantidadEntrada, 0 AS pUnitarioEntrada, 0 AS importeEntrada,
                dv.cantidad AS cantidadSalida, dv.pVenta AS pUnitarioSalida, dv.subtotal AS importeSalida,
                ISNULL(dv.costoUnitario, 0) AS costoUnitarioSalida,
-               ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, NULL AS observaciones
+               ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, NULL AS observaciones,
+               ${selectReceta}
         FROM DetalleVenta dv
         INNER JOIN Ventas v ON dv.idVenta = v.idVenta
         LEFT JOIN Comprobantes comp ON comp.idComprobante = v.idComprobante AND comp.idEmpresa = v.idEmpresa
+        ${joinReceta}
         WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto
           AND v.fEmision >= @fechaDesde AND v.fEmision < DATEADD(day, 1, @fechaHasta)
       `),
@@ -269,7 +320,11 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       importeSalida: cantidadSalida > 0 ? round2(cantidadSalida * pUnitarioSalida) : 0,
       costoUnitarioSalida,
       excluidoDeTotales,
-      estadoComprobante
+      estadoComprobante,
+      pacienteNombre: r.pacienteNombre != null ? String(r.pacienteNombre).trim() : '',
+      medicoNombre: r.medicoNombre != null ? String(r.medicoNombre).trim() : '',
+      cmp: r.cmp != null ? String(r.cmp).trim() : '',
+      numeroReceta: r.numeroReceta != null ? String(r.numeroReceta).trim() : ''
     };
   };
 
@@ -360,7 +415,11 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       saldoPUnitario,
       saldoImporte,
       excluidoDeTotales: f.excluidoDeTotales,
-      estadoComprobante: f.estadoComprobante
+      estadoComprobante: f.estadoComprobante,
+      pacienteNombre: f.pacienteNombre || '',
+      medicoNombre: f.medicoNombre || '',
+      cmp: f.cmp || '',
+      numeroReceta: f.numeroReceta || ''
     });
   }
 
@@ -378,7 +437,13 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       unidadMedida: producto.unidadMedida || 'NIU',
       unidadDescripcion: producto.unidadDescripcion || 'UNIDAD',
       tipoExistencia: '01',
-      tipoExistenciaDescripcion: 'MERCADERIAS'
+      tipoExistenciaDescripcion: 'MERCADERIAS',
+      controlado: !!(producto.controlado === true || producto.controlado === 1),
+      principioActivo: producto.principioActivo || '',
+      concentracion: producto.concentracion || '',
+      formaFarmaceutica: producto.formaFarmaceutica || '',
+      registroSanitario: producto.registroSanitario || '',
+      marca: producto.marca || ''
     },
     saldoInicial: {
       cantidad: round3(cantidadIni),
@@ -401,12 +466,17 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
 };
 
 /**
- * Lista productos de la empresa para el kardex completo (formato 13.1).
+ * Lista productos de la empresa para el kardex completo (formato 13.1 o DIGEMID).
  */
-exports.listarProductosParaKardex = async (pool, idEmpresa) => {
-  const r = await pool.request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
+exports.listarProductosParaKardex = async (pool, idEmpresa, opciones = {}) => {
+  const soloControlados = opciones.soloControlados === true;
+  const esquemaFar = await obtenerEsquemaFarmacia(pool);
+  if (soloControlados && !esquemaFar.tieneControlado) {
+    throw new Error('Aplique la migración de botica para el libro DIGEMID de productos controlados');
+  }
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const filtroControlado = soloControlados ? ' AND ISNULL(p.controlado, 0) = 1 ' : '';
+  const r = await req.query(`
       SELECT p.idProducto, p.codigo, p.descripcion,
              ISNULL(pr.codigo, 'NIU') AS unidadMedida,
              ISNULL(pr.descripcion, 'UNIDAD') AS unidadDescripcion
@@ -414,6 +484,7 @@ exports.listarProductosParaKardex = async (pool, idEmpresa) => {
       LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
       WHERE p.idEmpresa = @idEmpresa
         AND ISNULL(p.estado, 1) = 1
+        ${filtroControlado}
       ORDER BY p.codigo, p.descripcion
     `);
   return r.recordset || [];

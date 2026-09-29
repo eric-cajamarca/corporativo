@@ -22,6 +22,9 @@ import {
   esFormaOMedioSaldoFavor,
   filtrarSinSaldoFavor
 } from '../../../utils/saldo-favor-pago.util';
+import { RecetaVentaModalService } from '../../../services/receta-venta-modal.service';
+import { RecetaVentaPayload } from '../../../models/receta-venta.model';
+import { etiquetaCondicionVenta, lineasQueRequierenReceta, requiereReceta } from '../../../utils/receta-venta.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
@@ -286,6 +289,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Modal Convertir vale en venta (liquidación). Solo visible si la empresa tiene habilitado vales de despacho (config rubro usaValeDespacho). */
   usaValeDespachoHabilitado = false;
+  recetaPendiente: RecetaVentaPayload | null = null;
   valesParaLiquidar: ValeDespachoListItem[] = [];
   valeSeleccionadoLiquidar: ValeDespachoListItem | null = null;
   idComprobanteLiquidacion: number | null = null;
@@ -294,6 +298,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Check-out hotel pendiente de confirmar al registrar la venta. */
   private hotelCheckoutIdEstancia: string | null = null;
+  private hotelCheckoutIdGrupo: string | null = null;
 
   /** Comprobantes Factura (01) y Boleta (03) para elegir al liquidar vale */
   get comprobantesFacturaBoleta(): any[] {
@@ -340,7 +345,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private ngZone: NgZone,
     private route: ActivatedRoute,
     private router: Router,
-    private posKeyboard: PosKeyboardService
+    private posKeyboard: PosKeyboardService,
+    private recetaVentaModal: RecetaVentaModalService
   ) {}
 
 
@@ -580,6 +586,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     const preload = this.hotelPreloadVentaService.getAndClearPreload();
     if (!preload?.lineas?.length) return;
     this.hotelCheckoutIdEstancia = preload.idEstancia ?? null;
+    this.hotelCheckoutIdGrupo = preload.idGrupo ?? null;
     this.carrito = preload.lineas.map((lin) => {
       const desc = (lin.descripcion ?? '').toString().trim();
       const marca = (lin as { marca?: string }).marca ?? '';
@@ -593,7 +600,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         nombreMarca: marca,
         marca,
         cantidad: lin.cantidad,
-        pVenta: lin.pVenta
+        pVenta: lin.pVenta,
+        tipoHotel: lin.tipo,
+        idConsumoHotel: lin.idConsumo ?? null
       };
     });
     this.cargarClienteDesdePreloadHotel(preload);
@@ -607,8 +616,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.guardarEstadoProvisional();
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
-            title: 'Check-out',
-            message: 'Carrito cargado desde la estancia. Revise cliente y comprobante.',
+            title: preload.idGrupo ? 'Grupo hotel' : 'Check-out',
+            message: preload.idGrupo
+              ? 'Carrito con el hospedaje del grupo. El consumo de cada habitación se cobra aparte.'
+              : 'Carrito cargado desde la estancia. Puede quitar líneas; la habitación no se libera hasta facturar todo el saldo.',
             position: 'topRight'
           });
         }
@@ -665,16 +676,63 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cliente.rSocial = nombre;
   }
 
-  /** Cierra estancia y marca consumos facturados solo tras venta exitosa. */
-  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null): void {
+  /** Cierra estancia solo si ya no queda saldo (habitación + consumo). */
+  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null, intento = 0): void {
     if (!this.hotelCheckoutIdEstancia || !idVenta) return;
     const idEstancia = this.hotelCheckoutIdEstancia;
-    this.hotelCheckoutIdEstancia = null;
-    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora()).subscribe({
-      error: (err) => {
+    const incluyeHabitacion = this.carrito.some((l: { tipoHotel?: string }) => l.tipoHotel === 'habitacion');
+    const idsConsumo = this.carrito
+      .filter((l: { tipoHotel?: string; idConsumoHotel?: string | null }) => l.tipoHotel === 'consumo' && !!l.idConsumoHotel)
+      .map((l: { idConsumoHotel?: string | null }) => String(l.idConsumoHotel));
+    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora(), {
+      incluyeHabitacion,
+      idsConsumo
+    }).subscribe({
+      next: (res) => {
+        this.hotelCheckoutIdEstancia = null;
+        const msg = res.data?.message;
+        if (!msg) return;
+        if (res.data?.cerrado) {
+          iziToast.success({ title: 'Hotel', message: msg, position: 'topRight' });
+        } else {
+          iziToast.warning({ title: 'Hotel', message: msg, position: 'topRight' });
+        }
+      },
+      error: (err: { error?: { message?: string } }) => {
+        if (intento < 1) {
+          this.confirmarCheckoutHotelSiCorresponde(idVenta, intento + 1);
+          return;
+        }
+        this.hotelCheckoutIdEstancia = null;
         iziToast.warning({
           title: 'Hotel',
-          message: err?.error?.message || 'Venta registrada, pero no se pudo cerrar la estancia en hotel.',
+          message: err?.error?.message || 'Venta registrada, pero no se pudo actualizar la estancia en hotel.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  private confirmarFacturaGrupoSiCorresponde(idVenta: number | null, intento = 0): void {
+    if (!this.hotelCheckoutIdGrupo || !idVenta) return;
+    const idGrupo = this.hotelCheckoutIdGrupo;
+    this.hotelService.confirmarFacturaHospedajeGrupo(idGrupo, idVenta).subscribe({
+      next: (res) => {
+        this.hotelCheckoutIdGrupo = null;
+        const msg = res.data?.message;
+        if (msg) {
+          iziToast.success({ title: 'Grupo hotel', message: msg, position: 'topRight' });
+        }
+      },
+      error: (err: { error?: { message?: string } }) => {
+        if (intento < 1) {
+          this.confirmarFacturaGrupoSiCorresponde(idVenta, intento + 1);
+          return;
+        }
+        this.hotelCheckoutIdGrupo = null;
+        iziToast.warning({
+          title: 'Grupo hotel',
+          message: err?.error?.message || 'Venta registrada, pero no se marcó el hospedaje del grupo.',
           position: 'topRight'
         });
       }
@@ -836,6 +894,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       linea.idSucursal = match.idSucursal;
     }
     if (!linea.codigoPresentacion) linea.codigoPresentacion = match.codigoPresentacion ?? '';
+    if (match.condicionVenta != null && String(match.condicionVenta).trim()) {
+      linea.condicionVenta = match.condicionVenta;
+    }
+    if (match.principioActivo) linea.principioActivo = match.principioActivo;
+    if (match.concentracion) linea.concentracion = match.concentracion;
     if (!linea.sucursal) linea.sucursal = match.sucursal ?? '';
     if (match.idEmpresa != null) {
       linea.idEmpresa = String(match.idEmpresa);
@@ -852,6 +915,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           marcaCat;
       }
     }
+  }
+
+  esLineaReceta(item: { condicionVenta?: string | null } | null | undefined): boolean {
+    return requiereReceta(item?.condicionVenta);
+  }
+
+  etiquetaCondicionLinea(item: { condicionVenta?: string | null } | null | undefined): string {
+    return etiquetaCondicionVenta(item?.condicionVenta);
   }
 
   /** Stock numérico del catálogo o null si no aplica. */
@@ -1341,6 +1412,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.carrito = [];
+      this.recetaPendiente = null;
       this.actualizaTotales();
     }
     if (!idNueva) {
@@ -1656,6 +1728,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       const agregado = this.carrito[this.carrito.length - 1];
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
     }
+    this.recetaPendiente = null;
     this.actualizaTotales();
   }
 
@@ -2060,6 +2133,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   eliminarDelCarrito(index: number): void {
     this.carrito.splice(index, 1);
+    this.recetaPendiente = null;
     this.actualizaTotales();
   }
 
@@ -2925,6 +2999,15 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
       return;
     }
+    const lineasReceta = lineasQueRequierenReceta(this.carrito);
+    if (lineasReceta.length > 0 && !this.recetaPendiente) {
+      void this.recetaVentaModal.abrir(lineasReceta).then((receta) => {
+        if (!receta) return;
+        this.recetaPendiente = receta;
+        this.registrarVenta();
+      });
+      return;
+    }
     const lineaAjena = this.carrito.find((ln) => !this.productoPerteneceEmpresaOperativa(ln));
     if (lineaAjena) {
       iziToast.warning({
@@ -3546,10 +3629,12 @@ abrirModalPrecios(item: any) {
       detalles,
       detallePago: detallePago.length > 0 ? detallePago : undefined,
       ...(cuotasCredito && cuotasCredito.length ? { cuotasCredito } : {}),
+      receta: this.recetaPendiente || undefined,
       idApertura
     }).subscribe({
       next: (res: any) => {
         this.loading = false;
+        this.recetaPendiente = null;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
         if (res.avisoStockInsuficiente) {
           iziToast.warning({ title: 'Aviso', message: res.avisoStockInsuficiente, position: 'topRight' });
@@ -3558,7 +3643,9 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
-        if (!this.esGestora) {
+        if (this.hotelCheckoutIdGrupo) {
+          this.confirmarFacturaGrupoSiCorresponde(idVentaPdf);
+        } else if (this.hotelCheckoutIdEstancia) {
           this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
         }
         const abrirPdf =
@@ -4083,6 +4170,7 @@ abrirModalPrecios(item: any) {
 
   limpiarVenta(): void {
     this.carrito = [];
+    this.recetaPendiente = null;
     this.detallePago = [];
     this.cuotasCreditoPlano = [];
     this.pagaCon = 0;

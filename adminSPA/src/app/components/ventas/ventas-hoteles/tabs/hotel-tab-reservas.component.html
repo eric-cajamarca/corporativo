@@ -1,0 +1,82 @@
+    @if (h.activeTab() === 'reservas') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Reservas</h2>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary" (click)="h.abrirModalGrupo()">
+              <i class="bi bi-people me-1"></i> Reserva de grupo
+            </button>
+            <button type="button" class="btn btn-hotel-primary" (click)="h.abrirModalNuevaReserva()">
+              <i class="fas fa-plus me-1"></i>
+              Nueva reserva
+            </button>
+          </div>
+        </div>
+        @if (h.errorMessage()) {
+          <div class="alert alert-danger mb-3">{{ h.errorMessage() }}</div>
+        }
+        @if (h.loading()) {
+          <p class="text-muted">Cargando…</p>
+        } @else {
+          <div class="hotel-card">
+            <div class="table-responsive">
+              <table class="table hotel-table table-hotel-reservas-responsive">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Huésped</th>
+                    <th>Habitación</th>
+                    <th>Grupo</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Estado</th>
+                    <th class="text-end">Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of h.reservas; track r.idReserva) {
+                    <tr>
+                      <td data-label="Código"><span class="fw-medium">{{ r.codigo }}</span></td>
+                      <td data-label="Huésped">{{ r.nombreHuesped }}</td>
+                      <td data-label="Habitación"><span class="hotel-room-tag">{{ r.habitacionDescripcion || r.habitacionCodigo }}</span></td>
+                      <td data-label="Grupo">
+                        @if (r.idGrupo) {
+                          <button type="button" class="btn btn-link btn-sm p-0" (click)="h.abrirPanelGrupo({ idGrupo: r.idGrupo, codigo: r.grupoCodigo || '', nombre: r.grupoNombre || '', idCliente: r.idCliente, fechaEntrada: r.fechaEntrada, fechaSalida: r.fechaSalida, hospedajeFacturado: !!r.habitacionFacturada, estado: 'activo' })">
+                            {{ h.chipGrupoReserva(r) }}
+                          </button>
+                        } @else {
+                          <span class="text-muted">—</span>
+                        }
+                      </td>
+                      <td data-label="Entrada">{{ r.fechaEntrada }}</td>
+                      <td data-label="Salida">{{ r.fechaSalida }}</td>
+                      <td data-label="Estado">
+                        <span class="hotel-badge" [ngClass]="h.estadoReservaClass(r.estado)">
+                          {{ h.labelEstadoReserva(r.estado) }}
+                        </span>
+                      </td>
+                      <td class="text-end fw-semibold" data-label="Total">{{ h.formatearMoneda(r.total) }}</td>
+                      <td class="text-end text-nowrap" data-label="Acciones">
+                        @if (h.reservaEsConfirmada(r)) {
+                          <button type="button" class="btn btn-sm btn-outline-secondary me-1" (click)="h.abrirModalEditarReserva(r)">Editar</button>
+                          <button type="button" class="btn btn-sm btn-success me-1" (click)="h.abrirModalCheckInDesdeReserva(r)">Check-in</button>
+                          <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="h.abrirModalAnticipo(r)">Anticipo</button>
+                          <button type="button" class="btn btn-sm btn-outline-danger" (click)="h.cancelarReserva(r)">Cancelar</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (h.reservas.length === 0) {
+              <div class="hotel-empty">
+                <i class="fas fa-calendar-times hotel-empty-icon"></i>
+                <p class="mb-0 text-muted">No hay reservas registradas. Use "Nueva reserva" para crear una.</p>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }

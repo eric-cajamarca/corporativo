@@ -25,6 +25,20 @@ const ORDER_LOTES_FIFO_ASC = 'fechaIngreso ASC, idLote ASC';
 /** Último lote FIFO (para continuar saldo negativo en el mismo bucket). */
 const ORDER_LOTES_FIFO_DESC = 'fechaIngreso DESC, idLote DESC';
 
+function sqlOrdenLotes(usaFefo, alias = '') {
+  const p = alias ? `${alias}.` : '';
+  if (usaFefo) {
+    return `CASE WHEN ${p}fechaVencimiento IS NULL THEN 1 ELSE 0 END, ${p}fechaVencimiento ASC, ${p}fechaIngreso ASC, ${p}idLote ASC`;
+  }
+  return `${p}fechaIngreso ASC, ${p}idLote ASC`;
+}
+
+function sqlFiltroLoteNoVencido(usaFefo, alias = '') {
+  if (!usaFefo) return '';
+  const p = alias ? `${alias}.` : '';
+  return ` AND (${p}fechaVencimiento IS NULL OR CONVERT(DATE, ${p}fechaVencimiento) >= CONVERT(DATE, GETDATE()))`;
+}
+
 /**
  * Descuenta cantidad dejando cantidadDisponible negativa en un lote (venta sin stock).
  * Antes de ir a negativo, intenta tomar de lotes con cantidadDisponible > 0 (FIFO).
@@ -219,7 +233,8 @@ exports.ejecutarDescuento = async (transaction, stockData) => {
  * @param {string|null} idSucursal - UUID sucursal (opcional; si null, suma todas las sucursales)
  * @returns {Promise<number>} Cantidad disponible
  */
-exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSucursal) => {
+exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSucursal, opciones = {}) => {
+  const usaFefo = opciones.usaFefo === true;
   const req = transaction.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
@@ -228,7 +243,7 @@ exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSu
   const rs = await req.query(`
     SELECT ISNULL(SUM(cantidadDisponible), 0) AS total
     FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}${sqlFiltroLoteNoVencido(usaFefo)}
   `);
   const total = rs.recordset?.[0]?.total;
   return total != null ? parseFloat(total) : 0;
@@ -244,7 +259,8 @@ const queryFilasPorPrioridad = async (
   idProducto,
   idSucursalFiltro,
   idUbicacionFiltro,
-  idLoteFiltro
+  idLoteFiltro,
+  usaFefo = false
 ) => {
   const req = transaction.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
@@ -285,7 +301,8 @@ const queryFilasPorPrioridad = async (
       ${whereSucursal}
       ${whereUb}
       ${whereLote}
-    ORDER BY up.prioridad ASC, l.fechaIngreso ASC, l.idLote ASC
+      ${sqlFiltroLoteNoVencido(usaFefo, 'l')}
+    ORDER BY up.prioridad ASC, ${sqlOrdenLotes(usaFefo, 'l')}
   `);
   return rs.recordset || [];
 };
@@ -306,6 +323,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   if (cant <= 0) return { consumosPorLote: [] };
   if (!idEmpresa || !idProducto) return { consumosPorLote: [] };
 
+  const usaFefo = opciones.usaFefo === true;
   const controlUbicaciones = opciones.controlUbicaciones !== false;
   const idUbicacionSoloRaw = opciones.idUbicacionSolo;
   const idUbicacionSoloParsed =
@@ -361,7 +379,8 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         idProducto,
         idSucursal,
         idUbicacionSolo,
-        idLoteSolo || null
+        idLoteSolo || null,
+        usaFefo
       );
       await descontarPorPrioridad(filasSuc);
     }
@@ -380,11 +399,12 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
           WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
             AND l.idSucursal <> @idSucursal AND l.cantidadDisponible > 0
             AND ISNULL(l.activo, 1) = 1
-          ORDER BY up.prioridad ASC, l.fechaIngreso ASC, l.idLote ASC
+            ${sqlFiltroLoteNoVencido(usaFefo, 'l')}
+          ORDER BY up.prioridad ASC, ${sqlOrdenLotes(usaFefo, 'l')}
         `);
         await descontarPorPrioridad(rsOtras.recordset || []);
       } else {
-        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null, null, idLoteSolo || null);
+        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null, null, idLoteSolo || null, usaFefo);
         await descontarPorPrioridad(filasTodas);
       }
     }
@@ -393,7 +413,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   if (restante <= 0) return { consumosPorLote: consumos };
 
   if (idUbicacionSolo) {
-    if (opciones.permitirVentasNegativas) {
+    if (opciones.permitirVentasNegativas && !usaFefo) {
       await aplicarSaldoNegativoEnLote(transaction, {
         idEmpresa,
         idSucursal,
@@ -443,8 +463,8 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const rsFallback = await reqFallback.query(`
     SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
     FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}${whereLoteSolo}
-    ORDER BY ${ORDER_LOTES_FIFO_ASC}
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}${whereLoteSolo}${sqlFiltroLoteNoVencido(usaFefo)}
+    ORDER BY ${sqlOrdenLotes(usaFefo)}
   `);
   await ejecutarDescuentoSoloLotes(rsFallback.recordset || []);
 
@@ -458,13 +478,14 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
       FROM Lotes
       WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}
         AND idSucursal <> @idSucursalExcluida
-      ORDER BY ${ORDER_LOTES_FIFO_ASC}
+        ${sqlFiltroLoteNoVencido(usaFefo)}
+      ORDER BY ${sqlOrdenLotes(usaFefo)}
     `);
     await ejecutarDescuentoSoloLotes(rsFallback2.recordset || []);
   }
 
   if (restante > 0) {
-    if (opciones.permitirVentasNegativas) {
+    if (opciones.permitirVentasNegativas && !usaFefo) {
       await aplicarSaldoNegativoEnLote(transaction, {
         idEmpresa,
         idSucursal,
@@ -476,9 +497,11 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
       return { consumosPorLote: consumos };
     }
     throw new Error(
-      idLoteSolo
-        ? 'Stock insuficiente en el lote indicado'
-        : 'Stock insuficiente para el producto en la empresa'
+      usaFefo
+        ? 'No hay stock vigente (sin vencer) para este producto.'
+        : idLoteSolo
+          ? 'Stock insuficiente en el lote indicado'
+          : 'Stock insuficiente para el producto en la empresa'
     );
   }
   return { consumosPorLote: consumos };
