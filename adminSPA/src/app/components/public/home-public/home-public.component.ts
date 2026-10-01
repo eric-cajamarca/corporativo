@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { DomSanitizer, Meta, SafeResourceUrl, Title } from '@angular/platform-browser';
@@ -47,6 +47,13 @@ interface PublicRecurso {
   url: string;
 }
 
+interface ValorAgregadoSlide {
+  titulo: string;
+  descripcion: string;
+  nota?: string;
+  imagen: string;
+}
+
 @Component({
   selector: 'app-home-public',
   standalone: true,
@@ -54,7 +61,7 @@ interface PublicRecurso {
   templateUrl: './home-public.component.html',
   styleUrl: './home-public.component.css'
 })
-export class HomePublicComponent implements OnInit {
+export class HomePublicComponent implements OnInit, OnDestroy {
   readonly planes = signal<PlanCatalogoItem[]>([]);
   readonly cargandoPlanes = signal(true);
   readonly errorPlanes = signal<string | null>(null);
@@ -62,6 +69,38 @@ export class HomePublicComponent implements OnInit {
   videos: PublicVideo[] = [];
   /** Si el JPEG no carga (archivo borrado), se oculta la tarjeta. */
   readonly logosOcultos = signal<ReadonlySet<string>>(new Set());
+
+  readonly valorAgregado: ValorAgregadoSlide[] = [
+    {
+      titulo: 'WhatsApp te avisa los lotes por vencer',
+      descripcion: 'Cada día te llega qué ya venció y qué caduca en 7, 15 o 30 días. Ofertas a tiempo o das de baja, sin revisar el almacén a ciegas.',
+      imagen: 'assets/img/valor-agregado/flayer-lotes-vencidos-whatsapp.webp'
+    },
+    {
+      titulo: 'La factura de compra se carga desde SUNAT',
+      descripcion: 'Escribes RUC, serie y número. Llegan todos los ítems. Confirmas y el stock sube. No tecleas dieciocho productos uno por uno.',
+      imagen: 'assets/img/valor-agregado/flayer-compra-factura-sunat.webp'
+    },
+    {
+      titulo: 'En el matizado controlas hasta la última gota',
+      descripcion: 'La receta está en gramos. Si piden 1/4, se escala sola. El kardex resta solo lo que usaste, no el pote entero.',
+      imagen: 'assets/img/valor-agregado/flayer-pintura-matizado-ultima-gota.webp'
+    },
+    {
+      titulo: 'El arqueo te dice dónde está el dinero',
+      descripcion: 'Efectivo en el cajón, Yape en el celular, cuenta corriente en el banco. El fiado no se mezcla con lo que sí entró.',
+      imagen: 'assets/img/valor-agregado/flayer-cierre-caja.webp'
+    },
+    {
+      titulo: 'El WhatsApp de tu tienda cotiza y cobra',
+      descripcion: 'El cliente pregunta precio, arma el pedido y, si debe, le responde el saldo. Sin llamar al mostrador.',
+      nota: 'Bot de pedidos: planes Emprendedor y Profesional.',
+      imagen: 'assets/img/valor-agregado/flayer-pedidos-whatsapp.webp'
+    }
+  ];
+  readonly valorIndice = signal(0);
+  private valorTimer: ReturnType<typeof setInterval> | null = null;
+  private valorPausado = false;
 
   readonly recursos: PublicRecurso[] = [
     {
@@ -195,6 +234,53 @@ export class HomePublicComponent implements OnInit {
       this.crearVideo('vNkwHwWK3Hw', 'Gestión de cajas')
     ];
     this.cargarPlanes();
+    this.iniciarCarruselValor();
+  }
+
+  ngOnDestroy(): void {
+    this.detenerCarruselValor();
+  }
+
+  slideValor(): ValorAgregadoSlide {
+    return this.valorAgregado[this.valorIndice()];
+  }
+
+  irAValor(indice: number): void {
+    const n = this.valorAgregado.length;
+    if (!n) return;
+    this.valorIndice.set(((indice % n) + n) % n);
+  }
+
+  siguienteValor(): void {
+    this.irAValor(this.valorIndice() + 1);
+  }
+
+  anteriorValor(): void {
+    this.irAValor(this.valorIndice() - 1);
+  }
+
+  pausarCarruselValor(): void {
+    this.valorPausado = true;
+  }
+
+  reanudarCarruselValor(): void {
+    this.valorPausado = false;
+  }
+
+  private iniciarCarruselValor(): void {
+    this.detenerCarruselValor();
+    this.valorTimer = setInterval(() => {
+      if (!this.valorPausado) {
+        this.siguienteValor();
+      }
+    }, 5500);
+  }
+
+  private detenerCarruselValor(): void {
+    if (this.valorTimer != null) {
+      clearInterval(this.valorTimer);
+      this.valorTimer = null;
+    }
   }
 
   logoClienteVisible(cli: ClientePublico): boolean {

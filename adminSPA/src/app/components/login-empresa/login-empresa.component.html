@@ -5,12 +5,12 @@
         <!-- Header con logo y título -->
         <div class="login-header">
           <div class="logo-container">
-            <img class="logo" src="/assets/img/login.png" alt="Logo de la empresa">
+            <img class="logo" src="/assets/img/logo-efaferp-header.png?v=3" alt="EFAFERP">
           </div>
           <h1 class="login-title">ERP Empresarial</h1>
           <p class="login-subtitle">Acceso seguro al panel de administración</p>
           <div class="login-header-actions">
-            <button type="button" class="btn btn-sm btn-outline-secundary" (click)="irAccesoRapidoPos()">
+            <button type="button" class="pos-button" (click)="irAccesoRapidoPos()">
               <i class="bi bi-lightning-charge me-1"></i> Acceso rápido POS
             </button>
             <button type="button" class="planes-button" (click)="irPlanes()">
@@ -27,7 +27,7 @@
                [class.clickable]="isStepAccessible(1)"
                (click)="isStepAccessible(1) ? goToStep(1) : null">
             <div class="step-icon">
-              <i class="fas" [class.fa-building]="!isStepCompleted(1)" [class.fa-check]="isStepCompleted(1)"></i>
+              <i class="bi bi-building-fill" [class.fa-building]="!isStepCompleted(1)" [class.fa-check]="isStepCompleted(1)"></i>
             </div>
             <span class="step-label">Empresa</span>
           </div>
@@ -38,7 +38,7 @@
                [class.clickable]="isStepAccessible(2)"
                (click)="isStepAccessible(2) ? goToStep(2) : null">
             <div class="step-icon">
-              <i class="fas" [class.fa-user]="!isStepCompleted(2)" [class.fa-check]="isStepCompleted(2)"></i>
+              <i class="bi bi-person-fill" [class.fa-user]="!isStepCompleted(2)" [class.fa-check]="isStepCompleted(2)"></i>
             </div>
             <span class="step-label">Usuario</span>
           </div>
@@ -49,7 +49,7 @@
                [class.clickable]="isStepAccessible(3)"
                (click)="isStepAccessible(3) ? goToStep(3) : null">
             <div class="step-icon">
-              <i class="fas fa-lock"></i>
+              <i class="bi bi-lock-fill"></i>
             </div>
             <span class="step-label">Acceso</span>
           </div>
@@ -62,7 +62,7 @@
             <div class="form-group" [class.has-error]="rucInvalid">
               <div class="input-container">
                 <div class="input-icon">
-                  <i class="fas fa-id-card"></i>
+                  <i class="bi bi-id-card"></i>
                 </div>
                 <input type="text"
                        class="form-input"
@@ -87,7 +87,7 @@
             <button type="button" class="next-step-button" (click)="nextStep()" 
                     [disabled]="!canProceedToNextStep()">
               Continuar
-              <i class="fas fa-arrow-right"></i>
+              <i class="bi bi-arrow-right"></i>
             </button>
           </div>
 
@@ -118,14 +118,13 @@
             </div>
 
             <div class="step-navigation">
-              <button type="button" class="prev-step-button" (click)="previousStep()">
-                <i class="fas fa-arrow-left"></i>
-                Atrás
+              <button type="button" class="prev-step-button" (click)="previousStep()" aria-label="Atrás">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
               </button>
               <button type="button" class="next-step-button" (click)="nextStep()" 
                       [disabled]="!canProceedToNextStep()">
                 Continuar
-                <i class="fas fa-arrow-right"></i>
+                <i class="bi bi-arrow-right"></i>
               </button>
             </div>
           </div>
@@ -135,7 +134,7 @@
             <div class="form-group">
               <div class="input-container">
                 <div class="input-icon">
-                  <i class="fas fa-lock"></i>
+                  <i class="bi bi-lock-fill"></i>
                 </div>
                 <input [type]="showPassword ? 'text' : 'password'"
                        class="form-input"
@@ -152,19 +151,6 @@
               </div>
             </div>
 
-            <!-- Resumen de datos ingresados -->
-            <div class="login-summary">
-              <h4><i class="fas fa-info-circle"></i> Resumen de acceso</h4>
-              <div class="summary-item">
-                <span class="summary-label">RUC:</span>
-                <span class="summary-value">{{ user.ruc }}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Email:</span>
-                <span class="summary-value">{{ user.email }}</span>
-              </div>
-            </div>
-
             <!--  <div class="step-navigation">
               <button type="button" class="prev-step-button" (click)="previousStep()">
                 <i class="fas fa-arrow-left"></i>
@@ -174,12 +160,12 @@
           </div>
         </div>
 
-        <!-- Opciones adicionales y botón de login (reserva alto fijo) -->
+        <!-- Opciones adicionales y botón de login -->
         <div class="login-actions">
           <ng-container *ngIf="currentStep === 3">
             <div class="login-options">
               <a href="#" class="forgot-password" (click)="recuperarPassword($event)">
-                <i class="fas fa-key"></i>
+                <i class="bi bi-key-fill"></i>
                 Recuperar contraseña
               </a>
             </div>
@@ -197,29 +183,6 @@
               </svg>
             </button>
           </ng-container>
-        </div>
-
-        <!-- Información adicional -->
-        <div class="login-info">
-          <div class="info-card">
-            <i class="fas fa-shield-alt"></i>
-            <div>
-              <strong>Acceso Seguro</strong>
-              <p>Conexión encriptada y autenticación multi-factor</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="login-footer">
-         <!--<p class="footer-text">
-            ¿No tienes una cuenta?
-            <a href="#" class="register-link"  (click)="irPlanes()">
-              Contrata un plan
-            </a>
-          </p>
-        -->
-          <p class="version">v2.1.0 - Sistema EFAFERP</p>
         </div>
       </form>
 
@@ -242,7 +205,7 @@
         <div class="form-group twofa-code-group">
           <div class="input-container">
             <div class="input-icon">
-              <i class="fas fa-key"></i>
+              <i class="bi bi-key-fill"></i>
             </div>
             <input
               type="text"

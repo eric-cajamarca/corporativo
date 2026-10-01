@@ -15,7 +15,7 @@ Hablas en español, claro. No inventas menús, pestañas ni botones.
 Reglas:
 - Nunca pidas ni muestres API keys, certificados, claves SOL, contraseñas, tokens ni valores de campos.
 - No ejecutas cambios: solo guías. El usuario hace clic en las pantallas.
-- Enseñas el uso de la plataforma: primero el menú izquierdo, luego el clic en pantalla.
+- Enseñas el uso de la plataforma en este orden: menú principal del sidebar, módulo, ítem y después el clic en pantalla. El menú principal es uno de estos: **Comercial**, **Abastecimiento**, **Tesorería**, **Distribución**, **Fiscal (SUNAT)**, **Plataforma**. Nunca lo omitas cuando indiques cómo llegar a una pantalla. Ejemplo: abre **Fiscal (SUNAT)**, luego **Facturación electrónica** y pulsa **Emisión de guías**.
 - Recibes un MAPA DE MENÚ, un FLUJO ACTIVO (tema del chat), una FOTO (vacio/lleno, sin values) y a veces un libreto de la ruta.
 - foto.listos = pasos YA cubiertos. foto.faltantes = lo que aún falta. NUNCA pidas de nuevo un paso que esté en listos.
 - Si el usuario dice «ya está», «ya lo elegí» o «todos los campos ya están», AVANZA al siguiente paso. No repitas el mismo clic.
@@ -633,7 +633,7 @@ function armarContextoGuia(foto, ruta, titulo, texto, historial, fichaTexto, dat
     !flujo && lib ? `LIBRETO DE ESTA RUTA:\n${textoLibreto(lib, modo)}` : '',
     `Pasos YA listos (NO los pidas otra vez): ${listos}.`,
     `SIGUIENTE PASO (di solo esto, no el paso anterior):\n${siguiente}`,
-    'Si el usuario no está en la pantalla del flujo, el primer paso es el menú. Si ya está, no pidas volver al menú. Un paso por turno.'
+    'Si el usuario no está en la pantalla del flujo, el primer paso nombra el menú principal, luego el módulo y luego el ítem. Si ya está, no pidas volver al menú. Un paso por turno. No omitas el menú principal (Comercial, Abastecimiento, Tesorería, Distribución, Fiscal (SUNAT), Plataforma).'
   ]
     .filter(Boolean)
     .join('\n\n');

@@ -305,6 +305,129 @@
   margin-bottom: 0;
 }
 
+.valor-carrusel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 36px;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.valor-visual {
+  background: #0f172a;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.valor-visual img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+  object-position: top center;
+}
+
+.valor-paso {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #4f7cff;
+  margin-bottom: 10px;
+}
+
+.valor-copy h3 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.valor-copy > p {
+  font-size: 1.08rem;
+  line-height: 1.5;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.valor-nota {
+  font-size: 0.92rem;
+  color: #64748b;
+}
+
+.valor-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 16px;
+}
+
+.valor-cta {
+  background: #1f3b73;
+  border-color: #1f3b73;
+  color: #fff;
+  font-weight: 700;
+}
+
+.valor-cta:hover,
+.valor-cta:focus {
+  background: #17305e;
+  border-color: #17305e;
+  color: #fff;
+}
+
+.valor-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.valor-flecha,
+.valor-punto {
+  border: 0;
+  background: #e2e8f0;
+  cursor: pointer;
+}
+
+.valor-flecha {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #1f3b73;
+}
+
+.valor-punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.valor-punto.activo {
+  background: #4f7cff;
+  transform: scale(1.2);
+}
+
+@media (max-width: 991px) {
+  .valor-carrusel {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .valor-visual img {
+    max-height: 420px;
+  }
+
+  .valor-copy h3 {
+    font-size: 1.4rem;
+  }
+}
+
 .info-card,
 .plan-card,
 .testimonial-card,

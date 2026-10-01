@@ -3,50 +3,73 @@
  * No usar en el bot comercial de WhatsApp.
  */
 
+/** Menú principal del sidebar (dominio) que contiene cada módulo. */
+const DOMINIO_POR_MODULO = {
+  Ventas: 'Comercial',
+  Productos: 'Comercial',
+  Clientes: 'Comercial',
+  Compras: 'Abastecimiento',
+  Inventario: 'Abastecimiento',
+  Caja: 'Tesorería',
+  'Despachos y envíos': 'Distribución',
+  'Facturación electrónica': 'Fiscal (SUNAT)',
+  Configuración: 'Plataforma',
+  Catálogos: 'Plataforma',
+  Empresa: 'Plataforma'
+};
+
+function dominioDe(padre) {
+  return DOMINIO_POR_MODULO[padre] || '';
+}
+
 const MENU = [
-  { padre: 'Ventas', item: 'Venta rápida', ruta: '/ventas/rapida' },
-  { padre: 'Ventas', item: 'Nueva Venta', ruta: '/ventas/create' },
-  { padre: 'Ventas', item: 'Historial / Resumen de ventas', ruta: '/ventas' },
-  { padre: 'Ventas', item: 'Cotizaciones', ruta: '/cotizaciones' },
-  { padre: 'Productos', item: 'Lista de Productos', ruta: '/productos' },
-  { padre: 'Clientes', item: 'Lista de Clientes', ruta: '/clientes' },
-  { padre: 'Clientes', item: 'Nuevo Cliente', ruta: '/cliente/create' },
-  { padre: 'Compras', item: 'Registrar Compras', ruta: '/compras/create' },
-  { padre: 'Compras', item: 'Consultar Compras', ruta: '/compras' },
-  { padre: 'Inventario', item: 'Ingresos y salidas', ruta: '/inventario/ingresos' },
-  { padre: 'Inventario', item: 'Stock Actual', ruta: '/inventario/stock-actual' },
-  { padre: 'Inventario', item: 'Conteo físico', ruta: '/inventario/conteo-fisico' },
-  { padre: 'Caja', item: 'Gestión de Cajas', ruta: '/caja' },
-  { padre: 'Caja', item: 'Arqueo de Caja', ruta: '/caja/arqueo' },
-  { padre: 'Caja', item: 'Cobranza de Créditos', ruta: '/creditos' },
-  { padre: 'Inventario', item: 'Kardex', ruta: '/inventario/kardex' },
-  { padre: 'Compras', item: 'Proveedores', ruta: '/proveedores' },
-  { padre: 'Despachos y envíos', item: 'Despachos', ruta: '/despachos' },
-  { padre: 'Facturación electrónica', item: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito' },
-  { padre: 'Facturación electrónica', item: 'Emisión de guías', ruta: '/facturacion/emision-guias' },
-  { padre: 'Facturación electrónica', item: 'Resumen diario', ruta: '/facturacion/resumenes-diarios' },
-  { padre: 'Facturación electrónica', item: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja' }
+  { dominio: 'Comercial', padre: 'Ventas', item: 'Venta rápida', ruta: '/ventas/rapida' },
+  { dominio: 'Comercial', padre: 'Ventas', item: 'Nueva Venta', ruta: '/ventas/create' },
+  { dominio: 'Comercial', padre: 'Ventas', item: 'Historial / Resumen de ventas', ruta: '/ventas' },
+  { dominio: 'Comercial', padre: 'Ventas', item: 'Cotizaciones', ruta: '/cotizaciones' },
+  { dominio: 'Comercial', padre: 'Productos', item: 'Lista de Productos', ruta: '/productos' },
+  { dominio: 'Comercial', padre: 'Clientes', item: 'Lista de Clientes', ruta: '/clientes' },
+  { dominio: 'Comercial', padre: 'Clientes', item: 'Nuevo Cliente', ruta: '/cliente/create' },
+  { dominio: 'Abastecimiento', padre: 'Compras', item: 'Registrar Compras', ruta: '/compras/create' },
+  { dominio: 'Abastecimiento', padre: 'Compras', item: 'Consultar Compras', ruta: '/compras' },
+  { dominio: 'Abastecimiento', padre: 'Inventario', item: 'Ingresos y salidas', ruta: '/inventario/ingresos' },
+  { dominio: 'Abastecimiento', padre: 'Inventario', item: 'Stock Actual', ruta: '/inventario/stock-actual' },
+  { dominio: 'Abastecimiento', padre: 'Inventario', item: 'Conteo físico', ruta: '/inventario/conteo-fisico' },
+  { dominio: 'Tesorería', padre: 'Caja', item: 'Gestión de Cajas', ruta: '/caja' },
+  { dominio: 'Tesorería', padre: 'Caja', item: 'Arqueo de Caja', ruta: '/caja/arqueo' },
+  { dominio: 'Tesorería', padre: 'Caja', item: 'Cobranza de Créditos', ruta: '/creditos' },
+  { dominio: 'Abastecimiento', padre: 'Inventario', item: 'Kardex', ruta: '/inventario/kardex' },
+  { dominio: 'Abastecimiento', padre: 'Compras', item: 'Proveedores', ruta: '/proveedores' },
+  { dominio: 'Distribución', padre: 'Despachos y envíos', item: 'Despachos', ruta: '/despachos' },
+  { dominio: 'Fiscal (SUNAT)', padre: 'Facturación electrónica', item: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito' },
+  { dominio: 'Fiscal (SUNAT)', padre: 'Facturación electrónica', item: 'Emisión de guías', ruta: '/facturacion/emision-guias' },
+  { dominio: 'Fiscal (SUNAT)', padre: 'Facturación electrónica', item: 'Resumen diario', ruta: '/facturacion/resumenes-diarios' },
+  { dominio: 'Fiscal (SUNAT)', padre: 'Facturación electrónica', item: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja' }
 ];
 
 function textoMenu() {
   return [
-    'Menú izquierdo (nombres reales; no inventes otros):',
-    '- **Ventas**: Venta rápida, Nueva Venta, historial, Cotizaciones.',
-    '- **Productos**: Lista de Productos. El alta es el botón **Nuevo Producto** en esa lista (o /productos/create).',
-    '- **Clientes**: Lista de Clientes, Nuevo Cliente.',
-    '- **Compras**: Registrar Compras, Consultar Compras, Proveedores.',
-    '- **Inventario**: Ingresos y salidas, Stock Actual, Conteo físico, Kardex.',
-    '- **Caja**: Gestión de Cajas, Arqueo de Caja, Cobranza de Créditos.',
-    '- **Despachos y envíos**: Despachos.',
-    '- **Facturación electrónica**: Resumen diario, Emisión de notas, Comunicación de baja, Emisión de guías.',
-    'Para ir a una pantalla: «En el menú izquierdo abre **Padre** y pulsa **Ítem**» más el enlace markdown.'
+    'Menú izquierdo, de afuera hacia adentro: menú principal → módulo → ítem. Nombres reales; no inventes otros.',
+    'Siempre nombra el menú principal en el paso de ir. No saltes directo al módulo.',
+    '- **Comercial** → Ventas (Venta rápida, Nueva Venta, historial, Cotizaciones); Productos (Lista de Productos; el alta es **Nuevo Producto**); Clientes (Lista de Clientes, Nuevo Cliente).',
+    '- **Abastecimiento** → Compras (Registrar Compras, Consultar Compras, Proveedores); Inventario (Ingresos y salidas, Stock Actual, Conteo físico, Kardex).',
+    '- **Tesorería** → Caja (Gestión de Cajas, Arqueo de Caja, Cobranza de Créditos).',
+    '- **Distribución** → Despachos y envíos (Despachos).',
+    '- **Fiscal (SUNAT)** → Facturación electrónica (Resumen diario, Emisión de notas, Comunicación de baja, Emisión de guías).',
+    '- **Plataforma** → Configuración, Catálogos, Empresa.',
+    'Para ir a una pantalla: «En el menú izquierdo abre **Menú principal**, luego **Módulo** y pulsa **Ítem**» más el enlace markdown.'
   ].join('\n');
 }
 
 function textoIrMenu(flujo) {
   if (!flujo || !flujo.menu) return '';
   const { padre, item, ruta } = flujo.menu;
-  return `En el menú izquierdo abre **${padre}** y pulsa **${item}**. [${item}](${ruta}).`;
+  const dominio = flujo.menu.dominio || dominioDe(padre);
+  const enlace = `[${item}](${ruta})`;
+  if (!dominio) {
+    return `En el menú izquierdo abre **${padre}** y pulsa **${item}**. ${enlace}.`;
+  }
+  return `En el menú izquierdo abre **${dominio}**, luego **${padre}** y pulsa **${item}**. ${enlace}.`;
 }
 
 const FLUJOS = [
@@ -210,7 +233,7 @@ const FLUJOS = [
     menu: { padre: 'Productos', item: 'Lista de Productos', ruta: '/productos' },
     irA: '/productos/create',
     pasos: [
-      { clave: 'ir', texto: 'En el menú izquierdo abre **Productos** → **Lista de Productos** y pulsa **Nuevo Producto**. [Agregar producto](/productos/create).' },
+      { clave: 'ir', texto: 'En el menú izquierdo abre **Comercial**, luego **Productos** → **Lista de Productos** y pulsa **Nuevo Producto**. [Agregar producto](/productos/create).' },
       {
         clave: 'descripcion',
         texto:
@@ -341,7 +364,7 @@ const FLUJOS = [
     irA: '/caja/arqueo',
     pasos: [
       { clave: 'ir', texto: '' },
-      { clave: 'ver', texto: 'Consulta el arqueo de la caja/fecha. El cierre del turno se hace en **Caja → Gestión de Cajas**.' }
+      { clave: 'ver', texto: 'Consulta el arqueo de la caja/fecha. El cierre del turno se hace en **Tesorería** → **Caja** → **Gestión de Cajas**.' }
     ]
   },
   {
@@ -383,7 +406,7 @@ const FLUJOS = [
       {
         clave: 'enviar',
         texto:
-          'Elige la fecha y pulsa **Enviar resumen**. Esto aplica si en Configuración → Facturación está activo «Usar resumen diario (RC)» para boletas.'
+          'Elige la fecha y pulsa **Enviar resumen**. Esto aplica si en **Plataforma** → **Configuración** → pestaña Facturación está activo «Usar resumen diario (RC)» para boletas.'
       }
     ]
   },
@@ -407,7 +430,7 @@ const FLUJOS = [
     menu: { padre: 'Inventario', item: 'Ingresos y salidas', ruta: '/inventario/salidas' },
     irA: '/inventario/salidas',
     pasos: [
-      { clave: 'ir', texto: 'En el menú izquierdo abre **Inventario** → **Ingresos y salidas**, luego **Ir a salidas**. [Salidas](/inventario/salidas).' },
+      { clave: 'ir', texto: 'En el menú izquierdo abre **Abastecimiento**, luego **Inventario** → **Ingresos y salidas**, y pulsa **Ir a salidas**. [Salidas](/inventario/salidas).' },
       { clave: 'tipo', texto: 'Elige el **Tipo de movimiento** (merma, reajuste negativo, etc.).' },
       { clave: 'producto', texto: 'Agrega productos y cantidades. Pulsa el botón de guardar salida.' }
     ]
@@ -477,7 +500,9 @@ function textoFlujo(flujo) {
   const f = completarPasosIr(flujo);
   return [
     `Flujo: ${f.titulo} (id ${f.id})`,
-    f.menu ? `Menú: **${f.menu.padre}** → **${f.menu.item}** → [${f.menu.item}](${f.menu.ruta})` : '',
+    f.menu
+      ? `Menú: **${f.menu.dominio || dominioDe(f.menu.padre) || '—'}** → **${f.menu.padre}** → **${f.menu.item}** → [${f.menu.item}](${f.menu.ruta})`
+      : '',
     'Pasos (uno por turno; salta «ir» si ya está en esa pantalla; salta claves en foto.listos):',
     ...f.pasos.map((p, i) => `${i + 1}) [${p.clave}] ${p.texto}`)
   ]

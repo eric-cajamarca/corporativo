@@ -170,7 +170,63 @@
     </div>
   </section>
 
-  <section class="section section-light">
+  <section class="section section-light valor-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Lo que otros sistemas no hacen</h2>
+        <p>Cinco cosas que ves desde el primer día. El recuadro cambia solo; también puedes pasarlas a mano.</p>
+      </div>
+      <div
+        class="valor-carrusel"
+        (mouseenter)="pausarCarruselValor()"
+        (mouseleave)="reanudarCarruselValor()"
+        (focusin)="pausarCarruselValor()"
+        (focusout)="reanudarCarruselValor()">
+        <div class="valor-visual">
+          @for (slide of [slideValor()]; track slide.imagen) {
+            <img
+              [src]="slide.imagen"
+              [alt]="slide.titulo"
+              width="1080"
+              height="1230" />
+          }
+        </div>
+        <div class="valor-copy">
+          <span class="valor-paso">{{ valorIndice() + 1 }} / {{ valorAgregado.length }}</span>
+          <h3>{{ slideValor().titulo }}</h3>
+          <p>{{ slideValor().descripcion }}</p>
+          @if (slideValor().nota) {
+            <p class="valor-nota">{{ slideValor().nota }}</p>
+          }
+          <div class="valor-acciones">
+            <a class="btn valor-cta" routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">
+              Probar 14 días gratis
+            </a>
+            <a class="btn btn-outline-primary" routerLink="/planes">Ver planes</a>
+          </div>
+          <div class="valor-nav" role="tablist" aria-label="Ventajas del sistema">
+            <button type="button" class="valor-flecha" (click)="anteriorValor()" aria-label="Anterior">
+              <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            </button>
+            @for (slide of valorAgregado; track slide.imagen; let i = $index) {
+              <button
+                type="button"
+                class="valor-punto"
+                [class.activo]="valorIndice() === i"
+                (click)="irAValor(i)"
+                [attr.aria-label]="slide.titulo"
+                [attr.aria-selected]="valorIndice() === i"></button>
+            }
+            <button type="button" class="valor-flecha" (click)="siguienteValor()" aria-label="Siguiente">
+              <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
     <div class="container">
       <div class="section-header">
         <h2>Guías gratuitas para tu negocio</h2>

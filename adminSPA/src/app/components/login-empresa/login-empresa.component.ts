@@ -34,7 +34,7 @@ export class LoginEmpresaComponent implements OnInit {
   public loading2faQr = false;
 
   // Control de pasos del wizard
-  public currentStep: number = 1; // 1: Empresa, 2: Usuario, 3: Acceso (resumen)
+  public currentStep: number = 1; // 1: Empresa, 2: Usuario, 3: Acceso
   public maxStepReached: number = 1; // Para controlar navegación hacia adelante
 
   // Información de empresa recordada
