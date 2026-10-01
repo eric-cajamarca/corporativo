@@ -25,9 +25,7 @@ exports.procesarTrasConfirmarPago = async (pool, idVenta, idEmpresa) => {
     String(config.urlEnvio).trim() &&
     config.usuarioSunat &&
     config.claveSunat;
-  const usaFacturador =
-    config.rutaCarpetaFacturadorSunat && String(config.rutaCarpetaFacturadorSunat).trim() !== "";
-  if (!usaDirecto && !usaFacturador) return;
+  if (!usaDirecto) return;
 
   const modo = Number(config.modoEnvioSunat) || 2;
   const minutos = Math.max(1, Number(config.minutosEnvioAutomatico) || 10);

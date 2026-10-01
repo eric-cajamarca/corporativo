@@ -2,15 +2,11 @@
  * Orquestación de casos de uso de ventas (antes en ventasController):
  * repositorios y reglas de presentación/listado sin exponerlos al controlador.
  */
-const path = require('path');
-const fs = require('fs');
 const sql = require('mssql');
 const ventasRepository = require('../repositories/ventas.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
-const facturacionRepository = require('../repositories/facturacion.repository');
 const ventasService = require('./ventas.service');
 const sunatPostPagoService = require('./sunatPostPago.service');
-const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
 async function idsEmpresaParaComprobanteVenta(pool, idEmpresaUsuario) {
@@ -39,42 +35,8 @@ exports.obtenerVentasListado = async (pool, idempresa, opts = {}) => {
   } catch (_) {
     idsList = [idempresa];
   }
-  let list = await ventasRepository.listarPorIdsEmpresas(pool, idsList, opts || {});
-  const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
-  const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
-  if (rutaFacturador) {
-    const rutaFirma = getRutaFirmaFacturador(rutaFacturador);
-    const rutaRpta = getRutaRptaFacturador(rutaFacturador);
-    list = list.map((r) => {
-      let tieneXml = false;
-      let tieneCdr = false;
-      if (r.idComprobanteElectronico && r.rucEmpresa && r.tipoComprobante != null) {
-        const nombreArchivo = nombreArchivoComprobante({
-          ruc: r.rucEmpresa,
-          tipoComprobante: r.tipoComprobante,
-          serie: r.serie,
-          numero: r.numero
-        });
-        const base = nombreArchivo.replace(/\.json$/i, '');
-        if (rutaFirma) {
-          const xmlPath = path.join(rutaFirma, `${base}.xml`);
-          try {
-            tieneXml = fs.existsSync(xmlPath);
-          } catch (_) {}
-        }
-        if (rutaRpta) {
-          const zipPath = path.join(rutaRpta, `R${base}.zip`);
-          try {
-            tieneCdr = fs.existsSync(zipPath);
-          } catch (_) {}
-        }
-      }
-      return { ...r, tieneXml, tieneCdr };
-    });
-  } else {
-    list = list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
-  }
-  return list;
+  const list = await ventasRepository.listarPorIdsEmpresas(pool, idsList, opts || {});
+  return list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
 };
 
 exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
@@ -88,41 +50,7 @@ exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
     idsList = [idempresa];
   }
   const { rows, total, pagina, porPagina, resumen } = await ventasRepository.listarPorIdsEmpresasPaginado(pool, idsList, opts || {});
-  const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
-  const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
-  let list = rows;
-  if (rutaFacturador) {
-    const rutaFirma = getRutaFirmaFacturador(rutaFacturador);
-    const rutaRpta = getRutaRptaFacturador(rutaFacturador);
-    list = list.map((r) => {
-      let tieneXml = false;
-      let tieneCdr = false;
-      if (r.idComprobanteElectronico && r.rucEmpresa && r.tipoComprobante != null) {
-        const nombreArchivo = nombreArchivoComprobante({
-          ruc: r.rucEmpresa,
-          tipoComprobante: r.tipoComprobante,
-          serie: r.serie,
-          numero: r.numero
-        });
-        const base = nombreArchivo.replace(/\.json$/i, '');
-        if (rutaFirma) {
-          const xmlPath = path.join(rutaFirma, `${base}.xml`);
-          try {
-            tieneXml = fs.existsSync(xmlPath);
-          } catch (_) {}
-        }
-        if (rutaRpta) {
-          const zipPath = path.join(rutaRpta, `R${base}.zip`);
-          try {
-            tieneCdr = fs.existsSync(zipPath);
-          } catch (_) {}
-        }
-      }
-      return { ...r, tieneXml, tieneCdr };
-    });
-  } else {
-    list = list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
-  }
+  const list = rows.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
   return { rows: list, total, pagina, porPagina, resumen };
 };
 

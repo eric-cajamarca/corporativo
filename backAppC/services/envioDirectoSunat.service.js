@@ -41,7 +41,7 @@ function escXml(s) {
 }
 
 /**
- * Mapea ResponseCode del CDR a idEstadoSunat (mismo criterio que facturadorSunat.service).
+ * Mapea ResponseCode del CDR a idEstadoSunat.
  */
 function responseCodeToIdEstadoSunat(code) {
   const c = String(code).trim();

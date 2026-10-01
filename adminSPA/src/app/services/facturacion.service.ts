@@ -51,8 +51,6 @@ export class FacturacionService {
     serieBoleta: string;
     serieNotaCredito: string;
     serieNotaDebito: string;
-    rutaCarpetaFacturadorSunat?: string;
-    urlFacturadorSunat?: string;
     envioAutomatico?: boolean;
     minutosEnvioAutomatico?: number;
     envioPorLotes?: boolean;

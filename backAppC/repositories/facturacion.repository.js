@@ -6,9 +6,8 @@ const { getNowLocal, resolveFechaHoraClienteSql, getNowLocalSQLString } = requir
 const { formatearFechaApp } = require("../utils/fechaDisplay.util");
 const debugSunatLog = require("../utils/debugSunatLog.util");
 const { formatearHoraEnvioParaInput } = require("../utils/limaSunat.util");
-const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
+const { nombreArchivoComprobante } = require("../utils/nombreArchivoSunat.util");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
-const archivoPlanoFacturador = require("../services/archivoPlanoFacturador.service");
 const generadorXmlUblSunat = require("../services/generadorXmlUblSunat.service");
 const firmaXmlSunat = require("../services/firmaXmlSunat.service");
 const envioDirectoSunat = require("../services/envioDirectoSunat.service");
@@ -49,8 +48,6 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
         c.serieBoleta,
         c.serieNotaCredito,
         c.serieNotaDebito,
-        c.rutaCarpetaFacturadorSunat,
-        c.urlFacturadorSunat,
         c.envioAutomatico,
         c.minutosEnvioAutomatico,
         c.envioPorLotes,
@@ -93,7 +90,7 @@ exports.obtenerConfiguracionParaFirmaRepo = async (pool, idEmpresa) => {
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .query(`
-      SELECT certificadoDigital, claveCertificado, rutaCarpetaFacturadorSunat, urlFacturadorSunat
+      SELECT certificadoDigital, claveCertificado
       FROM ConfiguracionFacturacionElectronica
       WHERE idEmpresa = @idEmpresa
     `);
@@ -203,10 +200,10 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("serieBoleta", sql.VarChar, datos.serieBoleta || null)
       .input("serieNotaCredito", sql.VarChar, datos.serieNotaCredito || null)
       .input("serieNotaDebito", sql.VarChar, datos.serieNotaDebito || null)
-      .input("rutaCarpetaFacturadorSunat", sql.VarChar, datos.rutaCarpetaFacturadorSunat || null)
-      .input("urlFacturadorSunat", sql.VarChar, datos.urlFacturadorSunat || null)
+      .input("rutaCarpetaFacturadorSunat", sql.VarChar, null)
+      .input("urlFacturadorSunat", sql.VarChar, null)
       .input("urlEnvio", sql.VarChar, datos.urlEnvio || null)
-      .input("envioDirectoSunat", sql.Bit, datos.envioDirectoSunat !== undefined ? datos.envioDirectoSunat : 0)
+      .input("envioDirectoSunat", sql.Bit, datos.envioDirectoSunat !== undefined ? datos.envioDirectoSunat : 1)
       .input("envioAutomatico", sql.Bit, datos.envioAutomatico !== undefined ? datos.envioAutomatico : 0)
       .input("minutosEnvioAutomatico", sql.Int, datos.minutosEnvioAutomatico ?? 10)
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
@@ -281,10 +278,10 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("serieBoleta", sql.VarChar, datos.serieBoleta || null)
       .input("serieNotaCredito", sql.VarChar, datos.serieNotaCredito || null)
       .input("serieNotaDebito", sql.VarChar, datos.serieNotaDebito || null)
-      .input("rutaCarpetaFacturadorSunat", sql.VarChar, datos.rutaCarpetaFacturadorSunat || null)
-      .input("urlFacturadorSunat", sql.VarChar, datos.urlFacturadorSunat || null)
+      .input("rutaCarpetaFacturadorSunat", sql.VarChar, null)
+      .input("urlFacturadorSunat", sql.VarChar, null)
       .input("urlEnvio", sql.VarChar, datos.urlEnvio || null)
-      .input("envioDirectoSunat", sql.Bit, datos.envioDirectoSunat !== undefined ? datos.envioDirectoSunat : 0)
+      .input("envioDirectoSunat", sql.Bit, datos.envioDirectoSunat !== undefined ? datos.envioDirectoSunat : 1)
       .input("envioAutomatico", sql.Bit, datos.envioAutomatico !== undefined ? datos.envioAutomatico : 0)
       .input("minutosEnvioAutomatico", sql.Int, datos.minutosEnvioAutomatico ?? 10)
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
@@ -323,7 +320,7 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
 exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
   try {
     const result = await pool.request().query(`
-      SELECT idEmpresa, minutosEnvioAutomatico, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
+      SELECT idEmpresa, minutosEnvioAutomatico,
              urlEnvio, usuarioSunat, claveSunat, ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat,
              ISNULL(modoEnvioSunat, 2) AS modoEnvioSunat, horaEnvioSunat, fechaUltimaOlaEnvioProgramado,
              ISNULL(useResumenDiarioBoletas, 0) AS useResumenDiarioBoletas
@@ -332,18 +329,21 @@ exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
           (envioAutomatico = 1 AND ISNULL(modoEnvioSunat, 2) IN (2, 3))
           OR ISNULL(modoEnvioSunat, 2) = 1
         )
-        AND (
-          (rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(rutaCarpetaFacturadorSunat)) <> '')
-          OR (ISNULL(envioDirectoSunat, 0) = 1 AND urlEnvio IS NOT NULL AND LTRIM(RTRIM(urlEnvio)) <> '' AND usuarioSunat IS NOT NULL AND claveSunat IS NOT NULL)
-        )
+        AND ISNULL(envioDirectoSunat, 0) = 1
+        AND urlEnvio IS NOT NULL AND LTRIM(RTRIM(urlEnvio)) <> ''
+        AND usuarioSunat IS NOT NULL AND claveSunat IS NOT NULL
     `);
     return result.recordset || [];
   } catch (_) {
     const result = await pool.request().query(`
-      SELECT idEmpresa, minutosEnvioAutomatico, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
+      SELECT idEmpresa, minutosEnvioAutomatico, urlEnvio, usuarioSunat, claveSunat,
+             ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat,
              NULL AS modoEnvioSunat, NULL AS horaEnvioSunat, NULL AS fechaUltimaOlaEnvioProgramado, 0 AS useResumenDiarioBoletas
       FROM ConfiguracionFacturacionElectronica
-      WHERE envioAutomatico = 1 AND rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(rutaCarpetaFacturadorSunat)) <> ''
+      WHERE envioAutomatico = 1
+        AND ISNULL(envioDirectoSunat, 0) = 1
+        AND urlEnvio IS NOT NULL AND LTRIM(RTRIM(urlEnvio)) <> ''
+        AND usuarioSunat IS NOT NULL AND claveSunat IS NOT NULL
     `);
     return result.recordset || [];
   }
@@ -1919,17 +1919,10 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
 };
 
 /**
- * Envía el comprobante a SUNAT. Dos flujos según otros/manual_programador.pdf (RS 097-2012/SUNAT):
- *
- * 1) ENVÍO DIRECTO (config.envioDirectoSunat + urlEnvio + usuarioSunat + claveSunat + certificado):
- *    No archivos planos. Se genera XML UBL, se firma, se guarda en xml_firmados_sunat, se envía a BillService sendBill (§2.5). Se guarda CDR en BD.
- *
- * 2) FACTURADOR SFS (envío directo no activo; rutaCarpetaFacturadorSunat obligatoria):
- *    Archivos planos en DATA → actualizar bandeja → generar/firmar XML (Facturador) → actualizar bandeja
- *    → enviar a SUNAT → recepcionar CDR y guardar en BD → actualizar bandeja.
- *    Opción usarXmlUbl: true → XML UBL firmado en Firma, solo envío (sin planos).
+ * Envía el comprobante a SUNAT por SOAP BillService (envío directo).
+ * Genera XML UBL, lo firma, lo guarda en xml_firmados_sunat y lo envía con sendBill. Guarda el CDR en BD.
  */
-exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico, facturadorSunatService, config, opciones = {}) => {
+exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico, config) => {
   const comp = await exports.obtenerComprobanteParaEnvioRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comp) return null;
 
@@ -1948,14 +1941,6 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
       mensaje: errVal.message || "Código producto SUNAT inválido en ítems"
     };
   }
-  const nombreArchivo = nombreArchivoComprobante({
-    ruc: comp.rucEmpresa,
-    tipoComprobante: comp.tipoComprobante,
-    serie: comp.serie,
-    numero: comp.numero
-  });
-  const base = nombreArchivo.replace(/\.json$/i, "");
-  const usarXmlUbl = opciones.usarXmlUbl === true;
   const rucStr = String(comp.rucEmpresa || "").trim().replace(/\D/g, "").padStart(11, "0");
 
   // Envío directo a SUNAT (SOAP BillService): requiere UBL firmado, usuarioSunat, claveSunat y URL (o modoPrueba para derivar URL)
@@ -2042,129 +2027,10 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     };
   }
 
-  // Facturador SFS (respaldo): archivos planos o UBL en Firma
-  if (!config.rutaCarpetaFacturadorSunat) {
-    return {
-      ok: false,
-      errorConfig: true,
-      mensaje: "Configure la carpeta del Facturador SUNAT o active Envío directo con URL, usuario y clave SOL"
-    };
-  }
-
-  if (usarXmlUbl) {
-    const numeroComprobante = `${comp.serie}-${String(comp.numero).replace(/\D/g, "").padStart(8, "0")}`;
-    let xml;
-    if (comp.tipoComprobante === "07" || comp.tipoComprobante === "08") {
-      const venta = payload.venta || {};
-      const compRel = (venta.compRelacionado || "").trim();
-      const parts = compRel.split("-");
-      const documentoReferencia = {
-        tipoComprobanteRef: (venta.tipoComprobanteRef || "01").trim(),
-        serieRef: parts[0] || "",
-        numeroRef: parts.length >= 2 ? parts[1].replace(/\D/g, "") : ""
-      };
-      const esNc = comp.tipoComprobante === "07";
-      const motivo = {
-        codigo: (esNc
-          ? (venta.codigoMotivoNotaCredito || "01")
-          : (venta.codigoMotivoNotaDebito || venta.codigoMotivoNotaCredito || "01")
-        ).trim(),
-        descripcion: (esNc
-          ? (venta.descripcionMotivoNotaCredito || "Anulación de la operación")
-          : (venta.descripcionMotivoNotaDebito || "Intereses por mora")
-        ).trim()
-      };
-      const payloadNota = { ...payload, documentoReferencia, motivo };
-      xml = esNc
-        ? generadorXmlUblSunat.generarXmlUblCreditNote(payloadNota, numeroComprobante)
-        : generadorXmlUblSunat.generarXmlUblDebitNote(payloadNota, numeroComprobante);
-    } else {
-      xml = generadorXmlUblSunat.generarXmlUblFacturaBoleta(payload, comp.tipoComprobante, numeroComprobante);
-    }
-    const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
-    const certBase64 = configFirma?.certificadoDigital;
-    let claveCert = null;
-    try {
-      claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
-    } catch (err) {
-      console.error("[SUNAT] Error al descifrar clave certificado:", err.message);
-      return {
-        ok: false,
-        errorConfig: true,
-        mensaje: err.message || "Error al descifrar la clave del certificado"
-      };
-    }
-    if (certBase64 && claveCert) {
-      try {
-        const certificadoBuffer = Buffer.from(certBase64, "base64");
-        xml = firmaXmlSunat.firmarXmlUbl(xml, certificadoBuffer, claveCert);
-      } catch (err) {
-        console.error("firmaXmlSunat:", err);
-        return {
-          ok: false,
-          errorConfig: true,
-          mensaje: err.message || "Error al firmar XML con el certificado"
-        };
-      }
-      await exports.persistirHashXmlComprobanteElectronicoRepo(pool, idComprobanteElectronico, xml);
-    }
-    const writeXml = escribirXmlFirma(config.rutaCarpetaFacturadorSunat, base, xml);
-    if (!writeXml.ok) {
-      return {
-        ok: false,
-        mensaje: writeXml.error || "Error al escribir XML UBL en carpeta Firma del Facturador"
-      };
-    }
-  } else {
-    const contenidos = archivoPlanoFacturador.generarArchivosPlanos(payload, comp.tipoComprobante);
-    const writeResult = escribirArchivosPlanos(config.rutaCarpetaFacturadorSunat, base, contenidos);
-    if (!writeResult.ok) {
-      return {
-        ok: false,
-        mensaje: writeResult.error || "Error al escribir archivos planos (.CAB, .DET, .TRI, .LEY) en DATA del Facturador"
-      };
-    }
-  }
-
-  const resultado = await facturadorSunatService.enviarComprobanteAlFacturador({
-    baseUrl: config.urlFacturadorSunat || facturadorSunatService.URL_FACTURADOR_DEFAULT,
-    rutaCarpetaFacturadorSunat: config.rutaCarpetaFacturadorSunat,
-    ruc: comp.rucEmpresa,
-    tipoComprobante: comp.tipoComprobante,
-    serie: comp.serie,
-    numero: comp.numero,
-    xmlYaEnFirma: usarXmlUbl
-  });
-
-  const infraFac = !resultado.ok && esFalloInfraestructuraSunat(resultado, null);
-  if (!infraFac) {
-    await exports.actualizarResultadoEnvioRepo(
-      pool,
-      idComprobanteElectronico,
-      {
-        codigoRespuesta: resultado.codigoRespuesta,
-        descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
-        cdr: resultado.cdr,
-        idEstadoSunat: resultado.idEstadoSunat ?? 6
-      },
-      idUsuarioDesdePayloadUser(user)
-    );
-  }
-
-  if (infraFac) {
-    return {
-      ok: false,
-      mensaje: resultado.error || resultado.descripcionRespuesta || "Facturador/SUNAT no disponible; se reintentará automáticamente.",
-      quedarPendiente: true,
-      idEstadoSunat: 7
-    };
-  }
   return {
-    ok: resultado.ok,
-    mensaje: resultado.ok ? "Comprobante enviado a SUNAT" : (resultado.error || "Error en envío"),
-    idEstadoSunat: resultado.idEstadoSunat,
-    codigoRespuesta: resultado.codigoRespuesta,
-    descripcionRespuesta: resultado.descripcionRespuesta || resultado.error
+    ok: false,
+    errorConfig: true,
+    mensaje: "Active el envío directo a SUNAT y configure URL, usuario y clave SOL"
   };
 };
 

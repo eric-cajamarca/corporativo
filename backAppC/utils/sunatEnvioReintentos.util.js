@@ -118,12 +118,11 @@ function diagnosticoConfigEnvioSunat(config) {
     !!(config.urlEnvio && String(config.urlEnvio).trim()) &&
     !!(config.usuarioSunat && String(config.usuarioSunat).trim()) &&
     config.claveSunat != null && String(config.claveSunat).trim() !== "";
-  const usaFacturador = !!(config.rutaCarpetaFacturadorSunat && String(config.rutaCarpetaFacturadorSunat).trim());
-  if (!usaDirecto && !usaFacturador) {
+  if (!usaDirecto) {
     return {
       ok: false,
       errorConfig: true,
-      mensaje: "Configure envío directo SUNAT o ruta del Facturador"
+      mensaje: "Active el envío directo a SUNAT y configure URL, usuario y clave SOL"
     };
   }
   if (usaDirecto) {

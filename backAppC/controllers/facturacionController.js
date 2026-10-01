@@ -40,8 +40,6 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       serieBoleta,
       serieNotaCredito,
       serieNotaDebito,
-      rutaCarpetaFacturadorSunat,
-      urlFacturadorSunat,
       envioAutomatico,
       minutosEnvioAutomatico,
       envioPorLotes,
@@ -67,8 +65,6 @@ const actualizarConfiguracionFacturacion = async (req, res, next) => {
       serieBoleta,
       serieNotaCredito,
       serieNotaDebito,
-      rutaCarpetaFacturadorSunat,
-      urlFacturadorSunat,
       envioAutomatico,
       minutosEnvioAutomatico,
       envioPorLotes,
@@ -196,12 +192,11 @@ const generarComprobanteElectronico = async (req, res, next) => {
   }
 };
 
-// Enviar comprobante a SUNAT. Body opcional: { usarXmlUbl: true } para generar XML UBL y enviar sin archivos planos.
+// Enviar comprobante a SUNAT por envío directo (XML UBL firmado + BillService).
 const enviarComprobanteSunat = async (req, res, next) => {
   const { idComprobanteElectronico } = req.params;
-  const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
   try {
-    const result = await withPool(async (pool) => FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico, opciones));
+    const result = await withPool(async (pool) => FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico));
 
     if (result && !result.ok) {
       if (result.quedarPendiente) {
@@ -241,7 +236,7 @@ const enviarComprobanteSunat = async (req, res, next) => {
     }
     if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") {
       return res.status(400).json({
-        message: "Configure la carpeta del Facturador SUNAT en Configuración > Facturación",
+        message: "Active el envío directo a SUNAT y configure URL, usuario, clave SOL y certificado en Configuración > Facturación",
         data: undefined
       });
     }

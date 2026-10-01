@@ -1,11 +1,10 @@
 /**
- * Genera XML UBL 2.1 para Factura/Boleta (Peru SUNAT) a partir del mismo payload que los archivos planos.
- * Estructura UBL 2.1 Perú (compatible con Facturador y con envío directo).
- * Para envío directo, cac:Signature/cbc:Note debe indicar "del Contribuyente", no "Facturador SUNAT (SEE-SFS)" (manual del programador).
+ * Genera XML UBL 2.1 para Factura/Boleta (Peru SUNAT).
+ * El envío directo firma este XML y lo manda por BillService.
+ * cac:Signature/cbc:Note debe indicar "del Contribuyente" (manual del programador).
  * Referencias: UBL 2.1, CustomizationID 2.0 (Peru).
  */
 
-const { escribirXmlFirma } = require("../utils/facturadorSunat.util");
 const { numeroALetras } = require("../utils/numeroALetras.util");
 const { getFechaHoyApp } = require("../utils/fechaDisplay.util");
 const {
@@ -923,23 +922,8 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
   return xml;
 }
 
-/**
- * Genera el XML UBL 2.1 y lo escribe en la carpeta Firma del Facturador.
- * @param {object} payload - { venta, empresa, cliente, items }
- * @param {string} tipoComprobante - "01" | "03"
- * @param {string} numeroComprobante - Serie-Numero (ej: F001-00000001)
- * @param {string} base - Nombre base sin extensión (ej: 20100066603-01-F001-00000001)
- * @param {string} rutaCarpetaFacturadorSunat - Ruta base del Facturador
- * @returns {{ ok: boolean, rutaEscrita?: string, error?: string }}
- */
-function generarYEscribirXmlUblEnFirma(payload, tipoComprobante, numeroComprobante, base, rutaCarpetaFacturadorSunat) {
-  const xml = generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante);
-  return escribirXmlFirma(rutaCarpetaFacturadorSunat, base, xml);
-}
-
 module.exports = {
   generarXmlUblFacturaBoleta,
   generarXmlUblCreditNote,
-  generarXmlUblDebitNote,
-  generarYEscribirXmlUblEnFirma
+  generarXmlUblDebitNote
 };

@@ -56,8 +56,6 @@ export class IndexConfiguracionComponent implements OnInit {
     serieBoleta: 'B001',
     serieNotaCredito: 'FC01',
     serieNotaDebito: 'FD01',
-    rutaCarpetaFacturadorSunat: '' as string,
-    urlFacturadorSunat: 'http://localhost:9000' as string,
     envioAutomatico: false,
     minutosEnvioAutomatico: 10,
     envioPorLotes: false,
@@ -67,8 +65,7 @@ export class IndexConfiguracionComponent implements OnInit {
     enviarSunat: true,
     modoPrueba: true,
     tieneCertificado: false,
-    envioDirectoSunat: false,
-    usarFacturadorSunat: false,
+    envioDirectoSunat: true,
     useResumenDiarioBoletas: false,
     usaGuiasElectronicas: false,
     urlEnvio: '' as string,
@@ -468,18 +465,13 @@ export class IndexConfiguracionComponent implements OnInit {
           this.facturacion.serieBoleta = c.serieBoleta ?? 'B001';
           this.facturacion.serieNotaCredito = c.serieNotaCredito ?? 'FC01';
           this.facturacion.serieNotaDebito = c.serieNotaDebito ?? 'FD01';
-          this.facturacion.rutaCarpetaFacturadorSunat = c.rutaCarpetaFacturadorSunat ?? '';
-          this.facturacion.urlFacturadorSunat = c.urlFacturadorSunat ?? 'http://localhost:9000';
           this.facturacion.envioAutomatico = c.envioAutomatico === true;
           this.facturacion.minutosEnvioAutomatico = c.minutosEnvioAutomatico ?? 10;
           this.facturacion.envioPorLotes = c.envioPorLotes === true;
           this.facturacion.programacionEnvioLotes = c.programacionEnvioLotes ?? '';
           this.facturacion.modoPrueba = c.modoPrueba !== false;
           this.facturacion.tieneCertificado = c.tieneCertificado === true;
-          this.facturacion.envioDirectoSunat = c.envioDirectoSunat === true;
-          this.facturacion.usarFacturadorSunat =
-            !!(c.rutaCarpetaFacturadorSunat && String(c.rutaCarpetaFacturadorSunat).trim()) ||
-            !!(c.urlFacturadorSunat && String(c.urlFacturadorSunat).trim() && String(c.urlFacturadorSunat).trim() !== 'http://localhost:9000');
+          this.facturacion.envioDirectoSunat = c.envioDirectoSunat !== false;
           this.facturacion.useResumenDiarioBoletas = c.useResumenDiarioBoletas === true;
           this.facturacion.usaGuiasElectronicas = c.usaGuiasElectronicas === true;
           this.facturacion.urlEnvio = c.urlEnvio ?? '';
@@ -502,12 +494,6 @@ export class IndexConfiguracionComponent implements OnInit {
       serieBoleta: this.facturacion.serieBoleta,
       serieNotaCredito: this.facturacion.serieNotaCredito,
       serieNotaDebito: this.facturacion.serieNotaDebito,
-      rutaCarpetaFacturadorSunat: this.facturacion.usarFacturadorSunat
-        ? (this.facturacion.rutaCarpetaFacturadorSunat || undefined)
-        : '',
-      urlFacturadorSunat: this.facturacion.usarFacturadorSunat
-        ? (this.facturacion.urlFacturadorSunat || undefined)
-        : '',
       urlEnvio: this.facturacion.urlEnvio || undefined,
       envioDirectoSunat: this.facturacion.envioDirectoSunat,
       useResumenDiarioBoletas: this.facturacion.useResumenDiarioBoletas,

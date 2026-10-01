@@ -9,10 +9,6 @@
 const {
   generarXmlUblFacturaBoleta
 } = require("../services/generadorXmlUblSunat.service");
-const {
-  generarArchivosPlanosFacturaBoleta
-} = require("../services/archivoPlanoFacturador.service");
-const { buildFacturaBoletaJson } = require("../services/comprobanteJsonBuilder.service");
 
 function redondear2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
@@ -153,19 +149,6 @@ function probarCaso(nombre, lineasCarrito, precioIncluyeIgv) {
   assertCasiIgual(linea.precioRef, esperadoPrecio, 0.00001, `${nombre}: precio referencia XML`);
   assertCasiIgual(producto, linea.lineExt, 0.01, `${nombre}: SUNAT 3271 cantidad×valor≈LineExtension`);
   assertCasiIgual(linea.lineExt, items[0].subtotal, 0.001, `${nombre}: LineExtension=subtotal`);
-
-  // DET archivo plano: col 6 = valor sin IGV, col 34 = precio con IGV
-  const planos = generarArchivosPlanosFacturaBoleta(payload, "01");
-  const detCols = String(planos.det).trim().split("|");
-  const detValor = Number(detCols[5]);
-  const detPrecio = Number(detCols[33]);
-  assertCasiIgual(detValor, esperadoValor, 0.00001, `${nombre}: DET col6 valor unitario`);
-  assertCasiIgual(detPrecio, esperadoPrecio, 0.00001, `${nombre}: DET col34 precio unitario`);
-
-  // JSON Facturador
-  const json = buildFacturaBoletaJson(payload, "01");
-  assertCasiIgual(json.items[0].valorUnitario, esperadoValor, 0.00001, `${nombre}: JSON valorUnitario`);
-  assertCasiIgual(json.items[0].precioUnitario, esperadoPrecio, 0.00001, `${nombre}: JSON precioUnitario`);
 
   console.log(`OK  ${nombre}`);
   console.log(`    pVenta catálogo=${lineasCarrito[0].pVenta} | incluyeIGV=${precioIncluyeIgv}`);

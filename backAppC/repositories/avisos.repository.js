@@ -54,8 +54,7 @@ exports.obtenerAlertaConfigFacturacionRepo = async (pool, idEmpresa) => {
         CASE WHEN c.claveCertificado IS NOT NULL AND LEN(LTRIM(RTRIM(ISNULL(c.claveCertificado, '')))) > 0 THEN 1 ELSE 0 END AS tieneClaveCertificado,
         CASE WHEN c.usuarioSunat IS NOT NULL AND LTRIM(RTRIM(c.usuarioSunat)) <> '' THEN 1 ELSE 0 END AS tieneUsuarioSunat,
         CASE WHEN c.claveSunat IS NOT NULL AND LTRIM(RTRIM(c.claveSunat)) <> '' THEN 1 ELSE 0 END AS tieneClaveSunat,
-        CASE WHEN c.urlEnvio IS NOT NULL AND LTRIM(RTRIM(c.urlEnvio)) <> '' THEN 1 ELSE 0 END AS tieneUrlEnvio,
-        CASE WHEN c.rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(c.rutaCarpetaFacturadorSunat)) <> '' THEN 1 ELSE 0 END AS tieneFacturador
+        CASE WHEN c.urlEnvio IS NOT NULL AND LTRIM(RTRIM(c.urlEnvio)) <> '' THEN 1 ELSE 0 END AS tieneUrlEnvio
       FROM dbo.ConfiguracionFacturacionElectronica c
       WHERE c.idEmpresa = @idEmpresa
     `);
@@ -63,8 +62,7 @@ exports.obtenerAlertaConfigFacturacionRepo = async (pool, idEmpresa) => {
   if (!row) return null;
   const envioDirecto = row.envioDirectoSunat === true || row.envioDirectoSunat === 1 || String(row.envioDirectoSunat || '').trim() === '1';
   const canalDirecto = envioDirecto && Number(row.tieneUsuarioSunat) === 1 && Number(row.tieneClaveSunat) === 1 && Number(row.tieneUrlEnvio) === 1;
-  const tieneFacturador = Number(row.tieneFacturador) === 1;
-  const faltaCanalEnvio = !canalDirecto && !tieneFacturador;
+  const faltaCanalEnvio = !canalDirecto;
   const faltaCertificado =
     canalDirecto && (Number(row.tieneCertificado) !== 1 || Number(row.tieneClaveCertificado) !== 1);
   if (!faltaCertificado && !faltaCanalEnvio) return null;

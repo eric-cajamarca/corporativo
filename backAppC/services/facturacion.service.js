@@ -1,12 +1,11 @@
 const FacturacionRepository = require('../repositories/facturacion.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const guiaElectronicaRepository = require('../repositories/guiaElectronica.repository');
-const facturadorSunatService = require('./facturadorSunat.service');
 const firmaXmlSunat = require('./firmaXmlSunat.service');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
 const path = require('path');
 const fs = require('fs');
-const { nombreArchivoComprobante } = require('../utils/facturadorSunat.util');
+const { nombreArchivoComprobante } = require('../utils/nombreArchivoSunat.util');
 
 /** Misma carpeta que al enviar con SUNAT directo (facturacion.repository / envioDirectoSunat). */
 const CARPETA_XML_FIRMADOS_SUNAT = path.join(process.cwd(), 'xml_firmados_sunat');
@@ -21,12 +20,11 @@ const seguridadAlertasService = require('./seguridadAlertas.service');
 
 function configEnvioParaRepo(config) {
   return {
-    rutaCarpetaFacturadorSunat: config?.rutaCarpetaFacturadorSunat,
-    urlFacturadorSunat: config?.urlFacturadorSunat,
     envioDirectoSunat: config?.envioDirectoSunat,
     urlEnvio: config?.urlEnvio,
     usuarioSunat: config?.usuarioSunat,
-    claveSunat: config?.claveSunat
+    claveSunat: config?.claveSunat,
+    modoPrueba: config?.modoPrueba
   };
 }
 
@@ -145,7 +143,7 @@ exports.generarComprobanteElectronicoService = async (pool, user, datos) => {
   return result;
 };
 
-exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectronico, opciones = {}) => {
+exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectronico) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
@@ -168,9 +166,7 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
     pool,
     user,
     idComprobanteElectronico,
-    facturadorSunatService,
-    configEnvioParaRepo(config),
-    opciones
+    configEnvioParaRepo(config)
   );
   if (result && !result.ok) {
     await aplicarResultadoFalloEnvioService(pool, user.empresa, idComprobanteElectronico, result, null);
@@ -179,9 +175,9 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
 };
 
 /** Envío unitario desde job o post-cobro (sin req HTTP); requiere rol admin en validación interna. */
-exports.enviarComprobanteSunatPorEmpresaService = async (pool, idEmpresa, idComprobanteElectronico, opciones = {}) => {
+exports.enviarComprobanteSunatPorEmpresaService = async (pool, idEmpresa, idComprobanteElectronico) => {
   const user = { empresa: idEmpresa, rol: "Administrador" };
-  return exports.enviarComprobanteSunatService(pool, user, idComprobanteElectronico, opciones);
+  return exports.enviarComprobanteSunatService(pool, user, idComprobanteElectronico);
 };
 
 exports.consultarEstadoSunatService = async (pool, user, idComprobanteElectronico) => {
@@ -410,7 +406,6 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
         pool,
         { empresa: idEmpresa },
         ce.idComprobanteElectronico,
-        facturadorSunatService,
         configEnvioParaRepo(config)
       );
       if (result?.ok) {
