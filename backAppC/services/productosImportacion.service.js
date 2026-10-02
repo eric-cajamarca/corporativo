@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const ExcelJS = require('exceljs');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
 const marcaRepository = require('../repositories/marca.repository');
+const categoriaRepository = require('../repositories/categoria.repository');
 const { esCodigoPresentacionServicio } = require('../utils/productoInventariable.util');
 const productosMutacionesService = require('./productosMutaciones.service');
 const pdfBackend = require('./pdfBackend.client');
@@ -9,6 +10,8 @@ const saasPlanLimitesService = require('./saasPlanLimites.service');
 
 const MAX_FILAS = 4000;
 const MAX_BYTES = 8 * 1024 * 1024;
+/** Longitud de dbo.Productos.codigo. Más largo o vacío → correlativo interno. */
+const MAX_CODIGO_PRODUCTO = 20;
 
 function asegurarPuedeImportar(user) {
   if (!user || !user.empresa) {
@@ -42,7 +45,7 @@ function leerCelda(mapaNorm, aliases) {
 function normalizarNumeroFlexible(valueRaw) {
   let txt = String(valueRaw ?? '').trim();
   if (!txt) return '';
-  txt = txt.replace(/\s+/g, '');
+  txt = txt.replace(/s\/\.?/gi, '').replace(/\s+/g, '');
   if (txt.includes(',') && txt.includes('.')) {
     const lastComma = txt.lastIndexOf(',');
     const lastDot = txt.lastIndexOf('.');
@@ -160,9 +163,20 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
   };
 }
 
+function esFechaExcel(value) {
+  if (value instanceof Date) return true;
+  if (value && typeof value === 'object' && value.result instanceof Date) return true;
+  return false;
+}
+
 function celdaExcelACadena(value) {
   if (value == null) return '';
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   if (typeof value === 'object') {
     if (Array.isArray(value.richText)) {
       return value.richText.map((r) => r.text || '').join('');
@@ -238,7 +252,12 @@ async function parseBufferAObjetos(buffer) {
     for (let c = 1; c < headers.length; c += 1) {
       const header = headers[c];
       if (!header) continue;
-      const valor = celdaExcelACadena(row.getCell(c).value).trim();
+      const crudo = row.getCell(c).value;
+      const clave = normalizarClaveEncabezado(header);
+      const valor =
+        (clave === 'codigo' || clave === 'sku') && esFechaExcel(crudo)
+          ? ''
+          : celdaExcelACadena(crudo).trim();
       if (valor !== '') filaVacia = false;
       obj[header] = valor;
     }
@@ -437,14 +456,78 @@ function normalizarMarcaAlias(value) {
   return norm;
 }
 
+/** Alias habituales de unidad → código SUNAT de dbo.Presentacion. */
+const ALIAS_PRESENTACION = {
+  UND: 'NIU',
+  UN: 'NIU',
+  UNI: 'NIU',
+  UNIDAD: 'NIU',
+  UNIDADES: 'NIU',
+  PZA: 'NIU',
+  PIEZA: 'NIU',
+  PIEZAS: 'NIU',
+  GL: 'GLL',
+  GLN: 'GLL',
+  GAL: 'GLL',
+  GALON: 'GLL',
+  GALONES: 'GLL',
+  LT: 'LTR',
+  LITRO: 'LTR',
+  LITROS: 'LTR',
+  KG: 'KGM',
+  KILO: 'KGM',
+  KILOS: 'KGM',
+  KILOGRAMO: 'KGM',
+  GR: 'GRM',
+  GRAMO: 'GRM',
+  GRAMOS: 'GRM',
+  MT: 'MTR',
+  MTS: 'MTR',
+  METRO: 'MTR',
+  METROS: 'MTR',
+  CJ: 'BX',
+  CAJA: 'BX',
+  CAJAS: 'BX',
+  BOL: 'BG',
+  BOLSA: 'BG',
+  BOT: 'BO',
+  BOTELLA: 'BO',
+  PQ: 'PK',
+  PAQ: 'PK',
+  PAQUETE: 'PK',
+  SERVICIO: 'ZZ',
+  SERV: 'ZZ'
+};
+
+function clavePresentacion(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+}
+
 function buildPresentacionesIndex(rows) {
   const map = new Map();
   for (const row of rows || []) {
-    const key = normalizarCodigoKey(row.codigo);
-    if (!key || map.has(key)) continue;
-    map.set(key, Number(row.idPresentacion));
+    const id = Number(row.idPresentacion);
+    if (!Number.isFinite(id)) continue;
+    const porCodigo = clavePresentacion(row.codigo);
+    const porNombre = clavePresentacion(row.descripcion);
+    if (porCodigo && !map.has(porCodigo)) map.set(porCodigo, id);
+    if (porNombre && !map.has(porNombre)) map.set(porNombre, id);
   }
   return map;
+}
+
+function resolverIdPresentacion(index, codigoRaw) {
+  const key = clavePresentacion(codigoRaw);
+  if (!key) return null;
+  if (index.has(key)) return index.get(key);
+  const alias = ALIAS_PRESENTACION[key];
+  if (alias && index.has(alias)) return index.get(alias);
+  return null;
 }
 
 function buildCategoriasIndex(rows) {
@@ -485,7 +568,7 @@ function resolverCategoriaId(index, aliasRaw) {
   if (index.byName.has(key)) {
     return index.byName.get(key);
   }
-  if (key === 'VARIOS' && index.variosId != null) {
+  if (index.variosId != null) {
     return index.variosId;
   }
   return null;
@@ -617,6 +700,18 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     ]);
   const presentacionesIndex = buildPresentacionesIndex(presentacionesRows);
   const categoriasIndex = buildCategoriasIndex(categoriasRows);
+  if (categoriasIndex.variosId == null) {
+    const creada = await categoriaRepository.insertar(pool, idEmpresa, {
+      nombre: 'VARIOS',
+      descripcion: 'Categoría por defecto de importación',
+      estado: 1
+    });
+    const idCategoria = Number(creada && creada.idCategoria);
+    if (Number.isFinite(idCategoria)) {
+      categoriasIndex.byName.set('VARIOS', idCategoria);
+      categoriasIndex.variosId = idCategoria;
+    }
+  }
   let marcasIndex = buildMarcasIndex(marcasRows);
   const ubicacionesIndex = buildUbicacionesIndex(ubicacionesRows);
 
@@ -632,10 +727,9 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
   for (const f of filasParseadas) {
     const msgs = [];
 
-    if (!f.codigo) msgs.push('Falta codigo');
     if (!f.descripcion) msgs.push('Falta descripcion');
-    if (!f.presentacionCodigo) msgs.push('Falta presentacion (código ej. NIU)');
-    const costo = parseNumeroFlexible(f.costoStr);
+    if (!f.presentacionCodigo) msgs.push('Falta presentacion (código ej. NIU, o Unidad, Galón, Litro)');
+    const costo = f.costoStr === '' || f.costoStr == null ? 0 : parseNumeroFlexible(f.costoStr);
     if (Number.isNaN(costo) || costo < 0) msgs.push('costoUnitario inválido');
     const precioNormal = parsePrecioImportacion(f.precioNormalStr, 'precioNormal', msgs);
     const precioCliente = parsePrecioImportacion(f.precioClienteStr, 'precioCliente', msgs);
@@ -646,17 +740,18 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     if (Number.isNaN(cantidadInicialRaw)) msgs.push('cantidadInicial inválida');
     const cantidadInicial = Number.isNaN(cantidadInicialRaw) ? 0 : Math.max(0, cantidadInicialRaw);
 
-    const ck = normalizarCodigoKey(f.codigo);
-    if (vistosCodigo.has(ck)) {
+    const codigoExcel = String(f.codigo || '').trim();
+    const usarCorrelativo = !codigoExcel || codigoExcel.length > MAX_CODIGO_PRODUCTO;
+    const ck = usarCorrelativo ? '' : normalizarCodigoKey(codigoExcel);
+    if (!usarCorrelativo && vistosCodigo.has(ck)) {
       msgs.push(`Código duplicado en el archivo (fila ${vistosCodigo.get(ck)})`);
     }
 
     let idPresentacion = null;
     if (f.presentacionCodigo && msgs.length === 0) {
-      const presentacionKey = normalizarCodigoKey(f.presentacionCodigo);
-      idPresentacion = presentacionesIndex.get(presentacionKey) ?? null;
+      idPresentacion = resolverIdPresentacion(presentacionesIndex, f.presentacionCodigo);
       if (idPresentacion == null) {
-        msgs.push(`Presentación no encontrada: "${f.presentacionCodigo}"`);
+        msgs.push(`Presentación no encontrada: "${f.presentacionCodigo}". Use NIU, GLL, LTR o el nombre (Unidad, Galón, Litro).`);
       }
     }
 
@@ -677,10 +772,8 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       }
     }
 
-    if (msgs.length === 0 && f.codigo) {
-      if (codigosExistentes.has(ck)) {
-        msgs.push('El código ya existe en productos');
-      }
+    if (msgs.length === 0 && !usarCorrelativo && codigosExistentes.has(ck)) {
+      msgs.push('El código ya existe en productos');
     }
 
     let idUbicacion = null;
@@ -700,11 +793,15 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       continue;
     }
 
-    vistosCodigo.set(ck, f.numeroFila);
+    if (!usarCorrelativo) {
+      vistosCodigo.set(ck, f.numeroFila);
+    }
     filasResueltas.push({
       numeroFila: f.numeroFila,
-      codigo: f.codigo.trim(),
-      descripcion: f.descripcion.trim(),
+      codigo: usarCorrelativo ? '' : codigoExcel,
+      codigoExcel,
+      usarCorrelativo,
+      descripcion: f.descripcion.trim().slice(0, 200),
       idPresentacion,
       presentacionCodigo: f.presentacionCodigo,
       idCategoria,
@@ -734,9 +831,11 @@ async function validarArchivoConFilas(pool, user, filas) {
     conError: errores.length,
     errores,
     marcasCreadas: marcasCreadas || [],
+    correlativos: filasResueltas.filter((r) => r.usarCorrelativo).length,
     vistaPrevia: filasResueltas.slice(0, 30).map((r) => ({
       fila: r.numeroFila,
-      codigo: r.codigo,
+      codigo: r.usarCorrelativo ? 'Correlativo' : r.codigo,
+      usarCorrelativo: !!r.usarCorrelativo,
       descripcion: r.descripcion,
       cantidadInicial: r.cantidadInicial,
       costoUnitario: r.cUnitario,
@@ -836,7 +935,7 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
     try {
       const resultado = await productosMutacionesService.crearProductoConTransaccion(pool, {
         datosProducto,
-        usarCorrelativo: false,
+        usarCorrelativo: !!r.usarCorrelativo,
         lote,
         precioVenta: r.precioCliente,
         idListaPrecio: null,
@@ -863,17 +962,25 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
         erroresEjecucion.push({ fila: r.numeroFila, codigo: r.codigo, mensajes: ['Lista de precios principal no configurada'] });
         continue;
       }
-      insertados.push({ fila: r.numeroFila, idProducto: resultado.idProducto, codigo: r.codigo });
+      insertados.push({
+        fila: r.numeroFila,
+        idProducto: resultado.idProducto,
+        codigo: resultado.codigo || datosProducto.Codigo
+      });
     } catch (e) {
       console.error('contexto: importacion producto fila', r.numeroFila, e);
       const limitePlan = e && e.message === 'PLAN_LIMITE_PRODUCTOS';
+      const crudo = String(e.message || 'Error al insertar');
+      const truncado = /truncat/i.test(crudo) || /truncar/i.test(crudo);
       erroresEjecucion.push({
         fila: r.numeroFila,
         codigo: r.codigo,
         mensajes: [
           limitePlan
             ? 'El plan no permite registrar más productos.'
-            : String(e.message || 'Error al insertar').slice(0, 200)
+            : truncado
+              ? 'El código (máx. 20) o la descripción (máx. 200) no cabe en el catálogo.'
+              : crudo.slice(0, 200)
         ]
       });
       if (limitePlan) break;
@@ -933,5 +1040,6 @@ module.exports = {
   resolverUbicacionImportacion,
   resolverYValidarFilas,
   MAX_FILAS,
-  MAX_BYTES
+  MAX_BYTES,
+  MAX_CODIGO_PRODUCTO
 };

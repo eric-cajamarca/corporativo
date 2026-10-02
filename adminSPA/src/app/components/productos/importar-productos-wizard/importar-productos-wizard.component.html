@@ -127,6 +127,11 @@
           }
 
           @if (validacion.vistaPrevia.length) {
+            @if ((validacion.correlativos || 0) > 0) {
+              <div class="alert alert-info py-2 small">
+                {{ validacion.correlativos }} fila(s) sin código válido recibirán el correlativo interno (máx. 20 caracteres).
+              </div>
+            }
             <h3 class="h6">Vista previa de filas válidas (máx. 30)</h3>
             <div class="table-responsive preview-table mb-3">
               <table class="table table-sm table-striped">
@@ -137,10 +142,10 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (v of validacion.vistaPrevia; track v.fila + v.codigo) {
+                  @for (v of validacion.vistaPrevia; track v.fila) {
                     <tr>
                       <td>{{ v.fila }}</td>
-                      <td>{{ v.codigo }}</td>
+                      <td>{{ v.usarCorrelativo ? 'Correlativo' : v.codigo }}</td>
                       <td>{{ v.descripcion }}</td>
                       <td>{{ v.cantidadInicial }}</td>
                       <td>{{ v.costoUnitario }}</td>
@@ -172,19 +177,33 @@
       @if (paso === 4 && resultado) {
         <section>
           <h2 class="h5 mb-3">Paso 4 — Resultado</h2>
-          <div class="alert alert-success">
+          <div class="alert" [class.alert-success]="resultado.insertados > 0" [class.alert-danger]="resultado.insertados === 0">
             Se importaron <strong>{{ resultado.insertados }}</strong> producto(s) de
             <strong>{{ resultado.total }}</strong> fila(s) leídas.
           </div>
+          @if (motivosResultado.length) {
+            <h3 class="h6">Por qué no se importaron</h3>
+            <div class="table-responsive preview-table mb-3">
+              <table class="table table-sm table-bordered">
+                <thead>
+                  <tr><th>Fila</th><th>Código</th><th>Detalle</th></tr>
+                </thead>
+                <tbody>
+                  @for (e of motivosResultado; track e.fila + '-' + e.codigo) {
+                    <tr>
+                      <td>{{ e.fila }}</td>
+                      <td>{{ e.codigo || '—' }}</td>
+                      <td>{{ e.mensajes.join('; ') }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
           @if (resultado.noImportadosExcel?.total) {
             <p class="small text-muted">
               Se descargó un Excel con {{ resultado.noImportadosExcel?.total }} fila(s) no importadas.
             </p>
-          }
-          @if (resultado.erroresEjecucion.length) {
-            <div class="alert alert-danger py-2 small">
-              Algunas filas válidas fallaron al guardar. Revise el Excel de no importados.
-            </div>
           }
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-primary" (click)="volverAListado()">Ver productos</button>

@@ -122,7 +122,7 @@ async function obtenerPresentacionesCatalogo(pool) {
   const r = await pool
     .request()
     .query(`
-      SELECT idPresentacion, codigo
+      SELECT idPresentacion, codigo, descripcion
       FROM dbo.Presentacion
     `);
   return r.recordset || [];

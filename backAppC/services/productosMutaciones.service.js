@@ -187,7 +187,7 @@ async function crearProductoConTransaccion(pool, params) {
   if (!committed) {
     throw lastDupErr || new Error('No se pudo asignar un código de producto único.');
   }
-  return { ok: true, idProducto: datosProducto.idProducto };
+  return { ok: true, idProducto: datosProducto.idProducto, codigo: datosProducto.Codigo };
 }
 
 async function actualizarProductoCompra(pool, datosProducto) {

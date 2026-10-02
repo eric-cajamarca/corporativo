@@ -122,9 +122,11 @@ export interface ImportacionProductosValidarData {
   errores: Array<{ fila: number; codigo: string; mensajes: string[] }>;
   /** Marcas nuevas creadas automáticamente al validar/importar. */
   marcasCreadas?: string[];
+  correlativos?: number;
   vistaPrevia: Array<{
     fila: number;
     codigo: string;
+    usarCorrelativo?: boolean;
     descripcion: string;
     cantidadInicial: number;
     costoUnitario: number;

@@ -34,7 +34,7 @@ export class ImportarProductosWizardComponent implements OnInit {
   resultado: ImportacionProductosEjecutarData | null = null;
 
   readonly columnasPlantilla = [
-    { col: 'codigo', desc: 'Código único del producto (obligatorio)' },
+    { col: 'codigo', desc: 'Opcional. Máximo 20 caracteres. Vacío, fecha de Excel o más largo: se asigna el correlativo interno' },
     { col: 'descripcion', desc: 'Nombre o descripción (obligatorio)' },
     { col: 'presentacion', desc: 'Unidad SUNAT, ej. NIU (obligatorio)' },
     { col: 'cantidadInicial', desc: 'Stock inicial en sucursal principal (0 si vacío)' },
@@ -71,6 +71,11 @@ export class ImportarProductosWizardComponent implements OnInit {
 
   get puedeAvanzarPaso2(): boolean {
     return !!this.archivo;
+  }
+
+  get motivosResultado(): Array<{ fila: number; codigo: string; mensajes: string[] }> {
+    if (!this.resultado) return [];
+    return [...(this.resultado.erroresValidacion || []), ...(this.resultado.erroresEjecucion || [])].slice(0, 12);
   }
 
   get puedeImportar(): boolean {
@@ -128,9 +133,13 @@ export class ImportarProductosWizardComponent implements OnInit {
             marcas.length > 0
               ? ` Marcas nuevas: ${marcas.slice(0, 8).join(', ')}${marcas.length > 8 ? '…' : ''}.`
               : '';
+          const extraCorr =
+            Number(res.data.correlativos || 0) > 0
+              ? ` ${res.data.correlativos} recibirán correlativo interno.`
+              : '';
           iziToast.info({
             title: 'Validación',
-            message: `${res.data.validas} fila(s) válida(s), ${res.data.conError} con error.${extraMarcas}`,
+            message: `${res.data.validas} fila(s) válida(s), ${res.data.conError} con error.${extraCorr}${extraMarcas}`,
             position: 'topRight'
           });
         }
@@ -156,16 +165,32 @@ export class ImportarProductosWizardComponent implements OnInit {
           this.excelService.descargar(blob, noImport.fileName || 'productos_no_importados.xlsx');
         }
         if (typeof iziToast !== 'undefined') {
-          const marcas = res.data.marcasCreadas || [];
-          const extraMarcas =
-            marcas.length > 0
-              ? ` Marcas nuevas: ${marcas.slice(0, 8).join(', ')}${marcas.length > 8 ? '…' : ''}.`
-              : '';
-          iziToast.success({
-            title: 'Importación',
-            message: `Se registraron ${res.data.insertados} producto(s).${extraMarcas}`,
-            position: 'topRight'
-          });
+          const insertados = Number(res.data.insertados || 0);
+          const motivos = [
+            ...(res.data.erroresValidacion || []),
+            ...(res.data.erroresEjecucion || [])
+          ];
+          const primerMotivo = motivos[0]?.mensajes?.[0] || '';
+          if (insertados === 0) {
+            iziToast.error({
+              title: 'Importación',
+              message: primerMotivo
+                ? `No se registró ningún producto. ${primerMotivo}`
+                : 'No se registró ningún producto.',
+              position: 'topRight'
+            });
+          } else {
+            const marcas = res.data.marcasCreadas || [];
+            const extraMarcas =
+              marcas.length > 0
+                ? ` Marcas nuevas: ${marcas.slice(0, 8).join(', ')}${marcas.length > 8 ? '…' : ''}.`
+                : '';
+            iziToast.success({
+              title: 'Importación',
+              message: `Se registraron ${insertados} producto(s).${extraMarcas}`,
+              position: 'topRight'
+            });
+          }
         }
       },
       error: (err) => {
