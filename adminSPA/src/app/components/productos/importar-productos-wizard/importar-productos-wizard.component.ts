@@ -36,7 +36,7 @@ export class ImportarProductosWizardComponent implements OnInit {
   readonly columnasPlantilla = [
     { col: 'codigo', desc: 'Opcional. Máximo 20 caracteres. Vacío, fecha de Excel o más largo: se asigna el correlativo interno' },
     { col: 'descripcion', desc: 'Nombre o descripción (obligatorio)' },
-    { col: 'presentacion', desc: 'Unidad SUNAT, ej. NIU (obligatorio)' },
+    { col: 'presentacion', desc: 'Unidad SUNAT, ej. NIU. Vacío o desconocido = Unidad. Formas de botica (Tableta, etc.) solo se usan si el rubro es farmacia' },
     { col: 'cantidadInicial', desc: 'Stock inicial en sucursal principal (0 si vacío)' },
     { col: 'costoUnitario', desc: 'Costo unitario (≥ 0)' },
     { col: 'precioNormal', desc: 'Precio lista Normal (obligatorio)' },

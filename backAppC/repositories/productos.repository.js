@@ -1152,7 +1152,8 @@ exports.listarProductosPorCodigoRepo = async (executor, idEmpresa, codigo) => {
 };
 
 exports.insertarProducto = async (transaction, row) => {
-  return transaction
+  const columnas = await nombresColumnasProductos(transaction);
+  const request = transaction
     .request()
     .input('idProducto', sql.UniqueIdentifier, row.idProducto)
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
@@ -1172,46 +1173,76 @@ exports.insertarProducto = async (transaction, row) => {
     .input('FIngreso', sql.DateTime, row.FIngreso)
     .input('estado', sql.Bit, row.estado)
     .input('tipoProducto', sql.Char(1), row.tipoProducto)
-    .input('permiteDescripcionEnVenta', sql.Bit, row.permiteDescripcionEnVenta ? 1 : 0)
-    .input('codigoProductoSunat', sql.VarChar(8), row.codigoProductoSunat || null)
-    .input(
-      'requiereCodigoSunat',
-      sql.Bit,
-      row.requiereCodigoSunat === true || row.requiereCodigoSunat === 1
-        ? 1
-        : row.requiereCodigoSunat === false || row.requiereCodigoSunat === 0
-          ? 0
-          : null
-    )
-    .input('revisadoSunat', sql.Bit, row.revisadoSunat ? 1 : 0)
-    .input('anexoSunatSugerido', sql.VarChar(5), row.anexoSunatSugerido || null)
-    .input('codigoSunatSugerido', sql.VarChar(8), row.codigoSunatSugerido || null)
-    .input('principioActivo', sql.VarChar(150), row.principioActivo || null)
-    .input('concentracion', sql.VarChar(40), row.concentracion || null)
-    .input('formaFarmaceutica', sql.VarChar(80), row.formaFarmaceutica || null)
-    .input('registroSanitario', sql.VarChar(30), row.registroSanitario || null)
-    .input('laboratorio', sql.VarChar(120), row.laboratorio || null)
-    .input('condicionVenta', sql.VarChar(20), row.condicionVenta || 'LIBRE')
-    .input('codigoEan', sql.VarChar(14), row.codigoEan || null)
-    .input('controlado', sql.Bit, row.controlado ? 1 : 0)
-    .query(
-      `INSERT INTO Productos (
-        idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion,
-        cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas,
-        facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta,
-        codigoProductoSunat, requiereCodigoSunat, revisadoSunat, anexoSunatSugerido, codigoSunatSugerido,
-        principioActivo, concentracion, formaFarmaceutica, registroSanitario, laboratorio,
-        condicionVenta, codigoEan, controlado
-      ) VALUES (
-        @idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion,
-        @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas,
-        @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta,
-        @codigoProductoSunat, @requiereCodigoSunat, @revisadoSunat, @anexoSunatSugerido, @codigoSunatSugerido,
-        @principioActivo, @concentracion, @formaFarmaceutica, @registroSanitario, @laboratorio,
-        @condicionVenta, @codigoEan, @controlado
-      )`
-    );
+    .input('permiteDescripcionEnVenta', sql.Bit, row.permiteDescripcionEnVenta ? 1 : 0);
+  const extras = aplicarExtrasProducto(request, row, columnas);
+  return request.query(
+    `INSERT INTO Productos (
+      idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion,
+      cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas,
+      facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta
+      ${extras.sqlCols}
+    ) VALUES (
+      @idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion,
+      @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas,
+      @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta
+      ${extras.sqlVals}
+    )`
+  );
 };
+
+function valorDefinido(v) {
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
+
+const EXTRAS_PRODUCTO = [
+  { col: 'codigoProductoSunat', type: () => sql.VarChar(8), from: (row) => row.codigoProductoSunat || null, if: (row) => row.codigoProductoSunat !== undefined },
+  { col: 'requiereCodigoSunat', type: () => sql.Bit, from: (row) => {
+    if (row.requiereCodigoSunat === true || row.requiereCodigoSunat === 1) return 1;
+    if (row.requiereCodigoSunat === false || row.requiereCodigoSunat === 0) return 0;
+    return null;
+  }, if: (row) => row.requiereCodigoSunat !== undefined },
+  { col: 'revisadoSunat', type: () => sql.Bit, from: (row) => (row.revisadoSunat ? 1 : 0), if: (row) => row.revisadoSunat !== undefined },
+  { col: 'anexoSunatSugerido', type: () => sql.VarChar(5), from: (row) => row.anexoSunatSugerido || null, if: (row) => row.anexoSunatSugerido !== undefined },
+  { col: 'codigoSunatSugerido', type: () => sql.VarChar(8), from: (row) => row.codigoSunatSugerido || null, if: (row) => row.codigoSunatSugerido !== undefined },
+  { col: 'principioActivo', type: () => sql.VarChar(150), from: (row) => row.principioActivo || null, if: (row) => valorDefinido(row.principioActivo) },
+  { col: 'concentracion', type: () => sql.VarChar(40), from: (row) => row.concentracion || null, if: (row) => valorDefinido(row.concentracion) },
+  { col: 'formaFarmaceutica', type: () => sql.VarChar(80), from: (row) => row.formaFarmaceutica || null, if: (row) => valorDefinido(row.formaFarmaceutica) },
+  { col: 'registroSanitario', type: () => sql.VarChar(30), from: (row) => row.registroSanitario || null, if: (row) => valorDefinido(row.registroSanitario) },
+  { col: 'laboratorio', type: () => sql.VarChar(120), from: (row) => row.laboratorio || null, if: (row) => valorDefinido(row.laboratorio) },
+  { col: 'condicionVenta', type: () => sql.VarChar(20), from: (row) => row.condicionVenta || 'LIBRE', if: (row) => valorDefinido(row.condicionVenta) },
+  { col: 'codigoEan', type: () => sql.VarChar(14), from: (row) => row.codigoEan || null, if: (row) => valorDefinido(row.codigoEan) },
+  { col: 'controlado', type: () => sql.Bit, from: (row) => (row.controlado ? 1 : 0), if: (row) => row.controlado === true || row.controlado === 1 }
+];
+
+let cacheColumnasProductos = null;
+
+async function nombresColumnasProductos(executor) {
+  if (cacheColumnasProductos) return cacheColumnasProductos;
+  const r = await executor.request().query(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Productos'
+  `);
+  const set = new Set();
+  for (const row of r.recordset || []) {
+    set.add(String(row.COLUMN_NAME).toLowerCase());
+  }
+  cacheColumnasProductos = set;
+  return set;
+}
+
+function aplicarExtrasProducto(request, row, columnas) {
+  const sqlCols = [];
+  const sqlVals = [];
+  for (const extra of EXTRAS_PRODUCTO) {
+    if (!columnas.has(extra.col.toLowerCase())) continue;
+    if (!extra.if(row)) continue;
+    request.input(extra.col, extra.type(), extra.from(row));
+    sqlCols.push(`, ${extra.col}`);
+    sqlVals.push(`, @${extra.col}`);
+  }
+  return { sqlCols: sqlCols.join(''), sqlVals: sqlVals.join('') };
+}
 
 exports.insertarLoteInicial = async (transaction, row) => {
   const numLote =

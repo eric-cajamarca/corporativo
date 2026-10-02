@@ -71,6 +71,12 @@ const validar = async (req, res) => {
     ) {
       return res.status(400).json({ message: 'El Excel no contiene datos válidos.', data: undefined });
     }
+    if (error.message === 'PDF_BACKEND_NO_DISPONIBLE') {
+      return res.status(503).json({
+        message: 'No se pudo leer el Excel: el servicio pdf-backend no está disponible (puerto 3002).',
+        data: undefined
+      });
+    }
     if (error.message === 'SIN_SUCURSAL_PRINCIPAL') {
       return res.status(400).json({
         message: 'No hay sucursal activa para registrar stock inicial.',
@@ -126,6 +132,12 @@ const ejecutar = async (req, res) => {
     }
     if (error.message === 'ARCHIVO_DEMASIADO_GRANDE' || error.message === 'DEMASIADAS_FILAS') {
       return res.status(400).json({ message: error.message, data: undefined });
+    }
+    if (error.message === 'PDF_BACKEND_NO_DISPONIBLE') {
+      return res.status(503).json({
+        message: 'No se pudo leer el Excel: el servicio pdf-backend no está disponible (puerto 3002).',
+        data: undefined
+      });
     }
     console.error('contexto: productosImportacion.ejecutar', error);
     return res.status(500).json({ message: error.message || 'Error al importar', data: undefined });

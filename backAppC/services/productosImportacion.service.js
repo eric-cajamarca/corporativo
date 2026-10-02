@@ -1,9 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
-const ExcelJS = require('exceljs');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
 const marcaRepository = require('../repositories/marca.repository');
 const categoriaRepository = require('../repositories/categoria.repository');
 const { esCodigoPresentacionServicio } = require('../utils/productoInventariable.util');
+const { obtenerRubroEmpresa, esRubroFarmacia } = require('../utils/rubroEmpresa.util');
 const productosMutacionesService = require('./productosMutaciones.service');
 const pdfBackend = require('./pdfBackend.client');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
@@ -159,63 +159,29 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
     precioMayoristaStr,
     categoriaAlias,
     marcaAlias,
-    ubicacionCodigo
+    ubicacionCodigo,
+    principioActivo: leerCelda(mapaNorm, ['principioactivo', 'principio activo']),
+    concentracion: leerCelda(mapaNorm, ['concentracion', 'concentración']),
+    formaFarmaceutica: leerCelda(mapaNorm, ['formafarmaceutica', 'forma farmaceutica', 'forma farmacéutica']),
+    registroSanitario: leerCelda(mapaNorm, ['registrosanitario', 'registro sanitario']),
+    laboratorio: leerCelda(mapaNorm, ['laboratorio']),
+    condicionVenta: leerCelda(mapaNorm, ['condicionventa', 'condicion venta', 'condición venta']),
+    codigoEan: leerCelda(mapaNorm, ['codigoean', 'codigo ean', 'ean', 'barcode']),
+    controladoStr: leerCelda(mapaNorm, ['controlado'])
   };
 }
 
-function esFechaExcel(value) {
-  if (value instanceof Date) return true;
-  if (value && typeof value === 'object' && value.result instanceof Date) return true;
-  return false;
-}
-
-function celdaExcelACadena(value) {
-  if (value == null) return '';
-  if (value instanceof Date) {
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  if (typeof value === 'object') {
-    if (Array.isArray(value.richText)) {
-      return value.richText.map((r) => r.text || '').join('');
-    }
-    if (value.text != null) return String(value.text);
-    if (value.result != null) return celdaExcelACadena(value.result);
-    if (value.hyperlink && value.text == null) return String(value.hyperlink);
-    return '';
-  }
-  return String(value);
-}
-
-function encabezadosDeFila(sheet, rowNumber) {
-  const headerRow = sheet.getRow(rowNumber);
-  const headers = [];
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNum) => {
-    headers[colNum] = celdaExcelACadena(cell.value).trim();
-  });
-  return headers;
-}
-
-/** Hoja de productos: la que trae codigo + descripcion en las primeras filas. */
-function localizarHojaProductos(wb) {
-  for (const sheet of wb.worksheets || []) {
-    const tope = Math.min(3, sheet.rowCount || 3);
-    for (let r = 1; r <= tope; r += 1) {
-      const headers = encabezadosDeFila(sheet, r);
-      const norm = headers.map((h) => normalizarClaveEncabezado(h));
-      if (norm.includes('codigo') && (norm.includes('descripcion') || norm.includes('nombreproducto'))) {
-        return { sheet, headerRow: r, headers };
-      }
-    }
-  }
-  return null;
-}
+const CODIGOS_PARSE_EXCEL = new Set([
+  'EXCEL_SIN_DATOS',
+  'EXCEL_SIN_HOJAS',
+  'EXCEL_INVALIDO',
+  'DEMASIADAS_FILAS',
+  'ARCHIVO_DEMASIADO_GRANDE',
+  'PDF_BACKEND_NO_DISPONIBLE'
+]);
 
 /**
- * Lee el xlsx en este proceso. No depende de pdf-backend: si ese servicio está
- * apagado, la importación igual puede validar el archivo.
+ * Lee el xlsx vía pdf-backend (ExcelJS vive ahí, no en backAppC).
  */
 async function parseBufferAObjetos(buffer) {
   if (!buffer || buffer.length === 0) {
@@ -225,49 +191,23 @@ async function parseBufferAObjetos(buffer) {
     throw new Error('ARCHIVO_DEMASIADO_GRANDE');
   }
 
-  const wb = new ExcelJS.Workbook();
+  let parsed;
   try {
-    await wb.xlsx.load(buffer);
+    parsed = await pdfBackend.parsearExcel(buffer, {
+      fileName: 'importacion_productos.xlsx',
+      maxBytes: MAX_BYTES,
+      maxFilas: MAX_FILAS
+    });
   } catch (err) {
+    const code = (err && err.code) || (err && err.message);
+    if (CODIGOS_PARSE_EXCEL.has(code)) {
+      throw new Error(code);
+    }
     console.error('contexto: productosImportacion parseBufferAObjetos', err);
     throw new Error('EXCEL_INVALIDO');
   }
 
-  if (!wb.worksheets || wb.worksheets.length === 0) {
-    throw new Error('EXCEL_SIN_HOJAS');
-  }
-
-  const ubicada = localizarHojaProductos(wb);
-  if (!ubicada) {
-    throw new Error('EXCEL_SIN_DATOS');
-  }
-
-  const { sheet, headerRow, headers } = ubicada;
-  const filas = [];
-  const ultima = Math.min(sheet.rowCount || headerRow, headerRow + MAX_FILAS);
-  for (let r = headerRow + 1; r <= ultima; r += 1) {
-    const row = sheet.getRow(r);
-    const obj = {};
-    let filaVacia = true;
-    for (let c = 1; c < headers.length; c += 1) {
-      const header = headers[c];
-      if (!header) continue;
-      const crudo = row.getCell(c).value;
-      const clave = normalizarClaveEncabezado(header);
-      const valor =
-        (clave === 'codigo' || clave === 'sku') && esFechaExcel(crudo)
-          ? ''
-          : celdaExcelACadena(crudo).trim();
-      if (valor !== '') filaVacia = false;
-      obj[header] = valor;
-    }
-    if (filaVacia) continue;
-    filas.push(obj);
-    if (filas.length > MAX_FILAS) {
-      throw new Error('DEMASIADAS_FILAS');
-    }
-  }
-
+  const filas = Array.isArray(parsed && parsed.rows) ? parsed.rows : [];
   if (filas.length === 0) {
     throw new Error('EXCEL_SIN_DATOS');
   }
@@ -499,6 +439,38 @@ const ALIAS_PRESENTACION = {
   SERV: 'ZZ'
 };
 
+/** Nombres que eran formas farmacéuticas mal cargadas en Presentacion (solo botica). */
+const FORMAS_FARMACEUTICAS = new Set([
+  'TABLETA',
+  'CAPSULA',
+  'COMPRIMIDO',
+  'GRAGEA',
+  'AMPOLLA',
+  'VIAL',
+  'OVULO',
+  'SUPOSITORIO',
+  'PARCHE',
+  'INHALADOR',
+  'JERINGA',
+  'POTE',
+  'GOTAS',
+  'CREMA',
+  'POMADA',
+  'UNGUENTO',
+  'GEL',
+  'SOLUCION',
+  'EMULSION',
+  'POLVO',
+  'BLISTER',
+  'SOBRE',
+  'FRASCO',
+  'JARABE',
+  'GOTERO',
+  'SUSPENSION',
+  'TUBO',
+  'KIT'
+]);
+
 function clavePresentacion(value) {
   return String(value || '')
     .normalize('NFD')
@@ -676,6 +648,8 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
   if (!idSucursal) {
     throw new Error('SIN_SUCURSAL_PRINCIPAL');
   }
+  const rubroEmp = await obtenerRubroEmpresa(pool, idEmpresa);
+  const esBotica = esRubroFarmacia(rubroEmp.codigoRubro, rubroEmp.rubro);
 
   const listasDisponibles = await productosImportacionRepository.obtenerListasPrecioBaseImportacion(pool, idEmpresa);
   const listasPrecio = resolverListasPrecioImportacion(listasDisponibles);
@@ -728,7 +702,6 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     const msgs = [];
 
     if (!f.descripcion) msgs.push('Falta descripcion');
-    if (!f.presentacionCodigo) msgs.push('Falta presentacion (código ej. NIU, o Unidad, Galón, Litro)');
     const costo = f.costoStr === '' || f.costoStr == null ? 0 : parseNumeroFlexible(f.costoStr);
     if (Number.isNaN(costo) || costo < 0) msgs.push('costoUnitario inválido');
     const precioNormal = parsePrecioImportacion(f.precioNormalStr, 'precioNormal', msgs);
@@ -747,12 +720,32 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       msgs.push(`Código duplicado en el archivo (fila ${vistosCodigo.get(ck)})`);
     }
 
-    let idPresentacion = null;
-    if (f.presentacionCodigo && msgs.length === 0) {
-      idPresentacion = resolverIdPresentacion(presentacionesIndex, f.presentacionCodigo);
-      if (idPresentacion == null) {
-        msgs.push(`Presentación no encontrada: "${f.presentacionCodigo}". Use NIU, GLL, LTR o el nombre (Unidad, Galón, Litro).`);
+    let idPresentacion = resolverIdPresentacion(presentacionesIndex, f.presentacionCodigo);
+    let formaDesdePresentacion = '';
+    if (idPresentacion == null) {
+      const clavePres = clavePresentacion(f.presentacionCodigo);
+      if (clavePres && FORMAS_FARMACEUTICAS.has(clavePres) && esBotica) {
+        formaDesdePresentacion = String(f.presentacionCodigo || '').trim();
       }
+      idPresentacion = resolverIdPresentacion(presentacionesIndex, 'NIU');
+    }
+    if (idPresentacion == null && msgs.length === 0) {
+      msgs.push('No está registrado el código de unidad NIU en Presentación.');
+    }
+
+    let fichaBotica = null;
+    if (esBotica) {
+      const controladoRaw = String(f.controladoStr || '').trim().toLowerCase();
+      fichaBotica = {
+        principioActivo: f.principioActivo || null,
+        concentracion: f.concentracion || null,
+        formaFarmaceutica: f.formaFarmaceutica || formaDesdePresentacion || null,
+        registroSanitario: f.registroSanitario || null,
+        laboratorio: f.laboratorio || null,
+        condicionVenta: f.condicionVenta || null,
+        codigoEan: f.codigoEan || null,
+        controlado: controladoRaw === '1' || controladoRaw === 'si' || controladoRaw === 'true'
+      };
     }
 
     let idCategoria = null;
@@ -803,7 +796,8 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       usarCorrelativo,
       descripcion: f.descripcion.trim().slice(0, 200),
       idPresentacion,
-      presentacionCodigo: f.presentacionCodigo,
+      presentacionCodigo: f.presentacionCodigo || 'NIU',
+      fichaBotica,
       idCategoria,
       idMarca,
       cUnitario: costo,
@@ -918,7 +912,8 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
       alertaMaximo: 50,
       tipoProducto: 'S',
       VecesVendidas: 0,
-      permiteDescripcionEnVenta: 0
+      permiteDescripcionEnVenta: 0,
+      ...(r.fichaBotica || {})
     };
 
     const esServicio = esCodigoPresentacionServicio(r.presentacionCodigo);

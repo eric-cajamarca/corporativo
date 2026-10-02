@@ -93,13 +93,24 @@ async function parsearExcel(buffer, opts = {}) {
   if (opts.maxBytes) form.append('maxBytes', String(opts.maxBytes));
   if (opts.maxFilas) form.append('maxFilas', String(opts.maxFilas));
 
-  const res = await axios.post(excelParseUrl(), form, {
-    headers: authHeaders(form.getHeaders()),
-    timeout: TIMEOUT_MS,
-    validateStatus: () => true,
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity
-  });
+  let res;
+  try {
+    res = await axios.post(excelParseUrl(), form, {
+      headers: authHeaders(form.getHeaders()),
+      timeout: TIMEOUT_MS,
+      validateStatus: () => true,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+  } catch (err) {
+    const code = err && err.code;
+    if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ECONNRESET' || code === 'ETIMEDOUT') {
+      const e = new Error('PDF_BACKEND_NO_DISPONIBLE');
+      e.code = 'PDF_BACKEND_NO_DISPONIBLE';
+      throw e;
+    }
+    throw err;
+  }
 
   if (res.status >= 200 && res.status < 300) {
     return res.data;
