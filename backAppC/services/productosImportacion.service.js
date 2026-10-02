@@ -1,9 +1,11 @@
 const { v4: uuidv4 } = require('uuid');
+const ExcelJS = require('exceljs');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
 const marcaRepository = require('../repositories/marca.repository');
 const { esCodigoPresentacionServicio } = require('../utils/productoInventariable.util');
 const productosMutacionesService = require('./productosMutaciones.service');
 const pdfBackend = require('./pdfBackend.client');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
 
 const MAX_FILAS = 4000;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -158,13 +160,48 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
   };
 }
 
+function celdaExcelACadena(value) {
+  if (value == null) return '';
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') {
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((r) => r.text || '').join('');
+    }
+    if (value.text != null) return String(value.text);
+    if (value.result != null) return celdaExcelACadena(value.result);
+    if (value.hyperlink && value.text == null) return String(value.hyperlink);
+    return '';
+  }
+  return String(value);
+}
+
+function encabezadosDeFila(sheet, rowNumber) {
+  const headerRow = sheet.getRow(rowNumber);
+  const headers = [];
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNum) => {
+    headers[colNum] = celdaExcelACadena(cell.value).trim();
+  });
+  return headers;
+}
+
+/** Hoja de productos: la que trae codigo + descripcion en las primeras filas. */
+function localizarHojaProductos(wb) {
+  for (const sheet of wb.worksheets || []) {
+    const tope = Math.min(3, sheet.rowCount || 3);
+    for (let r = 1; r <= tope; r += 1) {
+      const headers = encabezadosDeFila(sheet, r);
+      const norm = headers.map((h) => normalizarClaveEncabezado(h));
+      if (norm.includes('codigo') && (norm.includes('descripcion') || norm.includes('nombreproducto'))) {
+        return { sheet, headerRow: r, headers };
+      }
+    }
+  }
+  return null;
+}
+
 /**
- * Delega la lectura del xlsx a pdf-backend (POST /api/reports/parse-excel).
- * Recibe { headers, rows: [{header: value}] } y aplica la normalización de negocio.
- *
- * Los códigos de error (ARCHIVO_DEMASIADO_GRANDE, EXCEL_SIN_HOJAS, EXCEL_SIN_DATOS,
- * DEMASIADAS_FILAS) los devuelve pdf-backend; aquí solo se relanzan tal cual para
- * que el controller los traduzca a HTTP de cara al frontend.
+ * Lee el xlsx en este proceso. No depende de pdf-backend: si ese servicio está
+ * apagado, la importación igual puede validar el archivo.
  */
 async function parseBufferAObjetos(buffer) {
   if (!buffer || buffer.length === 0) {
@@ -174,27 +211,46 @@ async function parseBufferAObjetos(buffer) {
     throw new Error('ARCHIVO_DEMASIADO_GRANDE');
   }
 
-  let parsed;
+  const wb = new ExcelJS.Workbook();
   try {
-    parsed = await pdfBackend.parsearExcel(buffer, {
-      fileName: 'productos_importacion.xlsx',
-      maxBytes: MAX_BYTES,
-      maxFilas: MAX_FILAS
-    });
+    await wb.xlsx.load(buffer);
   } catch (err) {
-    if (err && err.code) {
-      throw new Error(err.code);
-    }
-    console.error('contexto: productosImportacion parseBufferAObjetos pdf-backend', err);
+    console.error('contexto: productosImportacion parseBufferAObjetos', err);
+    throw new Error('EXCEL_INVALIDO');
+  }
+
+  if (!wb.worksheets || wb.worksheets.length === 0) {
+    throw new Error('EXCEL_SIN_HOJAS');
+  }
+
+  const ubicada = localizarHojaProductos(wb);
+  if (!ubicada) {
     throw new Error('EXCEL_SIN_DATOS');
   }
 
-  const filas = Array.isArray(parsed && parsed.rows) ? parsed.rows : [];
+  const { sheet, headerRow, headers } = ubicada;
+  const filas = [];
+  const ultima = Math.min(sheet.rowCount || headerRow, headerRow + MAX_FILAS);
+  for (let r = headerRow + 1; r <= ultima; r += 1) {
+    const row = sheet.getRow(r);
+    const obj = {};
+    let filaVacia = true;
+    for (let c = 1; c < headers.length; c += 1) {
+      const header = headers[c];
+      if (!header) continue;
+      const valor = celdaExcelACadena(row.getCell(c).value).trim();
+      if (valor !== '') filaVacia = false;
+      obj[header] = valor;
+    }
+    if (filaVacia) continue;
+    filas.push(obj);
+    if (filas.length > MAX_FILAS) {
+      throw new Error('DEMASIADAS_FILAS');
+    }
+  }
+
   if (filas.length === 0) {
     throw new Error('EXCEL_SIN_DATOS');
-  }
-  if (filas.length > MAX_FILAS) {
-    throw new Error('DEMASIADAS_FILAS');
   }
 
   const out = [];
@@ -734,6 +790,8 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
     throw new Error('SIN_USUARIO_PRODUCTO');
   }
 
+  await saasPlanLimitesService.assertPuedeCrearProducto(pool, idEmpresa);
+
   const insertados = [];
   const erroresEjecucion = [];
 
@@ -808,11 +866,17 @@ async function ejecutarImportacionConFilas(pool, user, filas) {
       insertados.push({ fila: r.numeroFila, idProducto: resultado.idProducto, codigo: r.codigo });
     } catch (e) {
       console.error('contexto: importacion producto fila', r.numeroFila, e);
+      const limitePlan = e && e.message === 'PLAN_LIMITE_PRODUCTOS';
       erroresEjecucion.push({
         fila: r.numeroFila,
         codigo: r.codigo,
-        mensajes: [String(e.message || 'Error al insertar').slice(0, 200)]
+        mensajes: [
+          limitePlan
+            ? 'El plan no permite registrar más productos.'
+            : String(e.message || 'Error al insertar').slice(0, 200)
+        ]
       });
+      if (limitePlan) break;
     }
   }
 

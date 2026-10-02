@@ -77,6 +77,12 @@ const validar = async (req, res) => {
         data: undefined
       });
     }
+    if (error.message === 'PLAN_LIMITE_PRODUCTOS') {
+      return res.status(400).json({
+        message: 'Su plan no permite registrar más productos.',
+        data: undefined
+      });
+    }
     console.error('contexto: productosImportacion.validar', error);
     return res.status(500).json({ message: error.message || 'Error al validar el archivo', data: undefined });
   }
@@ -109,6 +115,12 @@ const ejecutar = async (req, res) => {
     if (error.message === 'SIN_SUCURSAL_PRINCIPAL') {
       return res.status(400).json({
         message: 'No existe sucursal activa; no se puede registrar stock inicial.',
+        data: undefined
+      });
+    }
+    if (error.message === 'PLAN_LIMITE_PRODUCTOS') {
+      return res.status(400).json({
+        message: 'Su plan no permite registrar más productos.',
         data: undefined
       });
     }
