@@ -877,7 +877,14 @@ async function sendMedia(idEmpresa, number, mediatype, media, filename, caption,
     payload = { audio: buffer, mimetype: 'audio/mpeg' };
   } else {
     const ext = (name.split('.').pop() || 'pdf').toLowerCase();
-    const mimeMap = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
+    const mimeMap = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls: 'application/vnd.ms-excel'
+    };
     payload = {
       document: buffer,
       mimetype: mimeMap[ext] || 'application/octet-stream',

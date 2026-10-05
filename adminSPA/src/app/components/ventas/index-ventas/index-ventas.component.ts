@@ -53,14 +53,19 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   loading = true;
   ventaSeleccionada: VentaListado | null = null;
   exportandoLista = false;
-  /** PDF reporte contabilidad SUNAT (solo no gestora). */
+  /** PDF/Excel reporte contabilidad SUNAT (solo no gestora). */
   exportandoReporteContabilidad = false;
   reporteContabilidadBlob: Blob | null = null;
   reporteContabilidadNombreArchivo = '';
   resumenReporteContabilidad = '';
+  private reporteContabilidadComps: VentaListado[] = [];
+  private reporteContabilidadRas: ComunicacionBajaHistorialItem[] = [];
+  private reporteContabilidadExcelBlob: Blob | null = null;
+  private reporteContabilidadExcelNombreArchivo = '';
   mostrarFormWhatsappReporteContabilidad = false;
   whatsappReporteContabilidadNumber = '';
   whatsappReporteContabilidadCaption = '';
+  whatsappReporteContabilidadFormato: 'pdf' | 'excel' = 'pdf';
   enviandoWhatsappReporteContabilidad = false;
   whatsappReporteContabilidadMensaje: string | null = null;
   generandoPdf = false;
@@ -1231,8 +1236,8 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     return {};
   }
 
-  /** Pagina todos los comprobantes del listado (mismos filtros) y deja solo los válidos para contabilidad. */
-  private obtenerComprobantesParaReporteContabilidad(
+  /** Pagina todos los comprobantes del listado con los filtros actuales (no solo la página visible). */
+  private obtenerTodosComprobantesDelFiltro(
     callback: (items: VentaListado[]) => void,
     onError: (e: unknown) => void
   ): void {
@@ -1246,7 +1251,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           const total = res?.total ?? 0;
           acum.push(...chunk);
           if (chunk.length === 0 || acum.length >= total) {
-            callback(acum.filter((v) => this.incluirEnReporteContabilidadSunat(v)));
+            callback(acum);
           } else {
             pagina += 1;
             next();
@@ -1256,6 +1261,17 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       });
     };
     next();
+  }
+
+  /** Pagina todos los comprobantes del listado (mismos filtros) y deja solo los válidos para contabilidad. */
+  private obtenerComprobantesParaReporteContabilidad(
+    callback: (items: VentaListado[]) => void,
+    onError: (e: unknown) => void
+  ): void {
+    this.obtenerTodosComprobantesDelFiltro(
+      (items) => callback(items.filter((v) => this.incluirEnReporteContabilidadSunat(v))),
+      onError
+    );
   }
 
   /** Pagina todas las comunicaciones de baja y deja solo estados válidos para contabilidad. */
@@ -1303,22 +1319,38 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     this.reporteContabilidadBlob = null;
     this.reporteContabilidadNombreArchivo = '';
     this.resumenReporteContabilidad = '';
+    this.reporteContabilidadComps = [];
+    this.reporteContabilidadRas = [];
+    this.reporteContabilidadExcelBlob = null;
+    this.reporteContabilidadExcelNombreArchivo = '';
     this.mostrarFormWhatsappReporteContabilidad = false;
     this.whatsappReporteContabilidadNumber = '';
     this.whatsappReporteContabilidadCaption = '';
+    this.whatsappReporteContabilidadFormato = 'pdf';
     this.whatsappReporteContabilidadMensaje = null;
     this.enviandoWhatsappReporteContabilidad = false;
   }
 
-  private emitirPdfReporteContabilidad(comps: VentaListado[], ras: ComunicacionBajaHistorialItem[], resumenLinea: string): void {
-    const emp = this.empresa;
-    const empresaPdf = {
-      logo: emp?.logo ?? '',
-      nombre: emp?.nombre ?? '',
-      ruc: emp?.ruc ?? '',
-      direccion: emp?.direccion ?? '',
-      telefono: emp?.telefono ?? ''
-    };
+  private columnasReporteContabilidad(): string[] {
+    return [
+      '#',
+      'Tipo',
+      'Fecha',
+      'Comprobante / correlativo',
+      'Doc. afectado (NC/ND)',
+      'RUC cliente',
+      'Cliente',
+      'Condición',
+      'Total (S/)',
+      'Estado SUNAT'
+    ];
+  }
+
+  private filasOrdenadasReporteContabilidad(
+    comps: VentaListado[],
+    ras: ComunicacionBajaHistorialItem[],
+    totalComoNumero: boolean
+  ): (string | number)[][] {
     type FilaOrd = { clave: string; celdas: (string | number)[] };
     const tmp: FilaOrd[] = [];
     for (const v of comps) {
@@ -1333,7 +1365,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           v.clienteRuc || '—',
           v.clienteRazonSocial || '—',
           ((v.condicionPago || '—').trim() || '—') as string,
-          `S/ ${Number(v.total).toFixed(2)}`,
+          totalComoNumero ? Number(v.total) : `S/ ${Number(v.total).toFixed(2)}`,
           this.etiquetaEstadoSunatListado(v)
         ]
       });
@@ -1351,55 +1383,114 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           '—',
           '—',
           '—',
-          '—',
+          totalComoNumero ? '' : '—',
           this.etiquetaEstadoRaContabilidad(c)
         ]
       });
     }
     tmp.sort((a, b) => (a.clave < b.clave ? 1 : a.clave > b.clave ? -1 : 0));
-    const filas = tmp.map((row, i) => [i + 1, ...row.celdas]);
+    return tmp.map((row, i) => [i + 1, ...row.celdas]);
+  }
+
+  private guardarDatosReporteContabilidad(
+    comps: VentaListado[],
+    ras: ComunicacionBajaHistorialItem[],
+    resumenLinea: string
+  ): void {
+    this.reporteContabilidadComps = comps;
+    this.reporteContabilidadRas = ras;
     this.resumenReporteContabilidad = resumenLinea;
+  }
+
+  private obtenerPdfBlobReporteContabilidad(
+    comps: VentaListado[],
+    ras: ComunicacionBajaHistorialItem[],
+    onOk: (blob: Blob, filename: string) => void,
+    onError?: () => void
+  ): void {
+    if (this.reporteContabilidadBlob && this.reporteContabilidadNombreArchivo) {
+      onOk(this.reporteContabilidadBlob, this.reporteContabilidadNombreArchivo);
+      return;
+    }
+    const emp = this.empresa;
+    const empresaPdf = {
+      logo: emp?.logo ?? '',
+      nombre: emp?.nombre ?? '',
+      ruc: emp?.ruc ?? '',
+      direccion: emp?.direccion ?? '',
+      telefono: emp?.telefono ?? ''
+    };
     const datos = {
       empresa: empresaPdf,
       titulo: 'Reporte contabilidad — comprobantes SUNAT y comunicaciones de baja',
-      columnas: [
-        '#',
-        'Tipo',
-        'Fecha',
-        'Comprobante / correlativo',
-        'Doc. afectado (NC/ND)',
-        'RUC cliente',
-        'Cliente',
-        'Condición',
-        'Total (S/)',
-        'Estado SUNAT'
-      ],
-      filas
+      columnas: this.columnasReporteContabilidad(),
+      filas: this.filasOrdenadasReporteContabilidad(comps, ras, false)
     };
     const nombreArchivo = `reporte_contabilidad_sunat_${new Date().getTime()}.pdf`;
     this.pdfService.generarPdfDinamico(datos, 'lista-ventas', 9).subscribe({
       next: (blob) => {
         this.reporteContabilidadBlob = blob;
         this.reporteContabilidadNombreArchivo = nombreArchivo;
-        this.whatsappReporteContabilidadCaption = 'Reporte contabilidad SUNAT (comprobantes y RA)';
-        this.exportandoReporteContabilidad = false;
-        this.pdfService.previsualizar(blob);
-        this.abrirModalPostReporteContabilidad();
+        onOk(blob, nombreArchivo);
       },
       error: (err) => {
-        this.exportandoReporteContabilidad = false;
         const msg = (err as { error?: { error?: string } })?.error?.error || (err as Error)?.message || 'Error al generar el PDF.';
         this.toastInfo(msg);
+        onError?.();
       }
     });
   }
 
-  /** Solo empresas no gestoras: PDF con comprobantes 01/03/07/08 aceptados o dados de baja ante SUNAT + RA aceptadas. */
-  generarReporteContabilidadPdf(): void {
+  private emitirExcelReporteContabilidad(comps: VentaListado[], ras: ComunicacionBajaHistorialItem[], resumenLinea?: string): void {
+    if (resumenLinea) this.guardarDatosReporteContabilidad(comps, ras, resumenLinea);
+    this.exportandoReporteContabilidad = true;
+    this.obtenerExcelBlobReporteContabilidad(comps, ras, (blob, filename) => {
+      this.excelService.descargar(blob, filename);
+      this.exportandoReporteContabilidad = false;
+    }, () => {
+      this.exportandoReporteContabilidad = false;
+    });
+  }
+
+  private obtenerExcelBlobReporteContabilidad(
+    comps: VentaListado[],
+    ras: ComunicacionBajaHistorialItem[],
+    onOk: (blob: Blob, filename: string) => void,
+    onError?: () => void
+  ): void {
+    if (this.reporteContabilidadExcelBlob && this.reporteContabilidadExcelNombreArchivo) {
+      onOk(this.reporteContabilidadExcelBlob, this.reporteContabilidadExcelNombreArchivo);
+      return;
+    }
+    const filename = `reporte_contabilidad_sunat_${new Date().getTime()}.xlsx`;
+    this.excelService.generarExcel({
+      title: 'Reporte contabilidad — comprobantes SUNAT y comunicaciones de baja',
+      filename,
+      worksheetName: 'Contabilidad',
+      columns: this.columnasReporteContabilidad(),
+      rows: this.filasOrdenadasReporteContabilidad(comps, ras, true)
+    }).subscribe({
+      next: (blob) => {
+        this.reporteContabilidadExcelBlob = blob;
+        this.reporteContabilidadExcelNombreArchivo = filename;
+        onOk(blob, filename);
+      },
+      error: (err) => {
+        const msg = (err as { error?: { error?: string } })?.error?.error || (err as Error)?.message || 'Error al generar el Excel.';
+        this.toastError(msg);
+        onError?.();
+      }
+    });
+  }
+
+  private cargarDatosReporteContabilidad(
+    onOk: (comps: VentaListado[], ras: ComunicacionBajaHistorialItem[], resumen: string) => void,
+    opciones: { limpiar?: boolean } = {}
+  ): void {
     if (this.esGestora) return;
     const { fechaDesde, fechaHasta } = this.fechasReporteComunicacionesBaja();
     this.exportandoReporteContabilidad = true;
-    this.limpiarEstadoReporteContabilidad();
+    if (opciones.limpiar !== false) this.limpiarEstadoReporteContabilidad();
     this.obtenerComprobantesParaReporteContabilidad(
       (comps) => {
         this.obtenerComunicacionesBajaParaReporte(
@@ -1408,38 +1499,85 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           (ras) => {
             if (comps.length === 0 && ras.length === 0) {
               this.exportandoReporteContabilidad = false;
-              this.toastWarning('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
+              this.resumenReporteContabilidad = 'No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.';
+              this.toastWarning(this.resumenReporteContabilidad);
               return;
             }
             const resumen = `${comps.length} comprobante(s) electrónico(s); ${ras.length} comunicación(es) de baja (RA).`;
-            this.emitirPdfReporteContabilidad(comps, ras, resumen);
+            onOk(comps, ras, resumen);
           },
           () => {
             if (comps.length === 0) {
               this.exportandoReporteContabilidad = false;
-              this.toastError('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
+              this.resumenReporteContabilidad = 'No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.';
+              this.toastError(this.resumenReporteContabilidad);
               return;
             }
             const resumen = `${comps.length} comprobante(s) electrónico(s); RA no incluida (error al cargar el historial).`;
-            this.emitirPdfReporteContabilidad(comps, [], resumen);
+            onOk(comps, [], resumen);
           }
         );
       },
       () => {
         this.exportandoReporteContabilidad = false;
-        this.toastError('No se pudieron cargar los comprobantes para el reporte de contabilidad.');
+        this.resumenReporteContabilidad = 'No se pudieron cargar los comprobantes para el reporte de contabilidad.';
+        this.toastError(this.resumenReporteContabilidad);
       }
     );
   }
 
+  get hayDatosReporteContabilidad(): boolean {
+    return this.reporteContabilidadComps.length > 0 || this.reporteContabilidadRas.length > 0;
+  }
+
+  /** Abre el modal de inmediato; el PDF/Excel se generan solo al descargar o enviar. */
+  generarReporteContabilidadPdf(): void {
+    if (this.esGestora) return;
+    this.limpiarEstadoReporteContabilidad();
+    this.whatsappReporteContabilidadCaption = 'Reporte contabilidad SUNAT (comprobantes y RA)';
+    this.exportandoReporteContabilidad = true;
+    this.abrirModalPostReporteContabilidad();
+    this.cargarDatosReporteContabilidad((comps, ras, resumen) => {
+      this.guardarDatosReporteContabilidad(comps, ras, resumen);
+      this.exportandoReporteContabilidad = false;
+    }, { limpiar: false });
+  }
+
+  /** Mismo criterio del reporte de contabilidad, en Excel (totales numéricos para sumar). */
+  generarReporteContabilidadExcel(): void {
+    this.cargarDatosReporteContabilidad((comps, ras, resumen) => {
+      this.emitirExcelReporteContabilidad(comps, ras, resumen);
+    });
+  }
+
   descargarReporteContabilidadPdf(): void {
-    if (!this.reporteContabilidadBlob) return;
-    this.pdfService.descargar(this.reporteContabilidadBlob, this.reporteContabilidadNombreArchivo || 'reporte_contabilidad.pdf');
+    if (!this.hayDatosReporteContabilidad) return;
+    this.exportandoReporteContabilidad = true;
+    this.obtenerPdfBlobReporteContabilidad(
+      this.reporteContabilidadComps,
+      this.reporteContabilidadRas,
+      (blob, filename) => {
+        this.pdfService.descargar(blob, filename || 'reporte_contabilidad.pdf');
+        this.exportandoReporteContabilidad = false;
+      },
+      () => {
+        this.exportandoReporteContabilidad = false;
+      }
+    );
+  }
+
+  descargarReporteContabilidadExcel(): void {
+    if (this.reporteContabilidadComps.length === 0 && this.reporteContabilidadRas.length === 0) {
+      this.generarReporteContabilidadExcel();
+      return;
+    }
+    this.emitirExcelReporteContabilidad(this.reporteContabilidadComps, this.reporteContabilidadRas);
   }
 
   abrirFormWhatsappReporteContabilidad(): void {
     this.mostrarFormWhatsappReporteContabilidad = true;
     this.whatsappReporteContabilidadMensaje = null;
+    this.whatsappReporteContabilidadFormato = 'pdf';
   }
 
   cerrarFormWhatsappReporteContabilidad(): void {
@@ -1448,16 +1586,44 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   }
 
   enviarReporteContabilidadWhatsapp(): void {
-    if (!this.reporteContabilidadBlob || !this.reporteContabilidadNombreArchivo) {
-      this.whatsappReporteContabilidadMensaje = 'No hay PDF generado.';
-      return;
-    }
     if (!this.whatsappReporteContabilidadNumber.trim()) {
       this.whatsappReporteContabilidadMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
       return;
     }
+    if (this.whatsappReporteContabilidadFormato === 'pdf') {
+      if (!this.hayDatosReporteContabilidad) {
+        this.whatsappReporteContabilidadMensaje = 'No hay datos para generar el PDF.';
+        return;
+      }
+      this.enviandoWhatsappReporteContabilidad = true;
+      this.whatsappReporteContabilidadMensaje = null;
+      this.obtenerPdfBlobReporteContabilidad(
+        this.reporteContabilidadComps,
+        this.reporteContabilidadRas,
+        (blob, filename) => this.enviarBlobWhatsappReporte(blob, filename),
+        () => {
+          this.enviandoWhatsappReporteContabilidad = false;
+        }
+      );
+      return;
+    }
+    if (this.reporteContabilidadComps.length === 0 && this.reporteContabilidadRas.length === 0) {
+      this.whatsappReporteContabilidadMensaje = 'No hay datos para generar el Excel.';
+      return;
+    }
     this.enviandoWhatsappReporteContabilidad = true;
     this.whatsappReporteContabilidadMensaje = null;
+    this.obtenerExcelBlobReporteContabilidad(
+      this.reporteContabilidadComps,
+      this.reporteContabilidadRas,
+      (blob, filename) => this.enviarBlobWhatsappReporte(blob, filename),
+      () => {
+        this.enviandoWhatsappReporteContabilidad = false;
+      }
+    );
+  }
+
+  private enviarBlobWhatsappReporte(blob: Blob, filename: string): void {
     const reader = new FileReader();
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
@@ -1466,7 +1632,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
         .enviarArchivo(
           this.whatsappReporteContabilidadNumber.trim(),
           base64,
-          this.reporteContabilidadNombreArchivo,
+          filename,
           'document',
           this.whatsappReporteContabilidadCaption.trim() || undefined
         )
@@ -1486,42 +1652,91 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           }
         });
     };
-    reader.readAsDataURL(this.reporteContabilidadBlob);
+    reader.readAsDataURL(blob);
   }
 
-  /** Exporta la lista actual (filtrada) de ventas a PDF (vista previa). */
+  /** Exporta la lista filtrada de ventas a PDF (todos los registros, no solo la página visible). */
   exportarListaPdf(): void {
+    this.exportarListaCompleta('pdf');
+  }
+
+  /** Descarga la lista filtrada de ventas en Excel (todos los registros, no solo la página visible). */
+  exportarListaExcel(): void {
+    this.exportarListaCompleta('excel');
+  }
+
+  private exportarListaCompleta(formato: 'pdf' | 'excel'): void {
     if (this.esGestora && this.ventas.length === 0 && this.ventasEmpresa.length === 0) return;
     if (!this.esGestora && this.ventasEmpresa.length === 0) return;
+
+    const usarAgrupadas = this.esGestora && this.ventasEmpresa.length === 0;
+    if (usarAgrupadas) {
+      this.emitirListaExport(formato);
+      return;
+    }
+
+    this.exportandoLista = true;
+    this.obtenerTodosComprobantesDelFiltro(
+      (items) => {
+        if (!items.length) {
+          this.exportandoLista = false;
+          this.toastWarning('No hay comprobantes para exportar con el filtro actual.');
+          return;
+        }
+        this.emitirListaExport(formato, items);
+      },
+      (err: unknown) => {
+        this.exportandoLista = false;
+        const e = err as { error?: { error?: string }; message?: string };
+        const msg = e?.error?.error || e?.message || 'Error al obtener el listado para exportar.';
+        this.toastError(msg);
+      }
+    );
+  }
+
+  private empresaPdfExport(): { logo: string; nombre: string; ruc: string; direccion: string; telefono: string } {
     const emp = this.empresa;
-    const empresaPdf = {
+    return {
       logo: emp?.logo ?? '',
       nombre: emp?.nombre ?? '',
       ruc: emp?.ruc ?? '',
       direccion: emp?.direccion ?? '',
       telefono: emp?.telefono ?? ''
     };
-    const datos = this.esGestora
-      ? this.ventasEmpresa.length > 0
+  }
+
+  private columnasExportComprobantes(incluirEmpresa: boolean): string[] {
+    return incluirEmpresa
+      ? ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT']
+      : ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'];
+  }
+
+  private filaExportComprobante(v: VentaListado, i: number, incluirEmpresa: boolean, paraPdf: boolean): (string | number)[] {
+    const total = paraPdf ? `S/ ${Number(v.total).toFixed(2)}` : Number(v.total);
+    const fila: (string | number)[] = [i + 1];
+    if (incluirEmpresa) fila.push((v.razonSocialEmpresa || '').trim() || '—');
+    fila.push(
+      this.formatearFecha(v.fEmision),
+      v.compVenta || '—',
+      this.etiquetaDocAfectadoListado(v),
+      v.clienteRuc || '—',
+      v.clienteRazonSocial || '—',
+      (v.condicionPago || '—').trim() || '—',
+      total,
+      this.etiquetaEstadoSunatListado(v)
+    );
+    return fila;
+  }
+
+  private emitirListaExport(formato: 'pdf' | 'excel', comprobantes?: VentaListado[]): void {
+    const usarAgrupadas = !comprobantes;
+    const incluirEmpresa = this.esGestora && !usarAgrupadas;
+    this.exportandoLista = true;
+
+    if (formato === 'pdf') {
+      const datos = usarAgrupadas
         ? {
-            empresa: empresaPdf,
-            titulo: 'Comprobantes (gestora y empresas gestionadas)',
-            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
-            filas: this.ventasEmpresa.map((v, i) => [
-              i + 1,
-              (v.razonSocialEmpresa || '').trim() || '—',
-              this.formatearFecha(v.fEmision),
-              v.compVenta || '—',
-              this.etiquetaDocAfectadoListado(v),
-              v.clienteRuc || '—',
-              v.clienteRazonSocial || '—',
-              (v.condicionPago || '—').trim() || '—',
-              `S/ ${Number(v.total).toFixed(2)}`,
-              this.etiquetaEstadoSunatListado(v)
-            ])
-          }
-        : {
-            empresa: empresaPdf,
+            empresa: this.empresaPdfExport(),
             titulo: 'Lista de Ventas Agrupadas',
             columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Condición', 'Sucursal', 'Total (S/)', 'Estado Pago'],
             filas: this.ventas.map((v, i) => [
@@ -1536,98 +1751,55 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
               this.estadoPagoLabel(v.idEstadoPago)
             ])
           }
-      : {
-          empresa: empresaPdf,
-          titulo: 'Lista de Ventas',
-          columnas: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
-          filas: this.ventasEmpresa.map((v, i) => [
-            i + 1,
-            this.formatearFecha(v.fEmision),
-            v.compVenta || '—',
-            this.etiquetaDocAfectadoListado(v),
-            v.clienteRuc || '—',
-            v.clienteRazonSocial || '—',
-            (v.condicionPago || '—').trim() || '—',
-            `S/ ${Number(v.total).toFixed(2)}`,
-            this.etiquetaEstadoSunatListado(v)
-          ])
-        };
-    this.exportandoLista = true;
-    this.pdfService.generarPdfDinamico(datos, 'lista-ventas', 9).subscribe({
-      next: (blob) => {
-        this.pdfService.previsualizar(blob);
-        this.exportandoLista = false;
-      },
-      error: (err) => {
-        this.exportandoLista = false;
-        const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
-        this.toastInfo(msg);
-      }
-    });
-  }
-
-  /** Descarga la lista actual (filtrada) de ventas en Excel. */
-  exportarListaExcel(): void {
-    if (this.esGestora && this.ventas.length === 0 && this.ventasEmpresa.length === 0) return;
-    if (!this.esGestora && this.ventasEmpresa.length === 0) return;
-    const datosExcel = this.esGestora
-      ? this.ventasEmpresa.length > 0
-        ? {
-            title: 'Comprobantes (gestora y gestionadas)',
-            filename: `ventas_${new Date().getTime()}`,
-            worksheetName: 'Ventas',
-            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
-            rows: this.ventasEmpresa.map((v, i) => [
-              i + 1,
-              (v.razonSocialEmpresa || '').trim() || '—',
-              this.formatearFecha(v.fEmision),
-              v.compVenta || '—',
-              this.etiquetaDocAfectadoListado(v),
-              v.clienteRuc || '—',
-              v.clienteRazonSocial || '—',
-              (v.condicionPago || '—').trim() || '—',
-              Number(v.total),
-              this.etiquetaEstadoSunatListado(v)
-            ])
-          }
         : {
-            title: 'Lista de Ventas Agrupadas',
-            filename: `ventas_${new Date().getTime()}`,
-            worksheetName: 'Ventas',
-            columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Condición', 'Sucursal', 'Total (S/)', 'Estado Pago'],
-            rows: this.ventas.map((v, i) => [
-              i + 1,
-              this.formatearFecha(v.fEmision),
-              v.idVentaAgrupada || '—',
-              v.clienteRuc || '—',
-              v.clienteRazonSocial || '—',
-              '—',
-              v.sucursal || '—',
-              Number(v.total),
-              this.estadoPagoLabel(v.idEstadoPago)
-            ])
-          }
-      : {
-          title: 'Lista de Ventas',
-          filename: `ventas_${new Date().getTime()}`,
+            empresa: this.empresaPdfExport(),
+            titulo: this.esGestora ? 'Comprobantes (gestora y empresas gestionadas)' : 'Lista de Ventas',
+            columnas: this.columnasExportComprobantes(incluirEmpresa),
+            filas: (comprobantes ?? []).map((v, i) => this.filaExportComprobante(v, i, incluirEmpresa, true))
+          };
+      this.pdfService.generarPdfDinamico(datos, 'lista-ventas', 9).subscribe({
+        next: (blob) => {
+          this.pdfService.previsualizar(blob);
+          this.exportandoLista = false;
+        },
+        error: (err) => {
+          this.exportandoLista = false;
+          const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
+          this.toastInfo(msg);
+        }
+      });
+      return;
+    }
+
+    const filename = `ventas_${new Date().getTime()}`;
+    const datosExcel = usarAgrupadas
+      ? {
+          title: 'Lista de Ventas Agrupadas',
+          filename,
           worksheetName: 'Ventas',
-          columns: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
-          rows: this.ventasEmpresa.map((v, i) => [
+          columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Condición', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+          rows: this.ventas.map((v, i) => [
             i + 1,
             this.formatearFecha(v.fEmision),
-            v.compVenta || '—',
-            this.etiquetaDocAfectadoListado(v),
+            v.idVentaAgrupada || '—',
             v.clienteRuc || '—',
             v.clienteRazonSocial || '—',
-            (v.condicionPago || '—').trim() || '—',
+            '—',
+            v.sucursal || '—',
             Number(v.total),
-            this.etiquetaEstadoSunatListado(v)
+            this.estadoPagoLabel(v.idEstadoPago)
           ])
+        }
+      : {
+          title: this.esGestora ? 'Comprobantes (gestora y gestionadas)' : 'Lista de Ventas',
+          filename,
+          worksheetName: 'Ventas',
+          columns: this.columnasExportComprobantes(incluirEmpresa),
+          rows: (comprobantes ?? []).map((v, i) => this.filaExportComprobante(v, i, incluirEmpresa, false))
         };
-    this.exportandoLista = true;
     this.excelService.generarExcel(datosExcel).subscribe({
       next: (blob) => {
-        this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`);
+        this.excelService.descargar(blob, `${filename}.xlsx`);
         this.exportandoLista = false;
       },
       error: (err) => {
