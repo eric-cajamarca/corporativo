@@ -131,11 +131,12 @@ async function insertarLote(transaction, payload) {
     .input('cantidadIngresada', sql.Decimal(18, 2), payload.cantidadIngresada)
     .input('cantidadDisponible', sql.Decimal(18, 2), payload.cantidadDisponible)
     .input('fechaVencimiento', sql.DateTime, payload.fechaVencimiento)
+    .input('fechaIngreso', sql.DateTime, payload.fechaIngreso || new Date())
     .input('numeroLote', sql.VarChar(50), payload.numeroLote)
     .query(`
-      INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, numeroLote)
+      INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, fechaIngreso, numeroLote)
       OUTPUT INSERTED.idLote
-      VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @numeroLote)
+      VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @fechaIngreso, @numeroLote)
     `);
   return r.recordset?.[0]?.idLote ?? null;
 }

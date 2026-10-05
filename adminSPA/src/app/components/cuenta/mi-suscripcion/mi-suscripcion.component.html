@@ -169,6 +169,43 @@
                   }
                 </div>
               }
+              @if (e.indicadoresOperativos; as op) {
+                <div class="pt-3 mt-3 border-top">
+                  <div class="small text-muted mb-2">Operación de ventas</div>
+                  <div class="d-flex justify-content-between small mb-2">
+                    <span>Notas de venta</span>
+                    <span class="fw-semibold">{{ op.notasVenta | number: '1.0-0' }}</span>
+                  </div>
+                  <div class="d-flex justify-content-between small mb-0">
+                    <span>Comprobantes sin enviar a SUNAT</span>
+                    <span
+                      class="fw-semibold"
+                      [class.text-warning]="op.comprobantesSinEnviarSunat > 0"
+                      [class.text-danger]="op.comprobantesSinEnviarSunat > 10">
+                      {{ op.comprobantesSinEnviarSunat | number: '1.0-0' }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else if (e.indicadoresOperativos; as op) {
+          <div class="card shadow-sm mb-3">
+            <div class="card-body">
+              <h2 class="h5 card-title">Operación de ventas</h2>
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Notas de venta</span>
+                <span class="fw-semibold">{{ op.notasVenta | number: '1.0-0' }}</span>
+              </div>
+              <div class="d-flex justify-content-between small mb-0">
+                <span>Comprobantes sin enviar a SUNAT</span>
+                <span
+                  class="fw-semibold"
+                  [class.text-warning]="op.comprobantesSinEnviarSunat > 0"
+                  [class.text-danger]="op.comprobantesSinEnviarSunat > 10">
+                  {{ op.comprobantesSinEnviarSunat | number: '1.0-0' }}
+                </span>
+              </div>
             </div>
           </div>
         }

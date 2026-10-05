@@ -7,7 +7,12 @@ const saasPlanLimitesService = require('./saasPlanLimites.service');
 const { construirAlertasPlan } = require('../utils/saasPlanAlertas.util');
 const saasContadorComprobantesSunatService = require('./saasContadorComprobantesSunat.service');
 
-async function obtenerMiEstado(pool, idEmpresa) {
+function esRolDuenoOSuper(rol) {
+  const r = String(rol || '').trim();
+  return r === 'Administrador' || r === 'superAdmin';
+}
+
+async function obtenerMiEstado(pool, idEmpresa, opciones = {}) {
   const deploymentMode = getDeploymentMode();
   const suscripcion = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
   const planCatalogo = suscripcion?.planCode
@@ -132,6 +137,19 @@ async function obtenerMiEstado(pool, idEmpresa) {
     }
   }
 
+  let indicadoresOperativos = null;
+  if (opciones.incluirIndicadoresOperativos === true) {
+    try {
+      indicadoresOperativos = await empresaSuscripcionUsoRepository.contarIndicadoresOperativos(
+        pool,
+        idEmpresa
+      );
+    } catch (errInd) {
+      console.error('contexto: obtenerMiEstado indicadores operativos', errInd);
+      indicadoresOperativos = { notasVenta: 0, comprobantesSinEnviarSunat: 0 };
+    }
+  }
+
   return {
     deploymentMode,
     suscripcion,
@@ -141,10 +159,12 @@ async function obtenerMiEstado(pool, idEmpresa) {
     checkoutsOrden,
     planPendiente: planPendienteResumen,
     billingCyclePendiente: suscripcion?.billingCyclePendiente || null,
-    downgradeAplicaEn: suscripcion?.planCodePendiente ? suscripcion.fechaFin || null : null
+    downgradeAplicaEn: suscripcion?.planCodePendiente ? suscripcion.fechaFin || null : null,
+    indicadoresOperativos
   };
 }
 
 module.exports = {
-  obtenerMiEstado
+  obtenerMiEstado,
+  esRolDuenoOSuper
 };

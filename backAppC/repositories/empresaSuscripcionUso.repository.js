@@ -119,6 +119,49 @@ async function contarComprobantesSunatDesdeTablas(pool, idEmpresa) {
   }
 }
 
+/**
+ * Conteos operativos para super usuario / dueño: notas de venta emitidas
+ * y comprobantes electrónicos pendientes de envío a SUNAT (estado 7).
+ */
+async function contarIndicadoresOperativos(pool, idEmpresa) {
+  if (!idEmpresa) {
+    return { notasVenta: 0, comprobantesSinEnviarSunat: 0 };
+  }
+  try {
+    const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+      SELECT
+        ISNULL((
+          SELECT COUNT(*)
+          FROM dbo.Ventas v
+          INNER JOIN dbo.Comprobantes c
+            ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+          WHERE v.idEmpresa = @idEmpresa
+            AND ISNULL(v.eliminado, 0) = 0
+            AND UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) = 'NV'
+        ), 0) AS notasVenta,
+        ISNULL((
+          SELECT COUNT(*)
+          FROM dbo.ComprobantesElectronicos ce
+          INNER JOIN dbo.Ventas v ON v.idVenta = ce.idVenta AND v.idEmpresa = ce.idEmpresa
+          WHERE ce.idEmpresa = @idEmpresa
+            AND ce.idEstadoSunat = 7
+            AND ce.tipoComprobante IN ('01', '03', '07', '08')
+            AND ISNULL(v.eliminado, 0) = 0
+        ), 0) AS comprobantesSinEnviarSunat
+    `);
+    const row = r.recordset && r.recordset[0] ? r.recordset[0] : {};
+    const notas = Number(row.notasVenta);
+    const pend = Number(row.comprobantesSinEnviarSunat);
+    return {
+      notasVenta: Number.isFinite(notas) ? Math.max(0, Math.floor(notas)) : 0,
+      comprobantesSinEnviarSunat: Number.isFinite(pend) ? Math.max(0, Math.floor(pend)) : 0
+    };
+  } catch (err) {
+    console.error('contexto: contarIndicadoresOperativos', err);
+    return { notasVenta: 0, comprobantesSinEnviarSunat: 0 };
+  }
+}
+
 async function obtenerMetricasOnboarding(pool, idEmpresa) {
   const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
     SELECT
@@ -157,5 +200,6 @@ module.exports = {
   contarProductosActivos,
   contarUso,
   contarComprobantesSunatDesdeTablas,
+  contarIndicadoresOperativos,
   obtenerMetricasOnboarding
 };

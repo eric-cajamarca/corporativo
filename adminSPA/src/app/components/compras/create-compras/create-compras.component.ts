@@ -271,7 +271,12 @@ export class CreateComprasComponent {
     this.error = '';
 
     const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = this.consultaForm.value;
-    const body: any = { proveedor, tipo_doc, serie, correlativo };
+    const body: { proveedor: string; tipo_doc: string; serie: string; correlativo: string; ruc?: string; usuario?: string; password?: string } = {
+      proveedor,
+      tipo_doc,
+      serie,
+      correlativo
+    };
     if (ruc) body.ruc = ruc;
     if (usuario) body.usuario = usuario;
     if (password) body.password = password;
@@ -383,7 +388,12 @@ export class CreateComprasComponent {
     if (this.consultaForm.invalid) return;
 
     const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = this.consultaForm.value;
-    const body: any = { proveedor, tipo_doc, serie, correlativo };
+    const body: { proveedor: string; tipo_doc: string; serie: string; correlativo: string; ruc?: string; usuario?: string; password?: string } = {
+      proveedor,
+      tipo_doc,
+      serie,
+      correlativo
+    };
     if (ruc) body.ruc = ruc;
     if (usuario) body.usuario = usuario;
     if (password) body.password = password;

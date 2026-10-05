@@ -58,6 +58,12 @@ export interface SuscripcionCheckoutOrdenResumen {
   fConfirmacion: string | null;
 }
 
+/** Super usuario / dueño: conteos operativos (no son límites del plan). */
+export interface IndicadoresOperativosEmpresa {
+  notasVenta: number;
+  comprobantesSinEnviarSunat: number;
+}
+
 export interface MiEstadoSuscripcionResponse {
   deploymentMode: string;
   suscripcion: SuscripcionEmpresaRow | null;
@@ -69,6 +75,8 @@ export interface MiEstadoSuscripcionResponse {
   planPendiente?: PlanSuscripcionResumen | null;
   billingCyclePendiente?: string | null;
   downgradeAplicaEn?: string | null;
+  /** Solo super usuario o dueño (Administrador). */
+  indicadoresOperativos?: IndicadoresOperativosEmpresa | null;
 }
 
 export interface DowngradeProgramadoResponse {

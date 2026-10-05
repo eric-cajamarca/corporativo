@@ -748,8 +748,17 @@ export class CreatePreciosComponent implements OnInit {
     if (!raw) {
       return 0;
     }
-    const t = Date.parse(String(raw).replace(' ', 'T'));
-    return Number.isFinite(t) ? t : 0;
+    const s = String(raw).trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
+    const t = Date.parse(s.replace(' ', 'T'));
+    if (!Number.isFinite(t)) {
+      return 0;
+    }
+    const d = new Date(t);
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
   private diasDesdeIngreso(producto: ProductoPreciosFila): number | null {
@@ -757,11 +766,10 @@ export class CreatePreciosComponent implements OnInit {
     if (!ms) {
       return null;
     }
-    const ingreso = new Date(ms);
     const hoy = new Date();
-    const utcIngreso = Date.UTC(ingreso.getFullYear(), ingreso.getMonth(), ingreso.getDate());
     const utcHoy = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    return Math.floor((utcHoy - utcIngreso) / 86400000);
+    const d = Math.floor((utcHoy - ms) / 86400000);
+    return d < 0 ? 0 : d;
   }
 
   private estaEnRangoIngreso(producto: ProductoPreciosFila, dias: number): boolean {

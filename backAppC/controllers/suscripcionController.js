@@ -81,7 +81,11 @@ const miEstado = async (req, res) => {
     if (!idEmpresa) {
       return res.status(401).json({ message: 'No autorizado' });
     }
-    const data = await withPool((pool) => empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa));
+    const data = await withPool((pool) =>
+      empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa, {
+        incluirIndicadoresOperativos: empresaSuscripcionEstadoService.esRolDuenoOSuper(req.user?.rol)
+      })
+    );
     res.status(200).json({ data });
   } catch (error) {
     console.error('miEstado:', error);
@@ -105,7 +109,11 @@ const usoPlanEmpresa = async (req, res) => {
     if (!GUID_EMPRESA_RE.test(idEmpresa)) {
       return res.status(400).json({ message: 'idEmpresa inválido' });
     }
-    const data = await withPool((pool) => empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa));
+    const data = await withPool((pool) =>
+      empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa, {
+        incluirIndicadoresOperativos: true
+      })
+    );
     res.status(200).json({ data });
   } catch (error) {
     console.error('usoPlanEmpresa:', error);

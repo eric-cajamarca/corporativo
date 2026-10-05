@@ -357,6 +357,22 @@
   margin-left: 0.75rem;
 }
 
+.ge-uso-ops {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--ge-line);
+  border-radius: 10px;
+  background: var(--ge-soft);
+}
+
+.ge-uso-ops-row + .ge-uso-ops-row {
+  margin-top: 0.45rem;
+}
+
+.ge-uso-ops-row span:last-child {
+  font-variant-numeric: tabular-nums;
+  margin-left: 0.75rem;
+}
+
 @media (max-width: 575.98px) {
   .ge-uso-btn-label {
     display: none;

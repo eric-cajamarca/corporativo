@@ -210,6 +210,7 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
       tipoProducto: producto.tipoProducto,
       fProduccion: producto.fProduccion,
       fVencimiento: producto.fVencimiento,
+      fechaIngreso: producto.fechaIngreso || null,
       estado: !!(producto.estado === true || producto.estado === 1),
       precios: preciosProducto,
       aliasEmpresa: producto.aliasEmpresa || '',
@@ -288,7 +289,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             p.tipoProducto,
             p.fProduccion,
             p.fVencimiento,
-            CONVERT(VARCHAR(19), p.FIngreso, 120) AS fechaIngreso,
+            CONVERT(VARCHAR(19), ISNULL(ul.fechaIngreso, p.FIngreso), 120) AS fechaIngreso,
             p.estado,
             ISNULL(e.alias, e.nombreComercial) as aliasEmpresa,
             e.razon_Social as razonSocialEmpresa,
@@ -312,7 +313,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
         INNER JOIN Empresas e ON ss.idEmpresa = e.idEmpresa
         OUTER APPLY (
-          SELECT TOP 1 l.idLote, l.costoUnitario
+          SELECT TOP 1 l.idLote, l.costoUnitario, l.fechaIngreso
           FROM Lotes l
           WHERE l.idEmpresa = ss.idEmpresa
             AND l.idProducto = ss.idProducto
