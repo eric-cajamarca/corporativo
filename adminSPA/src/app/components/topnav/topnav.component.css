@@ -181,6 +181,13 @@
   white-space: nowrap;
 }
 
+@media (max-width: 767.98px) {
+  .tipo-cambio-badge {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+}
+
 /* Dropdown tipo de cambio del mes */
 .tc-mes-dropdown {
   min-width: 320px;

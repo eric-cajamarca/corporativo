@@ -14,6 +14,11 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { GestoresService, ConfiguracionEmpresa } from '../../../services/gestores.service';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import {
+  CODIGO_COMPROBANTE_VENTA_DEFECTO,
+  OPCIONES_COMPROBANTE_VENTA_DEFECTO,
+  normalizarCodigoComprobantePorDefecto
+} from '../../../utils/pos-validacion.util';
 import { PermisosService } from '../../../services/permisos.service';
 import { planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../../../config/saas-plan-reglas.util';
 import { CuentasBancariasService } from '../../../services/cuentas-bancarias.service';
@@ -127,9 +132,12 @@ export class IndexConfiguracionComponent implements OnInit {
     /** En Ventas → Matizador se crean las fórmulas; en la venta solo se jalan */
     usarMatizado: false,
     /** Cargo que se suma al precio de la lata */
-    cargoMatizado: 0
+    cargoMatizado: 0,
+    /** Código SUNAT/interno del comprobante que se preselecciona en POS (03 boleta, 01 factura, NV). */
+    comprobanteCodigoPorDefecto: CODIGO_COMPROBANTE_VENTA_DEFECTO
   };
   public ventasGuardando = false;
+  public comprobantesVentaOpciones: Array<{ codigo: string; nombre: string }> = [...OPCIONES_COMPROBANTE_VENTA_DEFECTO];
 
   /** CRUD CuentasBancarias (empresa del token JWT) */
   cuentasBancarias: CuentaBancaria[] = [];
@@ -706,8 +714,50 @@ export class IndexConfiguracionComponent implements OnInit {
         );
         const cargoRaw = Number(getVal('VENTAS_CARGO_MATIZADO', '0'));
         this.ventas.cargoMatizado = Number.isFinite(cargoRaw) && cargoRaw >= 0 ? cargoRaw : 0;
+        this.ventas.comprobanteCodigoPorDefecto = normalizarCodigoComprobantePorDefecto(
+          getVal('VENTAS_COMPROBANTE_CODIGO_POR_DEFECTO', CODIGO_COMPROBANTE_VENTA_DEFECTO)
+        );
+        this.cargarOpcionesComprobanteDefecto();
       },
-      error: () => {}
+      error: () => {
+        this.cargarOpcionesComprobanteDefecto();
+      }
+    });
+  }
+
+  /** Combina boleta/factura/NV con otros códigos de venta que tenga la empresa. */
+  private cargarOpcionesComprobanteDefecto(): void {
+    this._comprobanteService.obtenerComprobantesVenta().subscribe({
+      next: (response) => {
+        const vistos = new Set(OPCIONES_COMPROBANTE_VENTA_DEFECTO.map((o) => o.codigo.toUpperCase()));
+        const extras: Array<{ codigo: string; nombre: string }> = [];
+        for (const c of response?.data ?? []) {
+          const codigo = String(c?.codigo ?? '').trim();
+          if (!codigo || vistos.has(codigo.toUpperCase())) {
+            continue;
+          }
+          vistos.add(codigo.toUpperCase());
+          extras.push({
+            codigo,
+            nombre: String(c?.nombre ?? codigo).trim() || codigo
+          });
+        }
+        this.comprobantesVentaOpciones = [...OPCIONES_COMPROBANTE_VENTA_DEFECTO, ...extras];
+        const actual = normalizarCodigoComprobantePorDefecto(this.ventas.comprobanteCodigoPorDefecto);
+        const existe = this.comprobantesVentaOpciones.some(
+          (o) => o.codigo.toUpperCase() === actual.toUpperCase()
+        );
+        if (!existe) {
+          this.comprobantesVentaOpciones = [
+            ...this.comprobantesVentaOpciones,
+            { codigo: actual, nombre: `Código ${actual}` }
+          ];
+        }
+        this.ventas.comprobanteCodigoPorDefecto = actual;
+      },
+      error: () => {
+        this.comprobantesVentaOpciones = [...OPCIONES_COMPROBANTE_VENTA_DEFECTO];
+      }
     });
   }
 
@@ -949,6 +999,12 @@ export class IndexConfiguracionComponent implements OnInit {
         valor: String(this.ventas.cargoMatizado ?? 0),
         descripcion: 'Monto que se suma al precio de la lata cuando hay matizado',
         tipoDato: 'NUMBER'
+      },
+      {
+        clave: 'VENTAS_COMPROBANTE_CODIGO_POR_DEFECTO',
+        valor: normalizarCodigoComprobantePorDefecto(this.ventas.comprobanteCodigoPorDefecto),
+        descripcion: 'Código de comprobante preseleccionado en venta rápida y nueva venta (03, 01 o NV)',
+        tipoDato: 'STRING'
       }
     ];
     this._gestoresService.guardarConfiguracion(configs).subscribe({

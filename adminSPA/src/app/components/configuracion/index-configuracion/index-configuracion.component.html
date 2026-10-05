@@ -525,6 +525,22 @@
             <div class="card-body">
               <form>
                 <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="comprobanteCodigoPorDefecto" class="form-label">Comprobante por defecto</label>
+                    <select
+                      class="form-select"
+                      id="comprobanteCodigoPorDefecto"
+                      name="comprobanteCodigoPorDefecto"
+                      [(ngModel)]="ventas.comprobanteCodigoPorDefecto">
+                      @for (op of comprobantesVentaOpciones; track op.codigo) {
+                        <option [value]="op.codigo">{{ op.nombre }} ({{ op.codigo }})</option>
+                      }
+                    </select>
+                    <small class="text-muted">
+                      Se preselecciona en <strong>Venta rápida</strong> y <strong>Nueva venta</strong>.
+                      Hasta que lo cambie, se usa boleta electrónica (03).
+                    </small>
+                  </div>
                   <div class="col-md-6 d-flex align-items-center">
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="permitirCreditos" [(ngModel)]="ventas.permitirCreditos" name="permitirCreditos">

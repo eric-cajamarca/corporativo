@@ -147,8 +147,13 @@ exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucu
 
   const fetchConUnidades = async () => {
     const rows = await fetchFn();
-    const productoUnidadVentaService = require('./productoUnidadVenta.service');
-    return productoUnidadVentaService.adjuntarUnidadesAProductos(pool, user.empresa, rows);
+    try {
+      const productoUnidadVentaService = require('./productoUnidadVenta.service');
+      return await productoUnidadVentaService.adjuntarUnidadesAProductos(pool, user.empresa, rows);
+    } catch (error) {
+      console.error('buscarProductosVentaService adjuntarUnidades:', error);
+      return rows;
+    }
   };
 
   if (skipCache) {

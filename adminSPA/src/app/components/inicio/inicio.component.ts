@@ -429,6 +429,14 @@ export class InicioComponent implements OnInit, OnDestroy {
     });
   }
 
+  get hayDetalleOperativoHoy(): boolean {
+    const r = this.resumenDiario;
+    if (!r) {
+      return false;
+    }
+    return (r.ventasPorMedioPago?.length ?? 0) > 0 || r.comprasDia > 0 || (r.enviosManana?.length ?? 0) > 0;
+  }
+
   /** Etiqueta legible de la fecha del resumen diario */
   get etiquetaFechaResumen(): string {
     if (!this.resumenDiario?.fecha) return 'Hoy';

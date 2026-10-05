@@ -650,9 +650,104 @@ exports.buscarProductosVentaRepo = async (
 
     return await combinarRecordsetConPrecios(pool, ids, filas, idsProducto);
   } catch (error) {
-    throw new Error(`Repository Error: ${error.message}`);
+    console.error('buscarProductosVentaRepo:', error);
+    try {
+      return await buscarProductosVentaFallbackRepo(
+        pool,
+        idsEmpresa,
+        tokensBusqueda,
+        limite,
+        idsSucursalesFiltro,
+        idSucursalVenta
+      );
+    } catch (fallbackError) {
+      console.error('buscarProductosVentaRepo fallback:', fallbackError);
+      throw new Error(`Repository Error: ${error.message}`);
+    }
   }
 };
+
+/** Búsqueda mínima (sin stock por lote) si la consulta principal falla. */
+async function buscarProductosVentaFallbackRepo(
+  pool,
+  idsEmpresa,
+  tokensBusqueda,
+  limite,
+  idsSucursalesFiltro,
+  idSucursalVenta
+) {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  if (ids.length === 0) return [];
+  const tokens = (tokensBusqueda || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 4);
+  if (tokens.length === 0) return [];
+  const top = Math.min(100, Math.max(1, parseInt(limite, 10) || 80));
+
+  const req = pool.request();
+  req.input('limite', sql.Int, top);
+  const inClauseEmp = construirInClause(req, ids, 'idEmpFb');
+  const conds = [];
+  tokens.forEach((tok, i) => {
+    const p = `bf${i}`;
+    req.input(p, sql.NVarChar(120), `%${String(tok).replace(/[%_[\]]/g, '')}%`);
+    conds.push(`(
+      p.codigo LIKE @${p} OR
+      p.descripcion LIKE @${p} OR
+      m.nombre LIKE @${p} OR
+      c.nombre LIKE @${p}
+    )`);
+  });
+  const filtroBusq = conds.length ? ` AND (${conds.join(' AND ')}) ` : '';
+  const sucFilt = (idsSucursalesFiltro || []).filter(Boolean);
+  const inSucClause = sucFilt.length > 0 ? construirInClause(req, sucFilt, 'idSucFb') : null;
+  let filtroSuc = inSucClause ? ` AND defFb.idSucursal IN (${inSucClause}) ` : '';
+  if (idSucursalVenta) {
+    req.input('idSucursalVentaFb', sql.UniqueIdentifier, idSucursalVenta);
+    filtroSuc += ' AND defFb.idSucursal = @idSucursalVentaFb ';
+  }
+
+  const result = await req.query(`
+    SELECT TOP (@limite)
+      p.idProducto,
+      p.idEmpresa,
+      p.codigo,
+      p.idCategoria,
+      c.nombre AS categoria,
+      p.descripcion,
+      ISNULL(p.permiteDescripcionEnVenta, 0) AS permiteDescripcionEnVenta,
+      p.idMarca,
+      m.nombre AS marca,
+      p.idPresentacion,
+      pr.codigo AS codigoPresentacion,
+      pr.descripcion AS descripcionPres,
+      defFb.idSucursal,
+      s.nombre AS sucursal,
+      p.cUnitario,
+      p.tipoProducto,
+      p.estado,
+      CAST(0 AS DECIMAL(18, 3)) AS stock
+    FROM Productos p
+    INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
+    INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+    INNER JOIN Marcas m ON p.idMarca = m.idMarca
+    CROSS APPLY (
+      SELECT TOP 1 su.idSucursal
+      FROM Sucursal su
+      WHERE su.idEmpresa = p.idEmpresa
+        AND ISNULL(su.estado, 1) = 1
+      ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+    ) defFb
+    INNER JOIN Sucursal s ON s.idSucursal = defFb.idSucursal AND ISNULL(s.estado, 1) = 1
+    WHERE p.idEmpresa IN (${inClauseEmp})
+      AND ISNULL(p.estado, 1) = 1
+      ${filtroBusq}
+      ${filtroSuc}
+    ORDER BY p.descripcion, p.codigo
+  `);
+
+  const filas = result.recordset || [];
+  const idsProducto = [...new Set(filas.map((r) => r.idProducto).filter(Boolean))];
+  return combinarRecordsetConPrecios(pool, ids, filas, idsProducto);
+}
 // exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
 //   try {
 //     const result = await pool

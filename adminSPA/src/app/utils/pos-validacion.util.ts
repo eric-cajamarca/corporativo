@@ -53,6 +53,44 @@ export function codigoComprobanteDesdeLista(
   return String(comp?.codigo ?? '').trim();
 }
 
+/** Boleta electrónica: valor de fábrica hasta que la empresa configure otro. */
+export const CODIGO_COMPROBANTE_VENTA_DEFECTO = '03';
+
+export const OPCIONES_COMPROBANTE_VENTA_DEFECTO: Array<{ codigo: string; nombre: string }> = [
+  { codigo: '03', nombre: 'Boleta electrónica' },
+  { codigo: '01', nombre: 'Factura electrónica' },
+  { codigo: 'NV', nombre: 'Nota de venta' }
+];
+
+export function normalizarCodigoComprobantePorDefecto(valor?: string | null): string {
+  const raw = String(valor ?? '').trim();
+  if (!raw) {
+    return CODIGO_COMPROBANTE_VENTA_DEFECTO;
+  }
+  return raw.toUpperCase() === 'NV' ? 'NV' : raw;
+}
+
+/** Elige el comprobante de venta por código de empresa; si no existe, boleta 03 y luego el primero. */
+export function elegirComprobantePorCodigoDefecto<T extends { codigo?: string; idComprobante?: string | number }>(
+  comprobantes: T[] | null | undefined,
+  codigoPreferido?: string | null
+): T | undefined {
+  if (!Array.isArray(comprobantes) || comprobantes.length === 0) {
+    return undefined;
+  }
+  const pref = normalizarCodigoComprobantePorDefecto(codigoPreferido).toUpperCase();
+  const porPref = comprobantes.find(
+    (c) => String(c.codigo ?? '').trim().toUpperCase() === pref
+  );
+  if (porPref) {
+    return porPref;
+  }
+  const boleta = comprobantes.find(
+    (c) => String(c.codigo ?? '').trim() === CODIGO_COMPROBANTE_VENTA_DEFECTO
+  );
+  return boleta ?? comprobantes[0];
+}
+
 /** Reglas SUNAT mínimas antes de cobrar (factura/boleta). */
 export function validarClienteSunatParaComprobante(input: {
   codigoComprobante: string;

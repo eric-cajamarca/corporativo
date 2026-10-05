@@ -81,8 +81,11 @@ import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import {
   PosAlertaTemprana,
+  CODIGO_COMPROBANTE_VENTA_DEFECTO,
   codigoComprobanteDesdeLista,
   construirAlertaValidacionTemprana,
+  elegirComprobantePorCodigoDefecto,
+  normalizarCodigoComprobantePorDefecto,
   validarClienteSunatParaComprobante,
   validarStockLinea
 } from '../../../utils/pos-validacion.util';
@@ -222,6 +225,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Config empresa: si false, no acumular descuentos por diferencia de precio y el backend guarda descuentos 0. */
   usarDescuentoEnTotal = true;
+  /** Código de comprobante configurado por empresa (03 boleta hasta que se cambie). */
+  codigoComprobantePorDefecto = CODIGO_COMPROBANTE_VENTA_DEFECTO;
 
   /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
   private descuentoEnTotalConfigListo = false;
@@ -450,8 +455,19 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
             ? (itemPermNeg as { valor?: string; Valor?: string }).valor
             : (itemPermNeg as { valor?: string; Valor?: string })?.Valor;
         this.permitirVentasNegativas = interpretarBooleanoConfig(vPermNeg, false);
+        const itemCompDef = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_COMPROBANTE_CODIGO_POR_DEFECTO'
+        );
+        const vCompDef =
+          itemCompDef && (itemCompDef as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemCompDef as { valor?: string; Valor?: string }).valor
+            : (itemCompDef as { valor?: string; Valor?: string })?.Valor;
+        this.codigoComprobantePorDefecto = normalizarCodigoComprobantePorDefecto(vCompDef);
         this.descuentoEnTotalConfigListo = true;
         this.actualizaTotales();
+        if (this.carrito.length === 0) {
+          this.aplicarDefaultsVentaRapida({ forzarComprobante: true });
+        }
       },
       error: () => {
         this.descuentoEnTotalConfigListo = true;
@@ -567,18 +583,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.ventaProvisionalUi.abrirModalRecuperar();
   }
 
-  /** Boleta, contado, efectivo y cliente varios cuando el catálogo ya cargó. */
-  aplicarDefaultsVentaRapida(): void {
-    if (!this.ventas.idComprobante && this.comprobantes?.length) {
-      const boleta = this.comprobantes.find(
-        (c: { codigo?: string }) => String(c.codigo ?? '').trim() === '03'
-      );
-      const elegido = boleta ?? this.comprobantes[0];
-      if (elegido?.idComprobante != null) {
-        this.ventas.idComprobante = elegido.idComprobante;
-        this.cargarDatosComprobantePorId(elegido.idComprobante);
-      }
-    }
+  /** Comprobante configurado, contado, efectivo y cliente varios cuando el catálogo ya cargó. */
+  aplicarDefaultsVentaRapida(opciones?: { forzarComprobante?: boolean }): void {
+    this.asegurarComprobantePorDefecto(opciones?.forzarComprobante === true);
     if (this.ventas.idEstadoPago == null || this.ventas.idEstadoPago === '') {
       this.ventas.idEstadoPago = this.configDefaults.idEstadoPagoPorDefecto ?? 2;
     }
@@ -597,6 +604,31 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     }
     if (!this.ventas.fEmision) {
       this.ventas.fEmision = getFechaHoyLocal();
+    }
+  }
+
+  private asegurarComprobantePorDefecto(forzarCodigoConfigurado = false): void {
+    if (!this.comprobantes?.length) {
+      return;
+    }
+    const idActual = this.ventas.idComprobante;
+    const sigueEnLista =
+      idActual != null &&
+      idActual !== '' &&
+      this.comprobantes.some((c: { idComprobante?: string | number }) => String(c.idComprobante) === String(idActual));
+    if (sigueEnLista && !forzarCodigoConfigurado) {
+      return;
+    }
+    if (sigueEnLista && forzarCodigoConfigurado) {
+      const codActual = codigoComprobanteDesdeLista(this.comprobantes, idActual);
+      if (codActual.toUpperCase() === this.codigoComprobantePorDefecto.toUpperCase()) {
+        return;
+      }
+    }
+    const elegido = elegirComprobantePorCodigoDefecto(this.comprobantes, this.codigoComprobantePorDefecto);
+    if (elegido?.idComprobante != null) {
+      this.ventas.idComprobante = elegido.idComprobante;
+      this.cargarDatosComprobantePorId(elegido.idComprobante);
     }
   }
 
@@ -1302,6 +1334,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this._comprobanteService.obtenerComprobantesVenta(this.ventas.idSucursal).subscribe({
       next: (response) => {
         this.comprobantes = response.data || [];
+        this.aplicarDefaultsVentaRapida();
       },
       error: () => {}
     });
@@ -1730,6 +1763,18 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   private manejarErrorBusquedaInline(err: { error?: { message?: string } }): void {
     this.buscadorInlineBuscando = false;
+    const term = this.searchTermInline.trim();
+    const memoria = this._productoService.filtrarListaMemoriaVenta(term, this.buscadorLimiteFilas);
+    if (memoria && memoria.length) {
+      this.procesarRespuestaBusquedaInline({ data: memoria }, false);
+      return;
+    }
+    if (this.catalogoBusquedaInline.length > 0) {
+      this.filtrarBusquedaInlineLocal(term);
+      if (this.productosBusquedaInline.length > 0) {
+        return;
+      }
+    }
     this.productosBusquedaInline = [];
     this.buscadorInlineMensaje = err?.error?.message || 'Error al buscar productos.';
   }
@@ -4232,13 +4277,15 @@ abrirModalPrecios(item: any) {
     this.vuelto = 0;
     this.saldoFavorCliente = 0;
 
+    const sucursalActual = this.ventas.idSucursal || this.ultimaSucursalSeleccionada || '';
+
     // Reset modal comprobante (estado pedido y pago según configuración)
     this.ventas = {
       compVenta: '0000-00000000',
       idComprobante: '',
       serie: '0000',
       numero: '00000000',
-      idSucursal: '',
+      idSucursal: sucursalActual,
       idCliente: '',
       idDocumento: '',
       idMoneda: 1,
@@ -4287,6 +4334,7 @@ abrirModalPrecios(item: any) {
     this.actualizaTotales();
     this._productoService.limpiarCacheListaProductos();
     this.enfocarEscanner();
+    setTimeout(() => this.aplicarDefaultsVentaRapida({ forzarComprobante: true }), 150);
   }
 }
 

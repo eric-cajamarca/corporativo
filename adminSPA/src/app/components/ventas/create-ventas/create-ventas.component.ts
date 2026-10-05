@@ -84,8 +84,11 @@ import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
 import {
   PosAlertaTemprana,
+  CODIGO_COMPROBANTE_VENTA_DEFECTO,
   codigoComprobanteDesdeLista,
   construirAlertaValidacionTemprana,
+  elegirComprobantePorCodigoDefecto,
+  normalizarCodigoComprobantePorDefecto,
   validarClienteSunatParaComprobante,
   validarStockLinea
 } from '../../../utils/pos-validacion.util';
@@ -217,6 +220,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Config empresa: si false, no acumular descuentos por diferencia de precio y el backend guarda descuentos 0. */
   usarDescuentoEnTotal = true;
+  /** Código de comprobante configurado por empresa (03 boleta hasta que se cambie). */
+  codigoComprobantePorDefecto = CODIGO_COMPROBANTE_VENTA_DEFECTO;
 
   /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
   private descuentoEnTotalConfigListo = false;
@@ -453,8 +458,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
             ? (itemPermNeg as { valor?: string; Valor?: string }).valor
             : (itemPermNeg as { valor?: string; Valor?: string })?.Valor;
         this.permitirVentasNegativas = interpretarBooleanoConfig(vPermNeg, false);
+        this.codigoComprobantePorDefecto = normalizarCodigoComprobantePorDefecto(
+          getVal('VENTAS_COMPROBANTE_CODIGO_POR_DEFECTO', CODIGO_COMPROBANTE_VENTA_DEFECTO)
+        );
         this.descuentoEnTotalConfigListo = true;
         this.actualizaTotales();
+        if (this.carrito.length === 0) {
+          this.aplicarDefaultsNuevaVenta({ forzarComprobante: true });
+        }
       },
       error: () => {
         this.descuentoEnTotalConfigListo = true;
@@ -1159,19 +1170,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /**
-   * Igual que venta rápida: boleta (03), contado, fecha hoy y cliente varios (DNI 00000000).
+   * Igual que venta rápida: comprobante configurado (boleta 03 de fábrica), contado, fecha hoy y cliente varios.
    */
-  aplicarDefaultsNuevaVenta(): void {
-    if (!this.ventas.idComprobante && this.comprobantes?.length) {
-      const boleta = this.comprobantes.find(
-        (c: { codigo?: string }) => String(c.codigo ?? '').trim() === '03'
-      );
-      const elegido = boleta ?? this.comprobantes[0];
-      if (elegido?.idComprobante != null) {
-        this.ventas.idComprobante = elegido.idComprobante;
-        this.cargarDatosComprobantePorId(elegido.idComprobante);
-      }
-    }
+  aplicarDefaultsNuevaVenta(opciones?: { forzarComprobante?: boolean }): void {
+    this.asegurarComprobantePorDefecto(opciones?.forzarComprobante === true);
     if (this.ventas.idEstadoPago == null || this.ventas.idEstadoPago === '') {
       this.ventas.idEstadoPago = this.configDefaults.idEstadoPagoPorDefecto ?? 2;
     }
@@ -1190,6 +1192,31 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (!this.ventas.fEmision) {
       this.ventas.fEmision = getFechaHoyLocal();
+    }
+  }
+
+  private asegurarComprobantePorDefecto(forzarCodigoConfigurado = false): void {
+    if (!this.comprobantes?.length) {
+      return;
+    }
+    const idActual = this.ventas.idComprobante;
+    const sigueEnLista =
+      idActual != null &&
+      idActual !== '' &&
+      this.comprobantes.some((c: { idComprobante?: string | number }) => String(c.idComprobante) === String(idActual));
+    if (sigueEnLista && !forzarCodigoConfigurado) {
+      return;
+    }
+    if (sigueEnLista && forzarCodigoConfigurado) {
+      const codActual = codigoComprobanteDesdeLista(this.comprobantes, idActual);
+      if (codActual.toUpperCase() === this.codigoComprobantePorDefecto.toUpperCase()) {
+        return;
+      }
+    }
+    const elegido = elegirComprobantePorCodigoDefecto(this.comprobantes, this.codigoComprobantePorDefecto);
+    if (elegido?.idComprobante != null) {
+      this.ventas.idComprobante = elegido.idComprobante;
+      this.cargarDatosComprobantePorId(elegido.idComprobante);
     }
   }
 
@@ -4176,13 +4203,15 @@ abrirModalPrecios(item: any) {
     this.pagaCon = 0;
     this.vuelto = 0;
 
+    const sucursalActual = this.ventas.idSucursal || this.ultimaSucursalSeleccionada || '';
+
     // Reset modal comprobante (estado pedido y pago según configuración)
     this.ventas = {
       compVenta: '0000-00000000',
       idComprobante: '',
       serie: '0000',
       numero: '00000000',
-      idSucursal: '',
+      idSucursal: sucursalActual,
       idCliente: '',
       idDocumento: '',
       idMoneda: 1,
@@ -4233,7 +4262,7 @@ abrirModalPrecios(item: any) {
 
     this.actualizaTotales();
     this._productoService.limpiarCacheListaProductos();
-    setTimeout(() => this.aplicarDefaultsNuevaVenta(), 150);
+    setTimeout(() => this.aplicarDefaultsNuevaVenta({ forzarComprobante: true }), 150);
   }
 }
 

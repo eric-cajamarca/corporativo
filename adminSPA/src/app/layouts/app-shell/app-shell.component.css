@@ -38,3 +38,9 @@
     padding: 16px;
   }
 }
+
+/* Venta rápida: la barra de acciones queda pegada al topnav. */
+.main-content:has(app-create-venta-rapida),
+.main-content.sidebar-collapsed:has(app-create-venta-rapida) {
+  padding: 0;
+}

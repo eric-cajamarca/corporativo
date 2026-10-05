@@ -12,9 +12,9 @@
     </div>
 
     <div class="pos-topbar-total venta-rapida-total">
-      <span class="text-muted small">Total</span>
+      <span class="text-muted small d-none d-lg-inline">Total</span>
       <span class="pos-topbar-total-monto text-success">S/ {{ ventas.total | number:'1.2-2' }}</span>
-      <span class="text-muted small d-none d-sm-inline" *ngIf="carrito.length">
+      <span class="text-muted small d-none d-xl-inline" *ngIf="carrito.length">
         ({{ carrito.length }} ítem{{ carrito.length === 1 ? '' : 's' }})
       </span>
     </div>
@@ -42,10 +42,12 @@
         title="Cobrar (F4)">
         <i class="bi bi-cash-stack me-1"></i>{{ loading ? '...' : 'Cobrar' }}
       </button>
+      <!--
       <a class="btn btn-sm btn-outline-secondary" routerLink="/ventas/create" title="Ir a venta completa">
         <i class="bi bi-receipt"></i>
-        <span class="d-none d-md-inline ms-1">Venta completa</span>
+        <span class="d-none d-xl-inline ms-1">Venta completa</span>
       </a>
+      -->
     </div>
   </div>
 </header>
@@ -54,19 +56,16 @@
   <div class="app-container">
     <div class="container-fluid py-3">
       <div
-        *ngIf="alertaValidacionTemprana"
-        class="alert py-2 mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
-        [class.alert-success]="alertaValidacionTemprana.tipo === 'ok'"
+        *ngIf="alertaValidacionTemprana && alertaValidacionTemprana.tipo !== 'ok'"
+        class="alert py-2 mb-2 d-flex flex-wrap align-items-center gap-2"
         [class.alert-warning]="alertaValidacionTemprana.tipo === 'warning'"
         [class.alert-danger]="alertaValidacionTemprana.tipo === 'danger'">
         <span class="small mb-0">{{ alertaValidacionTemprana.mensaje }}</span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mostrarAyudaAtajosPos = !mostrarAyudaAtajosPos">
-          F1 Atajos
-        </button>
       </div>
       <div *ngIf="mostrarAyudaAtajosPos" class="alert alert-light border mb-2 py-2">
         <div class="small fw-semibold mb-1">Atajos de teclado POS</div>
         <div class="small text-muted d-flex flex-wrap gap-3">
+          <span><kbd>F1</kbd> Atajos</span>
           <span><kbd>F2</kbd> Búsqueda</span>
           <span><kbd>F4</kbd> Cobrar</span>
           <span><kbd>F8</kbd> Cliente</span>
@@ -190,15 +189,19 @@
                 </button>
               </div>
               
-              <p *ngIf="buscadorInlineMensaje" class="small text-muted mb-2">{{ buscadorInlineMensaje }}</p>
-              <div *ngIf="buscadorInlineBuscando" class="text-center py-2">
-                <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-                <span class="ms-2 small text-muted">Buscando…</span>
-              </div>
-              <div
-                *ngIf="!buscadorInlineBuscando && productosBusquedaInline.length > 0"
-                class="table-responsive venta-rapida-busqueda-wrap">
-                <table class="table table-sm table-hover align-middle mb-0 venta-rapida-busqueda-table">
+              <div class="table-responsive venta-rapida-busqueda-wrap">
+                <div *ngIf="buscadorInlineBuscando" class="venta-rapida-busqueda-vacio">
+                  <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                  <span class="ms-2">Buscando…</span>
+                </div>
+                <div
+                  *ngIf="!buscadorInlineBuscando && productosBusquedaInline.length === 0"
+                  class="venta-rapida-busqueda-vacio">
+                  {{ buscadorInlineMensaje || 'Escriba para buscar productos.' }}
+                </div>
+                <table
+                  *ngIf="!buscadorInlineBuscando && productosBusquedaInline.length > 0"
+                  class="table table-sm table-hover align-middle mb-0 venta-rapida-busqueda-table">
                   <thead class="table-light">
                     <tr>
                       <th *ngIf="esGestora">Empresa</th>

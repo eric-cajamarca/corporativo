@@ -26,8 +26,8 @@
           class="tipo-cambio-badge"
           (click)="toggleTipoCambioDropdown()"
           aria-expanded="showTipoCambioDropdown">
-          <span class="tc-label">TC:</span>
-          <span class="tc-valores">Compra {{tipoCambio.compra | number:'1.2-3'}} | Venta {{tipoCambio.venta | number:'1.2-3'}}</span>
+          <span class="tc-label">TC</span>
+          <span class="tc-valores d-none d-md-inline">: Compra {{tipoCambio.compra | number:'1.2-3'}} | Venta {{tipoCambio.venta | number:'1.2-3'}}</span>
           <i class="fas fa-chevron-down ms-1" style="font-size: 0.65rem;"></i>
         </button>
         <div class="dropdown-menu dropdown-menu-end tc-mes-dropdown" [class.show]="showTipoCambioDropdown">
