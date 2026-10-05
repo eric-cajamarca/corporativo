@@ -9,6 +9,7 @@ export interface ExcelData {
   columns: string[];
   rows: any[][];
   worksheetName?: string;
+  columnWidths?: number[];
 }
 
 @Injectable({

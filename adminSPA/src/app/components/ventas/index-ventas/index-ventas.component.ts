@@ -1336,14 +1336,18 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       '#',
       'Tipo',
       'Fecha',
-      'Comprobante / correlativo',
-      'Doc. afectado (NC/ND)',
-      'RUC cliente',
+      'Comprobante',
+      'Doc. afectado',
+      'RUC',
       'Cliente',
       'Condición',
       'Total (S/)',
       'Estado SUNAT'
     ];
+  }
+
+  private anchosColumnasReporteContabilidad(): number[] {
+    return [6, 22, 19, 16, 16, 13, 28, 12, 12, 16];
   }
 
   private filasOrdenadasReporteContabilidad(
@@ -1468,6 +1472,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
       filename,
       worksheetName: 'Contabilidad',
       columns: this.columnasReporteContabilidad(),
+      columnWidths: this.anchosColumnasReporteContabilidad(),
       rows: this.filasOrdenadasReporteContabilidad(comps, ras, true)
     }).subscribe({
       next: (blob) => {
