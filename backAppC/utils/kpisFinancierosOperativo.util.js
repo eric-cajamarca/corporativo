@@ -1,16 +1,15 @@
 const sql = require('mssql');
-const { partesAhoraApp, partesFechaHoraEnTz, getAppTimezone } = require('./fechaDisplay.util');
+const { partesAhoraApp } = require('./fechaDisplay.util');
 const GastosRepository = require('../repositories/gastos.repository');
 
 /**
  * KPIs financieros operativos compartidos (Inicio /dashboard y Análisis /analisis).
- * Ventas y costo desde Ventas + DetalleVenta; gastos operativos solo tabla Gastos
- * (incluye recurrentes mensuales; evita doble conteo con egresos de caja).
+ * Ventas = SUM(v.total) por cabecera (notas de crédito restan).
+ * Costo = SUM(detalle) agrupado por venta, para no multiplicar el total.
  */
 
-function fmtYmd(d) {
-  const p = partesFechaHoraEnTz(d, getAppTimezone());
-  return `${p.y}-${p.m}-${p.d}`;
+function ultimoDiaMesCivil(y, m) {
+  return new Date(y, m, 0).getDate();
 }
 
 function periodoARango(periodo) {
@@ -19,9 +18,11 @@ function periodoARango(periodo) {
     periodo = `${y}-${m}`;
   }
   const [y, m] = periodo.split('-').map(Number);
-  const inicio = new Date(y, m - 1, 1);
-  const fin = new Date(y, m, 0);
-  return { fechaInicio: fmtYmd(inicio), fechaFin: fmtYmd(fin) };
+  const mm = String(m).padStart(2, '0');
+  return {
+    fechaInicio: `${y}-${mm}-01`,
+    fechaFin: `${y}-${mm}-${String(ultimoDiaMesCivil(y, m)).padStart(2, '0')}`
+  };
 }
 
 function rangoMesActualYAnterior() {
@@ -46,6 +47,34 @@ function rangoMesActualYAnterior() {
   };
 }
 
+/** Notas de crédito restan; el costo se agrega por venta para no multiplicar v.total. */
+const SQL_VENTAS_AJUSTADAS_BASE = `
+      SELECT
+        v.idVenta,
+        CASE
+          WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -1
+          ELSE 1
+        END AS signo,
+        CASE
+          WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07')
+            THEN -ABS(ISNULL(v.total, 0))
+          ELSE ISNULL(v.total, 0)
+        END AS totalAjuste,
+        CONVERT(DATE, v.fEmision) AS fechaEmision
+      FROM Ventas v
+      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+      WHERE v.idEmpresa = @idEmpresa
+        AND ISNULL(v.eliminado, 0) = 0
+        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
+        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+`;
+
+const SQL_COSTO_POR_VENTA = `
+      SELECT dv.idVenta, SUM(ISNULL(dv.costoTotal, 0)) AS costo
+      FROM DetalleVenta dv
+      GROUP BY dv.idVenta
+`;
+
 async function obtenerVentasYCostoPeriodo(pool, idEmpresa, fechaInicio, fechaFin) {
   const r = await pool
     .request()
@@ -54,25 +83,10 @@ async function obtenerVentasYCostoPeriodo(pool, idEmpresa, fechaInicio, fechaFin
     .input('fechaFin', sql.Date, fechaFin)
     .query(`
       SELECT
-        ISNULL(SUM(
-          CASE
-            WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
-            ELSE v.total
-          END
-        ), 0) AS ventasTotales,
-        ISNULL(SUM(
-          CASE
-            WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(ISNULL(dv.costoTotal, 0))
-            ELSE ISNULL(dv.costoTotal, 0)
-          END
-        ), 0) AS costoVentas
-      FROM Ventas v
-      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND ISNULL(v.eliminado, 0) = 0
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ISNULL(SUM(base.totalAjuste), 0) AS ventasTotales,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costoVentas
+      FROM (${SQL_VENTAS_AJUSTADAS_BASE}) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
     `);
   const row = r.recordset[0] || {};
   return {
@@ -222,5 +236,7 @@ module.exports = {
   obtenerGastosOperativosPeriodo,
   obtenerGastosAgrupadosPorMes,
   calcularResumenFinancieroPeriodo,
-  calcularMargenesYVariaciones
+  calcularMargenesYVariaciones,
+  SQL_VENTAS_AJUSTADAS_BASE,
+  SQL_COSTO_POR_VENTA
 };

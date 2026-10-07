@@ -97,7 +97,7 @@ export class CreateComprasComponent {
 
   
 
-  public consultManual = false;
+  public consultManual = true;
   /** Si la consulta SUNAT/Factiliza llega antes que carguen comprobantes, se mapea el id al tener la lista. */
   private codigoSunatCompraPendiente: string | null = null;
   public idCompra: any = '';
@@ -367,7 +367,7 @@ export class CreateComprasComponent {
             })
             .filter((x: any) => x != null);
           this.matchDetalleConProductosCargados();
-          this.sumarFooterFactura();
+          this.sumarDetalleCompras();
           this.aplicarCuotasDesdeComprobanteSunat();
           this.syncSunatAuxiliaresDesdeFormulario();
         } else {
@@ -1458,7 +1458,7 @@ export class CreateComprasComponent {
     if (this.correlativo && typeof this.correlativo === 'object') {
       this.correlativo.numero = (Number(this.correlativo.numero) || 0) + 1;
     }
-    this.sumarFooterFactura();
+    this.sumarDetalleCompras();
   }
 
   //aqui quiero editar el producto modificado y agregarlo a detalleCompras
@@ -2190,6 +2190,10 @@ export class CreateComprasComponent {
     this.aplicarFechasDefaultSiSinConsulta();
   }
 
+  abrirConsultaSunat() {
+    this.consultManual = false;
+  }
+
   /** Etiqueta del tipo de comprobante según código SUNAT (01=Factura, 03=Boleta, etc.) */
   getTipoComprobanteLabel(codigo: string | undefined): string {
     if (!codigo) return '-';
@@ -2463,7 +2467,7 @@ export class CreateComprasComponent {
       this.detalleCompras.push(linea);
     }
 
-    this.sumarFooterFactura();
+    this.sumarDetalleCompras();
     iziToast.show({
       title: 'OK',
       titleColor: '#1DC74C',
@@ -2512,7 +2516,7 @@ export class CreateComprasComponent {
         numeroLote,
       });
     }
-    this.sumarFooterFactura();
+    this.sumarDetalleCompras();
   }
 
   abrirBuscadorProductos(): void {

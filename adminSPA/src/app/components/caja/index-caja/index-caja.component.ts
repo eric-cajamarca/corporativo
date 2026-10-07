@@ -7,7 +7,7 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/caja-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
+import { fechaHoraVentaClienteAhora, formatFechaHoraApiParaMostrar } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -77,6 +77,10 @@ export class IndexCajaComponent implements OnInit {
   }
   desdePagina(): number {
     return (this.page - 1) * this.pageSize + 1;
+  }
+
+  formatFechaMovimiento(valor: string | null | undefined): string {
+    return formatFechaHoraApiParaMostrar(valor) || '—';
   }
   hastaPagina(): number {
     return Math.min(this.page * this.pageSize, this.totalItems);
@@ -232,8 +236,30 @@ export class IndexCajaComponent implements OnInit {
       return;
     }
     this.cajaSeleccionada = caja;
+    this.filtrosMovimientos.idCaja = caja.idCaja;
     this.montoCierre = null;
     this.mostrarModalCierre = true;
+    this.cargarMovimientos();
+  }
+
+  get saldoEsperadoCierre(): number {
+    const inicial = Number(this.cajaSeleccionada?.montoInicial) || 0;
+    let ingresos = 0;
+    let egresos = 0;
+    for (const m of this.movimientos) {
+      const t = String(m.tipoOperacion || m.tipoMovimiento || '').toUpperCase();
+      const monto = Number(m.monto) || 0;
+      if (t === 'I' || t === 'INGRESO') ingresos += monto;
+      else if (t === 'E' || t === 'EGRESO') egresos += monto;
+    }
+    return Math.round((inicial + ingresos - egresos) * 100) / 100;
+  }
+
+  get diferenciaCierrePreview(): number {
+    const contado = this.montoCierre != null && !Number.isNaN(this.montoCierre)
+      ? Number(this.montoCierre)
+      : this.saldoEsperadoCierre;
+    return Math.round((contado - this.saldoEsperadoCierre) * 100) / 100;
   }
 
   cerrarModales() {
@@ -376,9 +402,23 @@ export class IndexCajaComponent implements OnInit {
     }
     this.cajaService.cerrarCaja(payload).subscribe({
       next: (response) => {
+        const d = response?.data || {};
+        const diferencia = Number(d.diferencia);
+        const esperado = Number(d.saldoEsperado);
+        const contado = Number(d.montoFinal);
+        let extra = '';
+        if (Number.isFinite(diferencia)) {
+          if (Math.abs(diferencia) < 0.01) {
+            extra = ' Sin diferencia (contado = esperado).';
+          } else if (diferencia > 0) {
+            extra = ` Sobrante S/ ${diferencia.toFixed(2)} (contado ${contado.toFixed(2)} vs esperado ${esperado.toFixed(2)}).`;
+          } else {
+            extra = ` Faltante S/ ${Math.abs(diferencia).toFixed(2)} (contado ${contado.toFixed(2)} vs esperado ${esperado.toFixed(2)}).`;
+          }
+        }
         iziToast.success({
-          title: 'Éxito',
-          message: 'Caja cerrada correctamente'
+          title: 'Caja cerrada',
+          message: 'Caja cerrada correctamente.' + extra
         });
         this.cerrarModales();
         this.cargarCajas();
@@ -397,6 +437,15 @@ export class IndexCajaComponent implements OnInit {
   getTipoMovimientoNombre(idTipo: number | undefined): string {
     if (idTipo == null) return 'Desconocido';
     const tipo = this.tiposMovimiento.find(t => t.idTipoMovimientoCaja === idTipo);
-    return tipo ? tipo.nombre : 'Desconocido';
+    const raw = tipo?.nombre || '';
+    const etiquetas: Record<string, string> = {
+      VENTA_CONTADO: 'Venta al contado',
+      VENTA_CREDITO: 'Venta a crédito',
+      COBRANZA_CREDITO: 'Cobranza de crédito',
+      APERTURA_CAJA: 'Apertura de caja',
+      CIERRE_CAJA: 'Cierre de caja'
+    };
+    if (etiquetas[raw]) return etiquetas[raw];
+    return raw ? raw.replace(/_/g, ' ') : 'Desconocido';
   }
 }

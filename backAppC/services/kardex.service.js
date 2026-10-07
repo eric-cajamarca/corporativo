@@ -10,7 +10,9 @@ function mapTipoOperacion(fila) {
   if (!fila) return 'Otros';
   if (fila.tipoRef === 'COMPRA') return 'Compra';
   if (fila.tipoRef === 'VENTA') return 'Venta';
-  if (fila.tipoMov === 'EN' || fila.tipoMov === 'AJ') return 'Entrada por ajuste';
+  if (fila.tipoMov === 'AJ' && (fila.cantidadSalida || 0) > 0) return 'Salida por ajuste';
+  if (fila.tipoMov === 'AJ') return 'Entrada por ajuste';
+  if (fila.tipoMov === 'EN') return 'Entrada por ajuste';
   if (fila.tipoMov === 'SA') return 'Salida por otros';
   return 'Otros';
 }

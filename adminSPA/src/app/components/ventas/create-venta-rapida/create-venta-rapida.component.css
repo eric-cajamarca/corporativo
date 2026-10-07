@@ -584,6 +584,45 @@
 }
 
 /* Responsive venta: mismo breakpoint que sidebar (lg = 992px) */
+.venta-rapida-detalle-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem !important;
+}
+
+.venta-rapida-detalle-titulo {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.venta-rapida-detalle-acciones {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.venta-rapida-codigo-group {
+  flex: 0 1 16rem;
+  width: 16rem;
+  max-width: 16rem;
+  min-width: 10rem;
+}
+
+.venta-rapida-codigo-group .create-ventas-search-code {
+  min-width: 0;
+  height: 40px;
+}
+
+.create-ventas-carga-dropdown {
+  flex: 0 0 auto;
+}
+
 @media (min-width: 992px) {
   .create-ventas-search-code {
     width: 150px;
@@ -627,6 +666,131 @@
 .venta-rapida-panel {
   border: 1px solid rgba(25, 135, 84, 0.25);
   border-radius: 0.75rem;
+}
+
+.venta-rapida-resumen-movil {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+
+.vr-chip {
+  background: #fff;
+  border: 1px solid #dbe4ea;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.vr-chip span {
+  display: inline-block;
+  margin-right: 0.28rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.vr-chip-edit {
+  min-height: 2.4rem;
+}
+
+.venta-rapida-btn-buscar-modal {
+  min-height: 2.75rem;
+  font-weight: 700;
+}
+
+@media (max-width: 991.98px) {
+  .create-ventas-carga-dropdown .create-ventas-icon-btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .venta-rapida-detalle-header {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .venta-rapida-detalle-acciones {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .venta-rapida-codigo-group {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .venta-rapida-btn-buscar-modal {
+    flex: 1 1 auto;
+  }
+}
+
+.venta-rapida-btn-camara {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+@media (max-width: 991.98px) {
+  :host {
+    --vr-pos-topbar-h: 3.35rem;
+  }
+
+  .pos-topbar {
+    top: 0;
+    z-index: 40;
+    min-height: var(--vr-pos-topbar-h);
+  }
+
+  .venta-rapida-resumen-movil {
+    padding: 0.35rem 0.75rem 0.45rem;
+    margin: 0;
+  }
+
+  .venta-rapida-panel-colapsado {
+    display: none;
+  }
+
+  .venta-rapida-busqueda-card {
+    position: sticky;
+    top: var(--vr-pos-topbar-h);
+    z-index: 30;
+    background: #fff;
+    margin-bottom: 0.5rem;
+  }
+
+  .venta-rapida-busqueda-card .card-header {
+    display: none;
+  }
+
+  .venta-rapida-busqueda-card input[type='search'] {
+    min-height: 2.75rem;
+    font-size: 16px;
+    scroll-margin-top: calc(var(--vr-pos-topbar-h) + 3rem);
+  }
+
+  .venta-rapida-busqueda-card .btn {
+    min-height: 2.75rem;
+  }
+
+  .venta-rapida-busqueda-wrap {
+    height: min(28vh, 200px);
+  }
 }
 
 .venta-rapida-top h5 {

@@ -14,9 +14,20 @@
                         </div>
                         <div>
                             @if (!imgSelect) {
-                            <!-- <label for="logoPreview" class="form-label">Vista previa del logo actual</label> -->
                             <hr>
-                            <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 100%" class="img-fluid">
+                            <img
+                              *ngIf="empresas.logo"
+                              [src]="urlLogoEmpresa"
+                              style="width: 100%"
+                              class="img-fluid"
+                              alt="Logo de la empresa"
+                              (error)="onLogoError($event)">
+                            <img
+                              *ngIf="!empresas.logo"
+                              src="assets/img/logo-efaferp.png"
+                              style="width: 100%"
+                              class="img-fluid"
+                              alt="EFAFERP">
                             }
                             @if (imgSelect) {
                             <!-- <label for="newLogoPreview" class="form-label">Vista previa del nuevo logo</label> -->

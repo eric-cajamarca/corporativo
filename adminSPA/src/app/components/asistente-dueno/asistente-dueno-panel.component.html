@@ -19,7 +19,7 @@
     <div class="asistente-msgs" #listaMensajes>
       @for (m of mensajes; track $index) {
         <div class="asistente-burbuja" [class.asistente-burbuja--user]="m.role === 'user'">
-          <p>{{ textoVisible(m.text) }}</p>
+          <p [innerHTML]="textoHtml(m.text)"></p>
           @if (m.role === 'model') {
             <div class="asistente-links">
               @for (en of extraerEnlaces(m.text); track en.ruta) {

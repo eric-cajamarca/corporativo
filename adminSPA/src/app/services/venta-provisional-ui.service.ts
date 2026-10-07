@@ -99,10 +99,7 @@ export class VentaProvisionalUiService {
   }
 
   guardarEstadoActual(estado: VentaEstadoProvisional): void {
-    const tieneDatos =
-      estado.carrito.length > 0 ||
-      !!estado.ventas['idComprobante'] ||
-      !!(estado.cliente?.['idCliente'] && estado.cliente['idCliente'] !== '');
+    const tieneDatos = Array.isArray(estado.carrito) && estado.carrito.length > 0;
     if (!tieneDatos) return;
     if (!this.ventaSesionService.getSesionActivaId()) {
       this.ventaSesionService.obtenerOCrearSesionActiva();
@@ -119,6 +116,10 @@ export class VentaProvisionalUiService {
 
   eliminarSesionActiva(): void {
     this.ventaSesionService.eliminarSesionActiva();
+  }
+
+  eliminarTrasRegistro(compVenta?: string | null, carrito?: unknown[]): void {
+    this.ventaSesionService.eliminarTrasRegistro(compVenta, carrito);
   }
 
   /** Cierra y restaura el modal si quedó en body al salir de la pantalla. */

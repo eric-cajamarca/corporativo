@@ -69,7 +69,7 @@ export class ReportesNegocioPdfService {
     const tipoUtil = this.mapPeriodoUtilidades(periodoRapido);
 
     return forkJoin({
-      resumenDashboard: this.dashboardService.obtenerResumen(periodoRapido).pipe(
+      resumenDashboard: this.dashboardService.obtenerResumen(periodoRapido, fechaInicio, fechaFin).pipe(
         map((r) => r.data),
         catchError(() => of(null))
       ),

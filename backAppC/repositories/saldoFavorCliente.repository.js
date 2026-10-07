@@ -281,7 +281,7 @@ async function resumenCobrosCredito(ctx, idEmpresa, idCredito) {
           WHERE cu.idCredito = @idCredito AND cu.idEmpresa = @idEmpresa
         ), 0) AS totalPagos,
         ISNULL(SUM(CASE WHEN estado = 'PAGADO' THEN montoCuota ELSE 0 END), 0) AS totalCuotasPagadas,
-        ISNULL(SUM(CASE WHEN estado IN ('PENDIENTE','VENCIDO') THEN saldoPendiente ELSE 0 END), 0) AS saldoPendiente,
+        ISNULL(SUM(CASE WHEN estado IN ('PENDIENTE','VENCIDO','PARCIAL') THEN saldoPendiente ELSE 0 END), 0) AS saldoPendiente,
         COUNT(CASE WHEN estado = 'PAGADO' THEN 1 END) AS cuotasPagadas
       FROM CuotasCredito
       WHERE idCredito = @idCredito AND idEmpresa = @idEmpresa
@@ -311,7 +311,7 @@ async function anularCreditoYCuotasPendientes(ctx, idEmpresa, idCredito, obsExtr
       UPDATE CuotasCredito
       SET saldoPendiente = 0
       WHERE idCredito = @idCredito AND idEmpresa = @idEmpresa
-        AND estado IN ('PENDIENTE', 'VENCIDO')
+        AND estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
     `);
 
   const prev = await ctx
@@ -349,7 +349,7 @@ async function listarCreditosHuerfanos(ctx, idEmpresa) {
         FROM CuotasCredito cu WHERE cu.idCredito = cc.idCredito AND cu.idEmpresa = cc.idEmpresa
       ), 0) AS totalPagado,
       ISNULL((
-        SELECT SUM(CASE WHEN cu.estado IN ('PENDIENTE','VENCIDO') THEN cu.saldoPendiente ELSE 0 END)
+        SELECT SUM(CASE WHEN cu.estado IN ('PENDIENTE','VENCIDO','PARCIAL') THEN cu.saldoPendiente ELSE 0 END)
         FROM CuotasCredito cu WHERE cu.idCredito = cc.idCredito AND cu.idEmpresa = cc.idEmpresa
       ), 0) AS saldoPendiente
     FROM CreditosClientes cc

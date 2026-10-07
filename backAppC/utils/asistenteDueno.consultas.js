@@ -110,11 +110,13 @@ function textoFicha(ficha) {
     'FICHA DE LA EMPRESA (sin secretos ni montos):',
     `- Rubro: ${ficha.rubro || 'no indicado'}. Gestora: ${ficha.esGestora ? 'sí' : 'no'}. Hotel: ${ficha.esHotel ? 'sí' : 'no'}.`,
     `- Rol: ${ficha.rol || 'usuario'}. Permisos clave: config=${p.configuracion ? 'sí' : 'no'}, ventas=${p.ventas ? 'sí' : 'no'}, caja=${p.caja ? 'sí' : 'no'}, créditos=${p.creditos ? 'sí' : 'no'}, inventario=${p.inventario ? 'sí' : 'no'}.`,
+    `- Plan: ${ficha.planCode || 'n/d'}. Módulos del plan: ${(ficha.modulosPlanMenu || []).join(', ') || 'todos'}.`,
     `- Facturación: certificado=${fac.tieneCertificado ? 'sí' : 'no'}, usuario SOL=${fac.tieneUsuarioSunat ? 'sí' : 'no'}, serie factura=${fac.tieneSerieFactura ? 'sí' : 'no'}, serie boleta=${fac.tieneSerieBoleta ? 'sí' : 'no'}, URL beta=${fac.urlEsBeta ? 'sí' : 'no'}, resumen diario boletas=${fac.usaResumenDiario ? 'sí' : 'no'}.`,
     `- Caja: alguna abierta=${caja.algunaAbierta ? 'sí' : 'no'}. En sucursales del usuario: ${caja.abiertaEnUsuario ? 'sí' : caja.abiertaEnUsuario === false ? 'no' : 'no asignadas'}. Nombres sucursal con caja abierta: ${(caja.sucursalesAbiertas || []).join(', ') || 'ninguna'}.`,
     `- Guías: remitente=${guias.remitente ? 'sí' : 'no'}, transportista=${guias.transportista ? 'sí' : 'no'}.`,
     `- Productos activos: ${ficha.productos != null ? (ficha.productos > 0 ? 'sí' : 'no') : '?'}.`,
     'Si puede.X es no, NO indiques esa ruta; dile que pida el permiso al administrador.',
+    'Si un módulo no está en el plan, NO enlaces esa ruta. Di que está en otro plan.',
     'NUNCA inventes ni cites montos (S/, totales, saldos). Si hay deuda o un crédito, manda a la pantalla de créditos o de la venta.'
   ].join('\n');
 }

@@ -6,6 +6,7 @@ import { ClienteService } from '../../../services/cliente.service';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 declare var iziToast: any;
 declare var bootstrap: any;
 
@@ -77,6 +78,7 @@ export class UpdateClientesComponent {
     private _clientesService: ClienteService,
     private _router: Router,
     private _route: ActivatedRoute,
+    private confirmacion: ConfirmacionDialogService,
 
 
   ) {
@@ -383,19 +385,26 @@ export class UpdateClientesComponent {
   }
 
   eliminarDireccion(id: string | number): void {
-    if (!window.confirm('¿Eliminar esta dirección?')) return;
-    this._clientesService.eliminar_direccionCliente(id).subscribe({
-      next: () => {
-        this.cargarDirecciones();
-        if (typeof iziToast !== 'undefined') {
-          iziToast.success({ title: 'OK', message: 'Dirección eliminada.', position: 'topRight' });
+    void this.confirmacion.confirmar({
+      titulo: 'Eliminar dirección',
+      mensaje: '¿Eliminar esta dirección?',
+      confirmarTexto: 'Sí, eliminar',
+      peligro: true
+    }).then((ok) => {
+      if (!ok) return;
+      this._clientesService.eliminar_direccionCliente(id).subscribe({
+        next: () => {
+          this.cargarDirecciones();
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({ title: 'OK', message: 'Dirección eliminada.', position: 'topRight' });
+          }
+        },
+        error: () => {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.error({ title: 'Error', message: 'No se pudo eliminar la dirección.', position: 'topRight' });
+          }
         }
-      },
-      error: () => {
-        if (typeof iziToast !== 'undefined') {
-          iziToast.error({ title: 'Error', message: 'No se pudo eliminar la dirección.', position: 'topRight' });
-        }
-      }
+      });
     });
   }
 

@@ -131,9 +131,9 @@
                 <td data-label="Cliente">{{ getClienteNombre(credito) }}</td>
                 <td *ngIf="empresasOperacion.length > 1" data-label="Empresa">{{ nombreEmpresaCredito(credito.idEmpresa) }}</td>
                 <td data-label="Documento">{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
-                <td data-label="F.Venta">{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
+                <td data-label="F.Venta">{{ formatFechaCredito(credito.fechaCredito) }}</td>
                 <td class="text-end" data-label="Total">S/ {{ credito.montoTotal | number:'1.2-2' }}</td>
-                <td data-label="F.Venc.">{{ (credito.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
+                <td data-label="F.Venc.">{{ formatFechaCredito(credito.proximaCuota) }}</td>
                 <td data-label="N.C.">—</td>
                 <td class="text-end" data-label="Saldo">S/ {{ (credito.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
                 <td data-label="Estado">
@@ -255,9 +255,9 @@
                   <tr *ngFor="let item of detalleCobranza; let i = index">
                     <td>{{ i + 1 }}</td>
                     <td>{{ item.comprobante }}</td>
-                    <td>{{ item.fechaVenta | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ formatFechaCredito(item.fechaVenta) }}</td>
                     <td class="text-end">S/ {{ item.totalComprobante | number:'1.2-2' }}</td>
-                    <td>{{ item.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ formatFechaCredito(item.fechaVencimiento) }}</td>
                     <td class="text-end">
                       <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="item.importePagado" [name]="'importePagado_' + i" step="0.01" min="0" [max]="item.saldoPendiente" placeholder="0.00">
                     </td>
@@ -334,9 +334,9 @@
             <tbody>
               <tr *ngFor="let c of creditosClienteParaSelector">
                 <td>{{ c.comprobante || ('Venta ' + c.idVenta) }}</td>
-                <td>{{ c.fechaCredito | date:'dd/MM/yyyy' }}</td>
+                <td>{{ formatFechaCredito(c.fechaCredito) }}</td>
                 <td class="text-end">S/ {{ c.montoTotal | number:'1.2-2' }}</td>
-                <td>{{ (c.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
+                <td>{{ formatFechaCredito(c.proximaCuota) }}</td>
                 <td class="text-end">S/ {{ (c.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
                 <td>
                   <button type="button" class="btn btn-sm btn-success" (click)="agregarComprobanteADetalle(c)">
@@ -395,7 +395,7 @@
                     (change)="toggleCuotaMasivo(cuota.idCuota, $any($event.target).checked)" />
                 </td>
                 <td class="text-center">{{ cuota.numeroCuota }}</td>
-                <td>{{ cuota.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
+                <td>{{ formatFechaCredito(cuota.fechaVencimiento) }}</td>
                 <td class="text-end">S/ {{ cuota.montoCuota | number:'1.2-2' }}</td>
                 <td class="text-end">S/ {{ cuota.interes | number:'1.2-2' }}</td>
                 <td class="text-end">S/ {{ cuota.saldoPendiente | number:'1.2-2' }}</td>

@@ -19,7 +19,7 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa } from '../../../models/empresa.model';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
-import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { formatFechaHoraApiParaMostrar, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 
 
@@ -226,6 +226,10 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
   onFiltroCambio(): void {
     this.aplicarFiltros();
+  }
+
+  fechaEmisionLista(valor: string | null | undefined): string {
+    return formatFechaHoraApiParaMostrar(valor) || '—';
   }
 
 

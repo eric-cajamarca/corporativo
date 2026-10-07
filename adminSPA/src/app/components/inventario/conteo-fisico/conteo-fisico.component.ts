@@ -31,6 +31,7 @@ import {
 } from '../../../models/conteo-fisico.model';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
 
@@ -60,6 +61,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private pdfService = inject(PdfService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private confirmacion = inject(ConfirmacionDialogService);
 
   private destroy$ = new Subject<void>();
   private detalleModalRef: NgbModalRef | null = null;
@@ -917,7 +919,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     return Number.isFinite(n) && n > 0;
   }
 
-  aplicarMovimientos(): void {
+  async aplicarMovimientos(): Promise<void> {
     if (!this.idSesionEnCurso) {
       return;
     }
@@ -929,9 +931,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       });
       return;
     }
-    const ok = window.confirm(
-      'Se registrarán los movimientos de reajuste según el resumen y la sesión pasará a CERRADO. ¿Continuar?'
-    );
+    const ok = await this.confirmacion.confirmar({
+      titulo: 'Aplicar ajustes',
+      mensaje: 'Se registrarán los movimientos de reajuste según el resumen y la sesión pasará a CERRADO. ¿Continuar?',
+      confirmarTexto: 'Sí, aplicar',
+      peligro: true
+    });
     if (!ok) {
       return;
     }

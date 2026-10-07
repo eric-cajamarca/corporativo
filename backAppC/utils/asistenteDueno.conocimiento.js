@@ -21,11 +21,12 @@ Reglas:
 - Si el usuario dice «ya está», «ya lo elegí» o «todos los campos ya están», AVANZA al siguiente paso. No repitas el mismo clic.
 - Guía UN solo paso por turno: el que indica SIGUIENTE PASO en el contexto. Luego espera.
 - Cita botones y campos TAL CUAL aparecen en la foto o en el libreto (ej. **Cobrar**, **Buscar producto**, **Datos del Comprobante**).
-- Si foto.modo es cotizacion: no pidas **Forma de pago**. El botón final sigue diciendo **Registrar venta** y guarda la cotización.
+- Si foto.modo es cotizacion: no pidas **Forma de pago**. El botón final dice **Guardar cotización**.
 - Si un control no está en la foto ni en el libreto, di que no lo ves en esta pantalla. No inventes «pestaña Comprobantes», «Modo boleta», «Modo prueba» ni menús que no existan.
 - Si no estás seguro, di que no sabes y sugiere el Centro de ayuda (tutoriales PDF).
 - Cuando indiques otra pantalla, incluye un enlace markdown: [texto](/ruta).
-- Recibes una FICHA cada turno (rubro, rol, puede.X, facturación sí/no, caja abierta, GRE). Úsala. No inventes datos que no estén ahí.
+- Recibes una FICHA cada turno (rubro, rol, puede.X, plan, módulos del plan, facturación sí/no, caja abierta, GRE). Úsala. No inventes datos que no estén ahí.
+- Si un módulo no está en el plan de la ficha, NO enlaces esa ruta. Di que está en otro plan.
 - NUNCA cites ni inventes montos (S/, totales, saldos, costos, cantidades de stock). Si hay crédito o saldo, di que hay pendiente y manda a [Créditos](/creditos) o a la venta. Stock: solo sí/no por sucursal y manda a Kardex/Stock actual.
 - Si puede.X es no, NO enlaces esa ruta. Dile que pida el permiso al administrador. Sin VER_CONFIGURACION no mandes a Facturación SUNAT.
 - "Error al invocar el servicio de SUNAT" no es un código de negocio de SUNAT: falló la llamada (red, URL o certificado). Explícalo con la ficha, sin inventar el CDR.
@@ -51,7 +52,7 @@ Pantallas (rutas reales):
 - Ventas (historial): [Ventas](/ventas)
 - Venta rápida (mostrador): [Venta rápida](/ventas/rapida) — Comprobante, Cliente (F8), Buscar producto, **Cobrar** (F4)
 - Nueva venta (completa): [Nueva venta](/ventas/create) — **Datos del Comprobante**, **Cliente**, **Buscar**, **Forma de pago**, **Registrar venta**. El tipo se elige en un modal; si el cliente ya está habilitado, el comprobante YA está elegido.
-- Cotización en la misma pantalla: en **Datos del Comprobante** elige el tipo Cotización (CT). No uses Forma de pago. El botón **Registrar venta** guarda la cotización.
+- Cotización en la misma pantalla: en **Datos del Comprobante** elige el tipo Cotización (CT). No uses Forma de pago. El botón **Guardar cotización** guarda la cotización.
 - Cotizaciones (historial): [Cotizaciones](/cotizaciones)
 - Inventario inicial (sin factura): [Ingresos de inventario](/inventario/ingresos) — tipo Inventario inicial (II). No uses Compras si no hay comprobante.
 - Ingresos / salidas: [Ingresos](/inventario/ingresos) y [Salidas](/inventario/salidas). Conteo: [Conteo físico](/inventario/conteo-fisico).
@@ -683,30 +684,85 @@ function textoDiagnostico(diag, ficha) {
   ].join('\n');
 }
 
+const RUTA_A_MODULO_PLAN = [
+  { prefijo: '/configuracion', modulo: 'CONFIGURACION' },
+  { prefijo: '/facturacion', modulo: 'FACTURACION' },
+  { prefijo: '/catalogos', modulo: 'CATALOGOS' },
+  { prefijo: '/inventario', modulo: 'INVENTARIO' },
+  { prefijo: '/ventas', modulo: 'VENTAS' },
+  { prefijo: '/cotizaciones', modulo: 'VENTAS' },
+  { prefijo: '/matizado', modulo: 'VENTAS' },
+  { prefijo: '/compras', modulo: 'COMPRAS' },
+  { prefijo: '/proveedores', modulo: 'COMPRAS' },
+  { prefijo: '/caja', modulo: 'CAJA' },
+  { prefijo: '/creditos', modulo: 'CAJA' },
+  { prefijo: '/vales-despacho', modulo: 'DESPACHOS' },
+  { prefijo: '/despachos', modulo: 'DESPACHOS' },
+  { prefijo: '/envios', modulo: 'DESPACHOS' },
+  { prefijo: '/programacion', modulo: 'DESPACHOS' },
+  { prefijo: '/colaborador', modulo: 'CONFIGURACION' },
+  { prefijo: '/rol', modulo: 'CONFIGURACION' },
+  { prefijo: '/sucursal', modulo: 'CONFIGURACION' },
+  { prefijo: '/clientes', modulo: 'CLIENTES' },
+  { prefijo: '/cliente', modulo: 'CLIENTES' },
+  { prefijo: '/productos', modulo: 'PRODUCTOS' },
+  { prefijo: '/categorias', modulo: 'PRODUCTOS' },
+  { prefijo: '/marcas', modulo: 'PRODUCTOS' },
+  { prefijo: '/precios', modulo: 'PRODUCTOS' },
+  { prefijo: '/analisis', modulo: 'ANALISIS' },
+  { prefijo: '/reportes', modulo: 'REPORTES' },
+  { prefijo: '/utilidades', modulo: 'UTILIDADES' },
+  { prefijo: '/editar-empresa', modulo: 'EMPRESA' },
+  { prefijo: '/home', modulo: 'DASHBOARD' }
+];
+
+function moduloPlanDeRuta(ruta) {
+  const abs = String(ruta || '').split('?')[0] || '/';
+  const ordenados = [...RUTA_A_MODULO_PLAN].sort((a, b) => b.prefijo.length - a.prefijo.length);
+  for (const { prefijo, modulo } of ordenados) {
+    if (abs === prefijo || abs.startsWith(`${prefijo}/`)) {
+      return modulo;
+    }
+  }
+  return null;
+}
+
 function filtrarEnlacesPorPermiso(texto, ficha) {
-  if (!ficha || !ficha.puede) return String(texto || '');
+  if (!ficha) return String(texto || '');
   let t = String(texto || '');
-  if (!ficha.puede.configuracion) {
+  const puede = ficha.puede;
+  if (puede && !puede.configuracion) {
     t = t.replace(
       /\[([^\]]+)\]\(\/configuracion[^)]*\)/gi,
       'esa pantalla de configuración (pida VER_CONFIGURACION al administrador)'
     );
   }
-  if (!ficha.puede.caja) {
+  if (puede && !puede.caja) {
     t = t.replace(/\[([^\]]+)\]\(\/caja[^)]*\)/gi, 'Caja (pida VER_CAJA al administrador)');
   }
-  if (!ficha.puede.creditos) {
+  if (puede && !puede.creditos) {
     t = t.replace(/\[([^\]]+)\]\(\/creditos[^)]*\)/gi, 'Créditos (pida VER_CREDITOS al administrador)');
   }
-  if (!ficha.puede.inventario) {
+  if (puede && !puede.inventario) {
     t = t.replace(/\[([^\]]+)\]\(\/inventario[^)]*\)/gi, 'Inventario (pida VER_INVENTARIO al administrador)');
   }
-  if (!ficha.puede.ventas) {
+  if (puede && !puede.ventas) {
     t = t.replace(/\[([^\]]+)\]\(\/ventas[^)]*\)/gi, 'Ventas (pida VER_VENTAS al administrador)');
     t = t.replace(
       /\[([^\]]+)\]\(\/facturacion\/(emision-guias|guias-remision|guias-transportista|notas-credito-debito)[^)]*\)/gi,
       'esa pantalla de facturación (pida permiso al administrador)'
     );
+  }
+  const modulos = Array.isArray(ficha.modulosPlanMenu) ? ficha.modulosPlanMenu : [];
+  if (modulos.length) {
+    const set = new Set(modulos.map((m) => String(m || '').toUpperCase()));
+    t = t.replace(/\[([^\]]+)\]\((\/[^)]+)\)/g, (full, label, ruta) => {
+      const modulo = moduloPlanDeRuta(ruta);
+      if (modulo && !set.has(modulo.toUpperCase())) {
+        return `${label} (no incluido en su plan)`;
+      }
+      return full;
+    });
   }
   return t;
 }

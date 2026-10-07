@@ -67,22 +67,16 @@
           }
         </div>
         <div class="col-md-4">
-          <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }} *</label>
+          <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }}</label>
           <div class="input-group">
-            <select
-              class="form-select"
-              formControlName="idMarca"
-              [class.is-invalid]="hasError('idMarca')">
-              <option value="">Seleccione...</option>
+            <select class="form-select" formControlName="idMarca">
+              <option value="">Sin marca</option>
               @for (marca of marcas; track marca.idMarca) {
                 <option [value]="marca.idMarca">{{ marca.nombre }}</option>
               }
             </select>
             <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaMarca()">Crear</button>
           </div>
-          @if (hasError('idMarca')) {
-            <div class="invalid-feedback">{{ getError('idMarca') }}</div>
-          }
         </div>
         <div class="col-md-4">
           <label class="form-label">Presentación *</label>

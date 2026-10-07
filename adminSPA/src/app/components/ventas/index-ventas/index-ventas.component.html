@@ -400,7 +400,12 @@
                           </li>
                           <li *ngIf="puedeEliminarVenta(v)">
                             <a class="dropdown-item text-danger" href="javascript:void(0)" [class.disabled]="anulandoIdVenta === v.idVenta" (click)="anulandoIdVenta !== v.idVenta && confirmarAnularVenta(v)">
-                              <i class="bi bi-trash me-2"></i> Eliminar
+                              <i class="bi bi-trash me-2"></i> Anular
+                            </a>
+                          </li>
+                          <li *ngIf="puedeDevolverParcial(v)">
+                            <a class="dropdown-item" href="javascript:void(0)" (click)="abrirDevolucionParcial(v)">
+                              <i class="bi bi-arrow-return-left me-2"></i> Devolución parcial
                             </a>
                           </li>
                           <li *ngIf="(puedeEditarVenta(v) || puedeEliminarVenta(v)) && muestraOpcionesFacturacionEnMenu(v)"><hr class="dropdown-divider"></li>
@@ -520,7 +525,12 @@
                     </li>
                     <li *ngIf="puedeEliminarVenta(v)">
                       <a class="dropdown-item text-danger" href="javascript:void(0)" [class.disabled]="anulandoIdVenta === v.idVenta" (click)="anulandoIdVenta !== v.idVenta && confirmarAnularVenta(v)">
-                        <i class="bi bi-trash me-2"></i> Eliminar
+                        <i class="bi bi-trash me-2"></i> Anular
+                      </a>
+                    </li>
+                    <li *ngIf="puedeDevolverParcial(v)">
+                      <a class="dropdown-item" href="javascript:void(0)" (click)="abrirDevolucionParcial(v)">
+                        <i class="bi bi-arrow-return-left me-2"></i> Devolución parcial
                       </a>
                     </li>
                     <li *ngIf="(puedeEditarVenta(v) || puedeEliminarVenta(v)) && muestraOpcionesFacturacionEnMenu(v)"><hr class="dropdown-divider"></li>
@@ -854,6 +864,42 @@
         <p class="text-muted small" *ngIf="loadingArchivo"><i class="bi bi-hourglass-split"></i> Cargando...</p>
         <p class="text-danger small" *ngIf="archivoError">{{ archivoError }}</p>
         <pre *ngIf="contenidoArchivo && !loadingArchivo" class="bg-light p-3 rounded small overflow-auto" style="max-height: 70vh;"><code>{{ contenidoArchivo }}</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+@if (mostrarDevolucion) {
+<div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.45);">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Devolución parcial — {{ ventaDevolucion?.compVenta }}</h5>
+        <button type="button" class="btn-close" (click)="mostrarDevolucion = false"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Indique cuánto devuelve de cada línea. Se restaura stock y, si hay caja abierta, se registra el extorno.</p>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th>Producto</th><th>Vendido</th><th>Devolver</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let ln of lineasDevolucion">
+                <td>{{ ln.descripcion }}</td>
+                <td>{{ ln.cantidad }}</td>
+                <td>
+                  <input type="number" class="form-control form-control-sm" min="0" [max]="ln.cantidad" step="0.001" [(ngModel)]="ln.devolver">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="mostrarDevolucion = false">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="devolviendo" (click)="confirmarDevolucionParcial()">
+          {{ devolviendo ? 'Registrando…' : 'Registrar devolución' }}
+        </button>
       </div>
     </div>
   </div>

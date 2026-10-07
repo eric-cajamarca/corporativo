@@ -1,4 +1,8 @@
 const sql = require('mssql');
+const {
+  SQL_VENTAS_AJUSTADAS_BASE,
+  SQL_COSTO_POR_VENTA
+} = require('../utils/kpisFinancierosOperativo.util');
 
 /** Ventas anuladas, rechazadas o con baja SUNAT aceptada no suman en utilidades. */
 const FILTRO_VENTA_VALIDA_UTILIDADES = `
@@ -39,15 +43,14 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
   if (tipo === 'rango') {
     const rs = await req.query(`
       SELECT
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costos,
-        ISNULL(SUM(v.total), 0) - ISNULL(SUM(dv.costoTotal), 0) AS utilidadBruta
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costos,
+        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+      FROM (
+        ${SQL_VENTAS_AJUSTADAS_BASE}
         ${FILTRO_VENTA_VALIDA_UTILIDADES}
+      ) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
     `);
     const r = (rs.recordset && rs.recordset[0]) ? rs.recordset[0] : {};
     return [{
@@ -61,18 +64,17 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
   if (tipo === 'dia') {
     const rs = await req.query(`
       SELECT
-        CONVERT(DATE, v.fEmision) AS fecha,
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costos,
-        ISNULL(SUM(v.total), 0) - ISNULL(SUM(dv.costoTotal), 0) AS utilidadBruta
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        base.fechaEmision AS fecha,
+        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costos,
+        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+      FROM (
+        ${SQL_VENTAS_AJUSTADAS_BASE}
         ${FILTRO_VENTA_VALIDA_UTILIDADES}
-      GROUP BY CONVERT(DATE, v.fEmision)
-      ORDER BY CONVERT(DATE, v.fEmision)
+      ) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
+      GROUP BY base.fechaEmision
+      ORDER BY base.fechaEmision
     `);
     return (rs.recordset || []).map((r) => ({
       periodo: r.fecha ? formatFecha(r.fecha) : '',
@@ -85,18 +87,17 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
   if (tipo === 'mes') {
     const rs = await req.query(`
       SELECT
-        CONCAT(YEAR(v.fEmision), '-', RIGHT('0' + CAST(MONTH(v.fEmision) AS VARCHAR(2)), 2)) AS periodo,
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costos,
-        ISNULL(SUM(v.total), 0) - ISNULL(SUM(dv.costoTotal), 0) AS utilidadBruta
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        CONCAT(YEAR(base.fechaEmision), '-', RIGHT('0' + CAST(MONTH(base.fechaEmision) AS VARCHAR(2)), 2)) AS periodo,
+        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costos,
+        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+      FROM (
+        ${SQL_VENTAS_AJUSTADAS_BASE}
         ${FILTRO_VENTA_VALIDA_UTILIDADES}
-      GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
-      ORDER BY YEAR(v.fEmision), MONTH(v.fEmision)
+      ) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
+      GROUP BY YEAR(base.fechaEmision), MONTH(base.fechaEmision)
+      ORDER BY YEAR(base.fechaEmision), MONTH(base.fechaEmision)
     `);
     return (rs.recordset || []).map((r) => ({
       periodo: String(r.periodo || ''),
@@ -109,18 +110,17 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
   if (tipo === 'anio') {
     const rs = await req.query(`
       SELECT
-        CAST(YEAR(v.fEmision) AS VARCHAR(4)) AS periodo,
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costos,
-        ISNULL(SUM(v.total), 0) - ISNULL(SUM(dv.costoTotal), 0) AS utilidadBruta
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-        AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        CAST(YEAR(base.fechaEmision) AS VARCHAR(4)) AS periodo,
+        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costos,
+        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+      FROM (
+        ${SQL_VENTAS_AJUSTADAS_BASE}
         ${FILTRO_VENTA_VALIDA_UTILIDADES}
-      GROUP BY YEAR(v.fEmision)
-      ORDER BY YEAR(v.fEmision)
+      ) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
+      GROUP BY YEAR(base.fechaEmision)
+      ORDER BY YEAR(base.fechaEmision)
     `);
     return (rs.recordset || []).map((r) => ({
       periodo: String(r.periodo || ''),

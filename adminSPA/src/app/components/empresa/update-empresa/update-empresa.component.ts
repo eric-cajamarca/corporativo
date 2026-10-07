@@ -170,7 +170,7 @@ export class UpdateEmpresaComponent {
     );
     this._rubrosService.listar({ activo: true }).subscribe(res => {
       const todos = res.data || [];
-      this.rubros = todos.filter(r => ['GEN', 'GRF', 'HOTEL', 'PINT', 'FAR'].includes((r.codigo || '').trim().toUpperCase()));
+      this.rubros = todos.filter(r => ['GEN', 'FERR', 'GRF', 'HOTEL', 'PINT', 'FAR'].includes((r.codigo || '').trim().toUpperCase()));
     });
 
     this._empresasService.getDireccionEmpresa_id().subscribe(
@@ -757,6 +757,24 @@ export class UpdateEmpresaComponent {
           });
         }
       });
+    }
+  }
+
+  get urlLogoEmpresa(): string {
+    const logo = String(this.empresas?.logo || '').trim();
+    if (!logo) {
+      return 'assets/img/logo-efaferp.png';
+    }
+    if (logo.startsWith('http') || logo.startsWith('assets/') || logo.startsWith('/assets/')) {
+      return logo;
+    }
+    return `${this.url}obtener_logo/${logo}`;
+  }
+
+  onLogoError(ev: Event): void {
+    const img = ev.target as HTMLImageElement | null;
+    if (img && !img.src.includes('logo-efaferp.png')) {
+      img.src = 'assets/img/logo-efaferp.png';
     }
   }
 

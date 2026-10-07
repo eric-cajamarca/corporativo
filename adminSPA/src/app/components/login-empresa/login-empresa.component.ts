@@ -196,7 +196,7 @@ export class LoginEmpresaComponent implements OnInit {
 
         iziToast.success({
           title: '¡Bienvenido!',
-          message: 'Acceso concedido al sistema CRM',
+          message: 'Acceso concedido a EFAFERP',
           position: 'topRight'
         });
       },
@@ -289,7 +289,7 @@ export class LoginEmpresaComponent implements OnInit {
         this.handleLoginSuccess(d);
         iziToast.success({
           title: '¡Bienvenido!',
-          message: 'Acceso concedido al sistema CRM',
+          message: 'Acceso concedido a EFAFERP',
           position: 'topRight'
         });
       },

@@ -18,6 +18,8 @@ router.get('/clientes-rentabilidad', reportesController.getClientesRentabilidad)
 
 // Resumen de cartera de créditos (usar lógica existente de créditos)
 router.get('/cartera-creditos', reportesController.getCarteraCreditos);
+router.get('/antiguedad-deuda', reportesController.getAntiguedadDeuda);
+router.get('/estado-cuenta/:idCliente', reportesController.getEstadoCuentaCliente);
 
 module.exports = router;
 

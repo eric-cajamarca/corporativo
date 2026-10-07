@@ -819,6 +819,27 @@ const cambiar_principal_direccion = async function (req, res, next) {
     }
 }
 
+const aplicarZonaExonerada = async function (req, res, next) {
+    if (!req.user || !req.user.empresa) {
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    try {
+        const exonerada = req.body?.exonerada === true || req.body?.exonerada === 1 || req.body?.exonerada === '1';
+        const data = await withPool((pool) =>
+            empresaService.aplicarZonaExonerada(pool, req.user.empresa, exonerada)
+        );
+        return res.status(200).send({
+            message: exonerada
+                ? 'Se activó exonerado y se desactivó el IGV.'
+                : 'Se dejó el IGV 18% activo.',
+            data
+        });
+    } catch (error) {
+        console.error('Error aplicando zona exonerada:', error);
+        return next(error);
+    }
+};
+
 const getEstadoConfiguracion = async function (req, res, next) {
         
     if (!req.user || !req.user.empresa) {
@@ -967,6 +988,7 @@ module.exports = {
     createSucursalEmpresa,
 
     getEstadoConfiguracion,
+    aplicarZonaExonerada,
 
     reset2faEmpresa,
     putPolitica2faAdmin

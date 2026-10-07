@@ -1,7 +1,7 @@
 // SIEMPRE usa environment para URLs (regla 2.2)
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap, catchError, of } from 'rxjs';
+import { Observable, tap, catchError, of, shareReplay, finalize } from 'rxjs';
 import { global } from './global';
 import { 
     Permiso, 
@@ -10,6 +10,12 @@ import {
     ModuloInfo,
     LimitesPlanAcciones
 } from '../interfaces/permisos-interface';
+import { moduloMenuRequeridoParaUrl } from '../config/ruta-plan-modulo.map';
+import {
+    normalizarRutaAbsoluta,
+    planPermiteWhatsAppBot,
+    planPermiteWhatsAppVinculado
+} from '../config/saas-plan-reglas.util';
 
 interface ApiResponse<T> {
     message: string;
@@ -32,6 +38,8 @@ export class PermisosService {
     private _limitesPlan = signal<LimitesPlanAcciones | null>(null);
     /** True tras primera carga de permisos (éxito o error) para que el guard no re-dispare en bucle. */
     private _contextoPlanCargado = signal<boolean>(false);
+    private ultimaRespuestaPermisos: ApiResponse<PermisosUsuario> | null = null;
+    private permisosEnVuelo: Observable<ApiResponse<PermisosUsuario>> | null = null;
 
     // Exponer datos reactivos
     permisos = this._permisos.asReadonly();
@@ -54,12 +62,19 @@ export class PermisosService {
      * Carga los permisos del usuario autenticado
      */
     cargarPermisosUsuario(): Observable<ApiResponse<PermisosUsuario>> {
+        if (this.ultimaRespuestaPermisos && this._contextoPlanCargado()) {
+            return of(this.ultimaRespuestaPermisos);
+        }
+        if (this.permisosEnVuelo) {
+            return this.permisosEnVuelo;
+        }
         this._cargando.set(true);
-        return this.http.get<ApiResponse<PermisosUsuario>>(
+        this.permisosEnVuelo = this.http.get<ApiResponse<PermisosUsuario>>(
             `${this.url}permisos/usuario`,
             { withCredentials: true }
         ).pipe(
             tap(response => {
+                this.ultimaRespuestaPermisos = response;
                 if (response.data) {
                     this._permisos.set(response.data.listaPermisos || []);
                     const dm = response.data.deploymentMode;
@@ -102,8 +117,13 @@ export class PermisosService {
                         limitesPlan: null
                     }
                 });
-            })
+            }),
+            finalize(() => {
+                this.permisosEnVuelo = null;
+            }),
+            shareReplay(1)
         );
+        return this.permisosEnVuelo;
     }
 
     /**
@@ -206,9 +226,47 @@ export class PermisosService {
     }
 
     /**
+     * True si la ruta está permitida por el plan SaaS (mismos tope que saasPlanModuloGuard).
+     */
+    puedeAccederRutaPlan(ruta: string): boolean {
+        if (this.deploymentMode() !== 'saas') {
+            return true;
+        }
+        const modulos = this.modulosPlanMenu();
+        if (!modulos.length) {
+            return true;
+        }
+        const requerido = moduloMenuRequeridoParaUrl(ruta);
+        if (requerido === null) {
+            return true;
+        }
+        const set = new Set(modulos.map((m) => m.toUpperCase()));
+        if (!set.has(requerido.toUpperCase())) {
+            return false;
+        }
+        const abs = normalizarRutaAbsoluta((ruta || '').split('?')[0] || '/');
+        const planRaw = this.planCodeEfectivo();
+        if (abs.startsWith('/configuracion/whatsapp-bot')) {
+            return planPermiteWhatsAppBot(planRaw);
+        }
+        if (abs.startsWith('/configuracion/whatsapp')) {
+            return planPermiteWhatsAppVinculado(planRaw);
+        }
+        const plan = (planRaw || '').toLowerCase();
+        if (plan === 'demo') {
+            if (abs === '/caja' || abs.startsWith('/caja/') || abs === '/creditos' || abs.startsWith('/creditos/')) {
+                return abs === '/caja' || abs === '/caja/arqueo' || abs.startsWith('/caja/arqueo/');
+            }
+        }
+        return true;
+    }
+
+    /**
      * Limpia los permisos (al cerrar sesión)
      */
     limpiarPermisos(): void {
+        this.ultimaRespuestaPermisos = null;
+        this.permisosEnVuelo = null;
         this._permisos.set([]);
         this._navegacion.set([]);
         this._deploymentMode.set(null);

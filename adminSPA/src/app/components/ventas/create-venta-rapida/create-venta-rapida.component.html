@@ -74,7 +74,15 @@
       </div>
       <div class="row">
         <div class="venta-rapida-top mb-3">
-          <div class="card venta-rapida-panel shadow-sm">
+          <div class="venta-rapida-resumen-movil d-lg-none">
+            <div class="vr-chip"><span>Doc.</span> {{ etiquetaComprobanteRapido() }}</div>
+            <div class="vr-chip"><span>Cliente</span> {{ etiquetaClienteRapido() }}</div>
+            <div class="vr-chip"><span>Pago</span> {{ etiquetaPagoRapido() }}</div>
+            <button type="button" class="btn btn-sm btn-outline-secondary vr-chip-edit" (click)="mostrarDatosVentaRapida = !mostrarDatosVentaRapida">
+              {{ mostrarDatosVentaRapida ? 'Ocultar datos' : 'Editar datos' }}
+            </button>
+          </div>
+          <div class="card venta-rapida-panel shadow-sm" [class.venta-rapida-panel-colapsado]="!mostrarDatosVentaRapida">
             <div class="card-body py-3">
               <div class="row g-2 align-items-end">
                 <div class="col-6 col-md-3 col-lg-2">
@@ -162,8 +170,8 @@
 
         <div class="col-12">
 
-          <!-- Búsqueda inline de productos -->
-          <section class="card mb-3 venta-rapida-busqueda-card shadow-sm">
+          <!-- Escritorio: búsqueda inline de productos. En móvil se abre el modal con el botón Buscar del detalle. -->
+          <section class="card mb-3 venta-rapida-busqueda-card shadow-sm d-none d-lg-block">
             <div class="card-header bg-primary text-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
               <h6 class="mb-0"><i class="bi bi-search me-1"></i> Buscar producto</h6>
               <small class="opacity-75">Clic en fila para agregar al detalle</small>
@@ -248,13 +256,30 @@
 
           <!-- CARD: Detalle de Venta -->
           <section class="cart-section card">
-            <div class="card-header bg-success text-white d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 py-2 py-lg-3">
-              <h5 class="mb-0 flex-shrink-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
+            <div class="card-header bg-success text-white venta-rapida-detalle-header">
+              <h5 class="mb-0 venta-rapida-detalle-titulo"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
 
-              <div class="d-flex flex-wrap align-items-stretch align-items-lg-center gap-2 w-100 w-lg-auto justify-content-lg-end">
-                <input #inputCodigoBarra type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo"
-                  (input)="onInputCodigoProd()" (keydown.enter)="onEnterCodigoProd($event)"
-                  placeholder="Código de barras / producto" autocomplete="off" autofocus>
+              <div class="venta-rapida-detalle-acciones">
+                <div class="input-group venta-rapida-codigo-group">
+                  <input #inputCodigoBarra type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo"
+                    name="searchCodigoVentaRapida" [ngModelOptions]="{standalone: true}"
+                    (input)="onInputCodigoProd()" (keydown.enter)="onEnterCodigoProd($event)"
+                    placeholder="Código de barras / producto" autocomplete="off" autofocus>
+                  <button
+                    type="button"
+                    class="btn btn-outline-light d-lg-none venta-rapida-btn-camara"
+                    (click)="abrirEscanerCamara()"
+                    title="Leer código con la cámara"
+                    aria-label="Leer código con la cámara">
+                    <i class="bi bi-upc-scan" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-light text-success fw-semibold d-lg-none venta-rapida-btn-buscar-modal"
+                  (click)="abrirBuscadorProductos()">
+                  <i class="bi bi-search me-1"></i> Buscar
+                </button>
                 <div class="dropdown create-ventas-carga-dropdown">
                   <button type="button" class="btn btn-outline-light btn-sm create-ventas-icon-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Buscar venta o cotización">
                     <i class="bi bi-file-text"></i>

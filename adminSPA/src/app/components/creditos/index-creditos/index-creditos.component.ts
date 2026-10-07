@@ -14,7 +14,7 @@ import { filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
+import { fechaHoraVentaClienteAhora, formatFechaApiParaMostrar } from '../../../utils/fecha-local.util';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 
 declare var iziToast: any;
@@ -669,7 +669,9 @@ export class IndexCreditosComponent implements OnInit {
         return this.creditosService.obtenerCuotasCredito(item.idCredito, idEmpresaPago).pipe(
           switchMap((res: any) => {
             const cuotas: CuotaCredito[] = res.data || [];
-            const pendiente = cuotas.find((cu: CuotaCredito) => cu.estado === 'PENDIENTE' || cu.estado === 'VENCIDO');
+            const pendiente = cuotas.find((cu: CuotaCredito) =>
+              cu.estado === 'PENDIENTE' || cu.estado === 'VENCIDO' || cu.estado === 'PARCIAL'
+            );
             if (!pendiente) {
               return throwError(() => new Error('No hay cuota pendiente para ' + (item.comprobante || item.idCredito)));
             }
@@ -858,6 +860,10 @@ export class IndexCreditosComponent implements OnInit {
     return e ? (e.razonSocial || e.ruc || idEmp) : String(idEmp).slice(0, 13);
   }
 
+  formatFechaCredito(valor: string | null | undefined): string {
+    return formatFechaApiParaMostrar(valor) || '—';
+  }
+
   getEstadoBadgeClass(estado: string): string {
     switch (estado) {
       case 'ACTIVO': return 'bg-success';
@@ -871,6 +877,7 @@ export class IndexCreditosComponent implements OnInit {
     switch (estado) {
       case 'PAGADO': return 'bg-success';
       case 'PENDIENTE': return 'bg-warning';
+      case 'PARCIAL': return 'bg-info';
       case 'VENCIDO': return 'bg-danger';
       default: return 'bg-secondary';
     }

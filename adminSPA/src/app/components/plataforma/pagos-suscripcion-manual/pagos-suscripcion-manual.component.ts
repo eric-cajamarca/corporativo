@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SaasSubscriptionService } from '../../../services/saas-subscription.service';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 declare var iziToast: {
   success: (o: object) => void;
@@ -39,7 +40,10 @@ export class PagosSuscripcionManualComponent implements OnInit {
   confirmando = signal<string | null>(null);
   eliminando = signal<string | null>(null);
 
-  constructor(private saas: SaasSubscriptionService) {}
+  constructor(
+    private saas: SaasSubscriptionService,
+    private confirmacion: ConfirmacionDialogService
+  ) {}
 
   ngOnInit(): void {
     this.cargar();
@@ -68,14 +72,14 @@ export class PagosSuscripcionManualComponent implements OnInit {
 
   confirmar(row: PagoManualRow): void {
     if (!row?.orderNumber) return;
-    if (
-      !window.confirm(
-        `¿Confirmar pago de ${row.orderNumber}?\nPlan ${row.planCode} · S/ ${Number(row.monto).toFixed(2)}\nSe marcará PAGADO y se habilitará el plan si hay empresa vinculada.`
-      )
-    ) {
-      return;
-    }
-    this.ejecutarConfirmar(row, 'Pago marcado como PAGADO. Plan habilitado si corresponde.');
+    void this.confirmacion.confirmar({
+      titulo: 'Confirmar pago',
+      mensaje:
+        `¿Confirmar pago de ${row.orderNumber}?\nPlan ${row.planCode} · S/ ${Number(row.monto).toFixed(2)}\nSe marcará PAGADO y se habilitará el plan si hay empresa vinculada.`,
+      confirmarTexto: 'Sí, confirmar'
+    }).then((ok) => {
+      if (ok) this.ejecutarConfirmar(row, 'Pago marcado como PAGADO. Plan habilitado si corresponde.');
+    });
   }
 
   /** Reaplica plan a empresa vinculada (órdenes ya PAGADO que quedaron en demo por bug previo). */
@@ -91,14 +95,13 @@ export class PagosSuscripcionManualComponent implements OnInit {
       }
       return;
     }
-    if (
-      !window.confirm(
-        `¿Aplicar plan ${row.planCode} a la empresa vinculada?\nOrden ${row.orderNumber}`
-      )
-    ) {
-      return;
-    }
-    this.ejecutarConfirmar(row, 'Plan aplicado a la empresa. Pida al cliente recargar Mi suscripción.');
+    void this.confirmacion.confirmar({
+      titulo: 'Aplicar plan',
+      mensaje: `¿Aplicar plan ${row.planCode} a la empresa vinculada?\nOrden ${row.orderNumber}`,
+      confirmarTexto: 'Sí, aplicar'
+    }).then((ok) => {
+      if (ok) this.ejecutarConfirmar(row, 'Plan aplicado a la empresa. Pida al cliente recargar Mi suscripción.');
+    });
   }
 
   private ejecutarConfirmar(row: PagoManualRow, okMsg: string): void {
@@ -141,13 +144,18 @@ export class PagosSuscripcionManualComponent implements OnInit {
       sinEmpresa || sinCorreo
         ? '\n(Orden sin empresa vinculada y/o sin correo: típica de checkout abandonado.)'
         : '';
-    if (
-      !window.confirm(
-        `¿Eliminar la solicitud ${row.orderNumber}?\nPlan ${row.planCode} · ${row.estado}${avisoExtra}\nEsta acción no se puede deshacer.`
-      )
-    ) {
-      return;
-    }
+    void this.confirmacion.confirmar({
+      titulo: 'Eliminar solicitud',
+      mensaje: `¿Eliminar la solicitud ${row.orderNumber}?\nPlan ${row.planCode} · ${row.estado}${avisoExtra}\nEsta acción no se puede deshacer.`,
+      confirmarTexto: 'Sí, eliminar',
+      peligro: true
+    }).then((ok) => {
+      if (!ok) return;
+      this.eliminarPagoConfirmado(row);
+    });
+  }
+
+  private eliminarPagoConfirmado(row: PagoManualRow): void {
     this.eliminando.set(row.orderNumber);
     this.saas.eliminarPagoManual(row.orderNumber).subscribe({
       next: () => {

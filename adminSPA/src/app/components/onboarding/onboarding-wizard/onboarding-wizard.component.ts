@@ -1,7 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { PasoOnboarding } from '../../../interfaces/onboarding.interface';
+import { EmpresaService } from '../../../services/empresa.service';
+
+declare var iziToast: { success: (o: object) => void; error: (o: object) => void };
 
 @Component({
   selector: 'app-onboarding-wizard',
@@ -20,6 +23,9 @@ export class OnboardingWizardComponent implements OnChanges {
   ocultoTemporal = false;
   pasoActual: PasoOnboarding | null = null;
 
+  private empresaService = inject(EmpresaService);
+  guardandoZona = false;
+
   constructor(private router: Router) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -31,6 +37,28 @@ export class OnboardingWizardComponent implements OnChanges {
 
   get mostrarPanel(): boolean {
     return this.visible && !this.ocultoTemporal && this.pasos.length > 0 && this.progreso < 100;
+  }
+
+  responderZonaExonerada(exonerada: boolean): void {
+    if (this.guardandoZona) return;
+    this.guardandoZona = true;
+    this.empresaService.aplicarZonaExonerada(exonerada).subscribe({
+      next: (res) => {
+        this.guardandoZona = false;
+        iziToast.success({
+          title: 'Listo',
+          message: res?.message || (exonerada ? 'Zona exonerada configurada.' : 'IGV 18% activo.')
+        });
+        this.refrescar.emit();
+      },
+      error: (err) => {
+        this.guardandoZona = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || err?.message || 'No se pudo guardar la opción fiscal.'
+        });
+      }
+    });
   }
 
   irAlPaso(paso: PasoOnboarding): void {

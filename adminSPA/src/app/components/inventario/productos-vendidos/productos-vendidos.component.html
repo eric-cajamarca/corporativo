@@ -4,14 +4,14 @@
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h1 class="content-title mb-1">{{ soloNoVendidos ? 'Productos no vendidos' : 'Productos vendidos' }}</h1>
-          <p class="content-subtitle text-muted mb-0">
+          <p class="content-subtitle text-muted mb-0 d-none d-md-block">
             {{ soloNoVendidos
               ? 'Productos activos sin ventas en el período seleccionado'
               : 'Costo, venta y utilidad por línea o agrupado por producto' }}
           </p>
         </div>
         <a routerLink="/inventario" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-arrow-left me-1"></i> Volver a inventario
+          <i class="bi bi-arrow-left me-1"></i><span class="d-none d-sm-inline"> Volver a inventario</span>
         </a>
       </div>
     </div>
@@ -21,9 +21,9 @@
         <div class="row g-3 align-items-end">
           <div class="col-lg-3 col-md-6">
             <label class="form-label small fw-semibold">Periodo</label>
-            <div class="d-flex align-items-center gap-1 flex-wrap">
+            <div class="periodo-fechas">
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" (change)="cargar()" />
-              <span class="text-muted small">—</span>
+              <span class="periodo-fechas-sep text-muted small">—</span>
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargar()" />
             </div>
           </div>
@@ -35,7 +35,7 @@
               </button>
               <input type="text" class="form-control" placeholder="RUC" [(ngModel)]="clienteRuc" (blur)="onClienteManual()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosCliente()" title="Todos los clientes">
-                <i class="bi bi-check2"></i> Todos
+                <i class="bi bi-check2"></i><span class="d-none d-sm-inline"> Todos</span>
               </button>
             </div>
           </div>
@@ -46,7 +46,7 @@
                 <i class="bi bi-search"></i>
               </button>
               <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
-              <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()"><i class="bi bi-check2"></i> Todos</button>
+              <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()"><i class="bi bi-check2"></i><span class="d-none d-sm-inline"> Todos</span></button>
             </div>
           </div>
           <div class="col-lg-2 col-md-6">
@@ -113,8 +113,8 @@
 
     <div class="card shadow-sm">
       <div class="card-body py-2 border-bottom bg-light">
-        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
-          <div class="input-group input-group-sm pv-search">
+        <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 justify-content-between">
+          <div class="input-group input-group-sm pv-search flex-grow-1">
             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
             <input type="search" class="form-control" placeholder="Buscar..." [(ngModel)]="buscar" (input)="onBuscarInput()" />
           </div>
@@ -192,7 +192,7 @@
           @if (!cargando && items.length) {
             <tfoot>
               <tr class="pv-tfoot-row fila-vacia">
-                <td class="text-end fw-bold" [attr.colspan]="3">Total</td>
+                <td class="text-end fw-bold" data-label="Resumen" [attr.colspan]="3">Total</td>
                 @if (mostrarColumnaEmpresa) {
                   <td></td>
                 }
@@ -212,7 +212,7 @@
 
 @if (mostrarModalCliente) {
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header bg-info text-white">
           <h5 class="modal-title">Buscar cliente</h5>
@@ -229,7 +229,7 @@
 
 @if (mostrarModalCategoria) {
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-    <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header bg-info text-white">
           <h5 class="modal-title">Elegir categoría</h5>

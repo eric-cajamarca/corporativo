@@ -133,20 +133,55 @@ async function callApisPeru(path) {
   }
 }
 
+function dniEsReservado(dni) {
+  const d = String(dni || '').replace(/\D/g, '');
+  return d.length !== 8 || d === '00000000' || /^0+$/.test(d);
+}
+
+function dniTieneNombre(data) {
+  if (!data || typeof data !== 'object') return false;
+  return !!(data.nombres || data.nombreCompleto || data.apellidoPaterno);
+}
+
+async function tokenFactilizaPreferido() {
+  let token = tokenFactilizaEnv();
+  try {
+    const db = await withPool(async (pool) => {
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_RUC_SUNAT);
+      return (config && String(config.tokenDefault || '').trim()) || null;
+    });
+    if (db) token = db;
+  } catch (err) {
+    console.error('externalController tokenFactilizaPreferido:', err.message);
+  }
+  return token;
+}
+
 async function getDni(req, res) {
   const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
   if (!idEmpresa) {
     return res.status(403).json({ error: 'No autorizado' });
   }
-  const dni = (req.params.dni || '').trim();
+  const dni = String(req.params.dni || '').replace(/\D/g, '');
   if (!dni) {
     return res.status(400).json({ error: 'DNI requerido' });
   }
+  if (dniEsReservado(dni)) {
+    return res.status(200).json({
+      _source: 'none',
+      error: 'DNI no válido o reservado. El 00000000 es el cliente genérico.'
+    });
+  }
 
-  let factilizaResult = await tryFactiliza(`/dni/info/${dni}`);
-  if (factilizaResult.ok && factilizaResult.inner) {
-    const data = normalizeDni(factilizaResult.raw);
-    return res.status(200).json({ _source: 'factiliza', data });
+  const token = await tokenFactilizaPreferido();
+  if (token) {
+    const factilizaResult = await tryFactilizaWithToken(`/dni/info/${dni}`, token, 3500);
+    if (factilizaResult.ok && factilizaResult.inner) {
+      const data = normalizeDni(factilizaResult.raw);
+      if (dniTieneNombre(data)) {
+        return res.status(200).json({ _source: 'factiliza', data });
+      }
+    }
   }
 
   const apisRes = await callApisPeru(`/dni/${dni}`);
@@ -154,7 +189,7 @@ async function getDni(req, res) {
   if (!apisRes.ok || apisRes.status !== 200) {
     return res.status(200).json({
       _source: sourceLabel,
-      error: (apisRes.raw && apisRes.raw.message) || 'Error al consultar DNI'
+      error: (apisRes.raw && apisRes.raw.message) || 'No se encontraron resultados para este DNI'
     });
   }
   const raw = apisRes.raw;
@@ -162,6 +197,9 @@ async function getDni(req, res) {
     return res.status(200).json({ _source: sourceLabel, error: raw.message || 'DNI no encontrado' });
   }
   const data = normalizeDni(raw);
+  if (!dniTieneNombre(data)) {
+    return res.status(200).json({ _source: sourceLabel, error: 'No se encontraron resultados para este DNI' });
+  }
   return res.status(200).json({ _source: sourceLabel, data });
 }
 

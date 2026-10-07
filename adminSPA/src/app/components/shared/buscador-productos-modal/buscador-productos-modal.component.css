@@ -49,15 +49,15 @@
   }
 
   .buscador-card-codigo {
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #64748b;
+    color: #334155;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
   }
 
   .buscador-card-precio {
@@ -77,9 +77,11 @@
   }
 
   .buscador-card-meta {
-    font-size: 0.75rem;
-    color: #94a3b8;
+    font-size: 0.78rem;
+    color: #475569;
     margin-bottom: 0.55rem;
+    white-space: normal;
+    word-break: break-word;
   }
 
   .buscador-card-foot {

@@ -16,7 +16,7 @@ import { VentasService, ComprobantePdfData } from '../../../services/ventas.serv
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { EmpresaService } from '../../../services/empresa.service';
-import { formatFechaLocal } from '../../../utils/fecha-local.util';
+import { formatFechaLocal, formatFechaApiParaMostrar } from '../../../utils/fecha-local.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
 import { forkJoin, Observable } from 'rxjs';
@@ -155,6 +155,13 @@ export class KardexComponent implements AfterViewInit, OnInit {
     return fila.excluidoDeTotales === true;
   }
 
+  get hayDiferenciaStockLotes(): boolean {
+    const stock = Number(this.data?.totales?.stockActualSistema);
+    const saldo = Number(this.data?.totales?.saldoFinalCantidad);
+    if (!Number.isFinite(stock) || !Number.isFinite(saldo)) return false;
+    return Math.abs(stock - saldo) > 0.0001;
+  }
+
   get filasVisibles(): KardexFila[] {
     if (!this.data?.filas) return [];
     const t = (this.filtroTexto || '').trim().toLowerCase();
@@ -224,12 +231,9 @@ export class KardexComponent implements AfterViewInit, OnInit {
 
   formatearFecha(iso: string | undefined): string {
     if (iso == null || iso === '') return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    const local = formatFechaApiParaMostrar(iso);
+    if (local) return local;
+    return String(iso);
   }
 
   formatearMoneda(n: number | undefined): string {
@@ -322,8 +326,8 @@ export class KardexComponent implements AfterViewInit, OnInit {
         f.pUnitarioEntrada || '',
         f.importeEntrada || '',
         f.cantidadSalida || '',
-        f.pUnitarioSalida || '',
-        f.importeSalida || '',
+        f.pUnitarioSalidaValorizado || f.pUnitarioSalida || '',
+        f.importeSalidaValorizado || f.importeSalida || '',
         f.saldoCantidad,
         f.saldoPUnitario,
         f.saldoImporte

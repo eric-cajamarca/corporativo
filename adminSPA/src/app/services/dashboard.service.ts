@@ -75,10 +75,12 @@ export class DashboardService {
     this.url = global.url;
   }
 
-  private queryDashboard(periodo?: string): string {
+  private queryDashboard(periodo?: string, fechaInicio?: string, fechaFin?: string): string {
     const params = new URLSearchParams();
     if (periodo) params.set('periodo', periodo);
     params.set('fechaReferencia', getFechaHoyLocal());
+    if (fechaInicio) params.set('fechaInicio', fechaInicio);
+    if (fechaFin) params.set('fechaFin', fechaFin);
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   }
@@ -87,12 +89,19 @@ export class DashboardService {
    * Obtiene el resumen del dashboard con datos reales de la empresa.
    * @param periodo - 'Hoy' | 'Esta Semana' | 'Este Mes' | 'Este Año'
    */
-  obtenerResumen(periodo?: string): Observable<{ data: ResumenDashboard }> {
+  obtenerResumen(
+    periodo?: string,
+    fechaInicio?: string,
+    fechaFin?: string
+  ): Observable<{ data: ResumenDashboard }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    return this._http.get<{ data: ResumenDashboard }>(this.url + 'dashboard/resumen' + this.queryDashboard(periodo), {
-      headers,
-      withCredentials: true
-    });
+    return this._http.get<{ data: ResumenDashboard }>(
+      this.url + 'dashboard/resumen' + this.queryDashboard(periodo, fechaInicio, fechaFin),
+      {
+        headers,
+        withCredentials: true
+      }
+    );
   }
 
   /** Consolidado gestora + empresas gestionadas (403 si no es gestora). */

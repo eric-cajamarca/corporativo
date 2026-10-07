@@ -20,13 +20,15 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { esFormaOMedioSaldoFavor, filtrarSinSaldoFavor } from '../../../utils/saldo-favor-pago.util';
 import { RecetaVentaModalService } from '../../../services/receta-venta-modal.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { BarcodeScannerModalService } from '../../../services/barcode-scanner-modal.service';
 import { RecetaVentaPayload } from '../../../models/receta-venta.model';
 import { etiquetaCondicionVenta, lineasQueRequierenReceta, requiereReceta } from '../../../utils/receta-venta.util';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
 import { VentaUnidadMatizadoFlowService } from '../../../services/venta-unidad-matizado-flow.service';
-import { cantidadEnUnidadCompra, etiquetaUnidadCarrito } from '../../../utils/unidad-venta.util';
+import { cantidadEnUnidadCompra, etiquetaUnidadCarrito, precioListaMismaUnidad } from '../../../utils/unidad-venta.util';
 import {
   descripcionConColorMatizado,
   payloadMatizadoParaApi,
@@ -38,7 +40,8 @@ import {
   marcaProductoEnLista,
   productoActivoParaVenta,
   productoCoincideBusquedaMultipalabra,
-  productoSinStockEnBusqueda
+  productoSinStockEnBusqueda,
+  resolverProductoPorCodigoEnLista
 } from '../../../utils/producto-busqueda.util';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { VentaCotizacionUiService } from '../../../services/venta-cotizacion-ui.service';
@@ -60,6 +63,7 @@ import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import {
   armarDetallesConIgv,
+  ajustarDesgloseSiPrecioIncluyeIgv,
   calcularMontoIgv,
   esImpuestoIgv,
   redondear2
@@ -89,6 +93,7 @@ import {
   validarClienteSunatParaComprobante,
   validarStockLinea
 } from '../../../utils/pos-validacion.util';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 import {
   COMPROBANTES_DESTINO_GESTORA,
   aplicaDescuentoEnTotalLineaGestora,
@@ -130,6 +135,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   public searchCodigo = '';
   /** Evita disparar la búsqueda en cada tecla del escáner (debounce). */
   private busquedaCodigoTimer: ReturnType<typeof setTimeout> | null = null;
+  private busquedaCodigoEnCurso = false;
   private readonly DEBOUNCE_BUSQUEDA_CODIGO_MS = 180;
   public searchTermInline = '';
   public productosBusquedaInline: any[] = [];
@@ -186,6 +192,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   loadingEditClienteCredito = false;
   public cajas: any[] = [];
   public loading = false;
+  private confirmadoEmisionSunat = false;
   public clienteBuscando = false;
   /** Forma de pago seleccionada en cabecera (venta rápida). */
   formaPagoRapidaId: number | string = 0;
@@ -263,6 +270,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   sesionesGuardadas: VentaSesion[] = [];
   mostrarModalRecuperar = false;
   hayVentasGuardadas = false;
+  mostrarDatosVentaRapida = false;
+  mostrarCantidadPreciosEnBuscador = false;
+  mostrarStockUbicacionesEnBuscador = false;
 
   /** Config inventario: permitir vender con stock 0 o negativo. */
   permitirVentasNegativas = false;
@@ -342,6 +352,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
+    private confirmacion: ConfirmacionDialogService,
     private auth: AuthService,
     private rubrosService: RubrosService,
     private pdfService: PdfService,
@@ -352,7 +363,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private route: ActivatedRoute,
     private router: Router,
     private posKeyboard: PosKeyboardService,
-    private recetaVentaModal: RecetaVentaModalService
+    private recetaVentaModal: RecetaVentaModalService,
+    private buscadorProductosModal: BuscadorProductosModalService,
+    private barcodeScannerModal: BarcodeScannerModalService
   ) {}
 
 
@@ -401,13 +414,29 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   ngOnInit(): void {
     this.ventaProvisionalUi.configurarModo('rapida');
     this.cargarCatalogoBusquedaInline();
-    this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
+    this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
         const normClave = (c: { clave?: string; Clave?: string }) =>
           String(c?.clave ?? c?.Clave ?? '')
             .trim()
             .toUpperCase();
+        const getVal = (clave: string, def = '') => {
+          const found = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === clave);
+          const raw =
+            found && (found as { valor?: string; Valor?: string }).valor !== undefined
+              ? (found as { valor?: string; Valor?: string }).valor
+              : (found as { valor?: string; Valor?: string })?.Valor;
+          return raw != null ? String(raw) : def;
+        };
+        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
+          false
+        );
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR', 'false'),
+          false
+        );
         const itemDesc = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_DESCUENTO_EN_TOTAL');
         const vDesc =
           itemDesc && (itemDesc as { valor?: string; Valor?: string }).valor !== undefined
@@ -537,7 +566,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
           return;
         }
         if (!this.esGestora) {
-          this._productoService.limpiarCacheListaProductos();
           this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
           this.carrito = this.carrito.filter((ln) => this.productoPerteneceEmpresaOperativa(ln));
         }
@@ -546,7 +574,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       error: () => {
         this.esGestora = false;
         this.esEmpresaGestionada = false;
-        this._productoService.limpiarCacheListaProductos();
         this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
         this.cargarPermitirVentaMultiSucursal();
       }
@@ -786,6 +813,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   private configurarAtajosPos(): void {
     this.posKeyboard.activar({
       buscar: () => {
+        if (typeof window !== 'undefined' && window.innerWidth < 992) {
+          this.abrirBuscadorProductos();
+          return;
+        }
         this.inputBusquedaInline?.nativeElement?.focus();
         this.enfocarEscanner();
       },
@@ -1320,8 +1351,13 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   /** Anula la venta actual (elimina de provisionales) y deja pantalla lista para nueva venta. */
-  anularVenta(): void {
-    if (!confirm('¿Anular esta venta? Se eliminará de las ventas provisionales.')) return;
+  async anularVenta(): Promise<void> {
+    const okAnularProv = await this.confirmacion.confirmar({
+      titulo: 'Anular venta',
+      mensaje: '¿Anular esta venta? Se eliminará de las ventas provisionales.',
+      peligro: true
+    });
+    if (!okAnularProv) return;
     this.ventaProvisionalUi.eliminarSesionActiva();
     this.limpiarVenta();
     this.actualizarIndicadorVentasGuardadas();
@@ -1796,6 +1832,73 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     setTimeout(() => this.inputBusquedaInline?.nativeElement?.focus(), 0);
   }
 
+  abrirBuscadorProductos(): void {
+    this.abrirBuscadorProductosModal();
+  }
+
+  async abrirEscanerCamara(): Promise<void> {
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (!codigo) return;
+    this.searchCodigo = codigo;
+    this.buscarCodigoProd();
+  }
+
+  private abrirBuscadorProductosModal(): void {
+    this.buscadorProductosModal
+      .abrir({
+        modo: 'venta',
+        conservarUltimaBusqueda: true,
+        terminoInicial: (this.searchTermInline || this.searchCodigo || '').toString().trim() || undefined,
+        idSucursal: String(this.ventas.idSucursal || ''),
+        mostrarStockUbicacionesEnBuscador: this.mostrarStockUbicacionesEnBuscador,
+        venta: {
+          idSucursalApi: this.idSucursalParaBusquedaApi(),
+          esGestora: this.esGestora,
+          idSucursalDefault: String(this.ventas.idSucursal || ''),
+          buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
+          filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
+          onPrecargarCatalogo: () => this.cargarCatalogoBusquedaInline(),
+          estaEnDetalle: (p) => this.yaEstaEnCarritoInline(p),
+          mostrarCantidadPreciosEnBuscador: this.mostrarCantidadPreciosEnBuscador,
+          mostrarStockUbicacionesEnBuscador: this.mostrarStockUbicacionesEnBuscador
+        }
+      })
+      .then((prod) => {
+        if (!prod) {
+          this.enfocarEscanner();
+          return;
+        }
+        this.fusionarFilasEnCatalogoMemoria([prod]);
+        this.fusionarCatalogoBusquedaInline([prod]);
+        this.agregarAlCarrito(prod);
+        this.enfocarEscanner();
+      });
+  }
+
+  private buscarEnCatalogoLocal(term: string): any[] | null {
+    const termOk = String(term || '').trim();
+    if (termOk.length < 2) {
+      return [];
+    }
+    if (this._productoService.tieneCatalogoEnMemoria()) {
+      const mem = this._productoService.filtrarListaMemoriaVenta(termOk, 300);
+      if (mem !== null) {
+        return this.obtenerCatalogoProductosOperativo(mem).slice(0, this.buscadorLimiteFilas);
+      }
+    }
+    const fuente =
+      (this.catalogoBusquedaInline?.length || 0) > 0
+        ? this.catalogoBusquedaInline
+        : this.stockSucursales_const;
+    if ((fuente?.length || 0) > 0) {
+      const parcial = (fuente || []).filter((item: any) =>
+        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, termOk)
+      );
+      return this.obtenerCatalogoProductosOperativo(parcial).slice(0, this.buscadorLimiteFilas);
+    }
+    return null;
+  }
+
   yaEstaEnCarritoInline(producto: any): boolean {
     return this.carrito.some(
       (p) =>
@@ -1981,6 +2084,12 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       0.000001,
       Number(producto?.cantidadSeleccionada) > 0 ? Number(producto.cantidadSeleccionada) : 1
     );
+    const precioElegido =
+      producto?.pVentaSeleccionada != null && !Number.isNaN(Number(producto.pVentaSeleccionada))
+        ? Number(producto.pVentaSeleccionada)
+        : producto?.pVenta != null && !Number.isNaN(Number(producto.pVenta))
+          ? Number(producto.pVenta)
+          : undefined;
     const existe = this.carrito.find(p =>
       String(p.idProducto) === String(producto.idProducto) &&
       String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
@@ -2000,6 +2109,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         iziToast.info({ title: 'Stock', message: stockVal.advertencia, position: 'topRight' });
       }
       existe.cantidad = cantNueva;
+      if (precioElegido != null) {
+        existe.pVenta = precioElegido;
+      }
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
       const stockVal = this.validarStockAgregarAlCarrito(producto, cantAgregar);
@@ -2014,6 +2126,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.carrito.push({
         ...producto,
         cantidad: cantAgregar,
+        ...(precioElegido != null ? { pVenta: precioElegido } : {}),
         descripcionOriginal: descCat,
         permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1)
       });
@@ -2060,26 +2173,30 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   buscarCodigoProd(): void {
-      // normalizar input
       const raw = (this.searchCodigo ?? '').toString().trim();
       if (!raw) {
         return;
       }
 
-      // opcional: exigir mínimo de caracteres para evitar búsquedas insignificantes
-      if (raw.length < 5) {
+      if (raw.length < 2) {
+        iziToast.warning({
+          title: 'Código',
+          message: 'Escriba al menos 2 caracteres para buscar.',
+          position: 'topRight'
+        });
         return;
       }
 
-      const term = raw.toLowerCase();
       const fuenteMemoria = this.obtenerCatalogoProductosOperativo();
-      if (fuenteMemoria.length > 0) {
-        const enMemoria = this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw);
-        if (enMemoria) {
-          this.aplicarResultadoBusquedaCodigo(enMemoria);
-          return;
-        }
+      const exactoMemoria = resolverProductoPorCodigoEnLista(fuenteMemoria, raw, { soloExacto: true });
+      if (exactoMemoria) {
+        this.aplicarResultadoBusquedaCodigo(exactoMemoria);
+        return;
       }
+      if (this.busquedaCodigoEnCurso) {
+        return;
+      }
+      this.busquedaCodigoEnCurso = true;
       this._productoService
         .buscarProductosVenta({
           q: raw,
@@ -2088,56 +2205,30 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         })
         .subscribe({
           next: (res) => {
+            this.busquedaCodigoEnCurso = false;
             const list = (Array.isArray(res?.data) ? res.data : []).filter((item: any) =>
               productoActivoParaVenta(item as Record<string, unknown>)
             );
             this.fusionarFilasEnCatalogoMemoria(list);
-            this.aplicarResultadoBusquedaCodigo(this.resolverProductoPorCodigoEnLista(list, term, raw));
+            this.aplicarResultadoBusquedaCodigo(
+              resolverProductoPorCodigoEnLista(list, raw, { aceptarUnico: true })
+            );
           },
-          error: () => {
+          error: (err) => {
+            this.busquedaCodigoEnCurso = false;
+            const local = resolverProductoPorCodigoEnLista(fuenteMemoria, raw);
+            if (local) {
+              this.aplicarResultadoBusquedaCodigo(local);
+              return;
+            }
             iziToast.show({
               title: 'ERROR',
               titleColor: '#FF0000',
-              message: 'No se pudo buscar el producto por código',
+              message: err?.error?.message || 'No se pudo buscar el producto por código',
               position: 'topRight'
             });
           }
         });
-  }
-
-  private resolverProductoPorCodigoEnLista(fuente: any[], term: string, raw: string): any | null {
-      let encontrado = fuente.find((item: any) => {
-        const codigo = (item.codigo ?? '').toString().toLowerCase();
-        return codigo === term;
-      });
-      if (encontrado) {
-        return encontrado;
-      }
-
-      // Códigos de barras numéricos (EAN/UPC, etc.): solo coincidencia exacta.
-      // Evita que al escanear "77585..." se dispare con el prefijo antes de terminar.
-      const esCodigoBarrasNumerico = /^\d+$/.test(term) && term.length >= 8;
-      if (esCodigoBarrasNumerico) {
-        encontrado = fuente.find((item: any) => String(item.idProducto) === term);
-        return encontrado ?? null;
-      }
-
-      if (!encontrado) {
-        encontrado = fuente.find((item: any) => {
-          const codigo = (item.codigo ?? '').toString().toLowerCase();
-          return codigo.includes(term);
-        });
-      }
-      if (!encontrado && /^\d+$/.test(term)) {
-        encontrado = fuente.find((item: any) => String(item.idProducto) === term);
-      }
-      if (!encontrado && raw.length >= 2) {
-        encontrado = fuente.find((item: any) => {
-          const codigo = (item.codigo ?? '').toString().toLowerCase();
-          return codigo.startsWith(term);
-        });
-      }
-      return encontrado ?? null;
   }
 
   private aplicarResultadoBusquedaCodigo(encontrado: any | null): void {
@@ -2154,7 +2245,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
           position: 'topRight',
           message: 'El código no existe.'
         });
-        this.searchCodigo = '';
         setTimeout(() => this.inputCodigoBarra?.nativeElement?.focus(), 0);
       }
   }
@@ -2176,15 +2266,15 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
       const aplicarDescuentoLinea = this.aplicaDescuentoEnTotalLinea(item);
-      const precioPrincipal = aplicarDescuentoLinea ? this.obtenerPrecioPrincipal(item) : 0;
+      const precioLista = aplicarDescuentoLinea
+        ? precioListaMismaUnidad(item, this.obtenerPrecioPrincipal(item))
+        : 0;
 
-      // Descuento lista vs vendido solo si hay precio de lista > 0 y se vende a ese o menos.
-      // Si lista es 0 / sin precio, o el precio manual es mayor, usar pVenta (visible en totales).
-      if (aplicarDescuentoLinea && precioPrincipal > 0 && precioPrincipal >= pVenta) {
-        const subtotalItem = redondear2(precioPrincipal * cant);
+      if (aplicarDescuentoLinea && precioLista > 0 && precioLista >= pVenta) {
+        const subtotalItem = redondear2(precioLista * cant);
         this.ventas.subTotal += subtotalItem;
-        if (precioPrincipal > pVenta) {
-          this.ventas.descuentos += redondear2((precioPrincipal - pVenta) * cant);
+        if (precioLista > pVenta) {
+          this.ventas.descuentos += redondear2((precioLista - pVenta) * cant);
         }
       } else {
         const subtotalItem = redondear2(pVenta * cant);
@@ -2212,9 +2302,14 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.ventas.igvMonto = calcularMontoIgv(baseGravada, this.ventas.igvPorcentaje, pIncluyeIGV);
       this.ventas.igv = this.ventas.igvMonto;
       if (pIncluyeIGV) {
-        // Subtotal fiscal = base imponible (precio final − IGV).
-        const baseImponible = redondear2(baseGravada - this.ventas.igvMonto);
-        this.ventas.subTotal = redondear2(baseImponible + this.ventas.descuentos);
+        const desglose = ajustarDesgloseSiPrecioIncluyeIgv(
+          this.ventas.descuentos,
+          baseGravada,
+          this.ventas.igvMonto,
+          this.ventas.igvPorcentaje
+        );
+        this.ventas.subTotal = desglose.subTotal;
+        this.ventas.descuentos = desglose.descuentos;
       }
     }
 
@@ -2266,15 +2361,23 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
  obtenerPrecioPrincipal(item: any): number {
+  const fallback = Number(item.precio ?? item.pVenta) || 0;
   if (!item.precios || typeof item.precios !== 'object') {
-    return Number(item.precio ?? item.pVenta) || 0;
+    return fallback;
   }
-
-  const listaPrincipal = Object.values(item.precios).find(
-    (p: any) => p.principal === true || p.principal === 1
+  const valores = Object.values(item.precios) as { principal?: unknown; precio?: unknown }[];
+  const listaPrincipal = valores.find(
+    (p) => p.principal === true || p.principal === 1
   );
-
-  return listaPrincipal ? (listaPrincipal as any).precio : Number(item.pVenta ?? item.precio) || 0;
+  const precioPrincipal = Number(listaPrincipal?.precio) || 0;
+  if (precioPrincipal > 0) {
+    return precioPrincipal;
+  }
+  const primeraConPrecio = valores.find((p) => Number(p.precio) > 0);
+  if (primeraConPrecio) {
+    return Number(primeraConPrecio.precio) || 0;
+  }
+  return fallback;
 }
 
   private aplicaDescuentoEnTotalLinea(item: { idEmpresa?: string | null }): boolean {
@@ -2448,6 +2551,26 @@ abrirModalPrecios(item: any) {
     const c = this.cliente;
     if (!c) return '';
     return (c.rSocial ?? c.r_Social ?? c.rsocial ?? c.nombre_o_razon_social ?? c.razonSocial ?? c.RazonSocial ?? '').toString().trim();
+  }
+
+  etiquetaComprobanteRapido(): string {
+    const id = String(this.ventas?.idComprobante || '');
+    const c = (this.comprobantes || []).find((x: { idComprobante?: unknown }) => String(x.idComprobante) === id);
+    if (!c) return '—';
+    return `${c.codigo || ''} ${c.nombre || ''}`.trim();
+  }
+
+  etiquetaClienteRapido(): string {
+    return this.getRazonSocialDisplay() || 'Público general';
+  }
+
+  etiquetaPagoRapido(): string {
+    const f = (this.formasPago || []).find((x: { idFormaPago?: unknown }) => x.idFormaPago === this.formaPagoRapidaId);
+    if (f?.descripcion) return String(f.descripcion);
+    const m = (this.mediosPago || []).find(
+      (x: { idMediosPago?: unknown }) => String(x.idMediosPago) === String(this.ventas?.idMediosPago || '')
+    );
+    return m?.descripcion ? String(m.descripcion) : '—';
   }
 
   /** True si hay cliente elegido: con idCliente (BD/lista) o con documento y razón social (se creará al registrar). */
@@ -3176,6 +3299,18 @@ abrirModalPrecios(item: any) {
       this.enviarCotizacion(idCliente);
       return;
     }
+    if (this.esFacturaOBoletaVenta() && !this.confirmadoEmisionSunat) {
+      void this.confirmacion.confirmar({
+        titulo: 'Emitir a SUNAT',
+        mensaje: 'Esta venta es boleta o factura electrónica. ¿Confirma emitirla a SUNAT?',
+        confirmarTexto: 'Sí, emitir'
+      }).then((ok) => {
+        if (!ok) return;
+        this.confirmadoEmisionSunat = true;
+        this.registrarVenta();
+      });
+      return;
+    }
     const totalCredit = this.getMontoCreditoVenta();
     if (
       totalCredit > 0.01 &&
@@ -3750,6 +3885,7 @@ abrirModalPrecios(item: any) {
         }
         const abrirPdf =
           this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
+        this.ventaProvisionalUi.eliminarTrasRegistro(ventaPayload.compVenta, this.carrito);
         if (abrirPdf) {
           this.postVentaIdVenta = idVentaPdf;
           this.cerrarPostVentaWhatsappForm();
@@ -3760,7 +3896,6 @@ abrirModalPrecios(item: any) {
             }
           }, 0);
         } else {
-          this.ventaProvisionalUi.eliminarSesionActiva();
           this.limpiarVenta();
         }
       },

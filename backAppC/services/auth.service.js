@@ -369,6 +369,7 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
     email,
     password: hashedPassword,
     idRol,
+    estado: datos.estado === false || datos.estado === 0 ? false : true,
     fregistro: moment().format('YYYY-MM-DD')
   };
 

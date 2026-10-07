@@ -2859,10 +2859,14 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecut
         }
       }
     }
-    await transaction.request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query('DELETE FROM MovimientosCaja WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa');
+    const CajaRepository = require('./caja.repository');
+    await CajaRepository.registrarExtornosAnulacionVentaRepo(transaction, {
+      idEmpresa,
+      idVenta,
+      idUsuario: idUsuarioEjecutor || venta.idUsuario,
+      compVenta: venta.compVenta,
+      fechaMovimiento: null
+    });
     await transaction.request()
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -3947,4 +3951,163 @@ exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
       WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
     `);
   return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+};
+
+exports.devolucionParcialNotaVentaRepo = async (pool, idEmpresa, idVenta, lineas, idUsuario) => {
+  const stockRepository = require('./stock.repository');
+  const inventarioRepository = require('./inventario.repository');
+  const CajaRepository = require('./caja.repository');
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const ventaRs = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT v.idVenta, v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario, v.total,
+          ISNULL(v.eliminado, 0) AS eliminado,
+          UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+      `);
+    const venta = ventaRs.recordset && ventaRs.recordset[0];
+    if (!venta) {
+      await transaction.rollback();
+      throw new Error('Venta no encontrada.');
+    }
+    if (venta.eliminado) {
+      await transaction.rollback();
+      throw new Error('La nota de venta ya fue anulada.');
+    }
+    if (String(venta.codigoComprobante || '').toUpperCase() !== 'NV') {
+      await transaction.rollback();
+      throw new Error('La devolución parcial aplica solo a nota de venta.');
+    }
+    const detRs = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .query(`
+        SELECT idDetalle, idProducto, cantidad, ISNULL(pVenta, 0) AS pVenta,
+          ISNULL(total, 0) AS total, ISNULL(costoUnitario, 0) AS costoUnitario
+        FROM DetalleVenta WHERE idVenta = @idVenta
+      `);
+    const porId = new Map((detRs.recordset || []).map((d) => [Number(d.idDetalle), d]));
+    let montoDevuelto = 0;
+    const aplicadas = [];
+    for (const ln of lineas || []) {
+      const idDetalle = Number(ln.idDetalle);
+      const cantDev = Number(ln.cantidad) || 0;
+      if (!idDetalle || cantDev <= 0) continue;
+      const det = porId.get(idDetalle);
+      if (!det) {
+        await transaction.rollback();
+        throw new Error('Hay una línea que no pertenece a esta venta.');
+      }
+      const cantOrig = Number(det.cantidad) || 0;
+      if (cantDev > cantOrig + 0.0001) {
+        await transaction.rollback();
+        throw new Error('La cantidad a devolver supera lo vendido en una línea.');
+      }
+      const factor = cantOrig > 0 ? cantDev / cantOrig : 0;
+      const montoLinea = Math.round((Number(det.total) || cantDev * Number(det.pVenta) || 0) * factor * 100) / 100;
+      montoDevuelto += montoLinea;
+      await stockRepository.restaurarStockEnLotes(transaction, {
+        idEmpresa,
+        idSucursal: venta.idSucursal,
+        idProducto: det.idProducto,
+        cantidad: cantDev
+      });
+      const idUsuarioMov = idUsuario || venta.idUsuario;
+      if (idUsuarioMov) {
+        await inventarioRepository.insertarFilaMovimiento(transaction, {
+          idEmpresa,
+          idSucursal: venta.idSucursal,
+          idProducto: det.idProducto,
+          tipoMovimiento: 'EN',
+          cantidad: cantDev,
+          docRelacionado: venta.compVenta,
+          idComprobante: venta.idComprobante,
+          idUsuario: idUsuarioMov,
+          observaciones: 'Devolución parcial de nota de venta',
+          costoUnitario: det.costoUnitario != null ? Number(det.costoUnitario) : 0,
+          idLote: null
+        });
+      }
+      const nuevaCant = Math.round((cantOrig - cantDev) * 1000) / 1000;
+      if (nuevaCant <= 0.0001) {
+        await transaction.request()
+          .input('idDetalle', sql.Int, idDetalle)
+          .query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
+      } else {
+        const nuevoTotal = Math.round((Number(det.pVenta) || 0) * nuevaCant * 100) / 100;
+        await transaction.request()
+          .input('idDetalle', sql.Int, idDetalle)
+          .input('cantidad', sql.Decimal(18, 6), nuevaCant)
+          .input('total', sql.Decimal(18, 6), nuevoTotal)
+          .query('UPDATE DetalleVenta SET cantidad = @cantidad, total = @total WHERE idDetalle = @idDetalle');
+      }
+      aplicadas.push({ idDetalle, cantidad: cantDev, monto: montoLinea });
+    }
+    if (!aplicadas.length) {
+      await transaction.rollback();
+      throw new Error('Indique al menos una cantidad a devolver.');
+    }
+    const totRs = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .query(`
+        SELECT ISNULL(SUM(ISNULL(total, 0)), 0) AS total,
+          ISNULL(SUM(ISNULL(cantidad, 0) * ISNULL(pVenta, 0)), 0) AS bruto
+        FROM DetalleVenta WHERE idVenta = @idVenta
+      `);
+    const nuevoTotal = Number(totRs.recordset[0]?.total) || 0;
+    await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('total', sql.Decimal(18, 6), nuevoTotal)
+      .input('subTotal', sql.Decimal(18, 6), nuevoTotal)
+      .query(`
+        UPDATE Ventas
+        SET total = @total, subtotal = @subTotal, igv = 0, exonerado = @total
+        WHERE idVenta = @idVenta
+      `);
+
+    if (montoDevuelto > 0.009) {
+      const idTipo = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(transaction, 'DEVOLUCION_VENTA');
+      const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(transaction, idEmpresa);
+      if (idTipo && apertura && apertura.idApertura) {
+        const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
+        await transaction.request()
+          .input('idApertura', sql.UniqueIdentifier, apertura.idApertura)
+          .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+          .input('idSucursal', sql.UniqueIdentifier, apertura.idSucursal || venta.idSucursal)
+          .input('idUsuario', sql.UniqueIdentifier, idUsuario || venta.idUsuario)
+          .input('idTipoMovimientoCaja', sql.Int, idTipo)
+          .input('fechaMovimiento', sql.VarChar(23), resolveFechaHoraClienteSql(null))
+          .input('concepto', sql.VarChar(100), ('Devolución parcial ' + (venta.compVenta || '')).slice(0, 100))
+          .input('monto', sql.Decimal(18, 2), Math.round(montoDevuelto * 100) / 100)
+          .input('idVenta', sql.Int, idVenta)
+          .query(`
+            INSERT INTO MovimientosCaja (
+              idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja,
+              fechaMovimiento, concepto, monto, idVenta
+            )
+            VALUES (
+              @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
+              TRY_CONVERT(DATETIME, @fechaMovimiento, 120), @concepto, @monto, @idVenta
+            )
+          `);
+      }
+    }
+
+    await transaction.commit();
+    return {
+      ok: true,
+      idVenta,
+      montoDevuelto: Math.round(montoDevuelto * 100) / 100,
+      totalRestante: nuevoTotal,
+      lineas: aplicadas
+    };
+  } catch (error) {
+    try { await transaction.rollback(); } catch (_) { /* ignore */ }
+    throw error;
+  }
 };

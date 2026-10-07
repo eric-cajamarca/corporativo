@@ -8,7 +8,7 @@
             Para vender hoy
           </h2>
           <p class="text-muted small mb-0">
-            Ya eres administrador, la caja está abierta y los catálogos listos. Solo faltan estos 2 pasos.
+            Ya eres administrador, la caja está abierta y los catálogos listos. Completa estos pasos para vender.
           </p>
         </div>
         <div class="text-lg-end">
@@ -26,9 +26,16 @@
       @if (pasoActual) {
         <div class="alert alert-light border mb-4 py-2 px-3">
           <strong>Siguiente paso:</strong> {{ pasoActual.titulo }} — {{ pasoActual.descripcion }}
-          <button type="button" class="btn btn-sm btn-primary ms-2" (click)="irAlPaso(pasoActual!)">
-            Ir ahora
-          </button>
+          @if (pasoActual.id === 'zona-exonerada') {
+            <div class="d-inline-flex flex-wrap gap-2 ms-2">
+              <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="guardandoZona" (click)="responderZonaExonerada(true)">Sí, zona exonerada</button>
+              <button type="button" class="btn btn-sm btn-primary" [disabled]="guardandoZona" (click)="responderZonaExonerada(false)">No, uso IGV 18%</button>
+            </div>
+          } @else {
+            <button type="button" class="btn btn-sm btn-primary ms-2" (click)="irAlPaso(pasoActual!)">
+              Ir ahora
+            </button>
+          }
         </div>
       }
 
@@ -51,7 +58,16 @@
                     }
                   </div>
                   <p class="small text-muted mb-2">{{ paso.descripcion }}</p>
-                  @if (!paso.completo) {
+                  @if (!paso.completo && paso.id === 'zona-exonerada') {
+                    <div class="d-flex flex-wrap gap-2">
+                      <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="guardandoZona" (click)="responderZonaExonerada(true)">
+                        Sí, zona exonerada
+                      </button>
+                      <button type="button" class="btn btn-primary btn-sm" [disabled]="guardandoZona" (click)="responderZonaExonerada(false)">
+                        No, uso IGV 18%
+                      </button>
+                    </div>
+                  } @else if (!paso.completo) {
                     <button type="button" class="btn btn-outline-primary btn-sm" (click)="irAlPaso(paso)">
                       Continuar
                     </button>

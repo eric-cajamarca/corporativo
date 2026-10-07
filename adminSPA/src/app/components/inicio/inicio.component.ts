@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, effect, OnDestroy } from '@angular/core';
-import { Router, NavigationEnd, RouterModule } from '@angular/router';
+import { Router, NavigationEnd, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { SidebarStateService } from '../../services/sidebar-state.service';
@@ -14,6 +14,8 @@ import { PasoOnboarding } from '../../interfaces/onboarding.interface';
 import { FacturacionService } from '../../services/facturacion.service';
 import { Chart } from 'chart.js/auto';
 import { filter, Subscription } from 'rxjs';
+
+declare var iziToast: any;
 
 @Component({
   selector: 'app-inicio',
@@ -80,6 +82,10 @@ export class InicioComponent implements OnInit, OnDestroy {
 
   /** SaaS: aviso si falta completar pago / vincular suscripción */
   public mostrarAlertaSuscripcion = false;
+  /** Plan Demo u otro plan: módulo bloqueado al entrar por URL. */
+  public moduloBloqueado: string | null = null;
+  public etiquetaModuloBloqueado = '';
+  private ultimoModuloBloqueadoToast: string | null = null;
 
   /** Recuadro de ayuda SUNAT en Inicio (se oculta si ya está configurada o el usuario la cerró). */
   public mostrarAyudaFacturacion = false;
@@ -93,6 +99,7 @@ export class InicioComponent implements OnInit, OnDestroy {
     private empresaService: EmpresaService,
     private saasSubscriptionService: SaasSubscriptionService,
     private facturacionService: FacturacionService,
+    private route: ActivatedRoute,
     public sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario
@@ -121,6 +128,7 @@ export class InicioComponent implements OnInit, OnDestroy {
 
     this.cargarEstadoOnboarding();
     this.cargarAyudaFacturacion();
+    this.route.queryParamMap.subscribe(() => this.leerModuloBloqueado());
 
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
@@ -153,6 +161,51 @@ export class InicioComponent implements OnInit, OnDestroy {
     });
   }
 
+  private leerModuloBloqueado(): void {
+    const raw = this.route.snapshot.queryParamMap.get('moduloBloqueado');
+    const codigo = (raw || '').trim().toUpperCase();
+    if (!codigo) {
+      this.moduloBloqueado = null;
+      this.etiquetaModuloBloqueado = '';
+      return;
+    }
+    const etiquetas: Record<string, string> = {
+      CAJA: 'Caja',
+      CREDITOS: 'Créditos',
+      WHATSAPP: 'WhatsApp',
+      WHATSAPP_BOT: 'WhatsApp Bot',
+      PLAN: 'este módulo',
+      VENTAS: 'Ventas',
+      COMPRAS: 'Compras',
+      INVENTARIO: 'Inventario',
+      FACTURACION: 'Facturación',
+      ANALISIS: 'Análisis',
+      REPORTES: 'Reportes',
+      CONFIGURACION: 'Configuración',
+      PRODUCTOS: 'Productos',
+      CLIENTES: 'Clientes',
+      DESPACHOS: 'Despachos'
+    };
+    this.moduloBloqueado = codigo;
+    this.etiquetaModuloBloqueado = etiquetas[codigo] || codigo.replace(/_/g, ' ').toLowerCase();
+    if (this.ultimoModuloBloqueadoToast === codigo) {
+      return;
+    }
+    this.ultimoModuloBloqueadoToast = codigo;
+    if (typeof iziToast !== 'undefined') {
+      iziToast.warning({
+        title: 'Plan actual',
+        message: `${this.etiquetaModuloBloqueado} está en otro plan. Mejore su plan para usarlo.`,
+        position: 'topRight',
+        timeout: 6000
+      });
+    }
+  }
+
+  irAMejorarPlan(): void {
+    void this.router.navigate(['/planes']);
+  }
+
   ocultarAyudaFacturacion(): void {
     localStorage.setItem(this.ayudaFacturacionStorageKey, '1');
     this.mostrarAyudaFacturacion = false;
@@ -183,17 +236,10 @@ export class InicioComponent implements OnInit, OnDestroy {
   // Información del usuario
   private initializeDashboard(): void {
     this.cargandoDatos.set(true);
-    
-    // Cargar permisos del usuario
-    this.permisosService.cargarPermisosUsuario().subscribe({
-      next: () => {
-        // Cargar datos del dashboard
-        this.cargarDatosDashboard();
-      },
-      error: (error) => {
-        this.cargarDatosDashboard();
-      }
-    });
+    if (!this.permisosService.contextoPlanCargado()) {
+      this.permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
+    }
+    this.cargarDatosDashboard();
   }
 
   /**
@@ -362,7 +408,15 @@ export class InicioComponent implements OnInit, OnDestroy {
           ticks: {
             callback: function(value: number | string) {
               const n = typeof value === 'number' ? value : parseFloat(String(value));
-              return 'S/ ' + (n / 1000).toFixed(0) + 'k';
+              if (!Number.isFinite(n)) return '';
+              if (Math.abs(n) < 1000) {
+                return 'S/ ' + n.toLocaleString('es-PE', { maximumFractionDigits: 0 });
+              }
+              if (Math.abs(n) < 1000000) {
+                const miles = n / 1000;
+                return 'S/ ' + miles.toFixed(Math.abs(n) % 1000 === 0 ? 0 : 1) + 'k';
+              }
+              return 'S/ ' + (n / 1000000).toFixed(1) + 'M';
             }
           },
           grid: { color: 'rgba(0, 0, 0, 0.05)' }

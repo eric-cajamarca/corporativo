@@ -53,6 +53,9 @@ export class BuscadorProductosModalService {
     if (opts.venta) {
       component.ventaOpciones = opts.venta;
     }
+    if (opts.terminoInicial) {
+      component.searchTerm = String(opts.terminoInicial).trim();
+    }
     if (typeof opts.mostrarStockUbicacionesEnBuscador === 'boolean') {
       component.mostrarStockUbicacionesEnBuscador = opts.mostrarStockUbicacionesEnBuscador;
     }
@@ -63,7 +66,13 @@ export class BuscadorProductosModalService {
         component.productosFiltrados = [...this.estadoBusquedaVentaPersistida.productosFiltrados];
         component.buscadorMensaje = this.estadoBusquedaVentaPersistida.buscadorMensaje;
       }
+      if (opts.terminoInicial) {
+        component.searchTerm = String(opts.terminoInicial).trim();
+      }
       opts.venta?.onPrecargarCatalogo?.();
+      if (opts.terminoInicial && component.modo === 'venta') {
+        component.recargarProductosDesdeServidor();
+      }
       component.enfocarCampoBusqueda();
     });
 

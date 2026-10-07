@@ -88,7 +88,7 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
       codigo: ['', [Validators.required, Validators.minLength(2)]],
       descripcion: ['', [Validators.required, Validators.minLength(3)]],
       idCategoria: ['', Validators.required],
-      idMarca: ['', Validators.required],
+      idMarca: [''],
       idPresentacion: ['', Validators.required],
       tipoProducto: ['S', Validators.required],
       cUnitario: [0, [Validators.required, Validators.min(0)]],
@@ -266,7 +266,7 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
     const payload = {
       Codigo: v.codigo,
       idCategoria: Number(v.idCategoria),
-      idMarca: Number(v.idMarca),
+      idMarca: v.idMarca != null && String(v.idMarca).trim() !== '' ? Number(v.idMarca) : undefined,
       descripcion: v.descripcion,
       idPresentacion: Number(v.idPresentacion),
       cUnitario: Number(v.cUnitario),

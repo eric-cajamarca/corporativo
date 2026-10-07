@@ -62,6 +62,17 @@ export function formatFechaApiParaMostrar(valor: string | null | undefined): str
   return `${d}/${m}/${y}`;
 }
 
+/** Formatea YYYY-MM-DD HH:mm[:ss] (API, hora civil) a dd/MM/yyyy HH:mm sin UTC. */
+export function formatFechaHoraApiParaMostrar(valor: string | null | undefined): string {
+  const v = valor != null ? String(valor).trim() : '';
+  if (!v) return '';
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (m) {
+    return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+  }
+  return formatFechaApiParaMostrar(v);
+}
+
 /** Igual que fechaVentaParaApi pero permite null (p. ej. fVencimiento opcional). */
 export function fechaVentaOpcionalParaApi(valor: string | null | undefined): string | null {
   const v = valor != null ? String(valor).trim() : '';

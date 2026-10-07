@@ -62,7 +62,7 @@
           <thead>
             <tr>
               <th>Ruc/Dni</th>
-              <th>Razón Social</th>
+              <th>Nombre / Razón social</th>
               <th>Condición</th>
               <th>Estado</th>
 
@@ -77,11 +77,11 @@
                 <span class="badge bg-success selector-estado-movil" *ngIf="item.estado === true">Activo</span>
                 <span class="badge bg-danger selector-estado-movil" *ngIf="item.estado === false">Inactivo</span>
               </td>
-              <td data-label="Razón social" class="selector-cell-razon">{{item.rSocial}}</td>
+              <td data-label="Nombre / Razón social" class="selector-cell-razon">{{item.rSocial}}</td>
               <td data-label="Condición"
                   [class.selector-cell-omit-mobile]="item.condicion !== 'ACTIVO' && item.condicion !== 'INACTIVO'">
-                <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Habido</span>
-                <span class="badge bg-danger" *ngIf="item.condicion === 'INACTIVO'">No habido</span>
+                <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">{{ esPersonaNatural(item) ? 'Activo' : 'Habido' }}</span>
+                <span class="badge bg-danger" *ngIf="item.condicion === 'INACTIVO'">{{ esPersonaNatural(item) ? 'Inactivo' : 'No habido' }}</span>
               </td>
               <td data-label="Estado" class="selector-cell-estado-desktop">
                 <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>

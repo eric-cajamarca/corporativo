@@ -269,6 +269,13 @@ export class IndexClientesComponent implements OnDestroy {
     });
   }
 
+  esPersonaNatural(item: { idDocumento?: unknown; ruc?: unknown }): boolean {
+    const id = String(item?.idDocumento ?? '');
+    if (id === '1' || id === '4') return true;
+    const doc = String(item?.ruc ?? '').replace(/\D/g, '');
+    return doc.length === 8;
+  }
+
   elegir(cliente: any): void {
     this.clienteElegido.emit(cliente);
   }

@@ -2,7 +2,9 @@ const sql = require('mssql');
 const {
   periodoARango,
   calcularResumenFinancieroPeriodo,
-  obtenerGastosAgrupadosPorMes
+  obtenerGastosAgrupadosPorMes,
+  SQL_VENTAS_AJUSTADAS_BASE,
+  SQL_COSTO_POR_VENTA
 } = require('../utils/kpisFinancierosOperativo.util');
 const {
   resolverRangoConsultaAnalisis,
@@ -10,6 +12,7 @@ const {
   rangoPeriodoAnterior
 } = require('../utils/analisisPeriodo.util');
 const { obtenerFlujoCajaPeriodo } = require('../utils/flujoCajaAnalisis.util');
+const { partesAhoraApp } = require('../utils/fechaDisplay.util');
 const InventarioRepository = require('./inventario.repository');
 
 /**
@@ -55,7 +58,7 @@ async function obtenerCuentasPorCobrarRepo(pool, idEmpresa) {
     const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
       SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
       FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
     `);
     return Number((r.recordset[0] || {}).saldo || 0);
   } catch (_) {
@@ -292,16 +295,14 @@ async function obtenerEstadoResultadosRepo(pool, idEmpresa, filtros) {
     .input('fechaFin', sql.Date, fechaFin)
     .query(`
       SELECT
-        CONCAT(YEAR(v.fEmision), '-', RIGHT('0' + CAST(MONTH(v.fEmision) AS VARCHAR(2)), 2)) AS periodo,
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costoVentas,
-        ISNULL(SUM(v.total), 0) - ISNULL(SUM(dv.costoTotal), 0) AS utilidadBruta
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio AND CONVERT(DATE, v.fEmision) <= @fechaFin
-      GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
-      ORDER BY YEAR(v.fEmision), MONTH(v.fEmision)
+        CONCAT(YEAR(base.fechaEmision), '-', RIGHT('0' + CAST(MONTH(base.fechaEmision) AS VARCHAR(2)), 2)) AS periodo,
+        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costoVentas,
+        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+      FROM (${SQL_VENTAS_AJUSTADAS_BASE}) base
+      LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
+      GROUP BY YEAR(base.fechaEmision), MONTH(base.fechaEmision)
+      ORDER BY YEAR(base.fechaEmision), MONTH(base.fechaEmision)
     `);
 
   const gastosPorPeriodo = await obtenerGastosAgrupadosPorMes(
@@ -431,18 +432,18 @@ async function obtenerComprasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fe
  * Ratios financieros del último período con datos reales (CxP, efectivo, rotaciones reales).
  */
 async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
-  const ahora = new Date();
-  const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+  const ahora = partesAhoraApp();
+  const mesActual = `${ahora.y}-${ahora.m}`;
   const { fechaInicio, fechaFin } = periodoARango(mesActual);
 
   const [balance, estado, inventarioValor, cxcSaldo, cxpSaldo, ventasCreditoMes, comprasCreditoMes] = await Promise.all([
-    obtenerBalanceGeneralRepo(pool, idEmpresa, 'MES_ACTUAL'),
+    obtenerBalanceGeneralRepo(pool, idEmpresa, { periodo: 'MES_ACTUAL' }),
     obtenerEstadoResultadosRepo(pool, idEmpresa, { periodoInicio: mesActual, periodoFin: mesActual }),
     InventarioRepository.obtenerInventarioValorizadoEmpresa(pool, idEmpresa),
     pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
       SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
       FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
     `).catch(() => ({ recordset: [{ saldo: 0 }] })),
     obtenerCxPRepo(pool, idEmpresa),
     obtenerVentasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fechaFin),

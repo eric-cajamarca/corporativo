@@ -19,6 +19,9 @@ const {
 const diagnosticoRepo = require('../repositories/asistenteDuenoDiagnostico.repository');
 const consultasRepo = require('../repositories/asistenteDuenoConsultas.repository');
 const { withPool } = require('../utils/dbPool.util');
+const saasPlanAccesoService = require('./saasPlanAcceso.service');
+const saasPlanAccesoRepository = require('../repositories/saasPlanAcceso.repository');
+const { getDeploymentMode } = require('../config/deployment.config');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MENSAJE = 2000;
@@ -254,7 +257,21 @@ async function chat(idEmpresa, { mensaje, historial, rutaActual, tituloPagina, f
   const ruta = sanitizarTexto(rutaActual).slice(0, 200);
   const titulo = sanitizarTexto(tituloPagina).slice(0, 120);
   const foto = sanitizarFotoPantalla(fotoPantalla);
-  const ficha = await withPool((pool) => consultasRepo.armarFicha(pool, idEmpresa, usuario || {}));
+  const ficha = await withPool(async (pool) => {
+    const base = await consultasRepo.armarFicha(pool, idEmpresa, usuario || {});
+    if (getDeploymentMode() === 'saas') {
+      try {
+        const planCode = await saasPlanAccesoService.obtenerPlanCodeActivo(pool, idEmpresa);
+        base.planCode = planCode;
+        base.modulosPlanMenu = await saasPlanAccesoRepository.listarModulosPorPlan(pool, planCode);
+      } catch (err) {
+        console.error('asistenteDueno.plan:', err.message);
+        base.planCode = null;
+        base.modulosPlanMenu = [];
+      }
+    }
+    return base;
+  });
 
   if (!geminiClient.resolverApiKey()) {
     return responderConGuiaLocal(idEmpresa, texto, ruta, foto, historial, ficha);

@@ -1,6 +1,33 @@
 const rubrosRepository = require('../repositories/rubros.repository');
 
+async function asegurarRubroFerreteria(pool) {
+    const sql = require('mssql');
+    const existente = await rubrosRepository.obtenerPorCodigo(pool, 'FERR');
+    if (!existente) {
+        await rubrosRepository.crear(pool, {
+            codigo: 'FERR',
+            nombre: 'Ferretería',
+            descripcion: 'Facturación estándar; tope 22 líneas por factura.',
+            activo: true
+        });
+        return;
+    }
+    if (!existente.activo) {
+        await rubrosRepository.actualizar(pool, existente.idRubro, {
+            codigo: existente.codigo,
+            nombre: existente.nombre || 'Ferretería',
+            descripcion: existente.descripcion,
+            activo: true
+        });
+    }
+}
+
 exports.listar = async (pool, query) => {
+    try {
+        await asegurarRubroFerreteria(pool);
+    } catch (err) {
+        console.error('rubros.service asegurarRubroFerreteria:', err.message);
+    }
     return rubrosRepository.listar(pool, query);
 };
 

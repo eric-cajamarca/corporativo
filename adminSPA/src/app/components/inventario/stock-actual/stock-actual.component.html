@@ -5,7 +5,7 @@
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h1 class="content-title mb-1">Stock actual</h1>
-          <p class="content-subtitle text-muted mb-0">Inventario consolidado por producto</p>
+          <p class="content-subtitle text-muted mb-0 d-none d-md-block">Inventario consolidado por producto</p>
         </div>
         
       </div>
@@ -22,7 +22,7 @@
               </button>
               <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()" title="Todas las categorías">
-                <i class="bi bi-check2"></i> Todos
+                <i class="bi bi-check2"></i><span class="d-none d-sm-inline"> Todos</span>
               </button>
             </div>
           </div>
@@ -34,7 +34,7 @@
               </button>
               <input type="text" class="form-control" placeholder="Marca" [(ngModel)]="filtroMarca" (blur)="cargar()" />
               <button type="button" class="btn btn-outline-primary" (click)="todosMarca()" title="Todas las marcas">
-                <i class="bi bi-check2"></i> Todos
+                <i class="bi bi-check2"></i><span class="d-none d-sm-inline"> Todos</span>
               </button>
             </div>
           </div>
@@ -137,11 +137,11 @@
           </thead>
           <tbody>
             @if (cargando) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 7 : 6" class="text-center py-4 text-muted">Cargando…</td>
               </tr>
             } @else if (!items.length) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 7 : 6" class="text-center py-4 text-muted">Sin resultados</td>
               </tr>
             } @else {
@@ -174,7 +174,7 @@
 
 @if (mostrarModalCategoria) {
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-    <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header bg-info text-white">
           <h5 class="modal-title">Elegir categoría</h5>
@@ -211,7 +211,7 @@
 
 @if (mostrarModalMarca) {
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-    <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header bg-info text-white">
           <h5 class="modal-title">Elegir marca</h5>

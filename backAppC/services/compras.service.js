@@ -182,6 +182,29 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
                 );
             }
 
+            const totalNum = Number(total) || 0;
+            if (idEstadoPagoFinal === 2 && totalNum > 0) {
+                const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(transaction, idEmpresa);
+                if (!apertura || !apertura.idApertura) {
+                    throw new Error('Abra la caja para registrar una compra al contado.');
+                }
+                const idTipoEgreso = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(transaction, 'COMPRA_CONTADO');
+                if (!idTipoEgreso) {
+                    throw new Error('No existe el tipo de movimiento COMPRA_CONTADO. Configure los tipos de caja.');
+                }
+                const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
+                const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
+                await CajaRepository.registrarMovimientoRepo(transaction, userMin, {
+                    idApertura: apertura.idApertura,
+                    idTipoMovimientoCaja: idTipoEgreso,
+                    concepto: 'Compra al contado ' + serieNum,
+                    monto: totalNum,
+                    idMediosPago: idMediosPago != null ? Number(idMediosPago) : null,
+                    documentoRelacionado: serieNum,
+                    fechaMovimiento: fEmisionSQL
+                });
+            }
+
             await transaction.commit();
         } catch (err) {
             try {
@@ -190,36 +213,6 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
                 console.error('compras.service crearCompra rollback:', re);
             }
             throw err;
-        }
-
-        // Registrar egreso en caja solo si: comprobante es Boleta (03) o Factura (01) y compra está pagada.
-        const totalNum = Number(total) || 0;
-        if (idEstadoPagoFinal === 2 && totalNum > 0) {
-            try {
-                const codigoComp = await comprasRepository.obtenerCodigoComprobante(pool, idEmpresa, idComprobante);
-                const codigo = (codigoComp || '').trim();
-                const esBoletaOFactura = codigo === '01' || codigo === '03';
-                if (esBoletaOFactura) {
-                    const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, idEmpresa);
-                    if (apertura && apertura.idApertura) {
-                        const idTipoEgreso = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(pool, 'COMPRA_CONTADO');
-                        if (idTipoEgreso) {
-                            const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
-                            const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
-                            await CajaRepository.registrarMovimientoRepo(pool, userMin, {
-                                idApertura: apertura.idApertura,
-                                idTipoMovimientoCaja: idTipoEgreso,
-                                concepto: 'Compra al contado ' + serieNum,
-                                monto: totalNum,
-                                idMediosPago: idMediosPago != null ? Number(idMediosPago) : null,
-                                documentoRelacionado: serieNum
-                            });
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('compras.service crearCompra: no se pudo registrar egreso en caja:', err);
-            }
         }
 
         return { idCompra };

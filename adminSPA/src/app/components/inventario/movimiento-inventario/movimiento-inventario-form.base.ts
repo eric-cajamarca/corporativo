@@ -390,9 +390,9 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
     const permitidos = new Set(this.tiposCodigoPermitidos);
     const fallback: TipoMovimientoItem[] = [
       { codigo: 'INVENTARIO_INICIAL', descripcion: 'Inventario inicial' },
-      { codigo: 'ENTRADA_VARIA', descripcion: 'Entrada varia' },
-      { codigo: 'REAJUSTE_POSITIVO', descripcion: 'Reajuste de stock (positivo)' },
-      { codigo: 'REAJUSTE_NEGATIVO', descripcion: 'Reajuste de stock (negativo)' },
+      { codigo: 'ENTRADA_VARIA', descripcion: 'Entradas varias' },
+      { codigo: 'REAJUSTE_POSITIVO', descripcion: 'Reajuste de stock positivo' },
+      { codigo: 'REAJUSTE_NEGATIVO', descripcion: 'Reajuste de stock negativo' },
       { codigo: 'SALIDA_MERMA', descripcion: 'Salida / Merma' },
       { codigo: 'DEVOLUCION', descripcion: 'Devoluciones' },
       { codigo: 'TRANSFERENCIA', descripcion: 'Transferencia entre sucursales' }
@@ -452,9 +452,12 @@ export abstract class MovimientoInventarioFormBase implements OnInit, OnDestroy 
   }
 
   private docRelacionadoDesdeComprobante(comp: { serie?: string; numero?: string | number }): string {
-    const serie = comp.serie || '';
-    const numero = comp.numero != null ? String(comp.numero) : '';
-    return serie && numero ? `${serie}-${numero}` : serie || numero || '';
+    const serie = String(comp.serie || '').trim();
+    const raw = String(comp.numero ?? '').replace(/\D/g, '');
+    const n = parseInt(raw || '0', 10);
+    const siguiente = Number.isFinite(n) && n > 0 ? n : 1;
+    const numero = String(siguiente).padStart(8, '0');
+    return serie ? `${serie}-${numero}` : numero;
   }
 
   protected aplicarComprobanteSugeridoPorTipo(tipoCodigo: string): void {

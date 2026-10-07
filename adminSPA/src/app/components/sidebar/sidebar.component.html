@@ -1,20 +1,4 @@
-<!-- Botón toggle para móvil -->
-
-<button 
-
-  class="sidebar-mobile-toggle d-lg-none" 
-
-  (click)="toggleMobileSidebar()"
-
-  [class.active]="isMobileOpen()">
-
-  <i class="bi" [class.bi-list]="!isMobileOpen()" [class.bi-x-lg]="isMobileOpen()"></i>
-
-</button>
-
-
-
-<!-- Overlay para móvil -->
+<!-- Overlay para móvil (el menú hamburguesa está solo en el topnav para no tapar el logo) -->
 
 <div 
 
@@ -178,13 +162,13 @@
 
                     [class.active]="isRouteActive(link.ruta || null)">
 
-                    <button type="button" class="submenu-link" (click)="navigateTo(link.ruta || null)">
+                    <a class="submenu-link" [routerLink]="rutaMenuLink(link.ruta)" (click)="onMenuClick($event, link.ruta || null)">
 
                       <i class="bi bi-circle submenu-dot"></i>
 
                       <span>{{ link.nombre }}</span>
 
-                    </button>
+                    </a>
 
                   </li>
 
@@ -202,13 +186,13 @@
 
                 [class.active]="isRouteActive(sub.ruta || null)">
 
-                <button type="button" class="submenu-link" (click)="navigateTo(sub.ruta || null)">
+                <a class="submenu-link" [routerLink]="rutaMenuLink(sub.ruta)" (click)="onMenuClick($event, sub.ruta || null)">
 
                   <i class="bi bi-circle submenu-dot"></i>
 
                   <span>{{ sub.nombre }}</span>
 
-                </button>
+                </a>
 
               </li>
 
@@ -232,7 +216,7 @@
 
                   <li *ngFor="let link of sub.submenu">
 
-                    <a href="#" (click)="navigateTo(link.ruta || null); $event.preventDefault()">{{ link.nombre }}</a>
+                    <a [routerLink]="rutaMenuLink(link.ruta)" (click)="onMenuClick($event, link.ruta || null)">{{ link.nombre }}</a>
 
                   </li>
 
@@ -240,7 +224,7 @@
 
                 <li *ngIf="!esSubmenuModulo(sub) && sub.visible !== false">
 
-                  <a href="#" (click)="navigateTo(sub.ruta || null); $event.preventDefault()">{{ sub.nombre }}</a>
+                  <a [routerLink]="rutaMenuLink(sub.ruta)" (click)="onMenuClick($event, sub.ruta || null)">{{ sub.nombre }}</a>
 
                 </li>
 
@@ -264,13 +248,13 @@
 
           [class.active]="isRouteActive(item.ruta || null)">
 
-          <button
-
-            type="button"
+          <a
 
             class="nav-link"
 
-            (click)="navigateTo(item.ruta || null)"
+            [routerLink]="rutaMenuLink(item.ruta)"
+
+            (click)="onMenuClick($event, item.ruta || null)"
 
             [title]="isCollapsed() ? item.nombre : ''">
 
@@ -278,7 +262,7 @@
 
             <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
 
-          </button>
+          </a>
 
         </li>
 
@@ -326,13 +310,13 @@
 
                 [class.active]="isRouteActive(subItem.ruta || null)">
 
-                <button type="button" class="submenu-link" (click)="navigateTo(subItem.ruta || null)">
+                <a class="submenu-link" [routerLink]="rutaMenuLink(subItem.ruta)" (click)="onMenuClick($event, subItem.ruta || null)">
 
                   <i class="bi bi-circle submenu-dot"></i>
 
                   <span>{{subItem.nombre}}</span>
 
-                </button>
+                </a>
 
               </li>
 
@@ -352,7 +336,7 @@
 
                 <li *ngIf="subItem.visible !== false && subItem.ruta">
 
-                  <a href="#" (click)="navigateTo(subItem.ruta); $event.preventDefault()">{{subItem.nombre}}</a>
+                  <a [routerLink]="rutaMenuLink(subItem.ruta)" (click)="onMenuClick($event, subItem.ruta || null)">{{subItem.nombre}}</a>
 
                 </li>
 

@@ -506,7 +506,7 @@ exports.buscarProductosVentaRepo = async (
       FROM Productos p
       INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
       INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-      INNER JOIN Marcas m ON p.idMarca = m.idMarca
+      LEFT JOIN Marcas m ON p.idMarca = m.idMarca
       INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
       WHERE p.idEmpresa IN (${inClauseEmp})
         AND ISNULL(p.estado, 1) = 1
@@ -728,7 +728,7 @@ async function buscarProductosVentaFallbackRepo(
     FROM Productos p
     INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
     INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-    INNER JOIN Marcas m ON p.idMarca = m.idMarca
+    LEFT JOIN Marcas m ON p.idMarca = m.idMarca
     CROSS APPLY (
       SELECT TOP 1 su.idSucursal
       FROM Sucursal su
@@ -1307,7 +1307,11 @@ const EXTRAS_PRODUCTO = [
   { col: 'laboratorio', type: () => sql.VarChar(120), from: (row) => row.laboratorio || null, if: (row) => valorDefinido(row.laboratorio) },
   { col: 'condicionVenta', type: () => sql.VarChar(20), from: (row) => row.condicionVenta || 'LIBRE', if: (row) => valorDefinido(row.condicionVenta) },
   { col: 'codigoEan', type: () => sql.VarChar(14), from: (row) => row.codigoEan || null, if: (row) => valorDefinido(row.codigoEan) },
-  { col: 'controlado', type: () => sql.Bit, from: (row) => (row.controlado ? 1 : 0), if: (row) => row.controlado === true || row.controlado === 1 }
+  { col: 'controlado', type: () => sql.Bit, from: (row) => (row.controlado ? 1 : 0), if: (row) => row.controlado === true || row.controlado === 1 },
+  { col: 'idImpuesto', type: () => sql.Int, from: (row) => {
+    const n = Number(row.idImpuesto);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, if: (row) => row.idImpuesto !== undefined && row.idImpuesto !== null && String(row.idImpuesto).trim() !== '' }
 ];
 
 let cacheColumnasProductos = null;

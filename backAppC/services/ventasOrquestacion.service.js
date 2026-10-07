@@ -208,6 +208,16 @@ exports.listarNotasCreditoDebito = async (pool, idempresa, query) => {
   });
 };
 
+exports.devolucionParcialNotaVenta = async (pool, idEmpresa, idVenta, lineas, user) => {
+  return ventasRepository.devolucionParcialNotaVentaRepo(
+    pool,
+    idEmpresa,
+    idVenta,
+    lineas,
+    user && user.sub ? user.sub : null
+  );
+};
+
 exports.anularVenta = async (pool, idEmpresaUsuario, idVenta, user) => {
   const idsPermitidos = await idsEmpresaParaComprobanteVenta(pool, idEmpresaUsuario);
   return ventasRepository.anularVentaRepo(

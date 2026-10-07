@@ -67,6 +67,8 @@
                 <th>Descripción</th>
                 <th>U.Med.</th>
                 <th>C.Unit.</th>
+                <th>P.Venta</th>
+                <th>Stock</th>
                 <th>F.Prod.</th>
                 <th>F.Venc.</th>
                 <th>Acción</th>
@@ -75,7 +77,7 @@
             </thead>
             <tbody class="font-size-base">
               <tr *ngIf="productos.length === 0" class="productos-fila-vacia">
-                <td [attr.colspan]="mostrarColumnaSucursal ? 9 : 8" class="text-center text-muted py-4" data-label="">
+                <td [attr.colspan]="mostrarColumnaSucursal ? 11 : 10" class="text-center text-muted py-4" data-label="">
                   <p class="mb-2">No se encontraron productos que coincidan con la búsqueda.</p>
                   <button type="button" class="btn btn-sm btn-outline-primary" (click)="limpiarFiltroBusqueda()">
                     Ver todos los productos
@@ -100,16 +102,22 @@
                   <span>{{item.descripcion}}</span>
                 </td>
                 <td data-label="U.Med.">
-                  <span>{{item.codigoPresentacion}} </span>
+                  <span>{{ etiquetaUnidad(item) }}</span>
                 </td>
                 <td data-label="C.Unit.">
                   <span>{{item.cUnitario | number:'1.2-2'}}</span>
                 </td>
+                <td data-label="P.Venta">
+                  <span>{{ precioVentaFila(item) | number:'1.2-2' }}</span>
+                </td>
+                <td data-label="Stock">
+                  <span>{{ stockFila(item) | number:'1.0-3' }}</span>
+                </td>
                 <td data-label="F.Prod.">
-                  <span>{{ item.fProduccion || '—' }}</span>
+                  <span>{{ fechaProducto(item.fProduccion) }}</span>
                 </td>
                 <td data-label="F.Venc." style="width: 60px; text-align: right;">
-                  <span>{{item.fVencimiento}}</span>
+                  <span>{{ fechaProducto(item.fVencimiento) }}</span>
                 </td>
                
                 <td data-label="Acción">

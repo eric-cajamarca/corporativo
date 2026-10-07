@@ -9,6 +9,7 @@ import { DeploymentContextService } from '../../../services/deployment-context.s
 import { AuthService } from '../../../services/auth.service';
 import { CheckoutResumen } from '../../../models/saas-public.model';
 import { LS_CHECKOUT_PENDIENTE } from '../../../utils/saas-registro-origen.util';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 type MedioPagoManual = 'yape' | 'plin' | 'bcp';
 /** Canal principal: Culqi (tarjeta) o transferencia / Yape / Plin. */
@@ -62,7 +63,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     private saasPublic: SaasPublicService,
     private deployment: DeploymentContextService,
     private auth: AuthService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private confirmacion: ConfirmacionDialogService
   ) {}
 
   ngOnInit(): void {
@@ -174,8 +176,21 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   async reportarPagoManual(): Promise<void> {
     if (!this.validarAceptacionLegal()) return;
     if (!this.validarEmailPago()) return;
+    const ref = (this.referenciaPago || '').trim();
+    if ((this.medioPagoManual === 'yape' || this.medioPagoManual === 'plin') && ref.length < 4) {
+      this.errorMsg.set('Ingrese el número de operación de Yape/Plin (mínimo 4 caracteres).');
+      return;
+    }
     const c = this.resumen();
     if (!c || c.esDemo) return;
+    const ok = await this.confirmacion.confirmar({
+      titulo: 'Enviar voucher por WhatsApp',
+      mensaje:
+        'Se abrirá WhatsApp con el texto del voucher hacia el número de Business Soft.\n\n' +
+        'Esto no confirma el pago solo: un asesor lo validará y le avisaremos.\n\n¿Desea continuar?',
+      confirmarTexto: 'Sí, enviar aviso'
+    });
+    if (!ok) return;
     this.procesando.set(true);
     this.errorMsg.set(null);
 
@@ -203,8 +218,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
             this.resumen.set({ ...this.resumen()!, pagoManual: data.pagoManual });
           }
           this.mensaje.set(
-            'Orden registrada. Abriremos WhatsApp para el voucher y lo llevaremos al siguiente paso.'
+            'Registramos su aviso de pago. Abriremos WhatsApp para el voucher. Le confirmaremos cuando validemos el depósito.'
           );
+          this.errorMsg.set(null);
           try {
             window.localStorage.setItem(
               LS_CHECKOUT_PENDIENTE,
@@ -213,11 +229,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           } catch {
             /* ignore */
           }
-          // Voucher primero; luego mismo destino que Culqi (sesión → Mi suscripción / sin sesión → crear empresa).
           this.abrirWhatsAppVoucher();
-          window.setTimeout(() => {
-            void this.redirigirPostCheckoutPagado();
-          }, 450);
         },
         error: (err) => {
           this.procesando.set(false);

@@ -31,6 +31,8 @@ export interface BuscadorProductosModalOpciones {
   etiquetaPrecio?: string;
   /** Al cerrar, conserva término y resultados para la próxima apertura (p. ej. venta completa). */
   conservarUltimaBusqueda?: boolean;
+  /** Término inicial al abrir (p. ej. código escrito en Nueva venta). */
+  terminoInicial?: string;
   /** Si se informa, el modal no espera la config asíncrona para mostrar la columna Ubic. */
   mostrarStockUbicacionesEnBuscador?: boolean;
 }

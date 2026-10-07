@@ -24,8 +24,17 @@ export function descripcionUnidadMedidaProducto(
   if (desc) {
     return desc;
   }
-  const codigo = String(p['codigoPresentacion'] ?? '').trim();
-  return codigo || '—';
+  const codigo = String(p['codigoPresentacion'] ?? '').trim().toUpperCase();
+  const porCodigoSunat: Record<string, string> = {
+    NIU: 'Unidad',
+    KGM: 'kg',
+    GLL: 'Galón',
+    LTR: 'Litro',
+    MTR: 'Metro',
+    MTK: 'm²',
+    ZZ: 'Servicio'
+  };
+  return porCodigoSunat[codigo] || codigo || '—';
 }
 
 /** Descripción de producto para PDF/listados: «descripción - marca» si hay marca. */

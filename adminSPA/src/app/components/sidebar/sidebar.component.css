@@ -284,6 +284,14 @@
   color: #fff;
 }
 
+a.nav-link:visited {
+  color: #b8c7ce;
+}
+
+.nav-item.active > a.nav-link:visited {
+  color: #fff;
+}
+
 .nav-item.active > .nav-link {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
@@ -363,6 +371,14 @@
 }
 
 .submenu-item.active .submenu-link {
+  color: #667eea;
+}
+
+a.submenu-link:visited {
+  color: #8e99a4;
+}
+
+.submenu-item.active a.submenu-link:visited {
   color: #667eea;
 }
 
@@ -467,23 +483,7 @@
    ============================================= */
 
 .sidebar-mobile-toggle {
-  position: fixed;
-  top: max(12px, env(safe-area-inset-top, 0px));
-  left: max(12px, env(safe-area-inset-left, 0px));
-  width: 44px;
-  height: 44px;
-  background: #1a1f2e;
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 1.2rem;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  display: none !important;
 }
 
 .sidebar-mobile-toggle:hover {

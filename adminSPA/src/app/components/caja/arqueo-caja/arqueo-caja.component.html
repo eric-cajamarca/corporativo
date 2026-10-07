@@ -218,7 +218,7 @@
                     <tbody>
                       <tr *ngFor="let ps of totalesPorSucursal">
                         <td>{{ ps.nombreSucursal || ps.idSucursal }}</td>
-                        <td class="small">{{ ps.idCaja }}</td>
+                        <td class="small">{{ ps.nombreCaja || nombreCajaPorId(ps.idCaja) }}</td>
                         <td class="text-end">{{ formatCurrency(ps.totalIngresos) }}</td>
                         <td class="text-end">{{ formatCurrency(ps.totalEgresos) }}</td>
                         <td class="text-end">{{ formatCurrency(importeArqueoCredito(ps.ventasCredito)) }}</td>

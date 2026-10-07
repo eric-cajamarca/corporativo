@@ -15,7 +15,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa as EmpresaPdf } from '../../../interfaces/pdf-interface';
-import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { formatFechaLocal } from '../../../utils/fecha-local.util';
 import { PackReportesNegocio, ReportesNegocioPdfService } from '../../../services/reportes-negocio-pdf.service';
 import {
   ReportesService,
@@ -34,6 +34,7 @@ type ReporteId =
   | 'inventario'
   | 'clientes'
   | 'creditos'
+  | 'antiguedad'
   | 'financiero'
   | 'productos'
   | 'margen';
@@ -114,6 +115,13 @@ export class IndexReportesComponent implements OnInit {
       tipo: 'creditos',
     },
     {
+      id: 'antiguedad',
+      nombre: 'Antigüedad de deuda',
+      descripcion: 'Saldos 0-30, 31-60 y más de 60 días, con estado de cuenta',
+      icono: 'bi bi-hourglass-split',
+      tipo: 'creditos',
+    },
+    {
       id: 'financiero',
       nombre: 'Estado Financiero',
       descripcion: 'Ingresos, costos y utilidad bruta',
@@ -141,6 +149,12 @@ export class IndexReportesComponent implements OnInit {
   cargando: boolean = false;
 
   resumenCreditos: CarteraCreditosResumen | null = null;
+  estadoCuenta: {
+    cliente: { idCliente: number; cliente: string; documento: string };
+    aging: { alDia: number; de1a30: number; de31a60: number; mas60: number; saldo: number };
+    movimientos: Array<{ fecha: string; documento: string; tipo: string; cargo: number; abono: number; estado: string }>;
+  } | null = null;
+  cargandoEstadoCuenta = false;
 
   // Resumen principal del dashboard
   resumenDashboard: ResumenDashboard | null = null;
@@ -189,10 +203,7 @@ export class IndexReportesComponent implements OnInit {
   }
 
   inicializarFechas(): void {
-    const hoy = new Date();
-    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    this.fechaFin = getFechaHoyLocal();
-    this.fechaInicio = formatFechaLocal(primerDiaMes);
+    this.aplicarRangoPeriodo(this.periodoSeleccionado);
   }
 
   aplicarFiltroFechas(): void {
@@ -207,7 +218,11 @@ export class IndexReportesComponent implements OnInit {
   cargarReportesPrincipales(): void {
     this.error = '';
     this.cargando = true;
-    this.dashboardService.obtenerResumen(this.periodoSeleccionado).subscribe({
+    this.dashboardService.obtenerResumen(
+      this.periodoSeleccionado,
+      this.fechaInicio,
+      this.fechaFin
+    ).subscribe({
       next: (res) => {
         this.resumenDashboard = res.data;
         this.cargando = false;
@@ -369,6 +384,41 @@ export class IndexReportesComponent implements OnInit {
               this.cargando = false;
             },
           });
+        break;
+      }
+      case 'antiguedad': {
+        this.estadoCuenta = null;
+        this.reportesService.obtenerAntiguedadDeuda().subscribe({
+          next: (res) => {
+            const r = res.data?.resumen;
+            const filas = (res.data?.clientes || []).map((c) => ({
+              idCliente: c.idCliente,
+              cliente: c.cliente,
+              alDia: c.alDia,
+              de1a30: c.de1a30,
+              de31a60: c.de31a60,
+              mas60: c.mas60,
+              saldo: c.saldo
+            }));
+            this.datosReporte = r
+              ? [
+                  { indicador: 'Al día', valor: r.alDia },
+                  { indicador: '1 a 30 días', valor: r.de1a30 },
+                  { indicador: '31 a 60 días', valor: r.de31a60 },
+                  { indicador: 'Más de 60 días', valor: r.mas60 },
+                  { indicador: 'Saldo total', valor: r.saldo },
+                  { indicador: 'Clientes con deuda', valor: r.clientes },
+                  ...filas
+                ]
+              : filas;
+            this.cargando = false;
+          },
+          error: (err) => {
+            this.error = err?.error?.message || err?.message || 'Error al obtener antigüedad de deuda';
+            this.datosReporte = [];
+            this.cargando = false;
+          }
+        });
         break;
       }
       case 'creditos': {
@@ -759,9 +809,65 @@ export class IndexReportesComponent implements OnInit {
     return 0;
   }
 
-  isCurrencyField(key: string): boolean {
-    const currencyFields = ['total', 'monto', 'compras', 'ventas', 'utilidad', 'valor', 'deuda'];
-    return currencyFields.includes(key);
+  isCurrencyField(key: string, row?: DatosReporteRow): boolean {
+    if (key === 'valor' && row) {
+      const ind = String(row['indicador'] || '').toLowerCase();
+      if (
+        ind.includes('eficiencia') ||
+        ind === 'total créditos' ||
+        ind.includes('créditos activos')
+      ) {
+        return false;
+      }
+    }
+    const currencyFields = ['total', 'monto', 'compras', 'ventas', 'utilidad', 'valor', 'deuda', 'saldo', 'aldia', 'de1a30', 'de31a60', 'mas60', 'cargo', 'abono'];
+    return currencyFields.includes(key.toLowerCase());
+  }
+
+  verEstadoCuenta(idCliente: unknown): void {
+    const id = Number(idCliente);
+    if (!id) return;
+    this.cargandoEstadoCuenta = true;
+    this.reportesService.obtenerEstadoCuenta(id).subscribe({
+      next: (res) => {
+        this.estadoCuenta = res.data || null;
+        this.cargandoEstadoCuenta = false;
+      },
+      error: (err) => {
+        this.cargandoEstadoCuenta = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo cargar el estado de cuenta'
+        });
+      }
+    });
+  }
+
+  imprimirEstadoCuenta(): void {
+    if (!this.estadoCuenta) return;
+    const c = this.estadoCuenta.cliente;
+    const a = this.estadoCuenta.aging;
+    const filas = this.estadoCuenta.movimientos
+      .map(
+        (m) =>
+          `<tr><td>${m.fecha || ''}</td><td>${m.documento || ''}</td><td>${m.tipo || ''}</td><td>${Number(m.cargo || 0).toFixed(2)}</td><td>${Number(m.abono || 0).toFixed(2)}</td><td>${m.estado || ''}</td></tr>`
+      )
+      .join('');
+    const html = `<!doctype html><html><head><title>Estado de cuenta</title>
+      <style>body{font-family:Arial,sans-serif;padding:16px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px;font-size:12px}</style>
+      </head><body>
+      <h2>Estado de cuenta</h2>
+      <p><strong>${c.cliente}</strong> — ${c.documento}</p>
+      <p>Al día: S/ ${Number(a.alDia).toFixed(2)} · 1-30: S/ ${Number(a.de1a30).toFixed(2)} · 31-60: S/ ${Number(a.de31a60).toFixed(2)} · +60: S/ ${Number(a.mas60).toFixed(2)} · Saldo: S/ ${Number(a.saldo).toFixed(2)}</p>
+      <table><thead><tr><th>Fecha</th><th>Documento</th><th>Tipo</th><th>Cargo</th><th>Abono</th><th>Estado</th></tr></thead>
+      <tbody>${filas}</tbody></table>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
   }
 
   exportarReporte(formato: string): void {

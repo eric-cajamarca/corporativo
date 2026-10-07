@@ -5,6 +5,10 @@ import { moduloMenuRequeridoParaUrl } from '../config/ruta-plan-modulo.map';
 import { normalizarRutaAbsoluta, planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../config/saas-plan-reglas.util';
 import { PermisosService } from '../services/permisos.service';
 
+function homeModuloBloqueado(router: Router, modulo: string): UrlTree {
+  return router.createUrlTree(['/home'], { queryParams: { moduloBloqueado: modulo } });
+}
+
 function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosService): boolean | UrlTree {
   const abs = normalizarRutaAbsoluta(url.split('?')[0] || '/');
 
@@ -23,18 +27,18 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
   }
   const set = new Set(modulos.map((m) => m.toUpperCase()));
   if (!set.has(requerido.toUpperCase())) {
-    return router.createUrlTree(['/home']);
+    return homeModuloBloqueado(router, requerido);
   }
 
   const planRaw = permisos.planCodeEfectivo();
 
   if (abs.startsWith('/configuracion/whatsapp-bot')) {
     if (!planPermiteWhatsAppBot(planRaw)) {
-      return router.createUrlTree(['/home']);
+      return homeModuloBloqueado(router, 'WHATSAPP_BOT');
     }
   } else if (abs.startsWith('/configuracion/whatsapp')) {
     if (!planPermiteWhatsAppVinculado(planRaw)) {
-      return router.createUrlTree(['/home']);
+      return homeModuloBloqueado(router, 'WHATSAPP');
     }
   }
 
@@ -44,7 +48,8 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
       const okCajaDemo =
         abs === '/caja' || abs === '/caja/arqueo' || abs.startsWith('/caja/arqueo/');
       if (!okCajaDemo) {
-        return router.createUrlTree(['/home']);
+        const modulo = abs.startsWith('/creditos') ? 'CREDITOS' : 'CAJA';
+        return homeModuloBloqueado(router, modulo);
       }
     }
   }
@@ -63,7 +68,7 @@ export const saasPlanModuloGuard: CanActivateFn = (_route, state): boolean | Url
   if (!permisos.contextoPlanCargado()) {
     return permisos.cargarPermisosUsuario().pipe(
       map(() => evaluarAccesoPlan(router, state.url, permisos)),
-      catchError(() => of(router.createUrlTree(['/home'])))
+      catchError(() => of(router.createUrlTree(['/home'], { queryParams: { moduloBloqueado: 'PLAN' } })))
     );
   }
 

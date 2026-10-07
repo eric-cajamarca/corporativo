@@ -80,7 +80,7 @@ exports.contarCuotasCreditoPorVencerMananaRepo = async (pool, idEmpresa) => {
       LEFT JOIN dbo.Ventas v ON v.idVenta = cr.idVenta AND v.idEmpresa = cr.idEmpresa
       WHERE cu.idEmpresa = @idEmpresa
         AND cr.estado = 'ACTIVO'
-        AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+        AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
         AND ISNULL(cu.saldoPendiente, 0) > 0.01
         AND (cr.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
         AND CONVERT(DATE, cu.fechaVencimiento) = DATEADD(DAY, 1, CONVERT(DATE, GETDATE()))
@@ -99,7 +99,7 @@ exports.contarCuotasCreditoVencidasRepo = async (pool, idEmpresa) => {
       LEFT JOIN dbo.Ventas v ON v.idVenta = cr.idVenta AND v.idEmpresa = cr.idEmpresa
       WHERE cu.idEmpresa = @idEmpresa
         AND cr.estado = 'ACTIVO'
-        AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+        AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
         AND ISNULL(cu.saldoPendiente, 0) > 0.01
         AND (cr.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
         AND CONVERT(DATE, cu.fechaVencimiento) < CONVERT(DATE, GETDATE())

@@ -13,7 +13,10 @@
                 <div class="card create-compras-card">
                     <div class="card-header bg-light border-bottom py-3">
                         <h2 class="mb-0 h5"><i class="fas fa-shopping-cart me-2"></i>Registrar nueva compra (manual)</h2>
-                        <p class="mb-0 small text-muted mt-1">Complete los datos del proveedor, comprobante y detalle de productos.</p>
+                        <p class="mb-0 small text-muted mt-1">Complete los datos del proveedor, comprobante y detalle de productos. La consulta SUNAT con Clave SOL es opcional.</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" (click)="abrirConsultaSunat()">
+                          Consultar en SUNAT
+                        </button>
                         <ng-container *ngIf="compras.idComprobante || compras.fEmision">
                             <p class="mb-0 small mt-2">
                                 <span class="text-primary fw-medium">Tipo comprobante:</span> {{ etiquetaTipoComprobanteCabecera() }}
@@ -40,11 +43,9 @@
                                             data-bs-target="#proveedoresModal" title="Elegir proveedor de la lista">
                                             <i class="bi bi-people me-1"></i>Elegir
                                         </button>
-                                        <!--
                                         <button type="button" class="btn btn-outline-primary" (click)="agregarNuevoProveedor()">
                                             Nuevo
                                         </button>
-                                        -->
                                     </div>
                                     <ng-container>
                                         <div *ngIf="compras.idProveedor">
@@ -204,9 +205,9 @@
                                             <small class="form-text text-muted">Sucursal donde se registrará el stock de los productos.</small>
                                         </div>
                                         <div class="form-group">
-                                            <label for="compRelacionado">CompRelacionado</label>
+                                            <label for="compRelacionado">Comprobante relacionado</label>
                                             <input type="text" class="form-control" name="compRelacionado"
-                                                [(ngModel)]="compras.compRelacionado" placeholder="Ingrese el compRelacionado">
+                                                [(ngModel)]="compras.compRelacionado" placeholder="Serie-número del comprobante relacionado">
                                         </div>
                                     </div>
                                 </ng-container>

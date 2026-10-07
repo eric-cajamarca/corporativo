@@ -2,7 +2,7 @@ const sql = require("mssql");
 const { getFechaHoyLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 
 /** Etiqueta de arqueo/caja: FormasPago (Yape, Efectivo…), no condición SUNAT (MediosPago). */
-const SQL_ETIQUETA_MEDIO_MOV_CAJA = `COALESCE(NULLIF(LTRIM(RTRIM(fp.descripcion)), ''), NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), 'Sin especificar')`;
+const SQL_ETIQUETA_MEDIO_MOV_CAJA = `COALESCE(NULLIF(LTRIM(RTRIM(fp.descripcion)), ''), NULLIF(LTRIM(RTRIM(mp.descripcion)), ''), CASE WHEN tmc.nombre = 'APERTURA_CAJA' THEN 'Efectivo' ELSE 'Sin especificar' END)`;
 
 function parseSqlSumImporte(val) {
   if (val == null) return 0;
@@ -285,7 +285,16 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
       `);
 
     await transaction.commit();
-    return cierreResult.recordset[0];
+    const idCierre = cierreResult.recordset[0]?.idCierre;
+    return {
+      idCierre,
+      saldoEsperado: Number(saldoEsperado) || 0,
+      montoFinal: Number(montoFinalDeclarado) || 0,
+      diferencia: Number(diferencia) || 0,
+      ingresos: Number(resumen.ingresos) || 0,
+      egresos: Number(resumen.egresos) || 0,
+      montoInicial: Number(resumen.montoInicial) || 0
+    };
   } catch (error) {
     await transaction.rollback();
     throw error;
@@ -509,7 +518,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
         ISNULL(NULLIF(LTRIM(RTRIM(e.alias)), ''), e.razon_Social) AS empresaMovimiento,
         mc.idApertura,
         mc.idTipoMovimientoCaja,
-        mc.fechaMovimiento,
+        CONVERT(VARCHAR(19), mc.fechaMovimiento, 120) AS fechaMovimiento,
         mc.concepto,
         mc.idConcepto,
         ISNULL(
@@ -564,7 +573,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
         ISNULL(NULLIF(LTRIM(RTRIM(e.alias)), ''), e.razon_Social) AS empresaMovimiento,
         mc.idApertura,
         mc.idTipoMovimientoCaja,
-        mc.fechaMovimiento,
+        CONVERT(VARCHAR(19), mc.fechaMovimiento, 120) AS fechaMovimiento,
         mc.concepto,
         mc.idConcepto,
         ISNULL(
@@ -774,8 +783,33 @@ exports.obtenerCualquierAperturaAbiertaRepo = async (pool, idEmpresa) => {
   return result.recordset[0] || null;
 };
 
+async function asegurarTipoMovimientoCaja(pool, nombre, descripcion, tipo) {
+  const existente = await pool.request()
+    .input("nombre", sql.VarChar(50), nombre)
+    .query("SELECT idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE nombre = @nombre");
+  if (existente.recordset && existente.recordset[0]) {
+    return existente.recordset[0].idTipoMovimientoCaja;
+  }
+  const ins = await pool.request()
+    .input("nombreIns", sql.VarChar(30), nombre)
+    .input("descripcion", sql.VarChar(100), descripcion || null)
+    .input("tipo", sql.Char(1), tipo)
+    .query(`
+      INSERT INTO TiposMovimientoCaja (nombre, descripcion, tipo)
+      OUTPUT INSERTED.idTipoMovimientoCaja
+      VALUES (@nombreIns, @descripcion, @tipo)
+    `);
+  return ins.recordset && ins.recordset[0] ? ins.recordset[0].idTipoMovimientoCaja : null;
+}
+
 /** Obtiene idTipoMovimientoCaja por nombre (ej. COMPRA_CONTADO) o el primer tipo de operación E (egreso). */
 exports.obtenerIdTipoMovimientoEgresoRepo = async (pool, nombrePreferido) => {
+  if (nombrePreferido === "COMPRA_CONTADO") {
+    return asegurarTipoMovimientoCaja(pool, "COMPRA_CONTADO", "Egreso por compra al contado", "E");
+  }
+  if (nombrePreferido === "DEVOLUCION_VENTA") {
+    return asegurarTipoMovimientoCaja(pool, "DEVOLUCION_VENTA", "Extorno / devolución de venta", "E");
+  }
   if (nombrePreferido) {
     const r = await pool.request()
       .input("nombre", sql.VarChar(50), nombrePreferido)
@@ -786,6 +820,99 @@ exports.obtenerIdTipoMovimientoEgresoRepo = async (pool, nombrePreferido) => {
     "SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'E' ORDER BY idTipoMovimientoCaja"
   );
   return r.recordset && r.recordset[0] ? r.recordset[0].idTipoMovimientoCaja : null;
+};
+
+/** Ingreso por nombre (COBRANZA_CREDITO). No usa el primer tipo I (suele ser VENTA_CONTADO). */
+exports.obtenerIdTipoMovimientoIngresoRepo = async (pool, nombrePreferido) => {
+  if (nombrePreferido === "COBRANZA_CREDITO") {
+    return asegurarTipoMovimientoCaja(pool, "COBRANZA_CREDITO", "Cobranza de crédito", "I");
+  }
+  if (nombrePreferido) {
+    const r = await pool.request()
+      .input("nombre", sql.VarChar(50), nombrePreferido)
+      .query("SELECT idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I' AND nombre = @nombre");
+    if (r.recordset && r.recordset[0]) return r.recordset[0].idTipoMovimientoCaja;
+  }
+  const r = await pool.request().query(
+    "SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I' AND nombre <> 'VENTA_CONTADO' ORDER BY idTipoMovimientoCaja"
+  );
+  if (r.recordset && r.recordset[0]) return r.recordset[0].idTipoMovimientoCaja;
+  const r2 = await pool.request().query(
+    "SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I' ORDER BY idTipoMovimientoCaja"
+  );
+  return r2.recordset && r2.recordset[0] ? r2.recordset[0].idTipoMovimientoCaja : null;
+};
+
+/**
+ * Conserva los movimientos originales de la venta y registra extornos (no borra).
+ * Usa la caja abierta actual; si no hay, la misma apertura del movimiento original.
+ */
+exports.registrarExtornosAnulacionVentaRepo = async (transaction, datos) => {
+  const idEmpresa = datos.idEmpresa;
+  const idVenta = datos.idVenta;
+  const idUsuario = datos.idUsuario || null;
+  const compVenta = (datos.compVenta && String(datos.compVenta).trim()) || "S/N";
+
+  const orig = await transaction.request()
+    .input("idVentaOrig", sql.Int, idVenta)
+    .input("idEmpresaOrig", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT mc.idApertura, mc.idSucursal, mc.monto, mc.idMediosPago, mc.idMoneda,
+             mc.documentoRelacionado, tmc.tipo AS tipoOperacion
+      FROM MovimientosCaja mc
+      INNER JOIN TiposMovimientoCaja tmc ON tmc.idTipoMovimientoCaja = mc.idTipoMovimientoCaja
+      WHERE mc.idVenta = @idVentaOrig AND mc.idEmpresa = @idEmpresaOrig
+        AND ISNULL(mc.eliminado, 0) = 0
+        AND LTRIM(RTRIM(ISNULL(mc.concepto, ''))) NOT LIKE 'Extorno anulación%'
+    `);
+  const filas = orig.recordset || [];
+  if (filas.length === 0) return 0;
+
+  const idTipoEgreso = await exports.obtenerIdTipoMovimientoEgresoRepo(transaction, "DEVOLUCION_VENTA");
+  const idTipoIngreso = await exports.obtenerIdTipoMovimientoIngresoRepo(transaction, "COBRANZA_CREDITO");
+  const aperturaActual = await exports.obtenerCualquierAperturaAbiertaRepo(transaction, idEmpresa);
+  const fechaSql = resolveFechaHoraClienteSql(datos.fechaMovimiento);
+  const concepto = ("Extorno anulación " + compVenta).slice(0, 100);
+  const doc = String(filas[0].documentoRelacionado || compVenta).slice(0, 20);
+
+  let registrados = 0;
+  for (const f of filas) {
+    const monto = Number(f.monto) || 0;
+    if (monto <= 0) continue;
+    const esIngreso = String(f.tipoOperacion || "").toUpperCase() === "I";
+    const idTipo = esIngreso ? idTipoEgreso : idTipoIngreso;
+    if (!idTipo) continue;
+    const idApertura = (aperturaActual && aperturaActual.idApertura) || f.idApertura;
+    const idSucursal = (aperturaActual && aperturaActual.idSucursal) || f.idSucursal;
+    if (!idApertura || !idSucursal) continue;
+    const reqIns = transaction.request();
+    await reqIns
+      .input("idApertura", sql.UniqueIdentifier, idApertura)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("idSucursal", sql.UniqueIdentifier, idSucursal)
+      .input("idUsuario", sql.UniqueIdentifier, idUsuario)
+      .input("idTipoMovimientoCaja", sql.Int, idTipo)
+      .input("fechaMovimiento", sql.VarChar(23), fechaSql)
+      .input("concepto", sql.VarChar(100), concepto)
+      .input("monto", sql.Decimal(18, 2), monto)
+      .input("idMediosPago", sql.Int, f.idMediosPago || null)
+      .input("idMoneda", sql.Int, f.idMoneda || 1)
+      .input("documentoRelacionado", sql.VarChar(20), doc)
+      .input("idVenta", sql.Int, idVenta)
+      .query(`
+        INSERT INTO MovimientosCaja (
+          idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja,
+          fechaMovimiento, concepto, monto, idMediosPago, idMoneda, documentoRelacionado, idVenta
+        )
+        VALUES (
+          @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
+          TRY_CONVERT(DATETIME, @fechaMovimiento, 120), @concepto, @monto, @idMediosPago, @idMoneda,
+          @documentoRelacionado, @idVenta
+        )
+      `);
+    registrados += 1;
+  }
+  return registrados;
 };
 
 /** Registra en caja los movimientos de venta al contado por cada forma de pago (catálogo FormasPago: Yape, Efectivo, Cheque…).

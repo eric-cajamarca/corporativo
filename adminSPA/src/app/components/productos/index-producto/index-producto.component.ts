@@ -17,6 +17,8 @@ import { GestoresService } from '../../../services/gestores.service';
 import { ProductoGaleriaModalService } from '../../../services/producto-galeria-modal.service';
 import { ProductoUnidadesMedidaModalService } from '../../../services/producto-unidades-medida-modal.service';
 import { AuthService } from '../../../services/auth.service';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
+import { formatFechaApiParaMostrar } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
  declare var bootstrap: any;
@@ -43,6 +45,22 @@ export class IndexProductoComponent {
   public desactivandoId: string | null = null;
   /** Configuración inventario: galería de imágenes habilitada */
   public productosConImagenes = false;
+
+  etiquetaUnidad(item: Record<string, unknown>): string {
+    return descripcionUnidadMedidaProducto(item);
+  }
+
+  precioVentaFila(item: { pVenta?: unknown; precio?: unknown }): number {
+    return Number(item?.pVenta ?? item?.precio) || 0;
+  }
+
+  stockFila(item: { stock?: unknown; stockDisponible?: unknown }): number {
+    return Number(item?.stock ?? item?.stockDisponible) || 0;
+  }
+
+  fechaProducto(valor: string | null | undefined): string {
+    return formatFechaApiParaMostrar(valor) || '—';
+  }
 
   // Configuración de paginación
   public page = 1;

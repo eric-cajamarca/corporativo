@@ -213,4 +213,20 @@
     align-items: center;
     justify-content: center;
   }
+
+  .caja-card-actions .btn {
+    min-height: 2.5rem;
+    flex: 1 1 calc(50% - 0.5rem);
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .main-content {
+    padding: 12px;
+  }
+  .card-header,
+  .card-body {
+    overflow-x: auto;
+  }
 }

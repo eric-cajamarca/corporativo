@@ -31,7 +31,7 @@ export interface CuotaCredito {
   interes: number;
   capital: number;
   saldoPendiente: number;
-  estado: 'PENDIENTE' | 'PAGADO' | 'VENCIDO';
+  estado: 'PENDIENTE' | 'PAGADO' | 'VENCIDO' | 'PARCIAL';
   fechaPago?: string;
   montoPagado?: number;
 }

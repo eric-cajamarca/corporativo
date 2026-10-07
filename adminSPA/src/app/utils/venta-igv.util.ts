@@ -26,6 +26,28 @@ export function calcularMontoIgv(
   return redondear2(n * (pct / 100));
 }
 
+/**
+ * Si el precio incluye IGV, deja subtotal y descuento en base imponible
+ * para que Subtotal − Descuento + IGV = Total.
+ */
+export function ajustarDesgloseSiPrecioIncluyeIgv(
+  descuentosIncluidos: number,
+  netoVendido: number,
+  igvMonto: number,
+  porcentaje: number
+): { subTotal: number; descuentos: number } {
+  const factor = 1 + (Number(porcentaje) || 0) / 100;
+  const descIncl = Number(descuentosIncluidos) || 0;
+  const neto = Number(netoVendido) || 0;
+  const igv = Number(igvMonto) || 0;
+  const descExcl = factor > 1 ? redondear2(descIncl / factor) : redondear2(descIncl);
+  const baseImponible = redondear2(neto - igv);
+  return {
+    subTotal: redondear2(baseImponible + descExcl),
+    descuentos: descExcl
+  };
+}
+
 export interface LineaCarritoIgv {
   cantidad: number;
   pVenta: number;

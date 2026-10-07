@@ -15,8 +15,9 @@ export class EmpresaService {
   public url: any;
   private _router: any;
   public idUser:any;
+  private readonly logoFallback = 'assets/img/logo-efaferp.png';
   private empresa = new Empresa(
-    `${environment.API_URL}obtener_logo/logo-1746675338771-466791498.png`,
+    'assets/img/logo-efaferp.png',
     'Mi Empresa S.A.C.',
     '00000000000',
     '',
@@ -26,6 +27,17 @@ export class EmpresaService {
     'Av. Principal 123, Lima',
     '(01) 456-7890'
   );
+
+  private resolverUrlLogo(logo: string | null | undefined): string {
+    const f = String(logo || '').trim();
+    if (!f) {
+      return this.logoFallback;
+    }
+    if (f.startsWith('http') || f.startsWith('assets/') || f.startsWith('/assets/')) {
+      return f;
+    }
+    return `${this.url || environment.API_URL}obtener_logo/${f}`;
+  }
 
     constructor(
     private _http: HttpClient,
@@ -47,8 +59,7 @@ export class EmpresaService {
   this.getEmpresasPdf().subscribe(response => {
     if (response.data?.[0]) {
       const empresaData = response.data[0];
-            // Construye URL completa del logo usando el nombre del archivo
-      empresaData.logo = `${environment.API_URL}obtener_logo/${empresaData.logo}`;
+      empresaData.logo = this.resolverUrlLogo(empresaData.logo);
       this.empresaSubject.next(empresaData);
           }
   });
@@ -71,9 +82,7 @@ export class EmpresaService {
         next: (response) => {
           const empresaData = response?.data?.[0];
           if (empresaData) {
-            if (empresaData.logo && !String(empresaData.logo).startsWith('http')) {
-              empresaData.logo = this.url + 'obtener_logo/' + empresaData.logo;
-            }
+            empresaData.logo = this.resolverUrlLogo(empresaData.logo);
             this.empresaSubject.next(empresaData);
             observer.next(empresaData);
           } else {
@@ -373,6 +382,14 @@ export class EmpresaService {
       headers: headers,
       withCredentials: true
     });
+  }
+
+  aplicarZonaExonerada(exonerada: boolean): Observable<{ message?: string; data?: { ok: boolean; exonerada: boolean } }> {
+    return this._http.post<{ message?: string; data?: { ok: boolean; exonerada: boolean } }>(
+      this.url + 'empresa/zona-exonerada',
+      { exonerada },
+      { withCredentials: true }
+    );
   }
 
   /** Integraciones y APIs de pago: flags + credenciales por proveedor */

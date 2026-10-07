@@ -29,11 +29,23 @@ const FILTRO_EXCLUIR_ANULACION_VENTA = `
   )
 `;
 
+/** AJ negativo se guarda con tipo 'AJ' y cantidad positiva; el código indica el sentido. */
+function sqlAjEsSalida(tieneCodigoTipo) {
+  const porCodigo = tieneCodigoTipo
+    ? `UPPER(LTRIM(RTRIM(ISNULL(m.codigoTipoMovimiento, '')))) = 'REAJUSTE_NEGATIVO' OR `
+    : '';
+  return `(
+  m.tipoMovimiento = 'AJ'
+  AND (${porCodigo}m.cantidad < 0)
+)`;
+}
+
 /**
  * Excluye movimientos de inventario que duplican filas ya tomadas de Ventas/Compras.
  * Una venta genera DetalleVenta (VEN) y además SA en MovimientosInventario; solo debe verse VEN.
  * Una compra genera DetalleCompras (COM) y, si hubiera EN vinculado al mismo documento, solo debe verse COM.
  */
+
 const FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA = `
   AND NOT (
     m.tipoMovimiento = 'SA'
@@ -74,6 +86,15 @@ const FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA = `
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/** YYYY-MM-DD 00:00:00.000 para CAST AS DATETIME sin desfase UTC del driver. */
+function fechaCivilSql(valor) {
+  if (valor == null || valor === '') return null;
+  const s = String(valor).trim();
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return `${m[1]} 00:00:00.000`;
+  return s;
+}
+
 let farSchemaCache = null;
 
 async function obtenerEsquemaFarmacia(pool) {
@@ -81,12 +102,14 @@ async function obtenerEsquemaFarmacia(pool) {
   const r = await pool.request().query(`
     SELECT
       CASE WHEN COL_LENGTH('Productos', 'controlado') IS NOT NULL THEN 1 ELSE 0 END AS tieneControlado,
-      CASE WHEN OBJECT_ID(N'dbo.RecetaVenta', N'U') IS NOT NULL THEN 1 ELSE 0 END AS tieneRecetaVenta
+      CASE WHEN OBJECT_ID(N'dbo.RecetaVenta', N'U') IS NOT NULL THEN 1 ELSE 0 END AS tieneRecetaVenta,
+      CASE WHEN COL_LENGTH('MovimientosInventario', 'codigoTipoMovimiento') IS NOT NULL THEN 1 ELSE 0 END AS tieneCodigoTipo
   `);
   const row = (r.recordset && r.recordset[0]) || {};
   farSchemaCache = {
     tieneControlado: Number(row.tieneControlado) === 1,
-    tieneRecetaVenta: Number(row.tieneRecetaVenta) === 1
+    tieneRecetaVenta: Number(row.tieneRecetaVenta) === 1,
+    tieneCodigoTipo: Number(row.tieneCodigoTipo) === 1
   };
   return farSchemaCache;
 }
@@ -97,13 +120,16 @@ async function obtenerEsquemaFarmacia(pool) {
  * Retorna: producto, saldoInicial (cantidad, pUnitario, importe), filas ordenadas por fecha, totales.
  */
 exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHasta) => {
+  const fechaDesdeSql = fechaCivilSql(fechaDesde);
+  const fechaHastaSql = fechaCivilSql(fechaHasta);
   const req = pool.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
-  req.input('fechaDesde', sql.DateTime, fechaDesde);
-  req.input('fechaHasta', sql.DateTime, fechaHasta);
+  req.input('fechaDesde', sql.VarChar(23), fechaDesdeSql);
+  req.input('fechaHasta', sql.VarChar(23), fechaHastaSql);
 
   const esquemaFar = await obtenerEsquemaFarmacia(pool);
+  const SQL_AJ_ES_SALIDA = sqlAjEsSalida(!!esquemaFar.tieneCodigoTipo);
   const selectFichaFar = esquemaFar.tieneControlado
     ? `ISNULL(p.controlado, 0) AS controlado,
                LTRIM(RTRIM(ISNULL(p.principioActivo, ''))) AS principioActivo,
@@ -160,34 +186,38 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
-      .input('fechaHasta', sql.DateTime, fechaHasta)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
+      .input('fechaHasta', sql.VarChar(23), fechaHastaSql)
       .query(`
         SELECT CONVERT(VARCHAR(19), c.fEmision, 120) AS fecha, 'COM' AS tipoMov,
                ISNULL(c.serie,'') + ':' + ISNULL(c.numero,'') AS nroDocum, c.idCompra AS idRef, 'COMPRA' AS tipoRef,
                ISNULL(c.serie,'') AS serie, ISNULL(c.numero,'') AS numero,
                RTRIM(LTRIM(ISNULL(comp.codigo, '00'))) AS tipoDocumento,
-               dc.cantidad AS cantidadEntrada, dc.pUnitario AS pUnitarioEntrada, dc.total AS importeEntrada,
+               dc.cantidad AS cantidadEntrada, dc.pUnitario AS pUnitarioEntrada,
+               dc.cantidad * ISNULL(dc.pUnitario, 0) AS importeEntrada,
                0 AS cantidadSalida, 0 AS pUnitarioSalida, 0 AS importeSalida,
                0 AS costoUnitarioSalida, 0 AS eliminado, NULL AS idEstadoSunat, NULL AS observaciones
         FROM DetalleCompras dc
         INNER JOIN Compras c ON dc.idCompra = c.idCompra AND c.idEmpresa = dc.idEmpresa
         LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
         WHERE dc.idEmpresa = @idEmpresa AND dc.idProducto = @idProducto
-          AND c.fEmision >= @fechaDesde AND c.fEmision < DATEADD(day, 1, @fechaHasta)
+          AND c.fEmision >= TRY_CONVERT(DATETIME, @fechaDesde, 120)
+          AND c.fEmision < DATEADD(day, 1, TRY_CONVERT(DATETIME, @fechaHasta, 120))
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
-      .input('fechaHasta', sql.DateTime, fechaHasta)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
+      .input('fechaHasta', sql.VarChar(23), fechaHastaSql)
       .query(`
         SELECT CONVERT(VARCHAR(19), v.fEmision, 120) AS fecha, 'VEN' AS tipoMov,
                ISNULL(v.serie,'') + ':' + ISNULL(v.numero,'') AS nroDocum, v.idVenta AS idRef, 'VENTA' AS tipoRef,
                ISNULL(v.serie,'') AS serie, ISNULL(v.numero,'') AS numero,
                RTRIM(LTRIM(ISNULL(comp.codigo, '00'))) AS tipoDocumento,
                0 AS cantidadEntrada, 0 AS pUnitarioEntrada, 0 AS importeEntrada,
-               dv.cantidad AS cantidadSalida, dv.pVenta AS pUnitarioSalida, dv.subtotal AS importeSalida,
+               dv.cantidad AS cantidadSalida,
+               ISNULL(dv.costoUnitario, 0) AS pUnitarioSalida,
+               dv.cantidad * ISNULL(dv.costoUnitario, 0) AS importeSalida,
                ISNULL(dv.costoUnitario, 0) AS costoUnitarioSalida,
                ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, NULL AS observaciones,
                ${selectReceta}
@@ -196,69 +226,92 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
         LEFT JOIN Comprobantes comp ON comp.idComprobante = v.idComprobante AND comp.idEmpresa = v.idEmpresa
         ${joinReceta}
         WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto
-          AND v.fEmision >= @fechaDesde AND v.fEmision < DATEADD(day, 1, @fechaHasta)
+          AND v.fEmision >= TRY_CONVERT(DATETIME, @fechaDesde, 120)
+          AND v.fEmision < DATEADD(day, 1, TRY_CONVERT(DATETIME, @fechaHasta, 120))
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
-      .input('fechaHasta', sql.DateTime, fechaHasta)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
+      .input('fechaHasta', sql.VarChar(23), fechaHastaSql)
       .query(`
         SELECT CONVERT(VARCHAR(19), m.fMovimiento, 120) AS fecha, m.tipoMovimiento AS tipoMov,
                ISNULL(m.docRelacionado,'') AS nroDocum, m.idMovimiento AS idRef, 'MOVIMIENTO' AS tipoRef,
                CAST('' AS VARCHAR(20)) AS serie, ISNULL(m.docRelacionado,'') AS numero,
                '00' AS tipoDocumento,
-               CASE WHEN m.tipoMovimiento IN ('EN','AJ') THEN m.cantidad ELSE 0 END AS cantidadEntrada,
+               CASE
+                 WHEN m.tipoMovimiento = 'EN' OR (m.tipoMovimiento = 'AJ' AND NOT ${SQL_AJ_ES_SALIDA})
+                 THEN ABS(m.cantidad) ELSE 0
+               END AS cantidadEntrada,
                ISNULL(m.costoUnitario,0) AS pUnitarioEntrada,
-               CASE WHEN m.tipoMovimiento IN ('EN','AJ') THEN m.cantidad * ISNULL(m.costoUnitario,0) ELSE 0 END AS importeEntrada,
-               CASE WHEN m.tipoMovimiento = 'SA' THEN m.cantidad ELSE 0 END AS cantidadSalida,
+               CASE
+                 WHEN m.tipoMovimiento = 'EN' OR (m.tipoMovimiento = 'AJ' AND NOT ${SQL_AJ_ES_SALIDA})
+                 THEN ABS(m.cantidad) * ISNULL(m.costoUnitario,0) ELSE 0
+               END AS importeEntrada,
+               CASE
+                 WHEN m.tipoMovimiento = 'SA' OR ${SQL_AJ_ES_SALIDA}
+                 THEN ABS(m.cantidad) ELSE 0
+               END AS cantidadSalida,
                ISNULL(m.costoUnitario,0) AS pUnitarioSalida,
-               CASE WHEN m.tipoMovimiento = 'SA' THEN m.cantidad * ISNULL(m.costoUnitario,0) ELSE 0 END AS importeSalida,
+               CASE
+                 WHEN m.tipoMovimiento = 'SA' OR ${SQL_AJ_ES_SALIDA}
+                 THEN ABS(m.cantidad) * ISNULL(m.costoUnitario,0) ELSE 0
+               END AS importeSalida,
                ISNULL(m.costoUnitario, 0) AS costoUnitarioSalida,
                0 AS eliminado, NULL AS idEstadoSunat, m.observaciones
         FROM MovimientosInventario m
         WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto
-          AND m.fMovimiento >= @fechaDesde AND m.fMovimiento < DATEADD(day, 1, @fechaHasta)
+          AND m.fMovimiento >= TRY_CONVERT(DATETIME, @fechaDesde, 120)
+          AND m.fMovimiento < DATEADD(day, 1, TRY_CONVERT(DATETIME, @fechaHasta, 120))
           ${FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA}
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
       .query(`
-        SELECT ISNULL(SUM(dc.cantidad),0) AS cantidad, ISNULL(SUM(dc.total),0) AS importe
+        SELECT ISNULL(SUM(dc.cantidad),0) AS cantidad,
+               ISNULL(SUM(dc.cantidad * ISNULL(dc.pUnitario, 0)),0) AS importe
         FROM DetalleCompras dc INNER JOIN Compras c ON dc.idCompra = c.idCompra AND c.idEmpresa = dc.idEmpresa
-        WHERE dc.idEmpresa = @idEmpresa AND dc.idProducto = @idProducto AND c.fEmision < @fechaDesde
+        WHERE dc.idEmpresa = @idEmpresa AND dc.idProducto = @idProducto
+          AND c.fEmision < TRY_CONVERT(DATETIME, @fechaDesde, 120)
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
       .query(`
-        SELECT ISNULL(SUM(m.cantidad),0) AS cantidad, ISNULL(SUM(m.cantidad * ISNULL(m.costoUnitario,0)),0) AS importe
+        SELECT ISNULL(SUM(ABS(m.cantidad)),0) AS cantidad,
+               ISNULL(SUM(ABS(m.cantidad) * ISNULL(m.costoUnitario,0)),0) AS importe
         FROM MovimientosInventario m
-        WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto AND m.tipoMovimiento IN ('EN','AJ') AND m.fMovimiento < @fechaDesde
+        WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto
+          AND (m.tipoMovimiento = 'EN' OR (m.tipoMovimiento = 'AJ' AND NOT ${SQL_AJ_ES_SALIDA}))
+          AND m.fMovimiento < TRY_CONVERT(DATETIME, @fechaDesde, 120)
           ${FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA}
           ${FILTRO_EXCLUIR_ANULACION_VENTA}
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
       .query(`
         SELECT ISNULL(SUM(dv.cantidad),0) AS cantidad, ISNULL(SUM(dv.cantidad * ISNULL(dv.costoUnitario, 0)),0) AS importe
         FROM DetalleVenta dv INNER JOIN Ventas v ON dv.idVenta = v.idVenta
-        WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto AND v.fEmision < @fechaDesde
+        WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto
+          AND v.fEmision < TRY_CONVERT(DATETIME, @fechaDesde, 120)
           ${FILTRO_VENTAS_ACTIVAS}
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idProducto', sql.UniqueIdentifier, idProducto)
-      .input('fechaDesde', sql.DateTime, fechaDesde)
+      .input('fechaDesde', sql.VarChar(23), fechaDesdeSql)
       .query(`
-        SELECT ISNULL(SUM(m.cantidad),0) AS cantidad, ISNULL(SUM(m.cantidad * ISNULL(m.costoUnitario,0)),0) AS importe
+        SELECT ISNULL(SUM(ABS(m.cantidad)),0) AS cantidad,
+               ISNULL(SUM(ABS(m.cantidad) * ISNULL(m.costoUnitario,0)),0) AS importe
         FROM MovimientosInventario m
-        WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto AND m.tipoMovimiento = 'SA' AND m.fMovimiento < @fechaDesde
+        WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto
+          AND (m.tipoMovimiento = 'SA' OR ${SQL_AJ_ES_SALIDA})
+          AND m.fMovimiento < TRY_CONVERT(DATETIME, @fechaDesde, 120)
           ${FILTRO_MOV_INVENTARIO_SIN_DUPLICAR_VENTA_COMPRA}
       `),
     pool.request()
@@ -337,32 +390,19 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
   const activas = todas.filter((f) => !f.excluidoDeTotales);
   const totalEntradaCant = activas.reduce((s, f) => s + f.cantidadEntrada, 0);
   const totalSalidaCant = activas.reduce((s, f) => s + f.cantidadSalida, 0);
-  const netPeriodo = totalEntradaCant - totalSalidaCant;
 
   const stockLotesRow = stockLotesResult.recordset && stockLotesResult.recordset[0]
     ? stockLotesResult.recordset[0]
     : { cantidad: 0, importe: 0 };
   const stockLotes = parseFloat(stockLotesRow.cantidad) || 0;
-  const stockImporteLotes = parseFloat(stockLotesRow.importe) || 0;
-  const costoPromedioLotes = stockLotes > 0 ? stockImporteLotes / stockLotes : 0;
 
-  let cantidadIni = cantidadIniLedger;
-  let importeIni = importeIniLedger;
-  const saldoFinalLedger = cantidadIniLedger + netPeriodo;
-  const diferenciaStock = stockLotes - saldoFinalLedger;
-  if (Math.abs(diferenciaStock) > 0.0001) {
-    cantidadIni += diferenciaStock;
-    importeIni += diferenciaStock * (costoPromedioLotes || (cantidadIniLedger > 0 ? importeIniLedger / cantidadIniLedger : 0));
-  }
-
-  let lastPpc = cantidadIni !== 0 ? importeIni / cantidadIni : costoPromedioLotes;
+  const cantidadIni = cantidadIniLedger;
+  const importeIni = importeIniLedger;
   let saldoCant = cantidadIni;
   let saldoValor = importeIni;
 
-  const pUnitarioIni = cantidadIni !== 0 ? round2(importeIni / cantidadIni) : round2(lastPpc);
-  const importeIniFinal = round2(cantidadIni * pUnitarioIni);
-  saldoValor = importeIniFinal;
-  lastPpc = cantidadIni !== 0 ? importeIniFinal / cantidadIni : lastPpc;
+  const pUnitarioIni = cantidadIni !== 0 ? round2(importeIni / cantidadIni) : 0;
+  const importeIniFinal = round2(importeIni);
 
   const filasConSaldo = [];
   let totalSalidaImporteValorizado = 0;
@@ -376,23 +416,21 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
         saldoCant += f.cantidadEntrada;
       }
       if (f.cantidadSalida > 0) {
-        const ppc = saldoCant > 0 ? saldoValor / saldoCant : lastPpc;
-        const costoSalida = f.costoUnitarioSalida > 0 ? f.costoUnitarioSalida : ppc;
+        const ppcRestante = saldoCant > 0 ? saldoValor / saldoCant : 0;
+        const costoSalida = f.costoUnitarioSalida > 0 ? f.costoUnitarioSalida : ppcRestante;
         pUnitarioSalidaValorizado = round2(costoSalida);
         importeSalidaValorizado = round2(f.cantidadSalida * costoSalida);
         totalSalidaImporteValorizado += importeSalidaValorizado;
         saldoValor -= f.cantidadSalida * costoSalida;
         saldoCant -= f.cantidadSalida;
-      }
-      if (saldoCant !== 0) {
-        lastPpc = saldoValor / saldoCant;
+        f.pUnitarioSalida = pUnitarioSalidaValorizado;
+        f.importeSalida = importeSalidaValorizado;
       }
     }
 
-    const ppcSaldo = saldoCant !== 0 ? saldoValor / saldoCant : lastPpc;
-    const saldoPUnitario = round2(ppcSaldo);
+    const saldoPUnitario = saldoCant !== 0 ? round2(saldoValor / saldoCant) : 0;
     const saldoCantidad = round3(saldoCant);
-    const saldoImporte = round2(saldoCantidad * saldoPUnitario);
+    const saldoImporte = round2(saldoValor);
 
     filasConSaldo.push({
       fecha: f.fecha,
@@ -425,9 +463,9 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
 
   const totalEntradaImporte = activas.reduce((s, f) => s + f.importeEntrada, 0);
   const totalSalidaImporte = activas.reduce((s, f) => s + f.importeSalida, 0);
-  const saldoFinalPUnit = saldoCant !== 0 ? round2(saldoValor / saldoCant) : round2(lastPpc);
+  const saldoFinalPUnit = saldoCant !== 0 ? round2(saldoValor / saldoCant) : 0;
   const saldoFinalCantidad = round3(saldoCant);
-  const saldoFinalImporte = round2(saldoFinalCantidad * saldoFinalPUnit);
+  const saldoFinalImporte = round2(saldoValor);
 
   return {
     producto: {
@@ -461,7 +499,8 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
       saldoFinalImporte: saldoFinalImporte,
       saldoFinalPUnitario: saldoFinalPUnit,
       stockActualSistema: stockLotes
-    }
+    },
+    metodoValorizacion: 'LOTE'
   };
 };
 

@@ -1,6 +1,31 @@
 const sql = require("mssql");
 const CajaRepository = require("./caja.repository");
-const { getNowLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
+const { getFechaHoyLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
+
+/** YYYY-MM-DD civil, sin new Date('YYYY-MM-DD') (eso resta un día en Perú). */
+function fechaCivilYmd(valor) {
+  if (valor == null || valor === "") return null;
+  if (typeof valor === "string") {
+    const m = valor.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : null;
+  }
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    const y = valor.getUTCFullYear();
+    const mo = String(valor.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(valor.getUTCDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  }
+  return null;
+}
+
+function addMonthsYmd(ymd, months) {
+  const base = fechaCivilYmd(ymd);
+  if (!base) return getFechaHoyLocal();
+  const [y, m, d] = base.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCMonth(dt.getUTCMonth() + months);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
 
 function normalizarIdsEmpresaCreditos(idEmpresas) {
   const arr = Array.isArray(idEmpresas) ? idEmpresas : idEmpresas ? [idEmpresas] : [];
@@ -50,7 +75,7 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
         cc.idCredito,
         cc.idCliente,
         ISNULL(c.rSocial, '') AS cliente,
-        cc.fechaCredito,
+        CONVERT(VARCHAR(19), cc.fechaCredito, 120) AS fechaCredito,
         cc.montoTotal,
         cc.plazoDias,
         cc.tasaInteres,
@@ -63,9 +88,9 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
         COUNT(CASE WHEN cu.estado = 'PAGADO' THEN 1 END) AS cuotasPagadas,
         COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN 1 END) AS cuotasVencidas,
         ISNULL(SUM(cu.montoCuota), 0) AS totalCuotasGeneradas,
-        ISNULL(SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END), 0) AS totalPagado,
+        ISNULL(SUM(cu.montoCuota - ISNULL(cu.saldoPendiente, 0)), 0) AS totalPagado,
         ISNULL(SUM(ISNULL(cu.saldoPendiente, 0)), 0) AS saldoPendiente,
-        MIN(CASE WHEN cu.estado IN ('PENDIENTE', 'VENCIDO') THEN cu.fechaVencimiento END) AS proximaCuota
+        CONVERT(VARCHAR(10), MIN(CASE WHEN cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL') THEN cu.fechaVencimiento END), 23) AS proximaCuota
       FROM CreditosClientes cc
       LEFT JOIN Clientes c ON cc.idCliente = c.idCliente
       LEFT JOIN Ventas v ON cc.idVenta = v.idVenta
@@ -213,7 +238,7 @@ exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params)
       .input("idCredito", sql.UniqueIdentifier, idCredito)
       .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
       .input("numeroCuota", sql.Int, num)
-      .input("fechaVencimiento", sql.Date, fv)
+      .input("fechaVencimiento", sql.VarChar(10), fv)
       .input("montoCuota", sql.Decimal(18, 2), monto)
       .input("interes", sql.Decimal(18, 2), 0)
       .input("capital", sql.Decimal(18, 2), monto)
@@ -223,7 +248,7 @@ exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params)
           idCredito, idEmpresa, numeroCuota, fechaVencimiento,
           montoCuota, interes, capital, saldoPendiente, estado
         ) VALUES (
-          @idCredito, @idEmpresa, @numeroCuota, @fechaVencimiento,
+          @idCredito, @idEmpresa, @numeroCuota, TRY_CONVERT(DATE, @fechaVencimiento, 23),
           @montoCuota, @interes, @capital, @saldoPendiente, 'PENDIENTE'
         )
       `);
@@ -237,7 +262,7 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
 
   try {
     const request = transaction.request();
-    const fechaInicio = datos.fechaInicio || new Date();
+    const fechaInicio = fechaCivilYmd(datos.fechaInicio) || getFechaHoyLocal();
 
     const fechaCreditoSql = resolveFechaHoraClienteSql(datos.fechaCredito);
 
@@ -282,15 +307,12 @@ async function generarCuotasCredito(request, idCredito, idEmpresa, montoTotal, p
   const numeroCuotas = numeroCuotasOverride === 1 ? 1 : Math.ceil(plazoDias / 30);
   const montoCuota = montoTotal / numeroCuotas;
   const tasaMensual = (tasaInteres || 0) / 100 / 12;
+  const inicioYmd = fechaCivilYmd(fechaInicio) || getFechaHoyLocal();
+  const unicaYmd = fechaCivilYmd(fechaVencimientoUnica);
 
   for (let i = 1; i <= numeroCuotas; i++) {
-    let fechaVencimiento;
-    if (numeroCuotasOverride === 1 && fechaVencimientoUnica) {
-      fechaVencimiento = new Date(fechaVencimientoUnica);
-    } else {
-      fechaVencimiento = new Date(fechaInicio);
-      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
-    }
+    const fechaVencimiento =
+      numeroCuotasOverride === 1 && unicaYmd ? unicaYmd : addMonthsYmd(inicioYmd, i);
 
     const interes = tasaMensual > 0 ? (montoTotal - (i - 1) * montoCuota) * tasaMensual : 0;
     const capital = montoCuota;
@@ -300,7 +322,7 @@ async function generarCuotasCredito(request, idCredito, idEmpresa, montoTotal, p
       .input(`idCredito_${i}`, sql.UniqueIdentifier, idCredito)
       .input(`idEmpresa_${i}`, sql.UniqueIdentifier, idEmpresa)
       .input(`numeroCuota_${i}`, sql.Int, i)
-      .input(`fechaVencimiento_${i}`, sql.Date, fechaVencimiento)
+      .input(`fechaVencimiento_${i}`, sql.VarChar(10), fechaVencimiento)
       .input(`montoCuota_${i}`, sql.Decimal(18, 2), totalCuota)
       .input(`interes_${i}`, sql.Decimal(18, 2), interes)
       .input(`capital_${i}`, sql.Decimal(18, 2), capital)
@@ -310,7 +332,7 @@ async function generarCuotasCredito(request, idCredito, idEmpresa, montoTotal, p
           idCredito, idEmpresa, numeroCuota, fechaVencimiento,
           montoCuota, interes, capital, saldoPendiente, estado
         ) VALUES (
-          @idCredito_${i}, @idEmpresa_${i}, @numeroCuota_${i}, @fechaVencimiento_${i},
+          @idCredito_${i}, @idEmpresa_${i}, @numeroCuota_${i}, TRY_CONVERT(DATE, @fechaVencimiento_${i}, 23),
           @montoCuota_${i}, @interes_${i}, @capital_${i}, @saldoPendiente_${i}, 'PENDIENTE'
         )
       `);
@@ -326,13 +348,13 @@ exports.obtenerCuotasCreditoRepo = async (pool, idEmpresa, idCredito) => {
       SELECT
         cu.idCuota,
         cu.numeroCuota,
-        cu.fechaVencimiento,
+        CONVERT(VARCHAR(10), cu.fechaVencimiento, 23) AS fechaVencimiento,
         cu.montoCuota,
         cu.interes,
         cu.capital,
         cu.saldoPendiente,
         cu.estado,
-        cu.fechaPago,
+        CONVERT(VARCHAR(19), cu.fechaPago, 120) AS fechaPago,
         -- Información de pagos
         COUNT(pc.idPagoCuota) AS numeroPagos,
         SUM(pc.montoPagado) AS totalPagado
@@ -356,7 +378,7 @@ exports.validarCuotaPendienteRepo = async (pool, idCuota, idEmpresa) => {
       SELECT COUNT(*) as existe
       FROM CuotasCredito
       WHERE idCuota = @idCuota AND idEmpresa = @idEmpresa
-        AND estado IN ('PENDIENTE', 'VENCIDO')
+        AND estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
     `);
 
   return result.recordset[0].existe > 0;
@@ -387,8 +409,10 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
     const idFormaPagoCaja = await resolveIdFormaPagoCaja(transaction, datos.idMediosPago);
 
     if (datos.idApertura && cuota) {
-      const tipoIngreso = await request.query("SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I'");
-      const idTipoMovimientoCaja = tipoIngreso.recordset?.[0]?.idTipoMovimientoCaja;
+      const idTipoMovimientoCaja = await CajaRepository.obtenerIdTipoMovimientoIngresoRepo(
+        transaction,
+        "COBRANZA_CREDITO"
+      );
       if (idTipoMovimientoCaja) {
         try {
           const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(
@@ -425,8 +449,7 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
     const esPagoParcial = datos.montoPagado < cuota.saldoPendiente;
 
     if (esPagoParcial) {
-      // Pago parcial: registrar pago y generar nueva cuota (usa su propio request para no duplicar parámetros)
-      await procesarPagoParcial(transaction, cuota, datos, user, fechaPagoSql);
+      await procesarPagoParcial(transaction, cuota, datos, fechaPagoSql);
     } else {
       // Pago total: marcar cuota como pagada (request nuevo para no duplicar idCuota del SELECT inicial)
       const reqUpdate = transaction.request();
@@ -461,13 +484,15 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
         )
       `);
 
+    await sincronizarEstadoCredito(transaction, cuota.idCredito, user.empresa);
+
     await transaction.commit();
     return {
       idCuota: datos.idCuota,
       montoPagado: datos.montoPagado,
       esPagoParcial,
       numeroRecibo: numeroReciboCobranza,
-      mensaje: esPagoParcial ? "Pago parcial registrado, nueva cuota generada" : "Cuota pagada completamente"
+      mensaje: esPagoParcial ? "Pago parcial registrado. La cuota queda con el saldo restante." : "Cuota pagada completamente"
     };
   } catch (error) {
     await transaction.rollback();
@@ -475,41 +500,51 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
   }
 };
 
-// Función auxiliar para procesar pagos parciales (usa request propio para no duplicar parámetros con el request del flujo principal)
-// La cuota actual se marca PAGADA (monto pagado = cancelado); solo el saldo restante genera una nueva cuota pendiente.
-async function procesarPagoParcial(transaction, cuota, datos, user, fechaPagoSql) {
+async function procesarPagoParcial(transaction, cuota, datos, fechaPagoSql) {
+  const pagado = Number(datos.montoPagado) || 0;
+  const saldoAntes = Number(cuota.saldoPendiente) || 0;
+  const saldoNuevo = Math.round((saldoAntes - pagado) * 100) / 100;
   const req = transaction.request();
-  // Marcar la cuota actual como PAGADA (el monto pagado queda cancelado; saldoPendiente en 0)
   await req
     .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
     .input("fechaPago", sql.VarChar(23), fechaPagoSql)
+    .input("saldoPendiente", sql.Decimal(18, 2), saldoNuevo > 0 ? saldoNuevo : 0)
     .query(`
       UPDATE CuotasCredito
-      SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0
+      SET estado = CASE WHEN @saldoPendiente <= 0 THEN 'PAGADO' ELSE 'PARCIAL' END,
+          fechaPago = TRY_CONVERT(DATETIME, @fechaPago, 120),
+          saldoPendiente = @saldoPendiente
       WHERE idCuota = @idCuota
     `);
+}
 
-  // Generar nueva cuota con el saldo restante (nuevo request para no reutilizar idCuota ni otros params)
-  const reqNueva = transaction.request();
-  const nuevaFechaVencimiento = new Date(cuota.fechaVencimiento);
-  nuevaFechaVencimiento.setMonth(nuevaFechaVencimiento.getMonth() + 1); // Próximo mes
-
-  await reqNueva
-    .input("idCredito", sql.UniqueIdentifier, cuota.idCredito)
-    .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
-    .input("numeroCuota", sql.Int, cuota.numeroCuota + 1)
-    .input("fechaVencimiento", sql.Date, nuevaFechaVencimiento)
-    .input("montoCuota", sql.Decimal(18, 2), cuota.saldoPendiente - datos.montoPagado)
-    .input("saldoPendiente", sql.Decimal(18, 2), cuota.saldoPendiente - datos.montoPagado)
+async function sincronizarEstadoCredito(transaction, idCredito, idEmpresa) {
+  if (!idCredito || !idEmpresa) return;
+  const r = await transaction.request()
+    .input("idCreditoSync", sql.UniqueIdentifier, idCredito)
+    .input("idEmpresaSync", sql.UniqueIdentifier, idEmpresa)
     .query(`
-      INSERT INTO CuotasCredito (
-        idCredito, idEmpresa, numeroCuota, fechaVencimiento,
-        montoCuota, interes, capital, saldoPendiente, estado
-      ) VALUES (
-        @idCredito, @idEmpresa, @numeroCuota, @fechaVencimiento,
-        @montoCuota, 0, @montoCuota, @saldoPendiente, 'PENDIENTE'
-      )
+      SELECT
+        SUM(CASE WHEN estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL') THEN 1 ELSE 0 END) AS abiertas,
+        SUM(ISNULL(saldoPendiente, 0)) AS saldo
+      FROM CuotasCredito
+      WHERE idCredito = @idCreditoSync AND idEmpresa = @idEmpresaSync
     `);
+  const abiertas = Number(r.recordset[0]?.abiertas) || 0;
+  const saldo = Number(r.recordset[0]?.saldo) || 0;
+  if (abiertas === 0 || saldo <= 0.009) {
+    try {
+      await transaction.request()
+        .input("idCreditoDone", sql.UniqueIdentifier, idCredito)
+        .query(`
+          UPDATE CreditosClientes
+          SET estado = 'COMPLETADO'
+          WHERE idCredito = @idCreditoDone AND estado = 'ACTIVO'
+        `);
+    } catch (errEstado) {
+      console.error("contexto: sincronizarEstadoCredito", errEstado.message || errEstado);
+    }
+  }
 }
 
 const resumenCreditosDefault = () => ({
@@ -539,44 +574,74 @@ exports.obtenerResumenCreditosRepo = async (pool, idEmpresas) => {
     ids.forEach((id, i) => request.input(`e${i}`, sql.UniqueIdentifier, id));
     const whereEmp =
       ids.length === 1 ? "cc.idEmpresa = @e0" : `cc.idEmpresa IN (${ids.map((_, i) => `@e${i}`).join(", ")})`;
-    const result = await request.query(`
+    const cab = await request.query(`
         SELECT
-          COUNT(DISTINCT cc.idCredito) AS totalCreditos,
-          SUM(cc.montoTotal) AS montoTotalCreditos,
-          COUNT(DISTINCT CASE WHEN cc.estado = 'ACTIVO' THEN cc.idCredito END) AS creditosActivos,
-          SUM(CASE WHEN cc.estado = 'ACTIVO' THEN cc.montoTotal ELSE 0 END) AS montoCreditosActivos,
-          COUNT(cu.idCuota) AS totalCuotas,
-          COUNT(CASE WHEN cu.estado = 'PAGADO' THEN cu.idCuota END) AS cuotasPagadas,
-          COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN cu.idCuota END) AS cuotasVencidas,
-          COUNT(CASE WHEN cu.estado = 'PENDIENTE' THEN cu.idCuota END) AS cuotasPendientes,
-          SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END) AS totalCobrado,
-          SUM(cu.saldoPendiente) AS saldoPendienteTotal,
-          AVG(cc.tasaInteres) AS tasaInteresPromedio
+          COUNT(*) AS totalCreditos,
+          ISNULL(SUM(cc.montoTotal), 0) AS montoTotalCreditos,
+          COUNT(CASE WHEN cc.estado = 'ACTIVO' THEN 1 END) AS creditosActivos,
+          ISNULL(SUM(CASE WHEN cc.estado = 'ACTIVO' THEN cc.montoTotal ELSE 0 END), 0) AS montoCreditosActivos,
+          ISNULL(AVG(cc.tasaInteres), 0) AS tasaInteresPromedio
         FROM CreditosClientes cc
-        LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
         WHERE ${whereEmp}
       `);
 
-    const row = result.recordset[0] || {};
-    const montoTotal = Number(row.montoTotalCreditos) ?? 0;
-    const saldoTotal = Number(row.saldoPendienteTotal) ?? 0;
-    const cobrado = Number(row.totalCobrado) ?? 0;
-    const tasa = Number(row.tasaInteresPromedio) ?? 0;
-    const totalCuotas = Number(row.totalCuotas) || 0;
-    const cuotasPag = Number(row.cuotasPagadas) || 0;
+    const reqCuotas = pool.request();
+    ids.forEach((id, i) => reqCuotas.input(`e${i}`, sql.UniqueIdentifier, id));
+    const cuotas = await reqCuotas.query(`
+        SELECT
+          COUNT(*) AS totalCuotas,
+          COUNT(CASE WHEN cu.estado = 'PAGADO' THEN 1 END) AS cuotasPagadas,
+          COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN 1 END) AS cuotasVencidas,
+          COUNT(CASE WHEN cu.estado IN ('PENDIENTE', 'PARCIAL') THEN 1 END) AS cuotasPendientes,
+          ISNULL(SUM(cu.saldoPendiente), 0) AS saldoPendienteTotal
+        FROM CuotasCredito cu
+        INNER JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito
+        WHERE ${whereEmp}
+      `);
+
+    const reqPagos = pool.request();
+    ids.forEach((id, i) => reqPagos.input(`e${i}`, sql.UniqueIdentifier, id));
+    let cobrado = 0;
+    try {
+      const pagos = await reqPagos.query(`
+          SELECT ISNULL(SUM(pc.montoPagado), 0) AS totalCobrado
+          FROM PagosCuotas pc
+          INNER JOIN CuotasCredito cu ON cu.idCuota = pc.idCuota
+          INNER JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito
+          WHERE ${whereEmp}
+        `);
+      cobrado = Number(pagos.recordset[0]?.totalCobrado) || 0;
+    } catch (errPagos) {
+      const msg = errPagos.message || "";
+      if (!/Invalid object name|PagosCuotas/.test(msg)) throw errPagos;
+    }
+
+    const row = cab.recordset[0] || {};
+    const rowCuotas = cuotas.recordset[0] || {};
+    const montoTotal = Number(row.montoTotalCreditos) || 0;
+    const saldoTotal = Number(rowCuotas.saldoPendienteTotal) || 0;
+    const tasaInteres = Number(row.tasaInteresPromedio) || 0;
+    const totalCuotas = Number(rowCuotas.totalCuotas) || 0;
+    const cuotasPag = Number(rowCuotas.cuotasPagadas) || 0;
+    const tasaCobro = montoTotal > 0 ? (cobrado / montoTotal) * 100 : 0;
     return {
       ...resumenCreditosDefault(),
-      ...row,
+      totalCreditos: Number(row.totalCreditos) || 0,
       montoTotalCreditos: montoTotal,
-      montoCreditosActivos: Number(row.montoCreditosActivos) ?? 0,
+      creditosActivos: Number(row.creditosActivos) || 0,
+      montoCreditosActivos: Number(row.montoCreditosActivos) || 0,
+      totalCuotas,
+      cuotasPagadas: cuotasPag,
+      cuotasVencidas: Number(rowCuotas.cuotasVencidas) || 0,
+      cuotasPendientes: Number(rowCuotas.cuotasPendientes) || 0,
       totalCobrado: cobrado,
       saldoPendienteTotal: saldoTotal,
-      tasaInteresPromedio: tasa,
+      tasaInteresPromedio: tasaInteres,
       totalMontoOtorgado: montoTotal,
       totalSaldoPendiente: saldoTotal,
       totalPagado: cobrado,
-      tasaCobro: tasa,
-      eficienciaCobro: totalCuotas > 0 ? (cuotasPag / totalCuotas) * 100 : 0
+      tasaCobro,
+      eficienciaCobro: tasaCobro
     };
   } catch (err) {
     const msg = err.message || '';
@@ -598,7 +663,7 @@ exports.obtenerCuotasPendientesRepo = async (pool, idEmpresa, dias = 7) => {
       SELECT
         cu.idCuota,
         cu.numeroCuota,
-        cu.fechaVencimiento,
+        CONVERT(VARCHAR(10), cu.fechaVencimiento, 23) AS fechaVencimiento,
         cu.montoCuota,
         cu.saldoPendiente,
         cu.estado,
@@ -616,7 +681,7 @@ exports.obtenerCuotasPendientesRepo = async (pool, idEmpresa, dias = 7) => {
       INNER JOIN Clientes c ON cc.idCliente = c.idCliente
       INNER JOIN UsuarioWeb uw ON cc.idUsuarioCredito = uw.idUsuario
       WHERE cu.idEmpresa = @idEmpresa
-        AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+        AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
         AND (
           DATEDIFF(DAY, GETDATE(), cu.fechaVencimiento) <= @dias
           OR cu.fechaVencimiento < GETDATE()

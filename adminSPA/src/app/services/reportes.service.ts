@@ -105,5 +105,30 @@ export class ReportesService {
       }
     );
   }
+
+  obtenerAntiguedadDeuda(): Observable<{
+    message: string;
+    data: {
+      resumen: { alDia: number; de1a30: number; de31a60: number; mas60: number; saldo: number; clientes: number };
+      clientes: Array<{ idCliente: number; cliente: string; alDia: number; de1a30: number; de31a60: number; mas60: number; saldo: number }>;
+    };
+  }> {
+    return this.http.get(this.baseUrl + 'antiguedad-deuda', { withCredentials: true }) as ReturnType<
+      ReportesService['obtenerAntiguedadDeuda']
+    >;
+  }
+
+  obtenerEstadoCuenta(idCliente: number): Observable<{
+    message: string;
+    data: {
+      cliente: { idCliente: number; cliente: string; documento: string };
+      aging: { alDia: number; de1a30: number; de31a60: number; mas60: number; saldo: number };
+      movimientos: Array<{ fecha: string; documento: string; tipo: string; cargo: number; abono: number; estado: string }>;
+    };
+  }> {
+    return this.http.get(this.baseUrl + 'estado-cuenta/' + idCliente, { withCredentials: true }) as ReturnType<
+      ReportesService['obtenerEstadoCuenta']
+    >;
+  }
 }
 

@@ -339,7 +339,7 @@ exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
     const inEmp = bindIdsInQuery(reqCajas, idsEmpresa, 'arqSucEmp');
     if (inEmp.length > 0) {
       const rsCajas = await reqCajas.query(`
-        SELECT c.idCaja, c.idEmpresa, c.idSucursal, ISNULL(s.nombre, '') AS nombreSucursal
+        SELECT c.idCaja, c.idEmpresa, c.idSucursal, ISNULL(c.nombre, '') AS nombreCaja, ISNULL(s.nombre, '') AS nombreSucursal
         FROM Cajas c
         INNER JOIN Sucursal s ON s.idSucursal = c.idSucursal
         WHERE c.idEmpresa IN (${inEmp.join(',')})
@@ -369,6 +369,7 @@ exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
           idSucursal: c.idSucursal,
           nombreSucursal: c.nombreSucursal || '',
           idCaja: c.idCaja,
+          nombreCaja: c.nombreCaja || '',
           movimientos: movs,
           ventasCredito: part.ventasCredito || { concepto: 'VENTA_CREDITO', importe: 0 },
           cobroCreditos: part.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 },

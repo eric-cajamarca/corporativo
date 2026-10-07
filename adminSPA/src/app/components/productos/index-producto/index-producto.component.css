@@ -225,6 +225,13 @@
     color: #0f172a;
   }
 
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Código"] span {
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+  }
+
   .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Marca"] {
     grid-column: 2;
     grid-row: 2;
@@ -234,9 +241,10 @@
   .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Marca"] span {
     display: inline-block;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-word;
     font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.03em;
@@ -255,6 +263,10 @@
   }
 
   .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="C.Unit."] {
+    display: none !important;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="P.Venta"] {
     grid-column: 4;
     grid-row: 2;
     justify-content: flex-end;
@@ -265,20 +277,24 @@
     white-space: nowrap;
   }
 
-  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="C.Unit."]::before {
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="P.Venta"]::before {
     content: 'S/';
     font-size: 0.68rem;
     font-weight: 800;
     color: #15803d;
   }
 
-  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="F.Prod."] {
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Stock"] {
     grid-column: 1 / 3;
     grid-row: 3;
-    color: #64748b;
-    font-size: 0.75rem;
+    color: #0f766e;
+    font-weight: 800;
     padding-top: 0.15rem;
     border-top: 1px dashed #e2e8f0;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="F.Prod."] {
+    display: none !important;
   }
 
   .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="F.Venc."] {
@@ -291,17 +307,14 @@
     border-top: 1px dashed #e2e8f0;
   }
 
-  .table-productos-responsive tbody tr:not(.productos-fila-vacia):has(td[data-label="Sucursal"]) td[data-label="F.Prod."] {
-    grid-column: 1;
-  }
-
   .table-productos-responsive tbody tr:not(.productos-fila-vacia):has(td[data-label="Sucursal"]) td[data-label="F.Venc."] {
-    grid-column: 2;
+    grid-column: 3 / 5;
+    grid-row: 4;
   }
 
   .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Sucursal"] {
-    grid-column: 3 / 5;
-    grid-row: 3;
+    grid-column: 1 / 3;
+    grid-row: 4;
     color: #64748b;
     font-size: 0.75rem;
     padding-top: 0.15rem;

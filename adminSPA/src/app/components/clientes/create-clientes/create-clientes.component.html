@@ -28,7 +28,7 @@
                     </div>
 
                     <div  class="input-group input-group-merge">
-                        <input type="text" class="form-control form-control-appended" data-asistente-campo="doc" placeholder="ingrese el número de RUC"
+                        <input type="text" class="form-control form-control-appended" data-asistente-campo="doc" [placeholder]="placeholderDocumento"
                             name="ruc" [(ngModel)]="clientes.ruc">
                         <div>
                             <button *ngIf="!busqueda" (click)="buscar()" class="btn btn-primary">Buscar</button>
@@ -163,9 +163,9 @@
 
                     <div class="card-body" [class.py-2]="desdeVenta" [class.px-3]="desdeVenta">
                         <div class="mb-2">
-                            <label for="rSocial" class="form-label">Razón Social</label>
+                            <label for="rSocial" class="form-label">Nombre completo</label>
                             <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
-                                placeholder="Ingrese la razón social">
+                                placeholder="Ingrese el nombre de la persona">
                         </div>
 
                         <div class="mb-2">

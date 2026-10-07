@@ -88,42 +88,152 @@
     min-width: 0;
     width: 100%;
   }
-}
 
-@media (max-width: 991.98px) {
+  .stock-tabla-scroll-wrap {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .btn-toolbar .btn {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+  }
+
+  .stock-toggle .btn {
+    min-height: 2.5rem;
+    font-size: 0.75rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+  }
+
+  .stock-footer {
+    justify-content: space-between !important;
+    gap: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .stock-footer .fs-5 {
+    font-size: 1.05rem !important;
+  }
+
+  .stock-table-mobile,
+  .stock-table-mobile tbody {
+    display: block;
+    width: 100%;
+  }
+
   .stock-table-mobile thead {
     display: none;
   }
 
-  .stock-table-mobile tbody tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
+  .stock-table-mobile tbody tr:not(.fila-vacia) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 0.5rem;
+    row-gap: 0.28rem;
+    margin-bottom: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
   }
 
-  .stock-table-mobile tbody td {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-    padding: 0.55rem 0.85rem !important;
-    border-bottom: 1px solid #f1f3f5;
+  .stock-table-mobile.table-striped > tbody > tr:not(.fila-vacia) > *,
+  .stock-table-mobile.table-hover > tbody > tr:not(.fila-vacia):hover > * {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    --bs-table-accent-bg: transparent;
+  }
+
+  .stock-table-mobile tbody tr:not(.fila-vacia) td {
+    display: block;
+    padding: 0 !important;
+    border: none !important;
     text-align: left !important;
+    background: transparent !important;
+    min-width: 0;
   }
 
-  .stock-table-mobile tbody td:last-child {
-    border-bottom: none;
+  .stock-table-mobile tbody tr:not(.fila-vacia) td::before {
+    display: none;
   }
 
-  .stock-table-mobile tbody td::before {
-    content: attr(data-label);
+  .stock-table-mobile tbody td[data-label="N°"] {
+    display: none !important;
+  }
+
+  .stock-table-mobile tbody td[data-label="Producto"] {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .stock-table-mobile tbody td[data-label="Stock"] {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f766e;
+    white-space: nowrap;
+    text-align: right !important;
+  }
+
+  .stock-table-mobile tbody td[data-label="Código"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .stock-table-mobile tbody td[data-label="Código"]::before {
+    display: inline;
+    content: attr(data-label) ': ';
     font-weight: 600;
-    color: #6c757d;
+    color: #94a3b8;
     font-size: 0.65rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+  }
+
+  .stock-table-mobile tbody td[data-label="Categoría"],
+  .stock-table-mobile tbody td[data-label="Marca"],
+  .stock-table-mobile tbody td[data-label="Empresa"] {
+    grid-row: 3;
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .stock-table-mobile tbody td[data-label="Categoría"] {
+    grid-column: 1;
+  }
+
+  .stock-table-mobile tbody td[data-label="Marca"] {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .stock-table-mobile tbody td[data-label="Empresa"] {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .stock-table-mobile tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .stock-table-mobile tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .stock-table-mobile tbody tr.fila-vacia td::before {
+    display: none;
   }
 }

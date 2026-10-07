@@ -21,7 +21,7 @@ export class CreateColaboradorComponent implements OnInit {
   public sidebarState = inject(SidebarStateService);
 
   public colaborador:any = {
-    estado : false
+    estado : true
   };
 
   public roles:any[] = [];

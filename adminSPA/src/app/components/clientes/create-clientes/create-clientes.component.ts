@@ -148,6 +148,14 @@ export class CreateClientesComponent implements OnInit, OnChanges {
     return String(this.clientes.idDocumento) === '1';
   }
 
+  get placeholderDocumento(): string {
+    const id = String(this.clientes.idDocumento || '');
+    if (id === '1') return 'Ingrese el número de DNI';
+    if (id === '4') return 'Ingrese el carnet de extranjería';
+    if (id === '6') return 'Ingrese el número de RUC';
+    return 'Ingrese el número de documento';
+  }
+
   /** DNI: dirección por defecto "-" para permitir guardar sin completar el campo. */
   onCambioTipoDocumento(idDocumento: string): void {
     if (String(idDocumento) === '1') {
@@ -347,6 +355,12 @@ private async handleRucSearch(): Promise<void> {
 }
 
 private async handleDniSearch(): Promise<void> {
+  const dniNorm = String(this.filtro || '').replace(/\D/g, '');
+  if (dniNorm === '00000000' || /^0+$/.test(dniNorm)) {
+    this.showError('El DNI 00000000 es el cliente genérico. Ingrese un DNI real para consultar RENIEC.');
+    this.busqueda = false;
+    return;
+  }
   try {
     const response = await firstValueFrom(this._apiperuService.getDniInfo(this.filtro));
     if (!response) throw new Error('No se recibieron datos del servicio');
@@ -362,6 +376,11 @@ private async handleDniSearch(): Promise<void> {
     const nom = (data.nombres ?? '').trim();
     const partes = [ap, am, nom].filter(Boolean);
     this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
+    if (!this.clientes.rSocial) {
+      this.showError('No se encontraron resultados para este DNI');
+      this.busqueda = false;
+      return;
+    }
     this.direccionClientes.direccion = '-';
   } catch (error) {
     this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
@@ -646,6 +665,31 @@ private showError(message: string): void {
       //  console.log('this.data como objeto', this.data);
       this._clientesService.crear_cliente(this.data).subscribe(
         response => {
+          if (response.existente === true || response.data?.existente === true) {
+            const ruc = String(this.clientes.ruc || '').trim();
+            const esGenerico = ruc === '00000000';
+            const msg = esGenerico
+              ? 'El DNI 00000000 es el cliente genérico y ya existe. Use otro DNI o selecciónelo en la venta.'
+              : (response.message || 'El DNI/RUC ya está registrado.');
+            if (typeof iziToast !== 'undefined') {
+              iziToast.warning({ title: 'Ya existe', message: msg, position: 'topRight' });
+            }
+            this.btn_registrar = false;
+            if (this.desdeVenta && response.data) {
+              const row = response.data;
+              this.clienteCreado.emit({
+                idCliente: row.idCliente,
+                idDocumento: row.idDocumento ?? this.clientes.idDocumento,
+                ruc: row.ruc ?? this.clientes.ruc,
+                rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? this.clientes.rSocial ?? '').toString().trim(),
+                direccion: (this.direccionClientes.direccion ?? '').toString().trim(),
+                correo: row.correo ?? this.clientes.correo ?? '',
+                celular: row.celular ?? this.clientes.celular ?? '',
+                condicion: row.condicion ?? this.clientes.condicion ?? 'ACTIVO'
+              });
+            }
+            return;
+          }
           if(response.data != undefined){
             this._clientesService.obtener_cliente_ruc(this.clientes.ruc).subscribe(
               resCliente => {

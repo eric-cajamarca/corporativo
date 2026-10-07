@@ -18,6 +18,7 @@ import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import { coincideBusquedaVentaAgrupadaGestora } from '../../../utils/gestora-ventas-historial.util';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 declare const iziToast: {
   success: (o: object) => void;
@@ -126,6 +127,10 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   whatsappCaptionHijo = '';
   whatsappFormatoHijo: 'A4' | 'A5' | 'ticket' = 'A4';
   enviandoWhatsappHijo = false;
+  mostrarDevolucion = false;
+  devolviendo = false;
+  ventaDevolucion: VentaListado | null = null;
+  lineasDevolucion: Array<{ idDetalle: number; descripcion: string; cantidad: number; devolver: number; pVenta: number }> = [];
 
   constructor(
     private ventasService: VentasService,
@@ -134,6 +139,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     private excelService: ExcelService,
     private empresaService: EmpresaService,
     private whatsappService: WhatsappService,
+    private confirmacion: ConfirmacionDialogService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -694,6 +700,16 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   enviarASunat(v: VentaListado): void {
     const id = v?.idComprobanteElectronico != null ? String(v.idComprobanteElectronico).trim() : '';
     if (!id) return;
+    void this.confirmacion.confirmar({
+      titulo: 'Emitir a SUNAT',
+      mensaje: `¿Confirma enviar ${v.compVenta || 'este comprobante'} a SUNAT? Esta acción declara el documento ante la SUNAT.`,
+      confirmarTexto: 'Sí, enviar a SUNAT'
+    }).then((ok) => {
+      if (ok) this.ejecutarEnvioSunat(v, id);
+    });
+  }
+
+  private ejecutarEnvioSunat(v: VentaListado, id: string): void {
     this.enviandoSunatId = id;
     this.facturacionService.enviarComprobanteSunat(id).subscribe({
       next: (res) => {
@@ -1831,31 +1847,65 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     iziToast.warning({ title: 'Aviso', message, position: 'topRight', timeout: 9000 });
   }
 
+  puedeDevolverParcial(v: VentaListado): boolean {
+    return this.esNotaVentaSinSunat(v) && !v.eliminado;
+  }
+
+  abrirDevolucionParcial(v: VentaListado): void {
+    const id = Number(v.idVenta);
+    if (!id) return;
+    this.ventaDevolucion = v;
+    this.lineasDevolucion = [];
+    this.mostrarDevolucion = true;
+    this.ventasService.obtenerDetalleSimple(id).subscribe({
+      next: (rows) => {
+        this.lineasDevolucion = (rows || []).map((r) => ({
+          idDetalle: Number(r.idDetalle),
+          descripcion: String(r.descripcion || r.idProducto || 'Producto'),
+          cantidad: Number(r.cantidad) || 0,
+          devolver: 0,
+          pVenta: Number(r.pVenta) || 0
+        }));
+      },
+      error: () => {
+        this.toastError('No se pudo cargar el detalle de la nota de venta');
+        this.mostrarDevolucion = false;
+      }
+    });
+  }
+
+  confirmarDevolucionParcial(): void {
+    if (!this.ventaDevolucion) return;
+    const lineas = this.lineasDevolucion
+      .filter((l) => Number(l.devolver) > 0)
+      .map((l) => ({ idDetalle: l.idDetalle, cantidad: Number(l.devolver) }));
+    if (!lineas.length) {
+      this.toastWarning('Indique al menos una cantidad a devolver.');
+      return;
+    }
+    this.devolviendo = true;
+    this.ventasService.devolucionParcial(Number(this.ventaDevolucion.idVenta), lineas).subscribe({
+      next: (res) => {
+        this.devolviendo = false;
+        this.mostrarDevolucion = false;
+        this.cargarVentas();
+        this.toastInfo(res?.message || 'Devolución registrada');
+      },
+      error: (err) => {
+        this.devolviendo = false;
+        this.toastError(err?.error?.message || err?.message || 'No se pudo devolver');
+      }
+    });
+  }
+
   private confirmarAccion(message: string, onConfirm: () => void): void {
-    iziToast.show({
-      title: 'Confirmar',
-      message,
-      position: 'center',
-      timeout: false,
-      close: true,
-      overlay: true,
-      overlayClose: true,
-      buttons: [
-        [
-          '<button>Sí, continuar</button>',
-          (instance: { hide: (opts: object, toast: unknown) => void }, toast: unknown) => {
-            instance.hide({ transitionOut: 'fadeOut' }, toast);
-            onConfirm();
-          },
-          true
-        ],
-        [
-          '<button>Cancelar</button>',
-          (instance: { hide: (opts: object, toast: unknown) => void }, toast: unknown) => {
-            instance.hide({ transitionOut: 'fadeOut' }, toast);
-          }
-        ]
-      ]
+    void this.confirmacion.confirmar({
+      titulo: 'Confirmar',
+      mensaje: message,
+      confirmarTexto: 'Sí, continuar',
+      peligro: true
+    }).then((ok) => {
+      if (ok) onConfirm();
     });
   }
 }

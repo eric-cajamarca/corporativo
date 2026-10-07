@@ -50,32 +50,36 @@
                             </div>
                           </div>
     
-                          <div class="mt-3 d-flex gap-2">
+                          <div class="mt-3 d-flex flex-wrap gap-2 caja-card-actions">
                             <button class="btn btn-sm btn-outline-primary"
                                     (click)="seleccionarCaja(caja)"
-                                    title="Ver Movimientos">
-                              <i class="bi bi-eye"></i>
+                                    title="Ver movimientos">
+                              <i class="bi bi-eye me-1"></i>
+                              <span>Movimientos</span>
                             </button>
     
                             <button class="btn btn-sm btn-success"
                                     *ngIf="!caja.cajaAbierta"
                                     (click)="abrirModalApertura(caja)"
-                                    title="Abrir Caja">
-                              <i class="bi bi-dropbox"></i>
+                                    title="Abrir caja">
+                              <i class="bi bi-unlock me-1"></i>
+                              <span>Abrir</span>
                             </button>
     
                             <button class="btn btn-sm btn-warning"
                                     *ngIf="caja.cajaAbierta"
                                     (click)="abrirModalMovimiento(caja)"
-                                    title="Registrar Movimiento">
-                              <i class="bi bi-file-earmark-plus"></i>
+                                    title="Registrar movimiento">
+                              <i class="bi bi-plus-circle me-1"></i>
+                              <span>Movimiento</span>
                             </button>
     
                             <button class="btn btn-sm btn-danger"
                                     *ngIf="caja.cajaAbierta"
                                     (click)="abrirModalCierre(caja)"
-                                    title="Cerrar Caja">
-                              <i class="bi bi-box-fill"></i>
+                                    title="Cerrar caja">
+                              <i class="bi bi-lock me-1"></i>
+                              <span>Cerrar caja</span>
                             </button>
                           </div>
                         </div>
@@ -144,7 +148,7 @@
                             </thead>
                             <tbody>
                               <tr *ngFor="let movimiento of movimientosPaginated">
-                                <td>{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</td>
+                                <td>{{ formatFechaMovimiento(movimiento.fechaMovimiento) }}</td>
                                 <td *ngIf="mostrarColumnaEmpresaMovimiento" class="small text-muted">{{ movimiento.empresaMovimiento || '—' }}</td>
                                 <td>
                                   <span class="badge"
@@ -169,7 +173,7 @@
                         <div class="d-lg-none caja-mov-cards">
                           <div class="caja-mov-card" *ngFor="let movimiento of movimientosPaginated">
                             <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                              <span class="small text-muted">{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</span>
+                              <span class="small text-muted">{{ formatFechaMovimiento(movimiento.fechaMovimiento) }}</span>
                               <span class="badge"
                                     [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',
                                                'bg-danger': movimiento.tipoOperacion === 'E'}">
@@ -361,6 +365,16 @@
         <div class="alert alert-warning">
           <i class="bi bi-exclamation-triangle-fill me-2"></i>
           ¿Está seguro de que desea cerrar esta caja? Una vez cerrada, no podrá registrar nuevos movimientos.
+        </div>
+        <div class="alert alert-light border mb-3 py-2">
+          <div class="d-flex justify-content-between"><span>Esperado</span><strong>S/ {{ saldoEsperadoCierre | number:'1.2-2' }}</strong></div>
+          <div class="d-flex justify-content-between">
+            <span>Diferencia</span>
+            <strong [class.text-success]="diferenciaCierrePreview >= 0" [class.text-danger]="diferenciaCierrePreview < 0">
+              S/ {{ diferenciaCierrePreview | number:'1.2-2' }}
+            </strong>
+          </div>
+          <small class="text-muted">Sobrante si es positivo; faltante si es negativo.</small>
         </div>
         <div class="mb-3">
           <label for="montoCierre" class="form-label">Monto final contado (opcional)</label>

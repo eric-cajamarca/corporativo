@@ -121,11 +121,7 @@
                 </div>
                 <div class="kpi-content">
                   <div class="kpi-value">
-                    S/ {{
-                      ((resumenDashboard?.ingresos || 0) -
-                        (resumenDashboard?.utilidadBruta || 0))
-                        | number:'1.0-0'
-                    }}
+                    S/ {{ resumenDashboard?.costos | number:'1.0-0' }}
                   </div>
                   <div class="kpi-label">Costos Asociados</div>
                 </div>
@@ -216,18 +212,40 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let item of datosReporte">
+                <tr *ngFor="let item of datosReporte" (click)="item['idCliente'] && verEstadoCuenta(item['idCliente'])" [style.cursor]="item['idCliente'] ? 'pointer' : 'default'">
                   <td *ngFor="let key of getObjectKeys(item)">
-                    <span *ngIf="isCurrencyField(key)" class="fw-semibold text-success">
+                    <span *ngIf="isCurrencyField(key, item)" class="fw-semibold text-success">
                       S/ {{getNumericValue(item, key) | number:'1.0-0'}}
                     </span>
-                    <span *ngIf="!isCurrencyField(key)">
+                    <span *ngIf="!isCurrencyField(key, item)">
                       {{item[key]}}
                     </span>
                   </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="mt-4" *ngIf="reporteActual?.id === 'antiguedad'">
+            <p class="small text-muted mb-2">Pulse un cliente de la tabla para ver su estado de cuenta. Luego puede imprimirlo o enviarlo (imprimir a PDF / WhatsApp).</p>
+            <div *ngIf="cargandoEstadoCuenta" class="text-muted">Cargando estado de cuenta…</div>
+            <div *ngIf="estadoCuenta" class="border rounded p-3">
+              <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                <div>
+                  <strong>{{ estadoCuenta.cliente.cliente }}</strong>
+                  <div class="small text-muted">{{ estadoCuenta.cliente.documento }}</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="imprimirEstadoCuenta()">
+                  Imprimir / enviar
+                </button>
+              </div>
+              <p class="small mb-2">
+                Al día S/ {{ estadoCuenta.aging.alDia | number:'1.2-2' }} ·
+                1-30 S/ {{ estadoCuenta.aging.de1a30 | number:'1.2-2' }} ·
+                31-60 S/ {{ estadoCuenta.aging.de31a60 | number:'1.2-2' }} ·
+                +60 S/ {{ estadoCuenta.aging.mas60 | number:'1.2-2' }}
+              </p>
+            </div>
           </div>
 
           <!-- Mensaje cuando no hay datos -->

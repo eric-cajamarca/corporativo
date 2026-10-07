@@ -53,13 +53,13 @@ export function codigoComprobanteDesdeLista(
   return String(comp?.codigo ?? '').trim();
 }
 
-/** Boleta electrónica: valor de fábrica hasta que la empresa configure otro. */
-export const CODIGO_COMPROBANTE_VENTA_DEFECTO = '03';
+/** Nota de venta: valor de fábrica hasta que la empresa configure otro. */
+export const CODIGO_COMPROBANTE_VENTA_DEFECTO = 'NV';
 
 export const OPCIONES_COMPROBANTE_VENTA_DEFECTO: Array<{ codigo: string; nombre: string }> = [
+  { codigo: 'NV', nombre: 'Nota de venta' },
   { codigo: '03', nombre: 'Boleta electrónica' },
-  { codigo: '01', nombre: 'Factura electrónica' },
-  { codigo: 'NV', nombre: 'Nota de venta' }
+  { codigo: '01', nombre: 'Factura electrónica' }
 ];
 
 export function normalizarCodigoComprobantePorDefecto(valor?: string | null): string {
@@ -70,7 +70,7 @@ export function normalizarCodigoComprobantePorDefecto(valor?: string | null): st
   return raw.toUpperCase() === 'NV' ? 'NV' : raw;
 }
 
-/** Elige el comprobante de venta por código de empresa; si no existe, boleta 03 y luego el primero. */
+/** Elige el comprobante de venta por código de empresa; si no existe, nota de venta y luego el primero. */
 export function elegirComprobantePorCodigoDefecto<T extends { codigo?: string; idComprobante?: string | number }>(
   comprobantes: T[] | null | undefined,
   codigoPreferido?: string | null

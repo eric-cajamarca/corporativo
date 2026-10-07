@@ -40,50 +40,6 @@ exports.obtenerResumenDashboardRepo = async (
   const refHoy = parseFechaReferenciaLocal(fechaRef);
   const stockMinimoGeneral = configInventario.stockMinimoGeneral != null ? Number(configInventario.stockMinimoGeneral) : 10;
   const controlVencimiento = configInventario.controlVencimiento !== false;
-  const req = pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("fechaInicio", sql.Date, fechaInicio)
-    .input("fechaFin", sql.Date, fechaFin)
-    .input("fechaInicioAnterior", sql.Date, fechaInicioAnterior)
-    .input("fechaFinAnterior", sql.Date, fechaFinAnterior);
-
-  // Ventas totales del período actual
-  const ventasActualPromise = req.query(`
-    SELECT ISNULL(SUM(
-      CASE
-        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
-        ELSE v.total
-      END
-    ), 0) AS total
-    FROM Ventas v
-    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-    WHERE v.idEmpresa = @idEmpresa
-      AND ISNULL(v.eliminado, 0) = 0
-      AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-      AND CONVERT(DATE, v.fEmision) <= @fechaFin
-  `);
-
-  // Ventas totales del período anterior (para variación %)
-  const ventasAnteriorPromise = pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("fechaInicioAnterior", sql.Date, fechaInicioAnterior)
-    .input("fechaFinAnterior", sql.Date, fechaFinAnterior)
-    .query(`
-    SELECT ISNULL(SUM(
-      CASE
-        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
-        ELSE v.total
-      END
-    ), 0) AS total
-    FROM Ventas v
-    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-    WHERE v.idEmpresa = @idEmpresa
-      AND ISNULL(v.eliminado, 0) = 0
-      AND CONVERT(DATE, v.fEmision) >= @fechaInicioAnterior
-      AND CONVERT(DATE, v.fEmision) <= @fechaFinAnterior
-  `);
 
   // Clientes activos (total en la empresa, no solo del período)
   const clientesResultPromise = pool
@@ -138,7 +94,8 @@ exports.obtenerResumenDashboardRepo = async (
     INNER JOIN Ventas v ON dv.idVenta = v.idVenta AND v.idEmpresa = @idEmpresa
     INNER JOIN Productos p ON dv.idProducto = p.idProducto AND p.idEmpresa = @idEmpresa
     LEFT JOIN Categorias c ON p.idCategoria = c.idCategoria AND c.idEmpresa = @idEmpresa
-    WHERE CONVERT(DATE, v.fEmision) >= @fechaInicio
+    WHERE ISNULL(v.eliminado, 0) = 0
+      AND CONVERT(DATE, v.fEmision) >= @fechaInicio
       AND CONVERT(DATE, v.fEmision) <= @fechaFin
     GROUP BY p.idProducto, p.descripcion, c.nombre
     ORDER BY SUM(ISNULL(dv.total, dv.subtotal)) DESC
@@ -155,6 +112,7 @@ exports.obtenerResumenDashboardRepo = async (
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
+      AND ISNULL(v.eliminado, 0) = 0
       AND CONVERT(DATE, v.fEmision) = @fechaReferencia
     GROUP BY DATEPART(HOUR, v.fEmision)
     ORDER BY hora
@@ -167,13 +125,14 @@ exports.obtenerResumenDashboardRepo = async (
     .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
-      DAY(v.fEmision) AS dia,
+      DAY(CONVERT(DATE, v.fEmision)) AS dia,
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND YEAR(v.fEmision) = YEAR(@fechaReferencia)
-      AND MONTH(v.fEmision) = MONTH(@fechaReferencia)
-    GROUP BY DAY(v.fEmision)
+      AND ISNULL(v.eliminado, 0) = 0
+      AND YEAR(CONVERT(DATE, v.fEmision)) = YEAR(@fechaReferencia)
+      AND MONTH(CONVERT(DATE, v.fEmision)) = MONTH(@fechaReferencia)
+    GROUP BY DAY(CONVERT(DATE, v.fEmision))
     ORDER BY dia
   `);
 
@@ -184,13 +143,14 @@ exports.obtenerResumenDashboardRepo = async (
     .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
-      YEAR(v.fEmision) AS anio,
-      MONTH(v.fEmision) AS mes,
+      YEAR(CONVERT(DATE, v.fEmision)) AS anio,
+      MONTH(CONVERT(DATE, v.fEmision)) AS mes,
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND v.fEmision >= DATEADD(MONTH, -6, @fechaReferencia)
-    GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
+      AND ISNULL(v.eliminado, 0) = 0
+      AND CONVERT(DATE, v.fEmision) >= DATEADD(MONTH, -6, @fechaReferencia)
+    GROUP BY YEAR(CONVERT(DATE, v.fEmision)), MONTH(CONVERT(DATE, v.fEmision))
     ORDER BY anio, mes
   `);
 
@@ -201,13 +161,14 @@ exports.obtenerResumenDashboardRepo = async (
     .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
-      YEAR(v.fEmision) AS anio,
-      MONTH(v.fEmision) AS mes,
+      YEAR(CONVERT(DATE, v.fEmision)) AS anio,
+      MONTH(CONVERT(DATE, v.fEmision)) AS mes,
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND v.fEmision >= DATEADD(MONTH, -12, @fechaReferencia)
-    GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
+      AND ISNULL(v.eliminado, 0) = 0
+      AND CONVERT(DATE, v.fEmision) >= DATEADD(MONTH, -12, @fechaReferencia)
+    GROUP BY YEAR(CONVERT(DATE, v.fEmision)), MONTH(CONVERT(DATE, v.fEmision))
     ORDER BY anio, mes
   `);
 
@@ -229,8 +190,6 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   const [
-    ventasActual,
-    ventasAnterior,
     clientesResult,
     clientesAnterior,
     clientesActual,
@@ -241,8 +200,6 @@ exports.obtenerResumenDashboardRepo = async (
     ventasMensuales,
     stockBajo
   ] = await Promise.all([
-    ventasActualPromise,
-    ventasAnteriorPromise,
     clientesResultPromise,
     clientesAnteriorPromise,
     clientesActualPromise,
@@ -271,7 +228,7 @@ exports.obtenerResumenDashboardRepo = async (
       INNER JOIN Clientes c ON cc.idCliente = c.idCliente AND c.idEmpresa = cc.idEmpresa
       LEFT JOIN Ventas v ON cc.idVenta = v.idVenta AND v.idEmpresa = cc.idEmpresa
       WHERE cu.idEmpresa = @idEmpresa
-        AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+        AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
         AND cu.saldoPendiente > 0
         AND ISNULL(cc.estado, '') = 'ACTIVO'
         AND (v.idVenta IS NULL OR ISNULL(v.eliminado, 0) = 0)
@@ -283,14 +240,6 @@ exports.obtenerResumenDashboardRepo = async (
   }
 
   const toNum = (val) => (val != null && typeof val === "number" ? val : parseFloat(val) || 0);
-  const row = (rs) => (rs && rs.recordset && rs.recordset[0] ? rs.recordset[0] : {});
-  const getTotal = (r) => toNum(r.total ?? r.Total);
-  const ventasTotales = getTotal(row(ventasActual));
-  const ventasTotalesAnterior = getTotal(row(ventasAnterior));
-  const ventasVariacion =
-    ventasTotalesAnterior > 0
-      ? ((ventasTotales - ventasTotalesAnterior) / ventasTotalesAnterior) * 100
-      : (ventasTotales > 0 ? 100 : 0);
 
   const clientesActivos = Number(clientesResult.recordset[0]?.total || 0);
   const clientesActualCount = Number(clientesActual.recordset[0]?.total || 0);
@@ -307,7 +256,9 @@ exports.obtenerResumenDashboardRepo = async (
     fechaFin,
     { fechaInicioAnterior, fechaFinAnterior }
   );
-  const ingresos = kpisFin.ingresos;
+  const ventasTotales = Number(kpisFin.ventasTotales || 0);
+  const ventasVariacion = Number(kpisFin.ventasVariacion || 0);
+  const ingresos = Number(kpisFin.ingresos || ventasTotales);
   const costos = kpisFin.costos;
   const utilidadBruta = kpisFin.utilidadBruta;
   const gastosOperativos = kpisFin.gastosOperativos;
@@ -578,7 +529,7 @@ exports.obtenerResumenDiarioRepo = async (pool, idEmpresa, fechaReferencia) => {
     SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS total
     FROM CuotasCredito cu
     WHERE cu.idEmpresa = @idEmpresa
-      AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+      AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
       AND cu.saldoPendiente > 0
   `).catch(() => ({ recordset: [{ total: 0 }] }));
 

@@ -17,6 +17,7 @@ export interface ParcheLineaUnidadMatizado {
   cantidadSeleccionada?: number;
   pVentaSeleccionada?: number;
   pVenta?: number;
+  precioListaUnidad?: number;
   matizado?: MatizadoLineaPayload;
   descripcion?: string;
 }
@@ -103,7 +104,8 @@ export class VentaUnidadMatizadoFlowService {
     }
 
     const cargo = matizado ? Number(matizado.cargoMatizado) || 0 : 0;
-    const pVenta = (Number(sel.pVenta) || Number(prod.pVenta) || 0) + cargo;
+    const precioListaUnidad = Number(sel.pVenta) || 0;
+    const pVenta = (precioListaUnidad || Number(prod.pVenta) || 0) + cargo;
     const desc = descripcionConColorMatizado(String(prod.descripcion || ''), matizado?.nombreColor);
 
     return {
@@ -114,6 +116,7 @@ export class VentaUnidadMatizadoFlowService {
       cantidadSeleccionada: sel.cantidad,
       pVentaSeleccionada: pVenta,
       pVenta,
+      precioListaUnidad,
       matizado,
       descripcion: desc || prod.descripcion
     };

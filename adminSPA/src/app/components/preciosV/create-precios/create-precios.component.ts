@@ -216,7 +216,14 @@ export class CreatePreciosComponent implements OnInit {
     this.preciosService.listar_listas_precios_empresa().subscribe({
       next: (response) => {
         this.listasPrecio = response.data || [];
-              },
+        if (this.listaSeleccionadaId == null && this.listasPrecio.length) {
+          const principal = this.listasPrecio.find(
+            (l: { principal?: unknown }) => l.principal === true || l.principal === 1
+          ) || this.listasPrecio[0];
+          this.listaSeleccionadaId = principal.idLista;
+          this.onListaSeleccionada();
+        }
+      },
       error: (error) => {
       }
     });

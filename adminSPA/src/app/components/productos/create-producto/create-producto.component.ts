@@ -22,6 +22,8 @@ import { esProductoServicio } from '../../../utils/producto-servicio.util';
 import { EmpresaService } from '../../../services/empresa.service';
 import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
 import { FORMAS_FARMACEUTICAS } from '../../../utils/formas-farmaceuticas.util';
+import { ImpuestoService } from '../../../services/impuesto.service';
+import { Impuesto } from '../../../interfaces/impuesto.interface';
 
 declare var iziToast: any;
 
@@ -116,6 +118,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   /** Empresa gestora: empresas gestionadas para selector y catálogos por empresa. */
   empresasGestionadas: Array<{ idEmpresa: string; nombre: string }> = [];
   idEmpresaSeleccionada = '';
+  impuestos: Impuesto[] = [];
 
   /** Galería: activa si la empresa tiene productos con imágenes */
   productosConImagenes = false;
@@ -139,10 +142,14 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     private modalService: NgbModal,
     private router: Router,
     private empresaService: EmpresaService,
+    private impuestoService: ImpuestoService,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
   ) {
     this.esModal = !!this.activeModal;
+    if (this.esModal) {
+      this.modoLote.set(true);
+    }
   }
 
   ngOnDestroy(): void {
@@ -159,6 +166,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.initForm();
+    this.cargarImpuestos();
     this.cargarEmpresasGestionadas();
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
@@ -200,7 +208,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       useCorrelativo: [false],
       descripcion: ['', [Validators.required, Validators.minLength(3)]],
       idCategoria: ['', Validators.required],
-      idMarca: ['', Validators.required],
+      idMarca: [''],
+      idImpuesto: [''],
       idPresentacion: [String(ID_PRESENTACION_UNIDAD_DEFAULT), Validators.required],
       tipoProducto: ['S', Validators.required], // S: Simple, C: Compuesto, V: Variante
       
@@ -370,6 +379,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     obsMarcas.subscribe({
       next: (response) => {
         this.marcas = response.data || [];
+        this.preseleccionarMarcaSinMarca();
         verificarCompletado();
       },
       error: () => verificarCompletado()
@@ -474,7 +484,6 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         !codigoOk ||
         this.productoForm.get('descripcion')?.invalid ||
         this.productoForm.get('idCategoria')?.invalid ||
-        this.productoForm.get('idMarca')?.invalid ||
         this.productoForm.get('idPresentacion')?.invalid
       ) {
         this.marcarCamposComoTocados();
@@ -501,7 +510,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
 
   calcularMargen(): void {
     if (this.loteData.costoUnitario > 0 && this.precioVenta > 0) {
-      this.margenGanancia = ((this.precioVenta - this.loteData.costoUnitario) / this.loteData.costoUnitario) * 100;
+      this.margenGanancia = Math.round(((this.precioVenta - this.loteData.costoUnitario) / this.loteData.costoUnitario) * 10000) / 100;
     }
   }
 
@@ -542,7 +551,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       Codigo: v.codigo,
       useCorrelativo: !!v.useCorrelativo,
       idCategoria: Number(v.idCategoria),
-      idMarca: Number(v.idMarca),
+      idMarca: v.idMarca != null && String(v.idMarca).trim() !== '' ? Number(v.idMarca) : undefined,
+      idImpuesto: v.idImpuesto != null && String(v.idImpuesto).trim() !== '' ? Number(v.idImpuesto) : undefined,
       descripcion: v.descripcion,
       idPresentacion: Number(v.idPresentacion),
       cUnitario: this.loteData.costoUnitario != null ? Number(this.loteData.costoUnitario) : 0,
@@ -732,6 +742,29 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  private cargarImpuestos(): void {
+    this.impuestoService.obtenerTodos().subscribe({
+      next: (res) => {
+        this.impuestos = res?.data || [];
+        const igv = this.impuestos.find((i) => /IGV/i.test(i.descripcion || '') && i.estado);
+        if (igv && !this.productoForm.get('idImpuesto')?.value) {
+          this.productoForm.patchValue({ idImpuesto: String(igv.idImpuesto) });
+        }
+      },
+      error: () => {
+        this.impuestos = [];
+      }
+    });
+  }
+
+  private preseleccionarMarcaSinMarca(): void {
+    if (this.productoForm.get('idMarca')?.value) return;
+    const sm = this.marcas.find((m) => /sin marca/i.test(String(m.nombre || '')));
+    if (sm) {
+      this.productoForm.patchValue({ idMarca: String(sm.idMarca) });
+    }
   }
 
   recargarMarcas(onDone?: () => void): void {
@@ -952,7 +985,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   /** Payload al cerrar modal (movimiento inventario: rellenar detalle con ingreso/salida según pantalla padre). */
   private buildProductoCreadoModalResult(idProducto: string): ProductoCreadoModalResult {
     const v = this.productoForm.value;
-    const loteQty = this.modoLote() ? Number(this.loteData.cantidadIngresada) || 0 : 0;
+    const loteQty = Number(this.loteData.cantidadIngresada) || 0;
     const costo = Number(this.loteData.costoUnitario) || 0;
     const fvRaw = v.fVencimiento != null && String(v.fVencimiento).trim() !== ''
       ? String(v.fVencimiento).trim()
@@ -977,8 +1010,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         ? Number(v.idPresentacion)
         : undefined,
       fProduccion: fp || undefined,
-      cantidadDesdeLote: loteQty > 0 ? loteQty : undefined,
-      costoUnitario: costo > 0 ? costo : undefined,
+      cantidadDesdeLote: loteQty > 0 ? loteQty : (this.esModal ? 1 : undefined),
+      costoUnitario: Number.isFinite(costo) && costo > 0 ? costo : undefined,
       fechaVencimiento: (this.modoLote() && String(this.loteData.fechaVencimiento || '').trim()
         ? String(this.loteData.fechaVencimiento).trim().slice(0, 10)
         : fv) || undefined,

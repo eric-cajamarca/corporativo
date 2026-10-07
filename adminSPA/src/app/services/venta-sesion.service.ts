@@ -9,6 +9,8 @@ const STORAGE_KEYS: Record<VentaSesionModo, string> = {
 };
 
 const MAX_SESIONES = 10;
+/** No ofrecer como borrador una venta abandonada hace más de 2 días. */
+const MAX_EDAD_BORRADOR_MS = 48 * 60 * 60 * 1000;
 
 @Injectable({
   providedIn: 'root'
@@ -46,6 +48,11 @@ export class VentaSesionService {
       }
       const data: VentasProvisionalStorage = JSON.parse(raw);
       this.sesiones = Array.isArray(data.sesiones) ? data.sesiones : [];
+      const utiles = this.sesiones.filter((s) => this.sesionTieneContenidoUtil(s));
+      if (utiles.length !== this.sesiones.length) {
+        this.sesiones = utiles;
+        this.persist();
+      }
       if (this.sesiones.length > MAX_SESIONES) {
         this.sesiones = this.sesiones.slice(-MAX_SESIONES);
         this.persist();
@@ -68,11 +75,42 @@ export class VentaSesionService {
   }
 
   getSesionesGuardadas(): VentaSesion[] {
-    return [...this.sesiones];
+    return this.sesiones.filter((s) => this.sesionTieneContenidoUtil(s));
   }
 
   tieneSesionesGuardadas(): boolean {
-    return this.sesiones.length > 0;
+    return this.getSesionesGuardadas().length > 0;
+  }
+
+  private sesionTieneContenidoUtil(s: VentaSesion | null | undefined): boolean {
+    if (!s || !Array.isArray(s.carrito) || s.carrito.length === 0) return false;
+    const ts = Date.parse(String(s.fechaActualizacion || s.fechaCreacion || ''));
+    if (Number.isFinite(ts) && Date.now() - ts > MAX_EDAD_BORRADOR_MS) return false;
+    return true;
+  }
+
+  private huellaCarrito(carrito: unknown[] | undefined): string {
+    return (Array.isArray(carrito) ? carrito : [])
+      .map((x) => {
+        const r = x as { idProducto?: unknown; cantidad?: unknown };
+        return `${String(r?.idProducto ?? '')}:${Number(r?.cantidad) || 0}`;
+      })
+      .sort()
+      .join('|');
+  }
+
+  /** Quita la sesión activa y cualquier borrador de la misma venta ya registrada. */
+  eliminarTrasRegistro(compVenta?: string | null, carrito?: unknown[]): void {
+    this.eliminarSesionActiva();
+    const cv = String(compVenta || '').trim();
+    const huella = this.huellaCarrito(carrito);
+    const antes = this.sesiones.length;
+    this.sesiones = this.sesiones.filter((s) => {
+      if (cv && String(s.ventas?.compVenta || '').trim() === cv) return false;
+      if (huella && this.huellaCarrito(s.carrito) === huella) return false;
+      return true;
+    });
+    if (this.sesiones.length !== antes) this.persist();
   }
 
   getSesionActivaId(): string | null {

@@ -4,7 +4,7 @@
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center flex-wrap gap-2">
         <div>
           <h1 class="content-title mb-1">Movimientos</h1>
-          <p class="content-subtitle text-muted mb-0">Ingresos y salidas registrados desde el formulario de inventario</p>
+          <p class="content-subtitle text-muted mb-0 d-none d-md-block">Ingresos y salidas registrados desde el formulario de inventario</p>
         </div>
         
       </div>
@@ -15,9 +15,9 @@
         <div class="row g-3 align-items-end">
           <div class="col-lg-3 col-md-6">
             <label class="form-label small fw-semibold">Periodo</label>
-            <div class="d-flex align-items-center gap-1 flex-wrap">
+            <div class="periodo-fechas">
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" (change)="cargar()" />
-              <span class="text-muted small">—</span>
+              <span class="periodo-fechas-sep text-muted small">—</span>
               <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargar()" />
             </div>
           </div>
@@ -90,11 +90,11 @@
           </thead>
           <tbody>
             @if (cargando) {
-              <tr>
+              <tr class="fila-vacia">
                 <td colspan="8" class="text-center py-4 text-muted">Cargando…</td>
               </tr>
             } @else if (!items.length) {
-              <tr>
+              <tr class="fila-vacia">
                 <td colspan="8" class="text-center py-4 text-muted">Sin movimientos en el periodo</td>
               </tr>
             } @else {
@@ -153,7 +153,7 @@
 @if (modalAbierto && cabeceraModal) {
   <div class="modal-backdrop fade show mi-modal-backdrop" (click)="cerrarModal()"></div>
   <div class="modal fade show d-block mi-modal-root" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document" (click)="$event.stopPropagation()">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-lg-down" role="document" (click)="$event.stopPropagation()">
       <div class="modal-content">
         <div class="modal-header mi-modal-header">
           <h5 class="modal-title">Detalle del movimiento</h5>
@@ -181,7 +181,7 @@
                 <tbody>
                   @for (l of lineasModal; track l.idMovimiento) {
                     <tr [ngClass]="claseFilaPorSentido(l.tipoMovimiento)">
-                      <td>
+                      <td data-label="Sentido">
                         <span class="badge rounded-pill"
                           [class.bg-danger]="l.tipoMovimiento === 'SA'"
                           [class.bg-success]="l.tipoMovimiento === 'EN'"
@@ -189,13 +189,13 @@
                           {{ etiquetaSentidoLinea(l.tipoMovimiento) }}
                         </span>
                       </td>
-                      <td><small>{{ l.sucursal || '—' }}</small></td>
-                      <td>
+                      <td data-label="Sucursal"><small>{{ l.sucursal || '—' }}</small></td>
+                      <td data-label="Producto">
                         <small>{{ l.productoCodigo }} {{ l.productoDescripcion }}</small>
                       </td>
-                      <td class="text-end">{{ l.cantidad | number: '1.2-3' }}</td>
-                      <td class="text-end">{{ (l.costoUnitario ?? 0) | number: '1.2-2' }}</td>
-                      <td class="text-end">{{ (l.cantidad * (l.costoUnitario ?? 0)) | number: '1.2-2' }}</td>
+                      <td class="text-end" data-label="Cantidad">{{ l.cantidad | number: '1.2-3' }}</td>
+                      <td class="text-end" data-label="Costo u.">{{ (l.costoUnitario ?? 0) | number: '1.2-2' }}</td>
+                      <td class="text-end" data-label="Importe">{{ (l.cantidad * (l.costoUnitario ?? 0)) | number: '1.2-2' }}</td>
                     </tr>
                   }
                 </tbody>

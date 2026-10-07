@@ -88,18 +88,50 @@ function normalizarPeriodo(periodo) {
   return match || "Hoy";
 }
 
-exports.obtenerResumenDashboardService = async (pool, user, periodo, fechaReferencia) => {
+function esFechaYmd(valor) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(valor || "").trim());
+}
+
+function obtenerRangoFechasExplicitas(fechaInicioYmd, fechaFinYmd) {
+  const fechaInicio = String(fechaInicioYmd).trim().slice(0, 10);
+  const fechaFin = String(fechaFinYmd).trim().slice(0, 10);
+  const dIni = parseFechaReferenciaLocal(fechaInicio);
+  const dFin = parseFechaReferenciaLocal(fechaFin);
+  const ini = dIni <= dFin ? dIni : dFin;
+  const fin = dIni <= dFin ? dFin : dIni;
+  const iniYmd = toYmdLocal(ini);
+  const finYmd = toYmdLocal(fin);
+  const dias = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
+  const fechaFinAnterior = new Date(ini);
+  fechaFinAnterior.setDate(fechaFinAnterior.getDate() - 1);
+  const fechaInicioAnterior = new Date(fechaFinAnterior);
+  fechaInicioAnterior.setDate(fechaInicioAnterior.getDate() - dias + 1);
+  return {
+    fechaInicio: iniYmd,
+    fechaFin: finYmd,
+    fechaInicioAnterior: toYmdLocal(fechaInicioAnterior),
+    fechaFinAnterior: toYmdLocal(fechaFinAnterior)
+  };
+}
+
+exports.obtenerResumenDashboardService = async (pool, user, periodo, fechaReferencia, rangoExplicit) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   const idEmpresa = user.empresa;
   const periodoNorm = normalizarPeriodo(periodo);
   const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
-  const cacheKey = `dashboard:resumen:${idEmpresa}:${periodoNorm}:${fechaRef}`;
+  const fechaInicioExp = rangoExplicit?.fechaInicio;
+  const fechaFinExp = rangoExplicit?.fechaFin;
+  const usaRango = esFechaYmd(fechaInicioExp) && esFechaYmd(fechaFinExp);
+  const cacheKey = usaRango
+    ? `dashboard:resumen:${idEmpresa}:${fechaInicioExp}:${fechaFinExp}:${fechaRef}`
+    : `dashboard:resumen:${idEmpresa}:${periodoNorm}:${fechaRef}`;
   const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
   const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
 
   const fetchDashboard = async () => {
-    const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
-      obtenerRangoFechas(periodoNorm, fechaRef);
+    const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } = usaRango
+      ? obtenerRangoFechasExplicitas(fechaInicioExp, fechaFinExp)
+      : obtenerRangoFechas(periodoNorm, fechaRef);
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(
       pool,
       idEmpresa

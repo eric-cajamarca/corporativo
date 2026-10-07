@@ -117,9 +117,44 @@ const getCarteraCreditos = async (req, res) => {
   }
 };
 
+const getAntiguedadDeuda = async (req, res) => {
+  try {
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!idEmpresa) {
+      return res.status(403).json({ message: 'No autorizado: falta empresa', data: null });
+    }
+    const data = await withPool(async (pool) => reportesService.obtenerAntiguedadDeuda(pool, idEmpresa));
+    return res.status(200).json({ message: 'OK', data });
+  } catch (error) {
+    console.error('Error getAntiguedadDeuda:', error);
+    return res.status(500).json({ message: 'Error al obtener antigüedad de deuda', data: null });
+  }
+};
+
+const getEstadoCuentaCliente = async (req, res) => {
+  try {
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!idEmpresa) {
+      return res.status(403).json({ message: 'No autorizado: falta empresa', data: null });
+    }
+    const data = await withPool(async (pool) =>
+      reportesService.obtenerEstadoCuentaCliente(pool, idEmpresa, req.params.idCliente)
+    );
+    return res.status(200).json({ message: 'OK', data });
+  } catch (error) {
+    if (error.message && (error.message.includes('requerido') || error.message.includes('no encontrado'))) {
+      return res.status(400).json({ message: error.message, data: null });
+    }
+    console.error('Error getEstadoCuentaCliente:', error);
+    return res.status(500).json({ message: 'Error al obtener estado de cuenta', data: null });
+  }
+};
+
 module.exports = {
   getComprasPorProveedor,
   getInventarioResumen,
   getClientesRentabilidad,
   getCarteraCreditos,
+  getAntiguedadDeuda,
+  getEstadoCuentaCliente,
 };

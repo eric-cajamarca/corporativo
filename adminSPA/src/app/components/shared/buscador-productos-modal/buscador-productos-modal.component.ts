@@ -531,9 +531,10 @@ export class BuscadorProductosModalComponent implements OnInit {
     return {
       ...item,
       idProducto: String(item['idProducto'] ?? ''),
-      codigo: String(item['codigo'] ?? ''),
+      codigo: String(item['codigo'] ?? item['Codigo'] ?? ''),
       descripcion: String(item['descripcion'] ?? ''),
-      pVenta: Number(item['pVenta'] ?? 0)
+      pVenta: Number(item['pVenta'] ?? item['precio'] ?? 0),
+      stock: Number(item['stock'] ?? item['stockDisponible'] ?? 0)
     };
   }
 

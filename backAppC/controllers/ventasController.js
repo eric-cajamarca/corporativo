@@ -368,7 +368,7 @@ const actualizarDetalleVenta = async function (req, res) {
 };
 
 const obtenerDetalleVenta_idVenta = async function (req, res) {
-  const idVenta = req.params.id;
+  const idVenta = req.params.idVenta || req.params.id;
   if (req.user) {
     try {
       const result = await withPool((pool) => ventasService.obtenerDetalleVentaPorIdVenta(pool, idVenta));
@@ -675,6 +675,37 @@ const listarNotasCreditoDebito = async (req, res) => {
   }
 };
 
+const devolucionParcialNotaVenta = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVenta = parseInt(req.params.idVenta, 10);
+  if (Number.isNaN(idVenta) || idVenta < 1) {
+    return res.status(400).json({ message: 'idVenta inválido' });
+  }
+  try {
+    const result = await withPool((pool) =>
+      ventasOrquestacion.devolucionParcialNotaVenta(
+        pool,
+        req.user.empresa,
+        idVenta,
+        req.body?.lineas || [],
+        req.user
+      )
+    );
+    auditoriaOperaciones.auditarVenta(req, 'DEVOLUCION_PARCIAL', idVenta, null);
+    return res.json({
+      message: `Devolución registrada por S/ ${(Number(result.montoDevuelto) || 0).toFixed(2)}.`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error devolucionParcialNotaVenta:', error);
+    const msg = error.message || 'No se pudo registrar la devolución';
+    const status = /solo a nota|supera|no encontrada|anulada|al menos/i.test(msg) ? 400 : 500;
+    return res.status(status).json({ message: msg });
+  }
+};
+
 const anularVenta = async (req, res) => {
   if (!req.user || !req.user.empresa) {
     return res.status(401).json({ message: 'No Access' });
@@ -759,5 +790,6 @@ module.exports = {
   obtenerDetalleVenta_idVenta,
   obtenerVenta_idDetalle,
   eliminarDetalleVenta,
-  anularVenta
+  anularVenta,
+  devolucionParcialNotaVenta
 };

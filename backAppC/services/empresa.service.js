@@ -66,8 +66,8 @@ async function listaComprobantesAlta(pool, idRubro) {
 
 /** Tributos mínimos para operar (Catálogo 05 SUNAT). */
 const IMPUESTOS_PREDETERMINADOS = [
-  { descripcion: 'Exonerado', codigoSunat: '9997', porcentaje: 0, pIncluyeIGV: false, estado: 1 },
-  { descripcion: 'IGV', codigoSunat: '1000', porcentaje: 18, pIncluyeIGV: true, estado: 0 }
+  { descripcion: 'Exonerado', codigoSunat: '9997', porcentaje: 0, pIncluyeIGV: false, estado: 0 },
+  { descripcion: 'IGV', codigoSunat: '1000', porcentaje: 18, pIncluyeIGV: true, estado: 1 }
 ];
 
 /** Permisos iniciales por rol operativo (Administrador recibe todos en runtime). */
@@ -1333,8 +1333,17 @@ exports.asegurarUsuarioAdminYCajaInicial = async (pool, idEmpresa, datosEmpresa 
 function construirPasosOnboarding(flags) {
     return [
         {
-            id: 'producto',
+            id: 'zona-exonerada',
             orden: 1,
+            titulo: '¿Estás en zona exonerada?',
+            descripcion: 'Si no pagas IGV (selva u otra zona exonerada), lo desactivamos. Si no, dejamos IGV 18% activo.',
+            completo: !!flags.zonaExoneradaConfirmada,
+            ruta: '/home?onboarding=zona-exonerada',
+            icono: 'bi-percent'
+        },
+        {
+            id: 'producto',
+            orden: 2,
             titulo: 'Primer producto',
             descripcion: 'Registra al menos un producto para vender',
             completo: !!flags.tieneProductos,
@@ -1343,7 +1352,7 @@ function construirPasosOnboarding(flags) {
         },
         {
             id: 'venta',
-            orden: 2,
+            orden: 3,
             titulo: 'Primera venta',
             descripcion: 'Registra una venta de prueba (cliente Público en general)',
             completo: !!flags.tieneVentas,
@@ -1521,12 +1530,27 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'conceptos', mensaje: error.message });
         }
 
-        // 10. Tributos predeterminados (Exonerado e IGV)
+        // 10. Tributos predeterminados (IGV 18% activo; Exonerado inactivo)
         try {
             resultado.impuestos = await exports.crearImpuestosPredeterminados(pool, idEmpresa);
         } catch (error) {
             console.error('⚠️ Error creando impuestos predeterminados:', error.message);
             resultado.errores.push({ tipo: 'impuestos', mensaje: error.message });
+        }
+
+        try {
+            const gestoresRepository = require('../repositories/gestores.repository');
+            await gestoresRepository.guardarConfiguracion(
+                pool,
+                idEmpresa,
+                'VENTAS_COMPROBANTE_CODIGO_POR_DEFECTO',
+                'NV',
+                'Comprobante preseleccionado en venta (nota de venta)',
+                'STRING'
+            );
+        } catch (error) {
+            console.error('⚠️ Error guardando comprobante por defecto:', error.message);
+            resultado.errores.push({ tipo: 'comprobanteDefecto', mensaje: error.message });
         }
 
         // 11. Permisos del sistema asignados a roles predeterminados
@@ -1758,13 +1782,27 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             cantidadVentas = ventasRes.recordset[0]?.total || 0;
         } catch (_) {}
 
+        let zonaExoneradaConfirmada = false;
+        try {
+            const zonaRes = await pool.request()
+                .input('idEmpresaZona', sql.UniqueIdentifier, idEmpresa)
+                .query(`
+                    SELECT TOP 1 valor
+                    FROM ConfiguracionEmpresa
+                    WHERE idEmpresa = @idEmpresaZona AND clave = 'ZONA_EXONERADA_CONFIRMADA'
+                `);
+            const val = String(zonaRes.recordset[0]?.valor || '').trim();
+            zonaExoneradaConfirmada = val === '1' || val.toLowerCase() === 'true';
+        } catch (_) {}
+
         const flagsOnboarding = {
             empresaCompleta,
             tieneColaboradores: colaboradores.recordset[0].total > 0,
             tieneProductos: productos.recordset[0].total > 0,
             tieneCajas: cantidadCajas > 0,
             tieneCajaAbierta,
-            tieneVentas: cantidadVentas > 0
+            tieneVentas: cantidadVentas > 0,
+            zonaExoneradaConfirmada
         };
         const pasosOnboarding = construirPasosOnboarding(flagsOnboarding);
         const pasosRequeridos = pasosOnboarding.length;
@@ -1805,6 +1843,40 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
         console.error('Error obteniendo estado de configuración:', error);
         throw new Error('Error al obtener estado de configuración: ' + error.message);
     }
+};
+
+exports.aplicarZonaExonerada = async (pool, idEmpresa, exonerada) => {
+    const impuestosRepository = require('../repositories/impuestos.repository');
+    const gestoresRepository = require('../repositories/gestores.repository');
+    const lista = await impuestosRepository.listarPorEmpresa(idEmpresa);
+    for (const imp of lista || []) {
+        const desc = String(imp.descripcion || '');
+        const esIgv = /IGV/i.test(desc);
+        const esExo = /exonera/i.test(desc);
+        if (esIgv) {
+            await impuestosRepository.actualizarEstado(imp.idImpuesto, idEmpresa, !exonerada);
+        }
+        if (esExo) {
+            await impuestosRepository.actualizarEstado(imp.idImpuesto, idEmpresa, !!exonerada);
+        }
+    }
+    await gestoresRepository.guardarConfiguracion(
+        pool,
+        idEmpresa,
+        'ZONA_EXONERADA_CONFIRMADA',
+        '1',
+        'Onboarding: ya eligió zona exonerada o IGV',
+        'BOOLEAN'
+    );
+    await gestoresRepository.guardarConfiguracion(
+        pool,
+        idEmpresa,
+        'ZONA_EXONERADA',
+        exonerada ? '1' : '0',
+        'Empresa en zona exonerada de IGV',
+        'BOOLEAN'
+    );
+    return { ok: true, exonerada: !!exonerada };
 };
 
 module.exports = exports;

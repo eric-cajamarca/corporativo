@@ -24,6 +24,7 @@ import { planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../../../c
 import { CuentasBancariasService } from '../../../services/cuentas-bancarias.service';
 import { CuentaBancaria } from '../../../models/cuenta-bancaria.model';
 import { AyudaFacturacionSunatComponent } from '../../shared/ayuda-facturacion-sunat/ayuda-facturacion-sunat.component';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 declare var iziToast: any;
 
@@ -227,7 +228,8 @@ export class IndexConfiguracionComponent implements OnInit {
     private _router: Router,
     private route: ActivatedRoute,
     public sidebarState: SidebarStateService,
-    private permisos: PermisosService
+    private permisos: PermisosService,
+    private confirmacion: ConfirmacionDialogService
   ) {}
 
   /** SaaS: según plan; enterprise: siempre visible. */
@@ -1023,7 +1025,7 @@ export class IndexConfiguracionComponent implements OnInit {
     });
   }
 
-  ejecutarBackupAhora(): void {
+  async ejecutarBackupAhora(): Promise<void> {
     if (!this.puedeEditarSistemaOperativo) {
       if (typeof iziToast !== 'undefined') {
         iziToast.warning({
@@ -1045,10 +1047,13 @@ export class IndexConfiguracionComponent implements OnInit {
       }
       return;
     }
-    const ok = window.confirm(
-      'Se ejecutará un backup completo de la base de datos en el servidor SQL.\n\n' +
-        'Puede tardar varios minutos según el tamaño de los datos.\n\n¿Continuar?'
-    );
+    const ok = await this.confirmacion.confirmar({
+      titulo: 'Ejecutar backup',
+      mensaje:
+        'Se ejecutará un backup completo de la base de datos en el servidor SQL.\n\n' +
+        'Puede tardar varios minutos según el tamaño de los datos.\n\n¿Continuar?',
+      confirmarTexto: 'Sí, ejecutar'
+    });
     if (!ok) {
       return;
     }

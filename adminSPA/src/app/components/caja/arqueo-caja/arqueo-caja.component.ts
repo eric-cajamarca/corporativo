@@ -35,6 +35,7 @@ export interface ArqueoTotalesPorSucursalFila {
   idSucursal: string;
   nombreSucursal: string;
   idCaja: string;
+  nombreCaja?: string;
   movimientos: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[];
   ventasCredito?: { importe?: number };
   cobroCreditos?: { importe?: number };
@@ -328,6 +329,7 @@ export class ArqueoCajaComponent implements OnInit {
               idSucursal: ps.idSucursal,
               nombreSucursal: ps.nombreSucursal || '',
               idCaja: ps.idCaja,
+              nombreCaja: ps.nombreCaja || this.nombreCajaPorId(ps.idCaja),
               movimientos: ps.movimientos || [],
               ventasCredito: ps.ventasCredito,
               cobroCreditos: ps.cobroCreditos,
@@ -496,6 +498,12 @@ export class ArqueoCajaComponent implements OnInit {
    * Unifica formas de pago equivalentes (EFECTIVO, Efectivo, CONTADO, Contado) en una sola etiqueta
    * para que no aparezcan duplicadas en Movimientos de Ingresos/Egresos (vienen de FormasPago y MediosPago).
    */
+  nombreCajaPorId(idCaja: string | undefined): string {
+    if (!idCaja) return '—';
+    const caja = this.cajas.find((c) => String(c.idCaja) === String(idCaja));
+    return (caja?.nombre || '').trim() || '—';
+  }
+
   private normalizarFormaPago(formaPago: string): string {
     const t = (formaPago || '').trim().toUpperCase();
     if (t === 'CONTADO' || t === 'EFECTIVO') return 'EFECTIVO';

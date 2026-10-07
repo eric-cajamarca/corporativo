@@ -29,6 +29,8 @@ api.get('/ventas/comprobante/:idVenta', auth.auth, ventasController.obtenerCompr
 api.get('/ventas/agrupadas/:idVentaAgrupada/comprobante-va', auth.auth, ventasController.obtenerComprobanteVAParaPdf);
 api.put('/ventas/editar/:idVenta', auth.auth, ventasController.actualizarVentaEdicion);
 api.delete('/ventas/anular/:idVenta', auth.auth, ventasController.anularVenta);
+api.post('/ventas/:idVenta/devolucion-parcial', auth.auth, ventasController.devolucionParcialNotaVenta);
+api.get('/ventas/:idVenta/detalle-simple', auth.auth, ventasController.obtenerDetalleVenta_idVenta);
 api.post('/ventas/:idVenta/cobrar', auth.auth, ventasController.postCobrarVenta);
 api.get('/ventas/:id/:idempresa', auth.auth, dventasController.obtenerDetalleVentaPorId_empresa);
 api.post('/ventas/completa', auth.auth, ventasController.crearVentaCompleta);

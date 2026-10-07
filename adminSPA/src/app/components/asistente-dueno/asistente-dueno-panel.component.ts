@@ -5,6 +5,7 @@ import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { AsistenteDuenoService } from '../../services/asistente-dueno.service';
 import { AsistenteDuenoUiService } from '../../services/asistente-dueno-ui.service';
+import { PermisosService } from '../../services/permisos.service';
 import { AsistenteEnlace, AsistenteMensaje } from '../../models/asistente-dueno.model';
 import {
   capturarFotoPantalla,
@@ -24,6 +25,7 @@ export class AsistenteDuenoPanelComponent {
   private readonly router = inject(Router);
   private readonly title = inject(Title);
   private readonly fb = inject(FormBuilder);
+  private readonly permisos = inject(PermisosService);
 
   @ViewChild('listaMensajes') listaMensajes?: ElementRef<HTMLDivElement>;
 
@@ -61,13 +63,24 @@ export class AsistenteDuenoPanelComponent {
     const re = /\[([^\]]+)\]\((\/[a-zA-Z0-9/?=&_-]*)\)/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(texto)) != null) {
-      out.push({ etiqueta: m[1], ruta: m[2] });
+      const ruta = m[2];
+      if (this.permisos.puedeAccederRutaPlan(ruta)) {
+        out.push({ etiqueta: m[1], ruta });
+      }
     }
     return out;
   }
 
-  textoVisible(texto: string): string {
-    return texto.replace(/\[([^\]]+)\]\((\/[a-zA-Z0-9/?=&_-]*)\)/g, '$1');
+  textoHtml(texto: string): string {
+    const esc = String(texto || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    return esc
+      .replace(/\[([^\]]+)\]\((\/[a-zA-Z0-9/?=&_-]*)\)/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
   }
 
   irA(ruta: string): void {

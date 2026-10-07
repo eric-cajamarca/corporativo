@@ -56,3 +56,15 @@
   background: #eef2ff;
   color: #4154f1;
 }
+
+@media (max-width: 767.98px) {
+  .onboarding-wizard {
+    padding: 0.75rem !important;
+  }
+  .onboarding-step {
+    padding: 0.75rem;
+  }
+  .onboarding-step .btn {
+    width: 100%;
+  }
+}

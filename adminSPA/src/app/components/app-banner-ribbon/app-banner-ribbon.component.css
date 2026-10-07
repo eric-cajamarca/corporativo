@@ -12,12 +12,6 @@
   left: 70px;
 }
 
-@media (max-width: 991.98px) {
-  .app-banner-ribbon-wrap {
-    left: 0;
-  }
-}
-
 .ribbon-inner {
   display: flex;
   flex-direction: column;
@@ -95,4 +89,54 @@
 .ribbon-success {
   background: #d1e7dd;
   color: #0f5132;
+}
+
+@media (max-width: 991.98px) {
+  .app-banner-ribbon-wrap,
+  .app-banner-ribbon-wrap.sidebar-collapsed {
+    left: 0;
+  }
+
+  .ribbon-inner {
+    max-height: 2.75rem;
+  }
+
+  .ribbon-item {
+    padding: 0.28rem 0.75rem;
+    font-size: 0.75rem;
+    flex-wrap: nowrap;
+  }
+
+  .ribbon-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .app-banner-ribbon-wrap,
+  .app-banner-ribbon-wrap.sidebar-collapsed {
+    left: 0;
+  }
+
+  .ribbon-inner {
+    max-height: 2.75rem;
+  }
+
+  .ribbon-item {
+    padding: 0.28rem 0.75rem;
+    font-size: 0.75rem;
+    flex-wrap: nowrap;
+  }
+
+  .ribbon-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

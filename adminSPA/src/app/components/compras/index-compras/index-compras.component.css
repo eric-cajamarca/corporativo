@@ -205,42 +205,101 @@
   }
 }
 
-/* Lista compras: celdas como tarjeta en < lg (mismos modales/dropdown) */
+/* Lista compras: tarjeta compacta en móvil */
 @media (max-width: 991.98px) {
   .table-compras-responsive thead {
     display: none;
   }
 
   .table-compras-responsive tbody tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 0.45rem;
+    row-gap: 0.2rem;
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
   }
 
   .table-compras-responsive tbody td {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-    padding: 0.65rem 1rem !important;
-    border-bottom: 1px solid #f1f3f5;
+    display: block;
+    padding: 0 !important;
+    border: none !important;
     text-align: left !important;
-  }
-
-  .table-compras-responsive tbody td:last-child {
-    border-bottom: none;
+    background: transparent !important;
   }
 
   .table-compras-responsive tbody td::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: #6c757d;
+    display: none;
+  }
+
+  .table-compras-responsive tbody td[data-label="Comprobante"] {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #0f172a;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .table-compras-responsive tbody td[data-label="Proveedor"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 0.8rem;
+    color: #334155;
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .table-compras-responsive tbody td[data-label="F. emisión"] {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 0.72rem;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .table-compras-responsive tbody td[data-label="Registrado por"] {
+    display: none !important;
+  }
+
+  .table-compras-responsive tbody td[data-label="Estado"] {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+  }
+
+  .table-compras-responsive tbody td[data-label="Total"] {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #15803d;
+    white-space: nowrap;
+  }
+
+  .table-compras-responsive tbody td[data-label="Total"]::before {
+    display: inline;
+    content: 'S/ ';
     font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 800;
+    color: #15803d;
+  }
+
+  .table-compras-responsive tbody td[data-label="Acciones"] {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .table-compras-responsive tbody td[data-label="Acciones"] .btn {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0.25rem 0.45rem;
   }
 }
 

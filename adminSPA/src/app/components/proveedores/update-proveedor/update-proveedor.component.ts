@@ -7,6 +7,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FactilizaService } from '../../../services/factiliza.service';
+import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
 
 declare var iziToast: any;
 
@@ -61,7 +62,8 @@ export class UpdateProveedorComponent {
     private _proveedorService: ProveedoresService,
     private _router: Router,
     private _route: ActivatedRoute,
-    private factilizaSvc: FactilizaService
+    private factilizaSvc: FactilizaService,
+    private confirmacion: ConfirmacionDialogService
 
   ) {
     //this.token = this._cookieService.get('token');
@@ -389,19 +391,26 @@ export class UpdateProveedorComponent {
   }
 
   eliminarDireccionProveedor(id: string | number): void {
-    if (typeof window !== 'undefined' && !window.confirm('¿Eliminar esta dirección?')) return;
-    this._proveedorService.eliminar_direccionProveedor(id).subscribe({
-      next: () => {
-        this.cargarDireccionesProveedor();
-        if (typeof iziToast !== 'undefined') {
-          iziToast.success({ title: 'OK', message: 'Dirección eliminada.', position: 'topRight' });
+    void this.confirmacion.confirmar({
+      titulo: 'Eliminar dirección',
+      mensaje: '¿Eliminar esta dirección?',
+      confirmarTexto: 'Sí, eliminar',
+      peligro: true
+    }).then((ok) => {
+      if (!ok) return;
+      this._proveedorService.eliminar_direccionProveedor(id).subscribe({
+        next: () => {
+          this.cargarDireccionesProveedor();
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({ title: 'OK', message: 'Dirección eliminada.', position: 'topRight' });
+          }
+        },
+        error: () => {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.error({ title: 'Error', message: 'No se pudo eliminar la dirección.', position: 'topRight' });
+          }
         }
-      },
-      error: () => {
-        if (typeof iziToast !== 'undefined') {
-          iziToast.error({ title: 'Error', message: 'No se pudo eliminar la dirección.', position: 'topRight' });
-        }
-      }
+      });
     });
   }
 

@@ -8,6 +8,7 @@ const productoHistorialService = require('../services/productoHistorial.service'
 const catalogoProductoSunatService = require('../services/catalogoProductoSunat.service');
 const productoSunatMatchService = require('../services/productoSunatMatch.service');
 const recetaVentaService = require('../services/recetaVenta.service');
+const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
 
 function parseRequiereCodigoSunat(valor) {
   if (valor === true || valor === 1 || valor === '1' || valor === 'true') return 1;
@@ -260,6 +261,7 @@ const crear_producto = async (req, res) => {
     codigo,
     idCategoria,
     idMarca,
+    idImpuesto,
     descripcion,
     idPresentacion,
     cUnitario,
@@ -326,6 +328,7 @@ const crear_producto = async (req, res) => {
     idCategoria: idCategoria != null ? parseInt(idCategoria, 10) : null,
     descripcion: descripcion != null ? String(descripcion).trim() : "",
     idMarca: idMarca != null ? parseInt(idMarca, 10) : null,
+    idImpuesto: idImpuesto != null && String(idImpuesto).trim() !== '' ? parseInt(idImpuesto, 10) : null,
     idPresentacion: idPresentacion != null ? parseInt(idPresentacion, 10) : null,
     cUnitario: cUnitarioNum,
     fProduccion: fProduccion ? convertirFormato(fProduccion) : null,
@@ -357,14 +360,33 @@ const crear_producto = async (req, res) => {
   if (
     (!usarCorrelativo && !datosProducto.Codigo) ||
     datosProducto.idCategoria === null || Number.isNaN(datosProducto.idCategoria) ||
-    datosProducto.idMarca === null || Number.isNaN(datosProducto.idMarca) ||
     !datosProducto.descripcion ||
     datosProducto.idPresentacion === null || Number.isNaN(datosProducto.idPresentacion)
   ) {
     return res.status(400).send({
-      message: "Todos los campos obligatorios deben ser completados (código, categoría, marca, descripción, presentación, costo unitario).",
+      message: "Todos los campos obligatorios deben ser completados (código, categoría, descripción, presentación, costo unitario).",
       data: undefined,
     });
+  }
+
+  if (datosProducto.idMarca === null || Number.isNaN(Number(datosProducto.idMarca))) {
+    try {
+      const sql = require('mssql');
+      const sm = await withPool(async (pool) => {
+        const r = await pool.request()
+          .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+          .query(`
+            SELECT TOP 1 idMarca FROM Marcas
+            WHERE idEmpresa = @idEmpresa
+              AND (UPPER(LTRIM(RTRIM(ISNULL(codigo,'')))) = 'SM'
+                OR LOWER(ISNULL(nombre,'')) LIKE '%sin marca%')
+          `);
+        return r.recordset[0]?.idMarca;
+      });
+      if (sm) datosProducto.idMarca = Number(sm);
+    } catch (err) {
+      console.error('contexto: resolver marca SM:', err.message);
+    }
   }
 
   if (lote && (!lote.idSucursal || lote.cantidadIngresada == null || lote.cantidadIngresada < 0)) {

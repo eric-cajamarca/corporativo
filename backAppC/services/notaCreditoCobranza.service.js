@@ -128,7 +128,7 @@ async function abonarCuotasCredito(ctx, idEmpresa, idCredito, montoAbonar, fecha
       SELECT idCuota, saldoPendiente, numeroCuota
       FROM CuotasCredito
       WHERE idCredito = @idCredito AND idEmpresa = @idEmpresa
-        AND estado IN ('PENDIENTE', 'VENCIDO')
+        AND estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
       ORDER BY numeroCuota ASC
     `);
   const cuotas = cuotasRs.recordset || [];
@@ -167,7 +167,7 @@ async function abonarCuotasCredito(ctx, idEmpresa, idCredito, montoAbonar, fecha
       .request()
       .input("idCredito", sql.UniqueIdentifier, idCredito)
       .query(`
-        SELECT SUM(CASE WHEN estado IN ('PENDIENTE','VENCIDO') THEN saldoPendiente ELSE 0 END) AS saldo
+        SELECT SUM(CASE WHEN estado IN ('PENDIENTE','VENCIDO','PARCIAL') THEN saldoPendiente ELSE 0 END) AS saldo
         FROM CuotasCredito WHERE idCredito = @idCredito
       `);
     const saldoCuotas = Number((credRs.recordset[0] || {}).saldo || 0);

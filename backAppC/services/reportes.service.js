@@ -44,10 +44,26 @@ async function obtenerCarteraCreditos(pool, idEmpresa) {
   return reportesRepository.obtenerCarteraCreditos(pool, idEmpresa);
 }
 
+async function obtenerAntiguedadDeuda(pool, idEmpresa) {
+  if (!idEmpresa) {
+    throw new Error('Empresa no identificada');
+  }
+  return reportesRepository.obtenerAntiguedadDeuda(pool, idEmpresa);
+}
+
+async function obtenerEstadoCuentaCliente(pool, idEmpresa, idCliente) {
+  if (!idEmpresa) {
+    throw new Error('Empresa no identificada');
+  }
+  return reportesRepository.obtenerEstadoCuentaCliente(pool, idEmpresa, idCliente);
+}
+
 module.exports = {
   obtenerComprasPorProveedor,
   obtenerInventarioResumen,
   obtenerClientesRentabilidad,
   obtenerCarteraCreditos,
+  obtenerAntiguedadDeuda,
+  obtenerEstadoCuentaCliente,
 };
 

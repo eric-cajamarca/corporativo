@@ -306,6 +306,12 @@ export const routes: Routes = [
         { path: 'detalle/:id', loadComponent: () => import('./components/ventas/detalle-venta/detalle-venta.component').then((m) => m.DetalleVentaComponent), title: 'Detalle de venta' },
         { path: 'editar/:id', loadComponent: () => import('./components/ventas/update-venta/update-venta.component').then((m) => m.UpdateVentaComponent), title: 'Editar venta' },
         { path: 'reporte-detallado', loadComponent: () => import('./components/ventas/reporte-ventas-detallado/reporte-ventas-detallado.component').then((m) => m.ReporteVentasDetalladoComponent), title: 'Reporte detallado de ventas' },
+        {
+          path: '**',
+          loadComponent: () =>
+            import('./components/public/not-found/not-found.component').then((m) => m.NotFoundComponent),
+          title: 'Página no encontrada'
+        }
       ]
     },
 
@@ -420,8 +426,22 @@ export const routes: Routes = [
 
     { path: 'facturacion/guias-transportista', loadComponent: () => import('./components/facturacion/guias-transportista/guias-transportista.component').then((m) => m.GuiasTransportistaComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Guías transportista' },
 
-  { path: 'auditoria', loadComponent: () => import('./components/auditoria/log-auditoria/log-auditoria.component').then((m) => m.LogAuditoriaComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Log de auditoría' }
+  { path: 'auditoria', loadComponent: () => import('./components/auditoria/log-auditoria/log-auditoria.component').then((m) => m.LogAuditoriaComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Log de auditoría' },
+
+      {
+        path: '**',
+        loadComponent: () =>
+          import('./components/public/not-found/not-found.component').then((m) => m.NotFoundComponent),
+        title: 'Página no encontrada'
+      }
     ]
+  },
+
+  {
+    path: '**',
+    loadComponent: () =>
+      import('./components/public/not-found/not-found.component').then((m) => m.NotFoundComponent),
+    title: 'Página no encontrada'
   }
 
 ];

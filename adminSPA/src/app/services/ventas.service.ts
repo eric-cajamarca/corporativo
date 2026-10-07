@@ -365,6 +365,21 @@ export class VentasService {
     );
   }
 
+  obtenerDetalleSimple(idVenta: number): Observable<Array<{ idDetalle: number; idProducto?: string; cantidad: number; pVenta?: number; total?: number; descripcion?: string }>> {
+    return this._http.get<Array<{ idDetalle: number; idProducto?: string; cantidad: number; pVenta?: number; total?: number; descripcion?: string }>>(
+      this.url + 'ventas/' + idVenta + '/detalle-simple',
+      { withCredentials: true }
+    );
+  }
+
+  devolucionParcial(idVenta: number, lineas: Array<{ idDetalle: number; cantidad: number }>): Observable<{ message: string; data?: { montoDevuelto: number; totalRestante: number } }> {
+    return this._http.post<{ message: string; data?: { montoDevuelto: number; totalRestante: number } }>(
+      this.url + 'ventas/' + idVenta + '/devolucion-parcial',
+      { lineas },
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }), withCredentials: true }
+    );
+  }
+
   /** Anula lógicamente un comprobante (restaura stock). No permitido si ya enviado a SUNAT. */
   anularVenta(idVenta: number): Observable<{ message: string }> {
     return this._http.delete<{ message: string }>(

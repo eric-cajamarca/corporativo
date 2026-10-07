@@ -78,7 +78,8 @@ export interface ProductoCreate {
   /** Si true, el servidor asigna el siguiente código desde Correlativos (ignorar el valor mostrado en pantalla). */
   useCorrelativo?: boolean;
   idCategoria: number;
-  idMarca: number;
+  idMarca?: number;
+  idImpuesto?: number;
   descripcion: string;
   idPresentacion: number;
   cUnitario: number;

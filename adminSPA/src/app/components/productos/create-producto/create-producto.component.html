@@ -154,15 +154,15 @@
             @if (hasError('idCategoria')) { <div class="invalid-feedback">{{ getError('idCategoria') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
-            <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }} *</label>
+            <label class="form-label">{{ esBotica ? 'Marca / laboratorio' : 'Marca' }}</label>
             <div class="input-group">
-              <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')" (focus)="recargarMarcas()">
-                <option value="">Seleccione...</option>
+              <select class="form-select" formControlName="idMarca" (focus)="recargarMarcas()">
+                <option value="">Sin marca</option>
                 @for (marca of marcas; track marca.idMarca) { <option [value]="marca.idMarca">{{ marca.nombre }}</option> }
               </select>
               <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaMarca()">Crear</button>
             </div>
-            @if (hasError('idMarca')) { <div class="invalid-feedback">{{ getError('idMarca') }}</div> }
+            <small class="text-muted">Opcional. Si no elige, se usa «Sin marca».</small>
           </div>
           <div class="col-md-4 mb-3">
             <label class="form-label">Presentación *</label>
@@ -173,6 +173,16 @@
               }
             </select>
             @if (hasError('idPresentacion')) { <div class="invalid-feedback">{{ getError('idPresentacion') }}</div> }
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Impuesto</label>
+            <select class="form-select" formControlName="idImpuesto">
+              <option value="">Según empresa</option>
+              @for (imp of impuestos; track imp.idImpuesto) {
+                <option [value]="imp.idImpuesto">{{ imp.descripcion }} ({{ imp.porcentaje }}%)</option>
+              }
+            </select>
+            <small class="text-muted">IGV 18% o Exonerado para este producto.</small>
           </div>
           <div class="col-md-6 mb-3">
             <label class="form-label">Fecha de Producción</label>
@@ -329,7 +339,7 @@
             <label class="form-label">Costo Unitario</label>
             <div class="input-group">
               <span class="input-group-text">S/</span>
-              <input type="number" class="form-control" [(ngModel)]="loteData.costoUnitario" [ngModelOptions]="{standalone: true}" (ngModelChange)="calcularPrecioVenta()" step="0.01" [readonly]="!esPresentacionServicioSeleccionada()" [attr.min]="esPresentacionServicioSeleccionada() ? 0 : null">
+              <input type="number" class="form-control" [(ngModel)]="loteData.costoUnitario" [ngModelOptions]="{standalone: true}" (ngModelChange)="calcularPrecioVenta()" step="0.01" [readonly]="!esModal && !esPresentacionServicioSeleccionada() && !modoLote()" [attr.min]="0">
             </div>
             <small class="text-muted">{{ esPresentacionServicioSeleccionada() ? 'Costo de referencia para costo de venta (servicio)' : 'Definido en la pestaña Inventario' }}</small>
           </div>

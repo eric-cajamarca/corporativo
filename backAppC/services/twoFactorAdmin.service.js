@@ -40,7 +40,7 @@ async function obtenerEmailEtiqueta(pool, decoded) {
 async function issuerNombre(pool, idEmpresa) {
   const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
   if (emp && emp.razon_Social) return String(emp.razon_Social).slice(0, 40);
-  return 'CRM';
+  return 'EFAFERP';
 }
 
 async function persistSecret(pool, decoded, secret, enabled) {

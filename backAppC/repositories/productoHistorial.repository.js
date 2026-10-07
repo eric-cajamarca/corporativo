@@ -50,7 +50,7 @@ exports.listarHistorialVentasProducto = async (pool, opts) => {
       v.idVenta,
       dv.idDetalle,
       CONVERT(VARCHAR(19), v.fEmision, 120) AS fecha,
-      ISNULL(NULLIF(LTRIM(RTRIM(v.compVenta)), ''), ISNULL(v.serie, '') + ':' + ISNULL(v.numero, '')) AS comprobante,
+      ISNULL(NULLIF(LTRIM(RTRIM(v.compVenta)), ''), ISNULL(v.serie, '') + '-' + RIGHT('00000000' + LTRIM(RTRIM(ISNULL(v.numero, '0'))), 8)) AS comprobante,
       ISNULL(cl.rSocial, '') AS cliente,
       CAST(dv.cantidad AS DECIMAL(18, 3)) AS cantidad,
       CAST(dv.pVenta AS DECIMAL(18, 6)) AS precio,

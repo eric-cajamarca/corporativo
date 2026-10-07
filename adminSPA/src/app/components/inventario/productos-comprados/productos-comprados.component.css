@@ -23,62 +23,228 @@
     margin-left: 0;
   }
 
-  /* Tabla → bloques tipo tarjeta (< lg) */
+  .pv-search {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pv-table-scroll {
+    max-height: none;
+    overflow: visible;
+    border: none;
+  }
+
+  .pv-table {
+    table-layout: auto;
+  }
+
+  .btn-toolbar .btn {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+  }
+
+  .periodo-fechas .form-control {
+    flex: 1 1 100%;
+  }
+
+  .periodo-fechas-sep {
+    display: none;
+  }
+
+  .table-productos-comprados-responsive,
+  .table-productos-comprados-responsive tbody,
+  .table-productos-comprados-responsive tfoot {
+    display: block;
+    width: 100%;
+  }
+
   .table-productos-comprados-responsive thead {
     display: none;
   }
 
   .table-productos-comprados-responsive tbody tr:not(.fila-vacia) {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 0.4rem;
+    row-gap: 0.22rem;
+    margin-bottom: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
+  }
+
+  .table-productos-comprados-responsive.table-striped > tbody > tr:not(.fila-vacia) > *,
+  .table-productos-comprados-responsive.table-hover > tbody > tr:not(.fila-vacia):hover > * {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    --bs-table-accent-bg: transparent;
   }
 
   .table-productos-comprados-responsive tbody tr:not(.fila-vacia) td {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-    width: 100% !important;
+    display: block;
+    width: auto !important;
+    min-width: 0;
     text-align: left !important;
-    padding: 0.65rem 1rem;
-    border-bottom: 1px solid #f1f3f5;
-  }
-
-  .table-productos-comprados-responsive tbody tr:not(.fila-vacia) td:last-child {
-    border-bottom: none;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: 0.78rem;
   }
 
   .table-productos-comprados-responsive tbody tr:not(.fila-vacia) td::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: #6c757d;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .table-productos-comprados-responsive tbody tr.fila-vacia,
-  .table-productos-comprados-responsive tfoot tr.fila-vacia {
     display: block;
-    margin-bottom: 1rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    overflow: hidden;
+    content: attr(data-label);
+    font-weight: 700;
+    color: #94a3b8;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+    margin-bottom: 0.05rem;
   }
 
-  .table-productos-comprados-responsive tbody tr.fila-vacia td,
-  .table-productos-comprados-responsive tfoot tr.fila-vacia td {
+  .table-productos-comprados-responsive tbody td[data-label="#"] {
+    display: none !important;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Producto"] {
+    grid-column: 1 / 4;
+    grid-row: 1;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Producto"]::before {
+    display: none;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Ver"] {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Ver"]::before {
+    display: none;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Ver"] .btn,
+  .table-productos-comprados-responsive tbody td[data-label="Ver"] a {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Proveedor"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    color: #334155;
+    font-size: 0.8rem;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Proveedor"]::before {
+    display: none;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Empresa"] {
+    display: none !important;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Fecha"] {
+    grid-column: 1;
+    grid-row: 3;
+    color: #64748b;
+    font-size: 0.75rem;
+    border-top: 1px dashed #e2e8f0 !important;
+    padding-top: 0.3rem !important;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Fecha"]::before {
+    display: none;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Cantidad"] {
+    grid-column: 2;
+    grid-row: 3;
+    font-weight: 700;
+    border-top: 1px dashed #e2e8f0 !important;
+    padding-top: 0.3rem !important;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Precio"] {
+    grid-column: 3;
+    grid-row: 3;
+    border-top: 1px dashed #e2e8f0 !important;
+    padding-top: 0.3rem !important;
+  }
+
+  .table-productos-comprados-responsive tbody td[data-label="Importe"] {
+    grid-column: 4;
+    grid-row: 3;
+    font-weight: 800;
+    color: #15803d;
+    border-top: 1px dashed #e2e8f0 !important;
+    padding-top: 0.3rem !important;
+  }
+
+  .table-productos-comprados-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-productos-comprados-responsive tbody tr.fila-vacia td {
     display: block;
     width: 100%;
   }
 
-  .table-productos-comprados-responsive tbody tr.fila-vacia td::before,
-  .table-productos-comprados-responsive tfoot tr.fila-vacia td::before {
+  .table-productos-comprados-responsive tbody tr.fila-vacia td::before {
     display: none;
+  }
+
+  .table-productos-comprados-responsive tfoot tr.pv-tfoot-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0.4rem;
+    row-gap: 0.2rem;
+    margin: 0.35rem 0 0;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.65rem;
+    background: #1a3a5c !important;
+    color: #fff;
+  }
+
+  .table-productos-comprados-responsive tfoot tr.pv-tfoot-row td {
+    display: block;
+    width: auto;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: #fff !important;
+    text-align: left !important;
+  }
+
+  .table-productos-comprados-responsive tfoot tr.pv-tfoot-row td::before {
+    display: block;
+    content: attr(data-label);
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    opacity: 0.75;
+  }
+
+  .table-productos-comprados-responsive tfoot td[data-label="Resumen"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-productos-comprados-responsive tfoot td:not([data-label]) {
+    display: none !important;
   }
 }
 
@@ -133,6 +299,26 @@
 .pv-search {
   max-width: 280px;
   min-width: 180px;
+}
+
+.periodo-fechas {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.periodo-fechas .form-control {
+  min-width: 0;
+  flex: 1 1 8rem;
+}
+
+@media (max-width: 991.98px) {
+  .pv-search {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 .agrupar-toggle .btn-agrupar-active {

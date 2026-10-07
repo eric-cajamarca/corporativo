@@ -102,11 +102,11 @@
               
                 <tr *ngFor="let item of compras">
                   <td class="fw-medium" data-label="Comprobante">{{item.compCompra}}</td>
-                  <td data-label="F. emisión">{{item.fEmision}}</td>
+                  <td data-label="F. emisión">{{ fechaEmisionLista(item.fEmision) }}</td>
                   <td data-label="Proveedor">
                     <div class="d-flex flex-column">
                       <span>{{item.rSocial}}</span>
-                      <span class="badge mt-1 badge-condicion" 
+                      <span class="badge mt-1 badge-condicion d-none d-lg-inline-block" 
                             [ngClass]="item.condicion === 'ACTIVO' ? 'bg-success' : 'bg-secondary'" >
                         {{item.condicion === 'ACTIVO' ? 'Activo' : 'No Activo'}}
                       </span>
@@ -127,7 +127,7 @@
                               type="button" 
                               data-bs-toggle="dropdown"
                               aria-expanded="false">
-                        <i class="bi bi-gear"></i> Opciones
+                        <i class="bi bi-gear"></i> <span class="d-none d-lg-inline">Opciones</span>
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
                         <li *ngIf="item.compCompra">

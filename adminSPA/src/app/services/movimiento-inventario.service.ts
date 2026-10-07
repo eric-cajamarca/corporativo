@@ -336,6 +336,7 @@ export interface KardexResponse {
   saldoInicial: KardexSaldoInicial | null;
   filas: KardexFila[];
   totales: KardexTotales | null;
+  metodoValorizacion?: 'LOTE' | 'PPC';
 }
 
 export interface KardexCompletoProducto {

@@ -622,6 +622,28 @@ export class SidebarComponent implements OnInit, OnDestroy {
     return item.tipo === 'dominio' && !!item.submenu?.length;
   }
 
+  rutaMenuLink(ruta: string | null | undefined): string {
+    if (!ruta) {
+      return '.';
+    }
+    return this.normalizarRuta(ruta);
+  }
+
+  /**
+   * Clic izquierdo navega en la misma app; Ctrl/Cmd/Shift/clic medio dejan abrir en otra pestaña.
+   */
+  onMenuClick(event: MouseEvent, ruta: string | null): void {
+    if (!ruta) {
+      event.preventDefault();
+      return;
+    }
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    this.navigateTo(ruta);
+  }
+
   /**
    * Navega a una ruta. Nueva venta se abre en otra pestaña.
    */

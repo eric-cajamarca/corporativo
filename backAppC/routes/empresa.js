@@ -39,5 +39,6 @@ api.put('/cambiar_principal/:id',auth.auth, empresasController.cambiar_principal
 
 // Estado de configuración de la empresa
 api.get('/estado_configuracion',auth.auth, empresasController.getEstadoConfiguracion);
+api.post('/empresa/zona-exonerada', auth.auth, empresasController.aplicarZonaExonerada);
 
 module.exports = api;

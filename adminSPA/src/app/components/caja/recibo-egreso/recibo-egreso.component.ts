@@ -9,7 +9,7 @@ import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { AuthService } from '../../../services/auth.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
+import { fechaEmisionVentaParaApi, formatFechaHoraApiParaMostrar, formatFechaApiParaMostrar } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -542,7 +542,6 @@ export class ReciboEgresoComponent implements OnInit {
 
   formatFecha(s: string): string {
     if (!s) return '-';
-    const d = new Date(s);
-    return d.toLocaleDateString('es-PE');
+    return formatFechaHoraApiParaMostrar(s) || formatFechaApiParaMostrar(s) || '-';
   }
 }

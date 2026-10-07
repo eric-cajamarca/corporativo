@@ -1,5 +1,19 @@
 const sql = require('mssql');
 
+function corregirEtiquetaCatalogo(texto) {
+  return String(texto || '')
+    .replace(/MASTERCAD/gi, 'MASTERCARD')
+    .replace(/DOLLAR AMERICANO/gi, 'DÓLAR AMERICANO')
+    .replace(/DOLAR AMERICANO/gi, 'DÓLAR AMERICANO');
+}
+
+function mapearEtiquetas(filas) {
+  return (filas || []).map((r) => ({
+    ...r,
+    descripcion: corregirEtiquetaCatalogo(r.descripcion)
+  }));
+}
+
 async function estadoPago(pool) {
   const result = await pool.request().query('SELECT * FROM EstadoPago');
   return result.recordset;
@@ -16,12 +30,12 @@ async function estadosPedidos(pool) {
 
 async function mediosPago(pool) {
   const result = await pool.request().query('SELECT * FROM MediosPago');
-  return result.recordset;
+  return mapearEtiquetas(result.recordset);
 }
 
 async function moneda(pool) {
   const result = await pool.request().query('SELECT * FROM Moneda');
-  return result.recordset;
+  return mapearEtiquetas(result.recordset);
 }
 
 async function leyenda(pool) {
