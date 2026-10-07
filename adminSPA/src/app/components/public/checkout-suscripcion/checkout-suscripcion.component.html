@@ -1,5 +1,98 @@
 <div class="checkout-page py-4 py-md-5 px-3">
   <div class="container checkout-wrap">
+    @if (esFormularioDemo()) {
+      <a class="btn btn-link checkout-back px-0 mb-3" routerLink="/publico">← Volver</a>
+      <div class="checkout-card">
+        <header class="checkout-hero">
+          <p class="checkout-hero-kicker mb-1">EFAFERP</p>
+          <h1 class="checkout-hero-title mb-2">Empieza tu demo de 14 días</h1>
+          <p class="mb-0">Sin tarjeta. Te dejamos el sistema listo y configuramos SUNAT sin costo.</p>
+        </header>
+        <div class="checkout-body">
+          @if (errorMsg()) {
+            <div class="alert alert-danger">{{ errorMsg() }}</div>
+          }
+          @if (demoLista()) {
+            <div class="alert alert-success">
+              Te enviamos un código de 6 dígitos a tu correo y a tu celular. Sin ese código la cuenta no se activa.
+            </div>
+            @if (mensaje()) {
+              <div class="alert alert-info">{{ mensaje() }}</div>
+            }
+            <p class="mb-1">Tu clave de acceso:</p>
+            <p class="fs-4 fw-bold mb-3">{{ demoClave }}</p>
+            <p class="checkout-hint">Guárdala. Podrás cambiarla después de entrar.</p>
+            <label class="checkout-section-title d-block" for="demoCodigo">Código de verificación</label>
+            <input
+              id="demoCodigo"
+              class="form-control checkout-input mb-3 text-center"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="6 dígitos"
+              [(ngModel)]="demoCodigo"
+              name="demoCodigo" />
+            <button
+              type="button"
+              class="btn btn-checkout-primary w-100"
+              [disabled]="procesando()"
+              (click)="activarDemo()">
+              {{ procesando() ? 'Activando…' : (demoActivada() ? 'Entrar' : 'Activar y entrar') }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-link w-100 mt-2"
+              [disabled]="reenviandoCodigo()"
+              (click)="reenviarCodigoDemo()">
+              {{ reenviandoCodigo() ? 'Reenviando…' : 'Reenviar código' }}
+            </button>
+          } @else {
+            <label class="checkout-section-title d-block" for="demoRuc">RUC</label>
+            <input
+              id="demoRuc"
+              class="form-control checkout-input mb-3"
+              inputmode="numeric"
+              maxlength="11"
+              autocomplete="off"
+              placeholder="11 dígitos"
+              [(ngModel)]="demoRuc"
+              name="demoRuc" />
+            <label class="checkout-section-title d-block" for="demoCorreo">Correo</label>
+            <input
+              id="demoCorreo"
+              type="email"
+              class="form-control checkout-input mb-3"
+              autocomplete="email"
+              placeholder="correo@empresa.com"
+              [(ngModel)]="demoCorreo"
+              name="demoCorreo" />
+            <label class="checkout-section-title d-block" for="demoCelular">Celular</label>
+            <input
+              id="demoCelular"
+              class="form-control checkout-input mb-3"
+              inputmode="numeric"
+              maxlength="9"
+              autocomplete="tel"
+              placeholder="9 dígitos"
+              [(ngModel)]="demoCelular"
+              name="demoCelular" />
+            <button
+              type="button"
+              class="btn btn-checkout-primary w-100"
+              [disabled]="procesando()"
+              (click)="empezarDemo()">
+              {{ procesando() ? 'Enviando el código…' : 'Empezar' }}
+            </button>
+            <p class="checkout-hint mt-3 mb-0">
+              Al pulsar Empezar aceptas los
+              <a routerLink="/politicas/terminos">términos</a>
+              y la
+              <a routerLink="/politicas/privacidad">privacidad</a>.
+            </p>
+          }
+        </div>
+      </div>
+    } @else {
     <button type="button" class="btn btn-link checkout-back px-0 mb-3" (click)="volverPlanes()">
       ← Volver a planes
     </button>
@@ -8,7 +101,7 @@
       <div class="alert alert-secondary">Modo enterprise: el checkout público no está disponible.</div>
     } @else {
       @if (procesando() && !resumen()) {
-        <p class="text-muted text-center py-5">Preparando checkout…</p>
+        <p class="text-muted text-center py-5">Preparando el pago…</p>
       }
 
       @if (errorMsg()) {
@@ -84,7 +177,7 @@
                     <span class="ciclo-check" aria-hidden="true"></span>
                     <span class="ciclo-text">
                       <strong>Anual</strong>
-                      <small>Un pago por año</small>
+                      <small class="ciclo-gratis">2 meses gratis</small>
                     </span>
                   </label>
                 </div>
@@ -473,6 +566,7 @@
           </div>
         </div>
       }
+    }
     }
   </div>
 </div>

@@ -89,7 +89,7 @@ const { isSaas } = require('../config/deployment.config');
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
 /** Envía código de activación por WhatsApp vía Factiliza (FactilizaConfig 'Factiliza WHATSAPP'). Sin sesión. */
-async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
+async function enviarCodigoActivacionFactiliza(pool, telefono, codigo, claveAcceso) {
   const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
   if (!config || !config.tokenDefault) {
     console.error('Factiliza WHATSAPP no configurado en FactilizaConfig (tokenDefault).');
@@ -104,7 +104,10 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
   }
   // Normalizar: quitar prefijo whatsapp: y + para enviar solo dígitos (ej. 51999999999)
   const numeroNormalizado = String(telefono).trim().replace(/^whatsapp:/i, '').replace(/^\+/, '');
-  const text = `Tu código de verificación para activar tu empresa es: ${codigo}`;
+  const clave = String(claveAcceso || '').trim();
+  const text = clave
+    ? `Tu código de verificación para activar tu empresa es: ${codigo}\nTu clave de acceso: ${clave}\nCámbiala después de entrar.`
+    : `Tu código de verificación para activar tu empresa es: ${codigo}`;
   try {
     const resultado = await whatsappFactilizaService.sendText(config, numeroNormalizado, text);
     if (resultado.success) {
@@ -117,18 +120,25 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
   }
 }
 
-async function enviarCodigoActivacionCorreo(correo, codigo) {
+async function enviarCodigoActivacionCorreo(correo, codigo, claveAcceso) {
   const destino = String(correo || '').trim();
   if (!destino) {
     return { sent: false, error: 'Correo destino vacío.' };
   }
+  const clave = String(claveAcceso || '').trim();
   const subject = 'Código de activación de cuenta';
-  const text = `Tu código de verificación para activar tu empresa es: ${codigo}\n\nSi no solicitaste este código, ignora este mensaje.`;
+  const lineaClave = clave ? `\nTu clave de acceso: ${clave}\nCámbiala después de entrar.\n` : '';
+  const text = `Tu código de verificación para activar tu empresa es: ${codigo}${lineaClave}\nSi no solicitaste este código, ignora este mensaje.`;
+  const claveHtml = clave.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const htmlClave = clave
+    ? `<p>Tu clave de acceso es:</p><p style="font-size: 18px; font-weight: 700; margin: 8px 0;">${claveHtml}</p><p style="color: #666; font-size: 14px;">Cámbiala después de entrar.</p>`
+    : '';
   const html = `
     <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto;">
       <h2 style="color: #333;">Código de activación</h2>
       <p>Tu código de verificación para activar tu empresa es:</p>
       <p style="font-size: 24px; font-weight: 700; letter-spacing: 2px; margin: 16px 0;">${codigo}</p>
+      ${htmlClave}
       <p style="color: #666; font-size: 14px;">Si no solicitaste este código, ignora este mensaje.</p>
     </div>
   `;
@@ -245,9 +255,10 @@ const createEmpresa = async function (req, res, next) {
                   console.error('Suscripción inicial no aplicada:', errSub);
                 }
 
+                const claveAcceso = String(req.body.claveAcceso || '').trim();
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
-                const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo);
-                const resultadoEmail = await enviarCodigoActivacionCorreo(correo, verificacion.codigo);
+                const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo, claveAcceso);
+                const resultadoEmail = await enviarCodigoActivacionCorreo(correo, verificacion.codigo, claveAcceso);
 
                 const mensaje = construirMensajeActivacion(resultadoWhatsApp, resultadoEmail);
 

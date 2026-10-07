@@ -50,7 +50,7 @@
                       <i class="bi bi-credit-card me-2"></i>{{ etiquetaBotonPago() }}
                     </button>
                   } @else {
-                    <a routerLink="/planes" class="btn btn-primary btn-lg flex-shrink-0">Ver planes</a>
+                    <a routerLink="/cuenta/planes" class="btn btn-primary btn-lg flex-shrink-0">Ver planes</a>
                   }
                 </div>
               </div>
@@ -64,7 +64,7 @@
             <div class="card-body">
               <h2 class="h5 card-title">Uso del plan</h2>
               <p class="small text-muted mb-2">
-                Mismo sistema en todos los planes; aquí ve el consumo frente a los límites de su contrato.
+                Consumo frente a los límites de su plan. El bot de pedidos entra desde Emprendedor.
               </p>
               <div class="mb-3">
                 <div class="d-flex justify-content-between small">
@@ -158,7 +158,7 @@
                   @if (agotadosComprobantesSunat(lim)) {
                     <div class="alert alert-danger py-2 px-3 small mb-0 mt-1">
                       Ya usó los comprobantes SUNAT de su plan. Renueve o cambie de plan para seguir emitiendo.
-                      <a routerLink="/planes" class="alert-link">Ver planes</a>
+                      <a routerLink="/cuenta/planes" class="alert-link">Ver planes</a>
                     </div>
                   } @else if (avisoComprobantes90(lim)) {
                     <div class="alert alert-warning py-2 px-3 small mb-0 mt-1">
@@ -243,13 +243,13 @@
                 <button type="button" class="btn btn-primary btn-sm me-2" (click)="irAPagarRenovacion()">
                   <i class="bi bi-credit-card me-1"></i>Pagar renovación
                 </button>
-                <a routerLink="/planes" class="btn btn-outline-primary btn-sm me-2">{{ etiquetaBotonPlanes(e.suscripcion) }}</a>
+                <a routerLink="/cuenta/planes" class="btn btn-outline-primary btn-sm me-2">{{ etiquetaBotonPlanes(e.suscripcion) }}</a>
                 <p class="small text-muted mt-2 mb-0">
                   «Pagar renovación» mantiene su plan actual ({{ e.planCatalogo?.nombre ?? e.suscripcion?.planCode ?? '—' }});
                   use «{{ etiquetaBotonPlanes(e.suscripcion) }}» solo si quiere cambiar de plan.
                 </p>
               } @else {
-                <a routerLink="/planes" class="btn btn-primary btn-sm me-2">{{ etiquetaBotonPlanes(e.suscripcion) }}</a>
+                <a routerLink="/cuenta/planes" class="btn btn-primary btn-sm me-2">{{ etiquetaBotonPlanes(e.suscripcion) }}</a>
               }
               <div class="mt-3 border-top pt-3">
                 <h3 class="h6 mb-2">Vincular pago con su cuenta</h3>

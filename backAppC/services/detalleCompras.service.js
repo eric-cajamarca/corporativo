@@ -4,6 +4,7 @@ const productosRepository = require('../repositories/productos.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
 const productoInventarioMetaService = require('./productoInventarioMeta.service');
+const loteDeficit = require('../repositories/loteDeficit.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function obtenerDetallePorCompra(pool, user, idCompra) {
@@ -175,6 +176,9 @@ async function crearDetalleCompraCompleto(pool, user, body) {
           idUbParaLote,
           Math.round(cantidadVal)
         );
+      }
+      if (idLote) {
+        await loteDeficit.compensarDeficitProducto(transaction, { idEmpresa, idProducto, idSucursal });
       }
     }
 

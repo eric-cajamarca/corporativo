@@ -50,9 +50,26 @@ function empresaExige2faAdmin(empresa) {
   return true;
 }
 
+async function suscripcionEsDemo(pool, idEmpresa) {
+  if (!idEmpresa) return false;
+  try {
+    const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
+    const row = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+    const plan = String(row?.planCode || '').trim().toLowerCase();
+    const estado = String(row?.estado || '').trim().toUpperCase();
+    return plan === 'demo' || estado === 'DEMO';
+  } catch (err) {
+    console.error('suscripcionEsDemo:', err.message);
+    return false;
+  }
+}
+
 async function evaluarEtapa2fa(pool, datosUsuario, syntheticAdmin, empresa) {
   const twoFactorAdminService = require('./twoFactorAdmin.service');
   const jwtHelper = require('../helpers/jwt');
+  if (await suscripcionEsDemo(pool, empresa?.idEmpresa || datosUsuario?.idEmpresa)) {
+    return { stage: 'OK', datosUsuario };
+  }
   if (!empresaExige2faAdmin(empresa)) {
     return { stage: 'OK', datosUsuario };
   }

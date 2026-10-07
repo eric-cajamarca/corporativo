@@ -254,7 +254,7 @@
     <div class="container">
       <div class="section-header">
         <h2>Planes disponibles</h2>
-        <p>El mismo sistema EFAFERP para todos; cada plan define los límites de escala de tu negocio.</p>
+        <p>Ventas, inventario, caja y SUNAT en todos los planes. El bot de pedidos entra desde Emprendedor. Precios en soles, sin IGV.</p>
       </div>
 
       @if (cargandoPlanes()) {
@@ -278,7 +278,13 @@
                 </ul>
                 <p class="plan-precio">
                   Desde <strong>S/ {{ plan.precioMensualPen | number : '1.0-0' }}</strong>/mes
+                  <span class="plan-precio-igv">sin IGV</span>
                 </p>
+                @if (mesesGratisAnual(plan.precioMensualPen, plan.precioAnualPen) > 0) {
+                  <p class="plan-meses-gratis">
+                    Anual: {{ mesesGratisAnual(plan.precioMensualPen, plan.precioAnualPen) }} meses gratis
+                  </p>
+                }
                 <a class="btn btn-outline-primary w-100" [routerLink]="['/suscribirse', plan.planCode]" [queryParams]="{ billing: 'monthly' }">
                   Contratar
                 </a>

@@ -42,6 +42,19 @@ export function resumirLimitesPlan(plan: PlanCatalogoItem): string[] {
   return lineas;
 }
 
+/**
+ * Meses que el anual no cobra frente a 12 mensualidades.
+ * Con los precios del catálogo (10 meses) son 2.
+ */
+export function mesesGratisAnual(mensual: number, anual: number): number {
+  const m = Number(mensual);
+  const a = Number(anual);
+  if (!(m > 0) || !(a > 0)) return 0;
+  const gratis = 12 - a / m;
+  if (gratis < 0.5) return 0;
+  return Math.round(gratis);
+}
+
 /** Una línea compacta para tarjetas pequeñas. */
 export function resumenCompactoPlan(plan: PlanCatalogoItem): string {
   return resumirLimitesPlan(plan).slice(0, 3).join(' · ');

@@ -640,6 +640,15 @@
   font-size: 0.85rem;
 }
 
+.plan-meses-gratis {
+  margin: -6px 0 14px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f766e;
+  line-height: 1.15;
+}
+
 .plan-card .btn-link {
   font-size: 0.88rem;
   text-decoration: none;

@@ -365,10 +365,10 @@ export class MiSuscripcionComponent implements OnInit {
   irAPagarRenovacion(): void {
     const plan = (this.estado()?.suscripcion?.planCode || '').trim();
     if (!this.planRenovablePorCheckout() || !plan) {
-      void this.router.navigate(['/planes']);
+      void this.router.navigate(['/cuenta', 'planes']);
       return;
     }
-    void this.router.navigate(['/suscribirse', plan], {
+    void this.router.navigate(['/cuenta', 'pagar', plan], {
       queryParams: { billing: this.cicloParaPago() }
     });
   }

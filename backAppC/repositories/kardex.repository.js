@@ -1,5 +1,6 @@
 // repositories/kardex.repository.js
 const sql = require('mssql');
+const loteDeficit = require('./loteDeficit.repository');
 
 function ventaExcluidaDeKardex(eliminado, idEstadoSunat) {
   if (eliminado) return true;
@@ -120,6 +121,11 @@ async function obtenerEsquemaFarmacia(pool) {
  * Retorna: producto, saldoInicial (cantidad, pUnitario, importe), filas ordenadas por fecha, totales.
  */
 exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHasta) => {
+  try {
+    await loteDeficit.compensarDeficitProducto(pool, { idEmpresa, idProducto });
+  } catch (errDef) {
+    console.error('kardex compensar deficit:', errDef.message);
+  }
   const fechaDesdeSql = fechaCivilSql(fechaDesde);
   const fechaHastaSql = fechaCivilSql(fechaHasta);
   const req = pool.request();

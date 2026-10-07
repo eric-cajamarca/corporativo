@@ -4,7 +4,7 @@ import { RouterModule } from '@angular/router';
 import { DomSanitizer, Meta, SafeResourceUrl, Title } from '@angular/platform-browser';
 import { SaasPublicService } from '../../../services/saas-public.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
-import { resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
+import { mesesGratisAnual, resumirLimitesPlan } from '../../../utils/saas-plan-resumen.util';
 import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 
 const SEO_TITLE = 'EFAFERP | Controla ventas, stock y créditos de tu negocio';
@@ -215,6 +215,7 @@ export class HomePublicComponent implements OnInit, OnDestroy {
   ];
 
   readonly resumirLimitesPlan = resumirLimitesPlan;
+  readonly mesesGratisAnual = mesesGratisAnual;
 
   readonly whatsappDisplay = '993 289 440';
   readonly chatUi = inject(ChatComercialPublicoUiService);

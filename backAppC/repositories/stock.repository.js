@@ -1,6 +1,7 @@
 // repositories/stock.repository.js
 const sql = require('mssql');
 const inventarioRepository = require('./inventario.repository');
+const loteDeficit = require('./loteDeficit.repository');
 
 async function obtenerCostoUnitarioProducto(transaction, idEmpresa, idProducto) {
   const rs = await transaction
@@ -315,6 +316,13 @@ const queryFilasPorPrioridad = async (
  */
 exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
+  if (idEmpresa && idProducto) {
+    await loteDeficit.compensarDeficitProducto(transaction, {
+      idEmpresa,
+      idProducto,
+      idSucursal: idSucursal || null
+    });
+  }
   const idLoteSolo =
     stockData.idLote != null && String(stockData.idLote).trim() !== ''
       ? String(stockData.idLote).trim()
@@ -541,4 +549,9 @@ exports.restaurarStockEnLotes = async (transaction, stockData) => {
       UPDATE Lotes SET cantidadDisponible = cantidadDisponible + @cantidad
       WHERE idLote = @idLote
     `);
+  await loteDeficit.compensarDeficitProducto(transaction, {
+    idEmpresa,
+    idProducto,
+    idSucursal: idSucursal || null
+  });
 };

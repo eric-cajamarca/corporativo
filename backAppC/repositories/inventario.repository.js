@@ -1,5 +1,6 @@
 // repositories/inventario.repository.js
 const sql = require('mssql');
+const loteDeficit = require('./loteDeficit.repository');
 const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
 const { clausulaBusquedaProductoMultiPalabra } = require('../utils/productoBusqueda.util');
 
@@ -116,6 +117,9 @@ exports.crearLoteSinCompra = async (transaction, datos) => {
       .input('cantidad', sql.Decimal(18, 3), cant)
       .query('INSERT INTO LotesUbicacion (idLote, idUbicacion, cantidad) VALUES (@idLote, @idUbicacion, @cantidad)');
   }
+  if (idLote && cant > 0) {
+    await loteDeficit.compensarDeficitProducto(transaction, { idEmpresa, idProducto, idSucursal });
+  }
   return idLote;
 };
 
@@ -177,6 +181,7 @@ exports.incrementarStockEnUbicacionExistente = async (transaction, datos) => {
        WHERE idLote = @idLote`
     );
 
+  await loteDeficit.compensarDeficitProducto(transaction, { idEmpresa, idProducto, idSucursal });
   return { actualizado: true, idLote };
 };
 

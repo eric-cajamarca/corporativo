@@ -28,3 +28,17 @@
 .planes-pricing-card.border-primary {
   border-width: 2px;
 }
+
+.planes-meses-gratis {
+  margin: 0 0 1.25rem;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f766e;
+  line-height: 1.1;
+}
+
+.planes-meses-gratis--card {
+  font-size: 1.65rem;
+  margin-bottom: 0.35rem;
+}

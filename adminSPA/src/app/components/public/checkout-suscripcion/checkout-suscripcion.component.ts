@@ -4,9 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { take } from 'rxjs/operators';
 import { SaasPublicService } from '../../../services/saas-public.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { AuthService } from '../../../services/auth.service';
+import { ApiperuService } from '../../../services/apiperu.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { AdminService } from '../../../services/admin.service';
 import { CheckoutResumen } from '../../../models/saas-public.model';
 import { LS_CHECKOUT_PENDIENTE } from '../../../utils/saas-registro-origen.util';
 import { ConfirmacionDialogService } from '../../../services/confirmacion-dialog.service';
@@ -53,6 +57,16 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   pagoManualReportado = signal(false);
   /** Huella de dispositivo (Culqi3DS) enviada en antifraud_details al crear el cargo. */
   deviceFingerPrintId = '';
+  /** Alta de demo en un solo paso (RUC, correo, celular). */
+  demoRuc = '';
+  demoCorreo = '';
+  demoCelular = '';
+  demoClave = '';
+  demoCodigo = '';
+  idEmpresaDemo = signal('');
+  demoLista = signal(false);
+  demoActivada = signal(false);
+  reenviandoCodigo = signal(false);
   /** Evita cargar el script dos veces. */
   private culqiScriptPromise: Promise<void> | null = null;
   private culqi3dsScriptPromise: Promise<void> | null = null;
@@ -64,10 +78,15 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     private deployment: DeploymentContextService,
     private auth: AuthService,
     private ngZone: NgZone,
-    private confirmacion: ConfirmacionDialogService
+    private confirmacion: ConfirmacionDialogService,
+    private apiperu: ApiperuService,
+    private empresaService: EmpresaService,
+    private adminService: AdminService
   ) {}
 
   ngOnInit(): void {
+    const planInicial = (this.route.snapshot.paramMap.get('planCode') || '').toLowerCase();
+    this.planCode.set(planInicial);
     this.deployment.cargarSiNecesario().subscribe((cfg) => {
       if (!cfg?.mostrarPlanesPublicos) {
         this.modoEnterprise.set(true);
@@ -77,6 +96,28 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.planCode.set(plan);
       const billing = (this.route.snapshot.queryParamMap.get('billing') || 'monthly').toLowerCase();
       this.billingCycle.set(billing === 'none' || billing === 'yearly' || billing === 'monthly' ? billing : 'monthly');
+      const cel = (this.route.snapshot.queryParamMap.get('celular') || '').replace(/\D/g, '').slice(-9);
+      if (/^9\d{8}$/.test(cel)) this.demoCelular = cel;
+      if (plan === 'demo') {
+        this.procesando.set(false);
+        return;
+      }
+      if (!this.enCuenta()) {
+        this.auth.verifyToken().pipe(take(1)).subscribe({
+          next: () => {
+            if (this.auth.isAuthenticated()) {
+              void this.router.navigate(['/cuenta', 'pagar', plan], {
+                queryParams: this.route.snapshot.queryParams,
+                replaceUrl: true
+              });
+              return;
+            }
+            this.cargarResumen();
+          },
+          error: () => this.cargarResumen()
+        });
+        return;
+      }
       this.cargarResumen();
     });
   }
@@ -109,7 +150,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           this.viaPago = data.culqiPublicKey || data.culqiDisponible ? 'culqi' : 'manual';
           this.procesando.set(false);
           if (data.esDemo) {
-            this.mensaje.set('Checkout demo listo. Al confirmar se genera el número de orden para registrar su empresa.');
+            this.mensaje.set(null);
           }
         },
         error: (err) => {
@@ -712,7 +753,180 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     return qp;
   }
 
+  enCuenta(): boolean {
+    return this.router.url.includes('/cuenta/');
+  }
+
+  esFormularioDemo(): boolean {
+    return this.planCode() === 'demo';
+  }
+
+  private claveTemporal(): string {
+    const letras = 'abcdefghjkmnpqrstuvwxyz';
+    let extra = '';
+    for (let i = 0; i < 4; i++) extra += letras[Math.floor(Math.random() * letras.length)];
+    return `Efa${extra}1!`;
+  }
+
+  /**
+   * Demo: crea la empresa inactiva y pide el código de 6 dígitos. Sin ese código no entra.
+   */
+  async empezarDemo(): Promise<void> {
+    const ruc = (this.demoRuc || '').replace(/\D/g, '');
+    const correo = (this.demoCorreo || '').trim();
+    const celular = (this.demoCelular || '').replace(/\D/g, '');
+    this.errorMsg.set(null);
+    if (!/^\d{11}$/.test(ruc)) {
+      this.errorMsg.set('Ingrese un RUC de 11 dígitos.');
+      return;
+    }
+    if (!this.esEmailValido(correo)) {
+      this.errorMsg.set('Ingrese un correo válido.');
+      return;
+    }
+    if (!/^9\d{8}$/.test(celular)) {
+      this.errorMsg.set('Ingrese un celular de 9 dígitos que empiece en 9.');
+      return;
+    }
+    this.demoRuc = ruc;
+    this.demoCorreo = correo;
+    this.demoCelular = celular;
+    this.procesando.set(true);
+
+    let razonSocial = `Empresa ${ruc}`;
+    let direccion = 'Sin dirección';
+    let ubigeo = '';
+    let condicion = '';
+    let estSunat = '';
+    try {
+      const response = await firstValueFrom(this.apiperu.getRucInfoPublic(ruc));
+      const data = response?.data ?? response;
+      if (data && !response?.error && response?.success !== false) {
+        if (data.razonSocial) razonSocial = String(data.razonSocial);
+        if (data.direccion) direccion = String(data.direccion);
+        if (data.ubigeo) ubigeo = String(data.ubigeo).replace(/\D/g, '');
+        if (data.condicion) condicion = String(data.condicion);
+        if (data.estado) estSunat = String(data.estado);
+      }
+    } catch {
+      /* Si SUNAT no responde, la empresa se crea con el RUC y se completa después. */
+    }
+
+    const clave = this.claveTemporal();
+    try {
+      this.emailPago = correo;
+      await this.asegurarOrden();
+      const order = this.orderNumber();
+      await firstValueFrom(this.saasPublic.confirmarDemo(order));
+      const creada = await firstValueFrom(
+        this.empresaService.createEmpresa({
+          idDocumento: '6',
+          ruc,
+          razon_Social: razonSocial,
+          nombre_Comercial: '',
+          correo,
+          celular,
+          password: clave,
+          claveAcceso: clave,
+          condicion,
+          estSunat,
+          direccion,
+          ubigeo,
+          codpais: 'PEN',
+          solicitudDemo: true,
+          checkoutOrderNumber: order
+        })
+      );
+      if (!creada?.data) {
+        this.procesando.set(false);
+        this.errorMsg.set(creada?.message || 'No se pudo crear la empresa.');
+        return;
+      }
+      this.demoClave = clave;
+      this.idEmpresaDemo.set(String(creada.data));
+      this.demoCodigo = '';
+      this.procesando.set(false);
+      this.demoLista.set(true);
+      if (creada.codigoEnviado === false) {
+        this.errorMsg.set(creada.mensaje || 'No se pudo enviar el código. Usa reenviar.');
+      }
+    } catch (err) {
+      this.procesando.set(false);
+      this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo empezar. Intente de nuevo.'));
+    }
+  }
+
+  /**
+   * El código de 6 dígitos activa la cuenta. Después entra directo, sin verificación en dos pasos.
+   */
+  async activarDemo(): Promise<void> {
+    const id = this.idEmpresaDemo().trim();
+    const cod = (this.demoCodigo || '').replace(/\D/g, '');
+    this.demoCodigo = cod;
+    this.errorMsg.set(null);
+    if (!id) {
+      this.errorMsg.set('No se encontró la empresa. Vuelve a empezar.');
+      return;
+    }
+    if (cod.length !== 6) {
+      this.errorMsg.set('Ingresa el código de 6 dígitos.');
+      return;
+    }
+    this.procesando.set(true);
+    if (!this.demoActivada()) {
+      try {
+        await firstValueFrom(this.empresaService.verificarEmpresa(id, cod));
+        this.demoActivada.set(true);
+      } catch (err) {
+        this.procesando.set(false);
+        this.errorMsg.set(this.mensajeErrorCheckout(err, 'Código incorrecto o vencido.'));
+        return;
+      }
+    }
+    try {
+      const sesion = await firstValueFrom(
+        this.adminService.admin_login({
+          email: this.demoCorreo,
+          password: this.demoClave,
+          ruc: this.demoRuc
+        })
+      );
+      const datos = sesion?.data;
+      this.procesando.set(false);
+      if (!datos?.idEmpresa || datos.requiresTwoFactor || datos.requiresTwoFactorSetup) {
+        await this.router.navigate(['/login-empresa']);
+        return;
+      }
+      this.auth.setUserDataFromLogin(datos);
+      await this.router.navigate(['/home']);
+    } catch {
+      this.procesando.set(false);
+      this.errorMsg.set('La cuenta ya está activa. Entra con la clave que aparece arriba.');
+    }
+  }
+
+  reenviarCodigoDemo(): void {
+    const id = this.idEmpresaDemo().trim();
+    if (!id || this.reenviandoCodigo()) return;
+    this.reenviandoCodigo.set(true);
+    this.errorMsg.set(null);
+    this.empresaService.enviarCodigoActivacion(id, this.demoCelular).subscribe({
+      next: (res) => {
+        this.reenviandoCodigo.set(false);
+        this.mensaje.set(res?.message || 'Te reenviamos el código por WhatsApp y correo.');
+      },
+      error: (err) => {
+        this.reenviandoCodigo.set(false);
+        this.errorMsg.set(this.mensajeErrorCheckout(err, 'No se pudo reenviar el código.'));
+      }
+    });
+  }
+
   volverPlanes(): void {
+    if (this.enCuenta() || this.auth.isAuthenticated()) {
+      void this.router.navigate(['/cuenta', 'planes']);
+      return;
+    }
     void this.router.navigate(['/planes']);
   }
 

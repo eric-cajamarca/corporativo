@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 const ProductosRepository = require('../repositories/productos.repository');
 const preciosVRepository = require('../repositories/preciosV.repository');
 const inventarioRepository = require('../repositories/inventario.repository');
+const loteDeficit = require('../repositories/loteDeficit.repository');
+const comprobantesRepository = require('../repositories/comprobantes.repository');
 
 async function resolverIdUsuarioParaProducto(pool, idEmpresa, subFromToken) {
   if (!subFromToken || !idEmpresa) return null;
@@ -56,6 +58,47 @@ async function obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpres
 }
 
 /**
+ * Resuelve comprobante para inventario inicial (II, IN o IV), respetando correlativo por sucursal/empresa.
+ */
+async function resolverComprobanteInventarioInicial(transaction, idEmpresa, idSucursal) {
+  try {
+    for (const cod of ['II', 'IN', 'IV']) {
+      let comp = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+        transaction,
+        idEmpresa,
+        cod,
+        idSucursal
+      );
+      if (!comp || !comp.idComprobante) {
+        comp = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+          transaction,
+          idEmpresa,
+          cod,
+          null
+        );
+      }
+      if (comp && comp.idComprobante) {
+        const serie = comp.serie || cod;
+        const numActual = parseInt(comp.numero, 10) || 0;
+        const siguiente = numActual + 1;
+        const numStr = String(siguiente).padStart(6, '0');
+        const docRelacionado = `${serie}-${numStr}`;
+        await comprobantesRepository.actualizarNumeroComprobante(
+          transaction,
+          idEmpresa,
+          comp.idComprobante,
+          siguiente
+        );
+        return { idComprobante: comp.idComprobante, docRelacionado };
+      }
+    }
+  } catch (errComp) {
+    console.error('resolverComprobanteInventarioInicial:', errComp.message);
+  }
+  return { idComprobante: null, docRelacionado: 'II01-000001' };
+}
+
+/**
  * Transacción de alta de producto (código correlativo opcional, lote inicial, precio en lista).
  * @returns {{ ok: true, idProducto }} | {{ errorLista: true }}
  */
@@ -98,11 +141,49 @@ async function crearProductoConTransaccion(pool, params) {
       ) {
         const cantidad = Math.max(0, parseFloat(lote.cantidadIngresada) || 0);
         const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
-        const idUbicacion =
+        let idUbicacion =
           lote.idUbicacion != null && lote.idUbicacion !== ''
             ? Number(lote.idUbicacion)
             : null;
-        await ProductosRepository.insertarLoteInicial(transaction, {
+        if ((!idUbicacion || Number.isNaN(idUbicacion)) && lote.ubicacion && String(lote.ubicacion).trim()) {
+          try {
+            const codUb = String(lote.ubicacion).trim().slice(0, 20);
+            const rUb = await transaction
+              .request()
+              .input('idSucursal', sql.UniqueIdentifier, lote.idSucursal)
+              .input('codigoUbicacion', sql.VarChar(20), codUb)
+              .query('SELECT TOP 1 idUbicacion FROM UbicacionesPrioridad WHERE idSucursal = @idSucursal AND codigoUbicacion = @codigoUbicacion');
+            if (rUb.recordset && rUb.recordset[0]) {
+              idUbicacion = rUb.recordset[0].idUbicacion;
+            } else {
+              const rInsUb = await transaction
+                .request()
+                .input('idSucursal', sql.UniqueIdentifier, lote.idSucursal)
+                .input('codigoUbicacion', sql.VarChar(20), codUb)
+                .input('prioridad', sql.Int, 10)
+                .query(`INSERT INTO UbicacionesPrioridad (idSucursal, codigoUbicacion, prioridad)
+                        OUTPUT INSERTED.idUbicacion
+                        VALUES (@idSucursal, @codigoUbicacion, @prioridad)`);
+              if (rInsUb.recordset && rInsUb.recordset[0]) {
+                idUbicacion = rInsUb.recordset[0].idUbicacion;
+              }
+            }
+          } catch (eUb) {
+            console.error('resolverUbicacionInicial:', eUb.message);
+          }
+        }
+
+        let numLote = lote.numeroLote && String(lote.numeroLote).trim() !== '' ? String(lote.numeroLote).trim() : null;
+        if (!numLote && cantidad > 0) {
+          try {
+            const sigLote = await inventarioRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
+            numLote = String(sigLote);
+          } catch (errSig) {
+            console.error('obtenerSiguienteNumeroLote inicial:', errSig.message);
+          }
+        }
+
+        const idLote = await ProductosRepository.insertarLoteInicial(transaction, {
           idEmpresa,
           idProducto: datosProducto.idProducto,
           idSucursal: lote.idSucursal,
@@ -110,9 +191,41 @@ async function crearProductoConTransaccion(pool, params) {
           cantidadIngresada: cantidad,
           cantidadDisponible: cantidad,
           idUbicacion: idUbicacion && !Number.isNaN(idUbicacion) ? idUbicacion : null,
-          numeroLote: lote.numeroLote,
-          fechaVencimiento: lote.fechaVencimiento
+          numeroLote: numLote,
+          fechaVencimiento: lote.fechaVencimiento,
+          fechaIngreso: new Date()
         });
+
+        if (cantidad > 0) {
+          const { idComprobante, docRelacionado } = await resolverComprobanteInventarioInicial(
+            transaction,
+            idEmpresa,
+            lote.idSucursal
+          );
+
+          await inventarioRepository.insertarFilaMovimiento(transaction, {
+            idEmpresa,
+            idSucursal: lote.idSucursal,
+            idProducto: datosProducto.idProducto,
+            tipoMovimiento: 'EN',
+            cantidad,
+            docRelacionado,
+            idComprobante,
+            idUsuario: datosProducto.idUsuario || null,
+            observaciones: 'Inventario inicial al registrar producto',
+            costoUnitario: costoLote,
+            idLote,
+            idGrupoMovimiento: uuidv4(),
+            codigoTipoMovimiento: 'INVENTARIO_INICIAL',
+            fMovimiento: null
+          });
+
+          await loteDeficit.compensarDeficitProducto(transaction, {
+            idEmpresa,
+            idProducto: datosProducto.idProducto,
+            idSucursal: lote.idSucursal
+          });
+        }
       }
 
       const preciosMulti = Array.isArray(preciosPorLista) ? preciosPorLista : [];

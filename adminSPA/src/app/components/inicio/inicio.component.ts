@@ -203,7 +203,7 @@ export class InicioComponent implements OnInit, OnDestroy {
   }
 
   irAMejorarPlan(): void {
-    void this.router.navigate(['/planes']);
+    void this.router.navigate(['/cuenta', 'planes']);
   }
 
   ocultarAyudaFacturacion(): void {

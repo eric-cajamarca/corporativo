@@ -1362,11 +1362,12 @@ exports.insertarLoteInicial = async (transaction, row) => {
     .input('cantidadIngresada', sql.Decimal(18, 2), row.cantidadIngresada)
     .input('cantidadDisponible', sql.Decimal(18, 2), row.cantidadDisponible)
     .input('fechaVencimiento', sql.DateTime, fechaVenc)
+    .input('fechaIngreso', sql.DateTime, row.fechaIngreso || new Date())
     .input('numeroLote', sql.VarChar(50), numLote)
     .query(
-      `INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, numeroLote)
+      `INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, fechaIngreso, numeroLote)
        OUTPUT INSERTED.idLote
-       VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @numeroLote)`
+       VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @fechaIngreso, @numeroLote)`
     );
   const idLote = result.recordset && result.recordset[0] ? result.recordset[0].idLote : null;
   const idUbicacion = row.idUbicacion != null ? Number(row.idUbicacion) : null;

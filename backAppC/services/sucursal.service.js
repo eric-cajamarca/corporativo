@@ -1,4 +1,5 @@
 const sucursalRepository = require('../repositories/sucursal.repository');
+const loteDeficit = require('../repositories/loteDeficit.repository');
 const empresaService = require('./empresa.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { idsSucursalesFiltroCatalogo, assertSucursalPermitidaParaUsuario } = require('../utils/sucursalUsuarioScope.util');
@@ -236,6 +237,9 @@ async function crearStockLote(pool, user, body) {
     cantidadIngresada: cantidadVal,
     cantidadDisponible: cantidadVal
   });
+  if (cantidadVal > 0) {
+    await loteDeficit.compensarDeficitProducto(pool, { idEmpresa, idProducto, idSucursal });
+  }
   return 1;
 }
 

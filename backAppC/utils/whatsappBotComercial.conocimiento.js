@@ -36,13 +36,16 @@ function textoFichaConviene() {
 
 function textoPlanes() {
   return [
-    'Los planes y precios vigentes están aquí:',
+    'Para casi todas las tiendas recomiendo uno de estos dos:',
+    '• *Básico*: un local, facturación SUNAT, inventario y WhatsApp para enviar boletas y facturas.',
+    '• *Emprendedor*: más usuarios y sucursales, más el bot de pedidos por WhatsApp.',
+    'El *anual* incluye *2 meses gratis* (pagas 10 meses y usas 12).',
+    'La *configuración SUNAT* (usuario SOL, certificado y series) te la hacemos *sin costo* al empezar.',
+    '',
+    'Precios vigentes, en soles y sin IGV:',
     urlPublica('/planes'),
     '',
-    'Si quieres *probar 14 días* (sin tarjeta), escribe *DEMO* y te acompaño. Si quieres *pagar un plan*, escribe *PAGAR*.',
-    '',
-    'Al contratar, un asesor te acompaña con SUNAT (usuario SOL, certificado, series). Horario en la web: lun–vie 9:00 a 18:00 (Perú).',
-    'Dentro del sistema, el *asistente de la plataforma* es para guiarte en el uso del sistema.'
+    'Si quieres *probar 14 días* (sin tarjeta), escribe *DEMO*. Si ya elegiste plan, escribe *PAGAR*.'
   ].join('\n');
 }
 
@@ -391,7 +394,8 @@ function pareceDudaPagoRegistro(texto) {
 function detectarPlanYCiclo(texto) {
   const t = String(texto || '').toLowerCase();
   let plan = null;
-  if (/\bemprendedor\b/.test(t)) plan = 'emprendedor';
+  if (/\bb[aá]sico\b/.test(t)) plan = 'basico';
+  else if (/\bemprendedor\b/.test(t)) plan = 'emprendedor';
   else if (/\bprofesional\b/.test(t)) plan = 'profesional';
   else if (/\benterprise\b/.test(t)) plan = 'enterprise';
   let ciclo = null;
@@ -404,24 +408,24 @@ function textoAcompanarDemo(com, ruta) {
   const r = String(ruta || '').toLowerCase().split('?')[0];
   if (r.includes('/suscribirse/demo')) {
     return [
-      'Estás en la pantalla de la *demo*. Acepta las políticas y pulsa *activar demo* (14 días, *sin tarjeta*).',
-      'Luego te pide el *RUC* (11 dígitos), correo, celular y contraseña. El código de 6 dígitos llega por WhatsApp y correo.',
-      'Si te trabas, dime el paso (políticas, RUC, correo o código). No cierres este chat.'
+      'Estás en la *demo*. Un solo paso: *RUC* (11 dígitos), *correo*, *celular* y el botón *Empezar*.',
+      '14 días, *sin tarjeta*. Al pulsar *Empezar* te llega un *código de 6 dígitos* por WhatsApp y correo. Sin ese código la cuenta no se activa.',
+      'La *configuración SUNAT* te la hacemos *sin costo*. Si te trabas, dime qué campo no avanza.'
     ].join('\n');
   }
   if (r.includes('/crear-empresa') || r.includes('/verificar-empresa')) {
     return textoAcompanarRegistro(ruta, com?.pasoRegistro);
   }
   return [
-    'Perfecto. Te acompaño a crear la *demo* (14 días, *sin tarjeta*).',
+    'Perfecto. La *demo* son 14 días, *sin tarjeta*, en un solo paso.',
     '',
-    '1. Abre este enlace y acepta las políticas:',
+    '1. Abre:',
     urlDemo(),
-    '2. Pulsa *activar demo* (no se cobra).',
-    '3. La web te lleva a registrar tu empresa (RUC, correo, celular y contraseña).',
-    '4. Te llega un *código de 6 dígitos* por WhatsApp y correo. Lo ingresas en verificar empresa.',
+    '2. Escribe *RUC*, *correo* y *celular*, y pulsa *Empezar*.',
+    '3. Te llega un *código de 6 dígitos* y tu clave por WhatsApp y correo. Ingresa el código para activar y entrar. No pide verificación en dos pasos.',
+    'La *configuración SUNAT* (usuario SOL, certificado y series) va *sin costo*.',
     '',
-    'Si te trabas (RUC, correo, código, contraseña), escríbeme aquí. No me envíes la contraseña ni datos de tarjeta.'
+    'Si te trabas, escríbeme. No me envíes la clave ni datos de tarjeta.'
   ].join('\n');
 }
 
@@ -430,7 +434,7 @@ function textoAcompanarPago(com, ruta) {
   const elegido = detectarPlanYCiclo(`${com?.planCode || ''} ${com?.billingCycle || ''}`);
   const plan = com?.planCode || elegido.plan;
   const ciclo = com?.billingCycle || elegido.ciclo || 'monthly';
-  if (r.includes('/suscribirse/') && !r.includes('/suscribirse/demo')) {
+  if ((r.includes('/suscribirse/') && !r.includes('/suscribirse/demo')) || r.includes('/cuenta/pagar')) {
     return [
       'Estás en el *pago del plan*.',
       '• *Tarjeta:* Culqi en esta misma pantalla. *Nunca* me envíes el número de tarjeta aquí.',
@@ -452,11 +456,13 @@ function textoAcompanarPago(com, ruta) {
   if (plan && plan !== 'enterprise') {
     lineas.push(`2. Directo a *${plan}* (${ciclo === 'yearly' ? 'anual' : 'mensual'}):`, urlSuscribirsePlan(plan, ciclo));
   } else {
-    lineas.push('2. Elige *mensual* o *anual*. El más usado es *Emprendedor*.');
+    lineas.push('2. Si es un solo local, el plan es *Básico*. Si quieres bot de pedidos o más sucursales, *Emprendedor*.');
+    lineas.push('   En el *anual* hay *2 meses gratis*. La configuración SUNAT va *sin costo*.');
+    lineas.push(`   Básico mensual: ${urlSuscribirsePlan('basico', 'monthly')}`);
     lineas.push(`   Emprendedor mensual: ${urlSuscribirsePlan('emprendedor', 'monthly')}`);
   }
   lineas.push(
-    '3. Paga con *tarjeta* (Culqi) o *Yape / Plin / depósito BCP*. El número y la cuenta los tienes en el checkout; también te los doy aquí si los pides.',
+    '3. Paga con *tarjeta* (Culqi) o *Yape / Plin / depósito BCP*. El número y la cuenta están en la pantalla de pago; también te los doy aquí si los pides.',
     '4. Si es Yape/Plin, reporta el *voucher* en esa pantalla; un asesor valida. Si ya pagaste, escribe *ya pagué*.',
     '5. Luego registras tu empresa (RUC, correo, celular, contraseña) y el código de 6 dígitos.',
     '',
@@ -527,7 +533,7 @@ function textoDudaPagoRegistro(texto, flujo, ruta, paso, errorPantalla) {
     return [
       'Puedo pasarte el *Yape/Plin* o la *cuenta BCP*. Escríbelo así: *YAPE*, *PLIN* o *CUENTA*.',
       `Elige el plan aquí: ${urlPlanes()}`,
-      'Paga y *adjunta el voucher en el checkout*. Si ya pagaste, escribe *ya pagué* y aviso al administrador.',
+      'Paga y *adjunta el voucher en la pantalla de pago*. Si ya pagaste, escribe *ya pagué* y aviso al administrador.',
       'Después registras la empresa (RUC, correo, celular, contraseña).'
     ].join('\n');
   }
@@ -554,7 +560,7 @@ function textoDudaPagoRegistro(texto, flujo, ruta, paso, errorPantalla) {
       urlPlanes(),
       flujo === 'demo'
         ? 'La *demo* es 14 días *sin tarjeta* y sin cobro.'
-        : 'Si ya sabes el plan (Emprendedor/Profesional) y mensual o anual, te armo el enlace de pago.'
+        : 'Si me dices si eres un local (*Básico*) o quieres bot y más sucursales (*Emprendedor*), y si vas mensual o anual (2 meses gratis), te armo el enlace.'
     ].filter(Boolean).join('\n');
   }
   if (/\b(gratis|cobra|cobran|tarjeta)\b/i.test(t) && (flujo === 'demo' || /\bdemo\b/i.test(t))) {
@@ -886,11 +892,12 @@ Si *en este mensaje* acaba de decir el rubro: plantilla=pitch_rubro.
 Si hace *otra* pregunta: respóndela (plantilla whatsapp/bot_pedidos/asistente/planes/…); no repitas el pitch.
 
 Hechos (sin montos ni cuentas):
-- Demo: 14 días, sistema real, sin tarjeta. Marcador [[DEMO]] o plantilla=demo. Web: ${site}/suscribirse/demo?billing=none
-- Planes y precios: plantilla=planes o [[PLANES]]. Nunca inventes un monto.
+- Demo: 14 días, sin tarjeta, UN solo paso: RUC, correo, celular y botón Empezar. Después llega un código de 6 dígitos por WhatsApp y correo; sin ese código la cuenta no se activa. No pide verificación en dos pasos. No digas checkout, orden, pasarela ni “activar demo”. Marcador [[DEMO]] o plantilla=demo. Web: ${site}/suscribirse/demo?billing=none
+- Recomienda *Básico* (un local, WhatsApp para enviar comprobantes) o *Emprendedor* (más usuarios, sucursales y bot de pedidos). Profesional solo si piden alto volumen. El anual incluye 2 meses gratis. Nunca inventes un monto: plantilla=planes o [[PLANES]].
+- Configuración SUNAT (usuario SOL, certificado y series) es *sin costo* al empezar. Ofrécela cuando hablen de facturar, SUNAT o contratar.
 - Pago: Culqi (tarjeta, solo en la web) o Yape / Plin / depósito. plantilla=yape|plin|cuenta|medios_pago. Tú no cobras. Si dice *ya pagué*: plantilla=pago_confirmado (no digas que el plan está activo).
-- Registro: primero elige *demo* o un *plan* en la web. Luego ${site}/crear-empresa — RUC 11 dígitos, correo, celular, contraseña, código 6 dígitos. En paso RUC, “Verificar” es el RUC, no el código. plantilla=registro si está en esa pantalla o se traba.
-- Asesor de BUSINESS SOFT acompaña la puesta en marcha (SUNAT). Lun–vie 9:00 a 18:00 (Perú).
+- Registro: la demo y los planes de pago piden un código de 6 dígitos por WhatsApp y correo para activar la cuenta. La demo no pide verificación en dos pasos. plantilla=registro si se traba en crear empresa o en el código.
+- Asesor de BUSINESS SOFT configura SUNAT sin costo. Lun–vie 9:00 a 18:00 (Perú).
 - WhatsApp vinculado (plan Básico): envía boletas/facturas desde EFAFERP. plantilla=whatsapp o [[WHATSAPP]]
 - Bot de pedidos (plan Emprendedor): *sus* clientes consultan stock por el WhatsApp de *su* tienda. plantilla=bot_pedidos o [[BOT]]
 - Asistente de la plataforma (con sesión): guía el uso. No guarda historial. No es este chat. plantilla=asistente o [[ASISTENTE]]

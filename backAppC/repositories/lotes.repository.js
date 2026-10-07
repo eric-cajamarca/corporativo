@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
+const loteDeficit = require('./loteDeficit.repository');
 
 function construirInClauseUuid(request, ids, prefix) {
   const valid = (ids || []).filter((id) => id && String(id).trim());
@@ -17,6 +18,11 @@ function construirInClauseUuid(request, ids, prefix) {
 
 async function getAll(idEmpresa) {
   return withPool(async (pool) => {
+    try {
+      await loteDeficit.compensarDeficitsEmpresa(pool, idEmpresa);
+    } catch (errDef) {
+      console.error('lotes compensar deficit:', errDef.message);
+    }
     const result = await pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
@@ -49,6 +55,13 @@ async function getAll(idEmpresa) {
 
 async function getAllPorEmpresas(idsEmpresa) {
   return withPool(async (pool) => {
+    for (const idEmpresa of idsEmpresa || []) {
+      try {
+        await loteDeficit.compensarDeficitsEmpresa(pool, idEmpresa);
+      } catch (errDef) {
+        console.error('lotes compensar deficit:', errDef.message);
+      }
+    }
     const request = pool.request();
     const inClause = construirInClauseUuid(request, idsEmpresa, 'idEmpresaLote');
     if (!inClause) {
@@ -158,9 +171,12 @@ async function create(loteData) {
       .query(`INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, numeroLote, fechaVencimiento)
                 OUTPUT INSERTED.idLote
                 VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @numeroLote, @fechaVencimiento)`);
-    return {
-      idLote: result.recordset && result.recordset[0] ? result.recordset[0].idLote : null
-    };
+    const idLote = result.recordset && result.recordset[0] ? result.recordset[0].idLote : null;
+    const cant = parseFloat(cantidadDisponible) || 0;
+    if (idLote && cant > 0) {
+      await loteDeficit.compensarDeficitProducto(pool, { idEmpresa, idProducto, idSucursal });
+    }
+    return { idLote };
   });
 }
 

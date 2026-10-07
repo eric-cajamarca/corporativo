@@ -10,7 +10,7 @@ import { AuthService } from '../../../services/auth.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { MiEstadoSuscripcionResponse } from '../../../models/saas-subscription.model';
-import { formatLimitePlan } from '../../../utils/saas-plan-resumen.util';
+import { formatLimitePlan, mesesGratisAnual } from '../../../utils/saas-plan-resumen.util';
 
 type EdicionPlan = {
   descripcionCorta: string;
@@ -57,7 +57,20 @@ export class PlanesPublicComponent implements OnInit {
         this.cargando.set(false);
         return;
       }
-      this.cargarPlanesYPermisoEdicion();
+      if (!this.enCuenta()) {
+        this.auth.verifyToken().pipe(take(1), catchError(() => of(false))).subscribe(() => {
+          if (this.auth.isAuthenticated()) {
+            void this.router.navigate(['/cuenta', 'planes'], {
+              queryParams: this.route.snapshot.queryParams,
+              replaceUrl: true
+            });
+            return;
+          }
+          this.cargarPlanesYPermisoEdicion();
+        });
+      } else {
+        this.cargarPlanesYPermisoEdicion();
+      }
       if (this.route.snapshot.queryParamMap.get('registro') === 'elige-plan') {
         this.avisoMsg.set('Para registrar tu empresa, elige primero la demo de 14 días o un plan.');
       }
@@ -257,8 +270,8 @@ export class PlanesPublicComponent implements OnInit {
             this.irCheckout(planCode);
             return;
           }
-          if (code === 'MISMO_PLAN') {
-            this.avisoMsg.set('Ya tiene este plan. Al renovar podrá pagar el mismo plan desde el checkout.');
+            if (code === 'MISMO_PLAN') {
+            this.avisoMsg.set('Ya tiene este plan. Puede pagarlo desde Mi suscripción cuando esté por vencer.');
             return;
           }
           const detail = err?.error?.detail;
@@ -269,8 +282,27 @@ export class PlanesPublicComponent implements OnInit {
       });
   }
 
+  enCuenta(): boolean {
+    return this.router.url.includes('/cuenta/');
+  }
+
+  mesesGratis(plan: PlanCatalogoItem): number {
+    return mesesGratisAnual(plan.precioMensualPen, plan.precioAnualPen);
+  }
+
+  /** Si todos los planes anuales coinciden, el aviso grande usa ese número. */
+  mesesGratisBanner(): number {
+    const vals = this.planes()
+      .map((p) => this.mesesGratis(p))
+      .filter((n) => n > 0);
+    if (!vals.length) return 0;
+    return vals.every((n) => n === vals[0]) ? vals[0] : 0;
+  }
+
   private irCheckout(planCode: string): void {
-    void this.router.navigate(['/suscribirse', planCode], {
+    const dentro = this.enCuenta() || this.auth.isAuthenticated();
+    const ruta = dentro ? ['/cuenta', 'pagar', planCode] : ['/suscribirse', planCode];
+    void this.router.navigate(ruta, {
       queryParams: { billing: this.ciclo() }
     });
   }

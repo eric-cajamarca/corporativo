@@ -27,6 +27,7 @@ Reglas:
 - Cuando indiques otra pantalla, incluye un enlace markdown: [texto](/ruta).
 - Recibes una FICHA cada turno (rubro, rol, puede.X, plan, módulos del plan, facturación sí/no, caja abierta, GRE). Úsala. No inventes datos que no estén ahí.
 - Si un módulo no está en el plan de la ficha, NO enlaces esa ruta. Di que está en otro plan.
+- Si preguntan por cambiar de plan, pagar, renovar o qué plan les conviene: recomienda **Básico** (un local y WhatsApp para enviar comprobantes) o **Emprendedor** (más usuarios, sucursales y bot de pedidos). El anual incluye **2 meses gratis**. La configuración SUNAT (usuario SOL, certificado y series) la hace un asesor **sin costo**. Enlaza [Planes](/cuenta/planes) y el pago en [Mi suscripción](/cuenta/suscripcion). Nunca enlaces /planes ni /suscribirse: eso saca al usuario del sistema.
 - NUNCA cites ni inventes montos (S/, totales, saldos, costos, cantidades de stock). Si hay crédito o saldo, di que hay pendiente y manda a [Créditos](/creditos) o a la venta. Stock: solo sí/no por sucursal y manda a Kardex/Stock actual.
 - Si puede.X es no, NO enlaces esa ruta. Dile que pida el permiso al administrador. Sin VER_CONFIGURACION no mandes a Facturación SUNAT.
 - "Error al invocar el servicio de SUNAT" no es un código de negocio de SUNAT: falló la llamada (red, URL o certificado). Explícalo con la ficha, sin inventar el CDR.
@@ -343,6 +344,16 @@ const LIBRETOS = [
 
 const TEMAS_GUIA = [
   {
+    id: 'planes',
+    re: /\b(plan(es)?|suscripci[oó]n|renovar|mejorar el plan|cambiar de plan|b[aá]sico|emprendedor|2 meses|dos meses)\b/i,
+    respuesta: [
+      'Para la mayoría de negocios el plan es **Básico** (un local, facturación SUNAT y WhatsApp para enviar comprobantes) o **Emprendedor** (más usuarios, sucursales y bot de pedidos).',
+      'El **anual** incluye **2 meses gratis**.',
+      'La configuración SUNAT (usuario SOL, certificado y series) la hace un asesor **sin costo**.',
+      'El cambio de plan y el pago se hacen dentro del sistema: [Planes](/cuenta/planes) y [Mi suscripción](/cuenta/suscripcion).'
+    ].join('\n')
+  },
+  {
     id: 'sunat',
     re: /\b(sunat|boleta|factura|certificado|\.pfx|usuario sol|usuario secundario|serie|billservice|e-beta|facturaci[oó]n electr[oó]nica)\b/i,
     respuesta: [
@@ -352,6 +363,7 @@ const TEMAS_GUIA = [
       '3) Series de factura y boleta.',
       '4) Activar **Usar envío directo (SOAP BillService)** si corresponde.',
       '5) En **URL BillService SUNAT**: pruebas = e-beta; producción = e-factura.sunat.gob.pe. No hay interruptor «modo prueba»: se cambia esa URL y se guarda.',
+      'Si prefieres, un asesor de Business Soft te deja esa configuración SUNAT **sin costo**.',
       'Cobrar el documento en [Venta rápida](/ventas/rapida) (**Comprobante** + **Cobrar**), no en Configuración.'
     ].join('\n')
   },

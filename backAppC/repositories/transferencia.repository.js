@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const loteDeficit = require('./loteDeficit.repository');
 
 // Primero, crear tabla de detalles si no existe
 exports.crearTablaDetalles = async (pool) => {
@@ -130,6 +131,7 @@ exports.ajustarStock = async (transaction, datos) => {
                     INSERT INTO Lotes (idEmpresa, idSucursal, idProducto, costoUnitario, cantidadIngresada, cantidadDisponible)
                     VALUES (@idEmpresa, @idSucursal, @idProducto, @costoUnitario, @cantidadIngresada, @cantidadDisponible)
                 `);
+            await loteDeficit.compensarDeficitProducto(transaction, { idEmpresa, idProducto, idSucursal });
             return result;
         }
 

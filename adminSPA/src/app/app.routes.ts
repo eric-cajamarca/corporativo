@@ -380,6 +380,10 @@ export const routes: Routes = [
 
      { path: 'cuenta/suscripcion', loadComponent: () => import('./components/cuenta/mi-suscripcion/mi-suscripcion.component').then((m) => m.MiSuscripcionComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Mi suscripción' },
 
+     { path: 'cuenta/planes', loadComponent: () => import('./components/public/planes-public/planes-public.component').then((m) => m.PlanesPublicComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Cambiar de plan' },
+
+     { path: 'cuenta/pagar/:planCode', loadComponent: () => import('./components/public/checkout-suscripcion/checkout-suscripcion.component').then((m) => m.CheckoutSuscripcionComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Pagar plan' },
+
      { path: 'configuracion/integraciones', loadComponent: () => import('./components/configuracion/integraciones/integraciones.component').then((m) => m.IntegracionesComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Integraciones y APIs de pago' },
 
      { path: 'configuracion/sesiones', loadComponent: () => import('./components/configuracion/mis-sesiones-dispositivos/mis-sesiones-dispositivos.component').then((m) => m.MisSesionesDispositivosComponent), canActivate: [empresaGestoraGuard, saasPlanModuloGuard], title: 'Sesiones y dispositivos' },

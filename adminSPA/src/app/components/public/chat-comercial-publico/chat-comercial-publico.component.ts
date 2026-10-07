@@ -97,6 +97,8 @@ export class ChatComercialPublicoComponent {
       p === '/planes' ||
       p.startsWith('/planes/') ||
       p.startsWith('/suscribirse') ||
+      p.startsWith('/cuenta/planes') ||
+      p.startsWith('/cuenta/pagar') ||
       p.startsWith('/crear-empresa') ||
       p.startsWith('/verificar-empresa') ||
       p.startsWith('/politicas') ||
