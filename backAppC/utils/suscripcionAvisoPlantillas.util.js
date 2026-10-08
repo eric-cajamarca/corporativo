@@ -4,6 +4,13 @@
  * contenido en ambos canales sin duplicar redacción.
  */
 
+let configDesdeEnv = null;
+try {
+  ({ configDesdeEnv } = require('../config/pagoManualSuscripcion.config'));
+} catch (errConfig) {
+  console.error('suscripcionAvisoPlantillas: no se pudo cargar configDesdeEnv:', errConfig.message);
+}
+
 const RUTA_MI_SUSCRIPCION = '/cuenta/suscripcion';
 
 const NOMBRES_PLAN = {
@@ -29,6 +36,7 @@ function nombrePlan(planCode) {
 
 function nombreCiclo(billingCycle) {
   const c = String(billingCycle || '').toLowerCase().trim();
+  if (!c || c === 'none' || c === 'null' || c === 'undefined') return '';
   return NOMBRES_CICLO[c] || c || '';
 }
 
@@ -57,8 +65,133 @@ function urlMiSuscripcion(frontendUrl) {
 
 function etiquetaPlanCiclo(planCode, billingCycle) {
   const plan = nombrePlan(planCode);
+  const code = String(planCode || '').toLowerCase().trim();
+  if (code === 'demo') return plan;
   const ciclo = nombreCiclo(billingCycle);
   return ciclo ? `${plan} (${ciclo})` : plan;
+}
+
+function resolverPagoManual(datos) {
+  if (datos?.pagoManual && typeof datos.pagoManual === 'object') {
+    return datos.pagoManual;
+  }
+  if (typeof configDesdeEnv === 'function') {
+    try {
+      return configDesdeEnv();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function formatearMediosPagoTexto(pagoManual, url, esVencida = false) {
+  const yape = String(pagoManual?.yapePlin || '').trim();
+  const b = pagoManual?.bcp || {};
+  const cuentas = Array.isArray(pagoManual?.cuentas)
+    ? pagoManual.cuentas.filter((c) => c?.cuenta || c?.cci)
+    : [];
+
+  const lineas = [
+    esVencida ? '*Regularice su servicio aquí:*' : '*Medios de pago disponibles:*'
+  ];
+
+  if (yape) {
+    lineas.push(`• *Yape / Plin:* ${yape}`);
+  }
+
+  if (cuentas.length > 0) {
+    for (const cta of cuentas) {
+      const banco = cta.banco || 'Banco';
+      const ctaPartes = [];
+      if (cta.cuenta) ctaPartes.push(`Cta: ${cta.cuenta}`);
+      if (cta.cci) ctaPartes.push(`CCI: ${cta.cci}`);
+      lineas.push(`• *${banco}:* ${ctaPartes.join(' · ')}`);
+    }
+  } else if (b.cuenta || b.cci) {
+    const banco = b.banco || 'BCP';
+    const ctaPartes = [];
+    if (b.cuenta) ctaPartes.push(`Cta: ${b.cuenta}`);
+    if (b.cci) ctaPartes.push(`CCI: ${b.cci}`);
+    lineas.push(`• *${banco}:* ${ctaPartes.join(' · ')}`);
+  }
+
+  const titular = b.titular || (cuentas[0] && cuentas[0].titular);
+  if (titular) {
+    lineas.push(`• *Titular:* ${titular}`);
+  }
+
+  if (url) {
+    lineas.push(
+      '',
+      '💳 *¿Prefiere pagar con tarjeta (débito o crédito)?*',
+      'Pague en línea con Culqi aquí:',
+      `👉 ${url}`
+    );
+  }
+
+  const wsDisplay = pagoManual?.whatsappDisplay ? ` (o al WhatsApp ${pagoManual.whatsappDisplay})` : '';
+  const accion = esVencida ? 'reactivar su sistema' : 'renovar su servicio';
+  lineas.push(
+    '',
+    '📲 *Activación:*',
+    `Una vez realizado el pago, *envíe la captura o voucher a este WhatsApp${wsDisplay}* para ${accion} de inmediato.`
+  );
+
+  return lineas.join('\n');
+}
+
+function formatearMediosPagoHtml(pagoManual, url, esVencida = false) {
+  const yape = String(pagoManual?.yapePlin || '').trim();
+  const b = pagoManual?.bcp || {};
+  const cuentas = Array.isArray(pagoManual?.cuentas)
+    ? pagoManual.cuentas.filter((c) => c?.cuenta || c?.cci)
+    : [];
+  const titular = b.titular || (cuentas[0] && cuentas[0].titular);
+  const ws = pagoManual?.whatsappDisplay || '993289440';
+  const accion = esVencida ? 'reactivar su sistema' : 'renovar su servicio';
+
+  const items = [];
+  if (yape) {
+    items.push(`<li><strong>Yape / Plin:</strong> ${yape}</li>`);
+  }
+  if (cuentas.length > 0) {
+    for (const cta of cuentas) {
+      const banco = cta.banco || 'Banco';
+      const ctaPartes = [];
+      if (cta.cuenta) ctaPartes.push(`Cta: ${cta.cuenta}`);
+      if (cta.cci) ctaPartes.push(`CCI: ${cta.cci}`);
+      items.push(`<li><strong>${banco}:</strong> ${ctaPartes.join(' &middot; ')}</li>`);
+    }
+  } else if (b.cuenta || b.cci) {
+    const banco = b.banco || 'BCP';
+    const ctaPartes = [];
+    if (b.cuenta) ctaPartes.push(`Cta: ${b.cuenta}`);
+    if (b.cci) ctaPartes.push(`CCI: ${b.cci}`);
+    items.push(`<li><strong>${banco}:</strong> ${ctaPartes.join(' &middot; ')}</li>`);
+  }
+  if (titular) {
+    items.push(`<li><strong>Titular:</strong> ${titular}</li>`);
+  }
+
+  const tituloBloque = esVencida ? 'Regularice su servicio aquí:' : 'Medios de pago disponibles:';
+
+  return `
+    <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 15px; color: #333;">${tituloBloque}</h3>
+      <ul style="margin: 0 0 12px 0; padding-left: 20px; color: #444; font-size: 14px; line-height: 1.5;">
+        ${items.join('')}
+      </ul>
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #333;">
+        💳 <strong>¿Prefiere pagar con tarjeta (débito o crédito)?</strong><br>
+        Pague en línea con Culqi desde su panel:
+        <a href="${url}" style="color: #0d6efd; font-weight: bold; text-decoration: underline;">Pagar con tarjeta aquí</a>
+      </p>
+      <p style="margin: 12px 0 0 0; font-size: 13px; color: #555; border-top: 1px dashed #ccc; padding-top: 10px;">
+        📲 <strong>Activación:</strong> Envíe el voucher o constancia al WhatsApp <strong>${ws}</strong> para ${accion} de inmediato.
+      </p>
+    </div>
+  `;
 }
 
 function htmlBase(titulo, cuerpoHtml, url) {
@@ -90,8 +223,12 @@ function avisoPorVencer(datos) {
   const planTxt = etiquetaPlanCiclo(planCode, billingCycle);
   const fechaTxt = fechaLegible(fechaFin);
   const empresa = razonSocial || 'su empresa';
+  const pagoManual = resolverPagoManual(datos);
 
   const asunto = `Su plan ${nombrePlan(planCode)} vence ${cuando}`;
+
+  const bloquePagoTexto = formatearMediosPagoTexto(pagoManual, url, false);
+  const bloquePagoHtml = formatearMediosPagoHtml(pagoManual, url, false);
 
   const texto = [
     `*Su suscripción vence ${cuando}*`,
@@ -100,7 +237,8 @@ function avisoPorVencer(datos) {
     `Vencimiento: ${fechaTxt}`,
     '',
     'Renueve antes del vencimiento para no interrumpir ventas ni facturación electrónica.',
-    `Renovar: ${url}`
+    '',
+    bloquePagoTexto
   ].join('\n');
 
   const html = htmlBase(
@@ -110,7 +248,8 @@ function avisoPorVencer(datos) {
        <li>Plan: <strong>${planTxt}</strong></li>
        <li>Fecha de vencimiento: <strong>${fechaTxt}</strong></li>
      </ul>
-     <p>Renueve antes del vencimiento para no interrumpir la emisión de comprobantes.</p>`,
+     <p>Renueve antes del vencimiento para no interrumpir la emisión de comprobantes.</p>
+     ${bloquePagoHtml}`,
     url
   );
 
@@ -128,8 +267,12 @@ function avisoVencida(datos) {
   const planTxt = etiquetaPlanCiclo(planCode, billingCycle);
   const fechaTxt = fechaLegible(fechaFin);
   const empresa = razonSocial || 'su empresa';
+  const pagoManual = resolverPagoManual(datos);
 
   const asunto = 'Suscripción vencida: pendiente de pago';
+
+  const bloquePagoTexto = formatearMediosPagoTexto(pagoManual, url, true);
+  const bloquePagoHtml = formatearMediosPagoHtml(pagoManual, url, true);
 
   const texto = [
     '*Suscripción vencida*',
@@ -139,7 +282,8 @@ function avisoVencida(datos) {
     'Estado: PENDIENTE DE PAGO',
     '',
     'Su acceso quedará limitado hasta registrar el pago.',
-    `Regularizar: ${url}`
+    '',
+    bloquePagoTexto
   ].join('\n');
 
   const html = htmlBase(
@@ -149,7 +293,8 @@ function avisoVencida(datos) {
        <li>Plan: <strong>${planTxt}</strong></li>
        <li>Venció el: <strong>${fechaTxt}</strong>${hace}</li>
      </ul>
-     <p>Regularice el pago para restablecer el acceso completo al sistema.</p>`,
+     <p>Regularice el pago para restablecer el acceso completo al sistema.</p>
+     ${bloquePagoHtml}`,
     url
   );
 

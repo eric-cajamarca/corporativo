@@ -112,3 +112,15 @@ exports.limpiarTotpEmpresaPorId = async (pool, idEmpresa) => {
     `);
   return result.rowsAffected[0];
 };
+
+exports.activarEmpresaSiInactiva = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE Empresas
+      SET estado = 1
+      WHERE idEmpresa = @idEmpresa AND estado = 0
+    `);
+  return result.rowsAffected[0];
+};

@@ -26,6 +26,8 @@ interface UserData {
   nombres: string;
   rol: string;
   lastVerified: number; // timestamp de última verificación
+  email?: string;
+  ruc?: string;
 }
 
 @Injectable({
@@ -235,13 +237,17 @@ export class AuthService {
     apellidos?: string;
     rol?: string;
     roles?: string;
+    email?: string;
+    ruc?: string;
   }): UserData {
     return {
       idEmpresa: d.idEmpresa ?? null,
       razonSocial: d.razonSocial || '',
       nombres: this.buildDisplayName(d),
       rol: d.roles ?? d.rol ?? '',
-      lastVerified: Date.now()
+      lastVerified: Date.now(),
+      email: d.email,
+      ruc: d.ruc
     };
   }
 

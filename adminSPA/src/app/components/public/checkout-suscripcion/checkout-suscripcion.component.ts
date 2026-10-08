@@ -118,6 +118,13 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
         });
         return;
       }
+      if (this.enCuenta()) {
+        const u = this.auth.userData();
+        if (u?.email && !this.emailPago) {
+          this.emailPago = u.email;
+        }
+        this.aceptoPoliticas = true;
+      }
       this.cargarResumen();
     });
   }
@@ -289,8 +296,12 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     const ciclo = this.etiquetaCiclo(c.billingCycle);
     const medio =
       this.medioPagoManual === 'yape' ? 'Yape' : this.medioPagoManual === 'plin' ? 'Plin' : 'Depósito BCP';
+    const u = this.enCuenta() ? this.auth.userData() : null;
+    const empInfo = u?.razonSocial ? `Empresa: ${u.razonSocial}${u.ruc ? ` (RUC: ${u.ruc})` : ''}` : null;
+
     const texto = [
       'Hola, envié el voucher de pago de suscripción Business Soft.',
+      empInfo,
       `Orden: ${this.orderNumber()}`,
       `Plan: ${c.planCode}`,
       `Ciclo: ${ciclo}`,

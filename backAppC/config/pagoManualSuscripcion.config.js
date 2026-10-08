@@ -141,5 +141,6 @@ async function getPagoManualSuscripcionConfig(pool) {
 }
 
 module.exports = {
+  configDesdeEnv,
   getPagoManualSuscripcionConfig
 };

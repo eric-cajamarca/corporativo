@@ -5,17 +5,27 @@
 <div class="modal-body">
   <div class="row g-2 mb-3 buscador-prod-filtros">
     <div class="col-12 col-lg-8">
-      <input
-        #inputBuscar
-        id="buscador-productos-modal-search"
-        type="search"
-        class="form-control"
-        [placeholder]="modo === 'venta' ? 'Código, descripción, marca, categoría…' : 'Nombre o código...'"
-        [(ngModel)]="searchTerm"
-        (input)="onBusquedaInput()"
-        (keyup.enter)="recargarProductosDesdeServidor()"
-        autocomplete="off"
-      />
+      <div class="input-group">
+        <input
+          #inputBuscar
+          id="buscador-productos-modal-search"
+          type="search"
+          class="form-control"
+          [placeholder]="modo === 'venta' ? 'Código, descripción, marca, categoría…' : 'Nombre o código...'"
+          [(ngModel)]="searchTerm"
+          (input)="onBusquedaInput()"
+          (keyup.enter)="recargarProductosDesdeServidor()"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="btn btn-outline-secondary d-lg-none"
+          (click)="abrirEscanerCamara()"
+          title="Escanear código de barras con lector / cámara"
+          aria-label="Escanear código de barras con lector / cámara">
+          <i class="bi bi-upc-scan" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
     <div class="col-12 col-lg-4">
       <button

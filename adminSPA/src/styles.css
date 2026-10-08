@@ -106,6 +106,20 @@ body > .modal-backdrop.modal-inventario-ngb-backdrop ~ .modal-backdrop.modal-inv
   border-radius: 0;
   background: #0f172a;
 }
+.barcode-scanner-modal-window {
+  z-index: 1085 !important;
+}
+.barcode-scanner-backdrop {
+  z-index: 1080 !important;
+}
+
+/* En desktop, los botones de escáner móvil se ocultan (.d-lg-none); restablecer bordes redondeados derechos del input */
+@media (min-width: 992px) {
+  .input-group > .form-control:has(+ button.d-lg-none) {
+    border-top-right-radius: var(--bs-border-radius, 0.375rem);
+    border-bottom-right-radius: var(--bs-border-radius, 0.375rem);
+  }
+}
 
 @media (max-width: 991.98px) {
   .buscador-productos-compra-dialog .modal-body {

@@ -147,4 +147,23 @@ export class SaasSubscriptionService {
       { headers: this.headers, withCredentials: true }
     );
   }
+
+  /**
+   * Administrador renueva/extiende el plan de una empresa tras recibir voucher/pago.
+   */
+  renovarEmpresaAdmin(body: {
+    idEmpresa: string;
+    planCode?: string;
+    billingCycle?: string;
+    medioPago?: string;
+    referencia?: string;
+    monto?: number;
+    notificarCliente?: boolean;
+  }): Observable<{ ok: boolean; message: string; data: unknown }> {
+    return this.http.post<{ ok: boolean; message: string; data: unknown }>(
+      `${this.baseUrl}suscripcion/renovar-empresa`,
+      JSON.stringify(body),
+      { headers: this.headers, withCredentials: true }
+    );
+  }
 }

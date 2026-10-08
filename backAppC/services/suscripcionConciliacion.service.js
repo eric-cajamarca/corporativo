@@ -1,8 +1,13 @@
+const { v4: uuidv4 } = require('uuid');
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 const empresaSuscripcionBootstrap = require('./empresaSuscripcionBootstrap.service');
 const suscripcionAvisosService = require('./suscripcionAvisos.service');
 const seguridadAlertasService = require('./seguridadAlertas.service');
+const empresaRepository = require('../repositories/empresa.repository');
+const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
+const suscripcionRepository = require('../repositories/suscripcion.repository');
+const saasPlanesService = require('./saasPlanes.service');
 
 /** Debe caber en SuscripcionCheckoutPendiente.estado VARCHAR(20). */
 const ESTADO_PENDIENTE_VALIDACION = 'PENDIENTE_VALIDACION';
@@ -133,6 +138,95 @@ async function eliminarSolicitudPagoManualAdmin(pool, user, orderNumber) {
   return { orderNumber: on, eliminado: true, modo: 'anulado' };
 }
 
+/**
+ * Super Admin / Empresa Principal renueva o extiende directamente el plan de una empresa
+ * tras recibir el voucher por WhatsApp, Yape, Plin o banco.
+ */
+async function renovarPlanEmpresaAdmin(pool, user, payload) {
+  const autorizado = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
+  if (!autorizado) throw new Error('NO_AUTORIZADO_CONCILIACION');
+
+  const idEmpresa = (payload?.idEmpresa || '').trim();
+  if (!idEmpresa) throw new Error('DATOS_INCOMPLETOS');
+
+  const empresa = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
+  if (!empresa) throw new Error('EMPRESA_NO_ENCONTRADA');
+
+  const suscripcionActual = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+
+  let planCode = (payload?.planCode || '').trim().toLowerCase();
+  if (!planCode || planCode === 'demo' || planCode === 'pendiente') {
+    const act = (suscripcionActual?.planCode || '').trim().toLowerCase();
+    planCode = act && act !== 'demo' && act !== 'pendiente' ? act : 'basico';
+  }
+
+  let billingCycle = (payload?.billingCycle || '').trim().toLowerCase();
+  if (billingCycle !== 'yearly' && billingCycle !== 'monthly') {
+    const actCiclo = (suscripcionActual?.billingCycle || '').trim().toLowerCase();
+    billingCycle = actCiclo === 'yearly' ? 'yearly' : 'monthly';
+  }
+
+  let monto = Number(payload?.monto);
+  if (!Number.isFinite(monto) || monto <= 0) {
+    monto = await saasPlanesService.montoSolesAsync(pool, planCode, billingCycle);
+  }
+
+  const medioPago = String(payload?.medioPago || 'YAPE').trim().toUpperCase();
+  const referencia = String(payload?.referencia || '').trim();
+
+  const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
+  if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
+
+  const idCheckout = uuidv4();
+  const orderNumber = `CHK-${uuidv4()}`;
+
+  await suscripcionCheckoutRepository.insertar(pool, {
+    idCheckout,
+    orderNumber,
+    planCode,
+    billingCycle,
+    monto,
+    moneda: 'PEN',
+    estado: 'PENDIENTE',
+    idEmpresaPrincipal,
+    emailContacto: empresa.correo || null,
+    idEmpresaCliente: idEmpresa
+  });
+
+  const idTransaccion = (`MANUAL-ADMIN-${medioPago}${referencia ? `-${referencia}` : ''}`).substring(0, 120);
+  await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, 'PAGADO', idTransaccion);
+
+  const subActualizada = await empresaSuscripcionBootstrap.vincularCheckoutPagado(pool, idEmpresa, orderNumber);
+
+  // Si la empresa estaba inactiva (desactivada por vencimiento), reactivarla
+  try {
+    await empresaRepository.activarEmpresaSiInactiva(pool, idEmpresa);
+  } catch (errAct) {
+    console.error('contexto: activarEmpresaSiInactiva en renovarPlanEmpresaAdmin', errAct);
+  }
+
+  if (payload?.notificarCliente !== false) {
+    avisarPagoConfirmado(pool, {
+      orderNumber,
+      planCode,
+      billingCycle,
+      idEmpresaCliente: idEmpresa,
+      monto
+    });
+  }
+
+  return {
+    orderNumber,
+    idEmpresa,
+    planCode,
+    billingCycle,
+    monto,
+    fechaFin: subActualizada?.fechaFin,
+    estado: subActualizada?.estado || 'ACTIVA',
+    empresaNombre: empresa.razon_Social
+  };
+}
+
 function convertirCsv(rows) {
   const headers = [
     'orderNumber',
@@ -163,6 +257,7 @@ module.exports = {
   listarPagosManualesPendientes,
   confirmarPagoManualAdmin,
   eliminarSolicitudPagoManualAdmin,
+  renovarPlanEmpresaAdmin,
   convertirCsv
 };
 

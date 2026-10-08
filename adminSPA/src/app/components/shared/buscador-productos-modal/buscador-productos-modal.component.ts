@@ -6,6 +6,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
+import { BarcodeScannerModalService } from '../../../services/barcode-scanner-modal.service';
 import {
   marcaProductoEnLista,
   productoActivoParaVenta,
@@ -112,8 +113,18 @@ export class BuscadorProductosModalComponent implements OnInit {
     private gestoresService: GestoresService,
     private empresaService: EmpresaService,
     private productosImagenService: ProductosImagenService,
+    private barcodeScannerModal: BarcodeScannerModalService,
     private cdr: ChangeDetectorRef
   ) {}
+
+  async abrirEscanerCamara(): Promise<void> {
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      this.searchTerm = codigo.trim();
+      this.onBusquedaInput();
+      this.recargarProductosDesdeServidor();
+    }
+  }
 
   ngOnInit(): void {
     if (this.modo === 'venta') {

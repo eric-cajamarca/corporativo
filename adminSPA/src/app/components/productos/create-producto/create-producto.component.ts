@@ -24,6 +24,7 @@ import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
 import { FORMAS_FARMACEUTICAS } from '../../../utils/formas-farmaceuticas.util';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
+import { BarcodeScannerModalService } from '../../../services/barcode-scanner-modal.service';
 
 declare var iziToast: any;
 
@@ -143,6 +144,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     private router: Router,
     private empresaService: EmpresaService,
     private impuestoService: ImpuestoService,
+    private barcodeScannerModal: BarcodeScannerModalService,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
   ) {
@@ -714,6 +716,25 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       codigoCtrl?.setValidators([Validators.required, Validators.minLength(2)]);
     }
     codigoCtrl?.updateValueAndValidity();
+  }
+
+  async abrirEscanerCodigo(): Promise<void> {
+    if (this.productoForm.get('useCorrelativo')?.value) return;
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      this.productoForm.patchValue({ codigo });
+      this.productoForm.get('codigo')?.markAsDirty();
+      this.productoForm.get('codigo')?.markAsTouched();
+    }
+  }
+
+  async abrirEscanerCodigoEan(): Promise<void> {
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      this.productoForm.patchValue({ codigoEan: codigo });
+      this.productoForm.get('codigoEan')?.markAsDirty();
+      this.productoForm.get('codigoEan')?.markAsTouched();
+    }
   }
 
   private actualizarCorrelativoSiAplica(): void {

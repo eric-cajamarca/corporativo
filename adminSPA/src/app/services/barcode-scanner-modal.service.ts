@@ -43,6 +43,8 @@ export class BarcodeScannerModalService {
     const ref = this.modalService.open(BarcodeScannerModalComponent, {
       fullscreen: true,
       backdrop: 'static',
+      backdropClass: 'barcode-scanner-backdrop',
+      windowClass: 'barcode-scanner-modal-window',
       keyboard: true,
       centered: false,
       modalDialogClass: 'barcode-scanner-ngb-dialog'

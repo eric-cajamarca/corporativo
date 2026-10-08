@@ -110,6 +110,14 @@
                     <div class="ge-acciones">
                       <button
                         type="button"
+                        class="btn btn-sm btn-outline-success"
+                        (click)="abrirRenovarPlan(empresa)"
+                        title="Renovar suscripción">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span class="ge-uso-btn-label">Renovar</span>
+                      </button>
+                      <button
+                        type="button"
                         class="btn btn-sm btn-outline-info"
                         (click)="abrirUsoPlan(empresa)"
                         title="Uso del plan">
@@ -124,6 +132,15 @@
                         Acciones
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a
+                            class="dropdown-item"
+                            href="#"
+                            (click)="$event.preventDefault(); abrirRenovarPlan(empresa)">
+                            <i class="bi bi-arrow-repeat text-success me-2"></i>
+                            Renovar plan
+                          </a>
+                        </li>
                         <li>
                           <a
                             class="dropdown-item"
@@ -220,6 +237,13 @@
               </div>
 
               <div class="ge-card-actions">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-success"
+                  (click)="abrirRenovarPlan(empresa)">
+                  <i class="bi bi-arrow-repeat me-1"></i>
+                  Renovar plan
+                </button>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-info"
@@ -490,6 +514,163 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Renovar Suscripción de Empresa -->
+<div class="modal fade" id="modalRenovarSuscripcion" tabindex="-1" aria-labelledby="modalRenovarTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title fw-bold" id="modalRenovarTitulo">
+            <i class="bi bi-arrow-repeat text-success me-2"></i>
+            Renovar o Activar Suscripción
+          </h5>
+          @if (empresaARenovar) {
+            <div class="small text-muted mt-1">
+              <strong>{{ empresaARenovar.razon_Social }}</strong>
+              @if (empresaARenovar.ruc) {
+                <span> · RUC {{ empresaARenovar.ruc }}</span>
+              }
+            </div>
+          }
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        @if (empresaARenovar) {
+          <!-- Resumen de estado actual -->
+          <div class="p-3 mb-3 rounded border bg-light small">
+            <div class="row g-2">
+              <div class="col-6">
+                <span class="text-muted d-block">Plan actual:</span>
+                <span class="fw-semibold text-capitalize">{{ empresaARenovar.planSuscripcion || '—' }}</span>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">Estado suscripción:</span>
+                <span class="badge" [ngClass]="claseBadgeSuscripcion(empresaARenovar.estadoSuscripcion)">
+                  {{ etiquetaEstadoSuscripcion(empresaARenovar.estadoSuscripcion) }}
+                </span>
+              </div>
+              <div class="col-12">
+                <span class="text-muted d-block">Vigencia actual:</span>
+                <span class="fw-semibold">{{ empresaARenovar.fechaFinSuscripcion || 'Sin fecha de vencimiento previa' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulario de Renovación -->
+          <form (ngSubmit)="guardarRenovacionSuscripcion()">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold small">Plan <span class="text-danger">*</span></label>
+                <select
+                  class="form-select form-select-sm"
+                  [(ngModel)]="renovarForm.planCode"
+                  name="planCode"
+                  (ngModelChange)="onCambioPlanOCicloRenovacion()"
+                  required>
+                  <option value="basico">Básico (S/ 49 / mes)</option>
+                  <option value="emprendedor">Emprendedor (S/ 89 / mes)</option>
+                  <option value="profesional">Profesional (S/ 149 / mes)</option>
+                  <option value="empresarial">Empresarial (S/ 249 / mes)</option>
+                </select>
+              </div>
+
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold small">Ciclo de facturación <span class="text-danger">*</span></label>
+                <select
+                  class="form-select form-select-sm"
+                  [(ngModel)]="renovarForm.billingCycle"
+                  name="billingCycle"
+                  (ngModelChange)="onCambioPlanOCicloRenovacion()"
+                  required>
+                  <option value="monthly">Mensual (+1 mes)</option>
+                  <option value="yearly">Anual (+1 año · 2 meses gratis)</option>
+                </select>
+              </div>
+
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold small">Medio de pago <span class="text-danger">*</span></label>
+                <select
+                  class="form-select form-select-sm"
+                  [(ngModel)]="renovarForm.medioPago"
+                  name="medioPago"
+                  required>
+                  <option value="YAPE">Yape</option>
+                  <option value="PLIN">Plin</option>
+                  <option value="BCP">Depósito / Transferencia BCP</option>
+                  <option value="EFECTIVO">Efectivo / Pago directo</option>
+                  <option value="OTRO">Otro banco / Transferencia</option>
+                </select>
+              </div>
+
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold small">N° Operación / Referencia</label>
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  placeholder="Ej: 849201"
+                  [(ngModel)]="renovarForm.referencia"
+                  name="referencia" />
+              </div>
+
+              <div class="col-sm-12">
+                <label class="form-label fw-semibold small">Monto abonado (S/) <span class="text-danger">*</span></label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">S/</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    class="form-control"
+                    placeholder="49.00"
+                    [(ngModel)]="renovarForm.monto"
+                    name="monto"
+                    required />
+                </div>
+                <small class="text-muted">Calculado según plan y ciclo; editable si se acordó descuento o tarifa especial.</small>
+              </div>
+
+              <div class="col-sm-12">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="notificarClienteCheck"
+                    [(ngModel)]="renovarForm.notificarCliente"
+                    name="notificarCliente" />
+                  <label class="form-check-label small" for="notificarClienteCheck">
+                    Registrar orden como pagada y reactivar acceso inmediatamente
+                  </label>
+                </div>
+              </div>
+            </div>
+          </form>
+        }
+      </div>
+
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" [disabled]="guardandoRenovacion()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-success btn-sm px-3"
+          (click)="guardarRenovacionSuscripcion()"
+          [disabled]="guardandoRenovacion() || renovarForm.monto <= 0">
+          @if (guardandoRenovacion()) {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+            Activando plan...
+          } @else {
+            <i class="bi bi-check-circle me-1"></i>
+            Confirmar y Activar Plan
+          }
+        </button>
       </div>
     </div>
   </div>

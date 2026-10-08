@@ -767,4 +767,107 @@ export class IndexEmpresaComponent implements OnInit {
     if (actual / maximo >= 0.9) return 'bg-warning';
     return 'bg-primary';
   }
+
+  // --- Renovación Rápida de Plan por Admin ---
+  public empresaARenovar: any = null;
+  public renovarForm = {
+    planCode: 'basico',
+    billingCycle: 'monthly',
+    medioPago: 'YAPE',
+    referencia: '',
+    monto: 49,
+    notificarCliente: true
+  };
+  public guardandoRenovacion = signal<boolean>(false);
+
+  private readonly PRECIOS_PLANES: Record<string, { monthly: number; yearly: number }> = {
+    basico: { monthly: 49, yearly: 490 },
+    emprendedor: { monthly: 89, yearly: 890 },
+    profesional: { monthly: 149, yearly: 1490 },
+    empresarial: { monthly: 249, yearly: 2490 }
+  };
+
+  abrirRenovarPlan(empresa: any): void {
+    this.empresaARenovar = empresa;
+    let plan = (empresa.planSuscripcion || 'basico').toLowerCase();
+    if (!this.PRECIOS_PLANES[plan]) {
+      plan = 'basico';
+    }
+    const ciclo = empresa.cicloSuscripcion === 'yearly' ? 'yearly' : 'monthly';
+    const precios = this.PRECIOS_PLANES[plan] || { monthly: 49, yearly: 490 };
+    const monto = ciclo === 'yearly' ? precios.yearly : precios.monthly;
+
+    this.renovarForm = {
+      planCode: plan,
+      billingCycle: ciclo,
+      medioPago: 'YAPE',
+      referencia: '',
+      monto: monto,
+      notificarCliente: true
+    };
+
+    const el = document.getElementById('modalRenovarSuscripcion');
+    if (el && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+  }
+
+  onCambioPlanOCicloRenovacion(): void {
+    const plan = this.renovarForm.planCode;
+    const ciclo = this.renovarForm.billingCycle as 'monthly' | 'yearly';
+    const precios = this.PRECIOS_PLANES[plan];
+    if (precios) {
+      this.renovarForm.monto = ciclo === 'yearly' ? precios.yearly : precios.monthly;
+    }
+  }
+
+  guardarRenovacionSuscripcion(): void {
+    if (!this.empresaARenovar?.idEmpresa) return;
+    if (this.renovarForm.monto <= 0) {
+      iziToast.show({
+        title: 'Atención',
+        titleColor: '#ffc107',
+        message: 'El monto a registrar debe ser mayor a 0.',
+        position: 'topRight'
+      });
+      return;
+    }
+
+    this.guardandoRenovacion.set(true);
+    this.saasSubscriptionService.renovarEmpresaAdmin({
+      idEmpresa: this.empresaARenovar.idEmpresa,
+      planCode: this.renovarForm.planCode,
+      billingCycle: this.renovarForm.billingCycle,
+      medioPago: this.renovarForm.medioPago,
+      referencia: this.renovarForm.referencia,
+      monto: Number(this.renovarForm.monto),
+      notificarCliente: this.renovarForm.notificarCliente
+    }).subscribe({
+      next: (res) => {
+        this.guardandoRenovacion.set(false);
+        const el = document.getElementById('modalRenovarSuscripcion');
+        if (el && typeof bootstrap !== 'undefined') {
+          bootstrap.Modal.getInstance(el)?.hide();
+        }
+        iziToast.show({
+          title: '¡Suscripción Renovada!',
+          titleColor: '#198754',
+          message: res.message || 'La suscripción ha sido activada con éxito.',
+          position: 'topRight'
+        });
+        this.cargarEmpresas();
+      },
+      error: (err) => {
+        this.guardandoRenovacion.set(false);
+        const msg = (typeof err?.error?.message === 'string' && err.error.message) ||
+          'No se pudo renovar la suscripción. Intente nuevamente.';
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: msg,
+          position: 'topRight'
+        });
+      }
+    });
+  }
 }

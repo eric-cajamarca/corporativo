@@ -17,14 +17,25 @@
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">Código *</label>
-          <input
-            type="text"
-            class="form-control"
-            formControlName="codigo"
-            [class.is-invalid]="hasError('codigo')"
-            placeholder="Ej: PROD-001" />
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control"
+              formControlName="codigo"
+              [class.is-invalid]="hasError('codigo')"
+              placeholder="Ej: PROD-001"
+              (keydown.enter)="$event.preventDefault()" />
+            <button
+              type="button"
+              class="btn btn-outline-secondary d-lg-none"
+              (click)="abrirEscanerCodigo()"
+              title="Escanear código de barras con lector / cámara"
+              aria-label="Escanear código de barras con lector / cámara">
+              <i class="bi bi-upc-scan" aria-hidden="true"></i>
+            </button>
+          </div>
           @if (hasError('codigo')) {
-            <div class="invalid-feedback">{{ getError('codigo') }}</div>
+            <div class="invalid-feedback d-block">{{ getError('codigo') }}</div>
           }
         </div>
         <div class="col-md-6">
@@ -236,7 +247,17 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Código EAN</label>
-            <input type="text" class="form-control" formControlName="codigoEan" maxlength="14" />
+            <div class="input-group">
+              <input type="text" class="form-control" formControlName="codigoEan" maxlength="14" (keydown.enter)="$event.preventDefault()" />
+              <button
+                type="button"
+                class="btn btn-outline-secondary d-lg-none"
+                (click)="abrirEscanerCodigoEan()"
+                title="Escanear código de barras EAN con lector / cámara"
+                aria-label="Escanear código de barras EAN con lector / cámara">
+                <i class="bi bi-upc-scan" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
           <div class="col-md-4 d-flex align-items-end">
             <div class="form-check mb-2">

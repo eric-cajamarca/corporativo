@@ -117,21 +117,30 @@ export class AppBannerService {
       }
 
       const fin = estado?.suscripcion?.fechaFin;
-      if (fin && dm === 'saas') {
-        const d = new Date(fin);
-        if (!Number.isNaN(d.getTime())) {
-          const dias = Math.ceil((d.getTime() - Date.now()) / (86400 * 1000));
-          if (dias <= 14 && dias > 0) {
-            auto.push({
-              id: 'suscripcion-por-vencer',
-              severity: 'warning',
-              message: `Su suscripción vence en ${dias} día(s) (${this.formatoCorto(fin)}). Renueve para no perder servicio.`,
-              link: '/cuenta/suscripcion',
-              linkLabel: 'Renovar',
-              dismissible: true,
-              dismissKey: 'suscripcion-por-vencer'
-            });
-          }
+      const estadoSub = (estado?.suscripcion?.estado || '').toUpperCase();
+      if (dm === 'saas') {
+        const dFin = fin ? new Date(fin) : null;
+        const dias = dFin && !Number.isNaN(dFin.getTime()) ? Math.ceil((dFin.getTime() - Date.now()) / (86400 * 1000)) : null;
+
+        if (estadoSub === 'VENCIDA' || (dias !== null && dias <= 0)) {
+          auto.push({
+            id: 'suscripcion-vencida',
+            severity: 'danger',
+            message: 'Su suscripción EFAF ERP ha vencido. Renueve su plan para reactivar o continuar con el servicio.',
+            link: '/cuenta/suscripcion',
+            linkLabel: 'Renovar ahora',
+            dismissible: false
+          });
+        } else if (dias !== null && dias <= 14 && dias > 0) {
+          auto.push({
+            id: 'suscripcion-por-vencer',
+            severity: 'warning',
+            message: `Su suscripción vence en ${dias} día(s) (${this.formatoCorto(fin!)}). Renueve para no perder servicio.`,
+            link: '/cuenta/suscripcion',
+            linkLabel: 'Renovar',
+            dismissible: true,
+            dismissKey: 'suscripcion-por-vencer'
+          });
         }
       }
 

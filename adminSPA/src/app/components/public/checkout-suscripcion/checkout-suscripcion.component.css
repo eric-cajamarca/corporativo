@@ -55,7 +55,7 @@
 .ciclo-text strong,.medio-name{font-size:.92rem;color:var(--ck-ink)}
 .medio-name{font-weight:700;font-size:1rem}
 .ciclo-text small,.medio-desc{font-size:.75rem;color:var(--ck-muted)}
-.ciclo-text small.ciclo-gratis{font-size:1.15rem;font-weight:800;color:#0f766e;letter-spacing:-.02em;line-height:1.1}
+.ciclo-text small.ciclo-gratis{font-size:1.15rem;font-weight:800;color:#1d4ed8;letter-spacing:-.02em;line-height:1.1}
 .medio-desc{font-size:.8rem}
 .via-grid,.medios-grid{display:grid;grid-template-columns:1fr;gap:.65rem}
 .via-card.via-culqi.is-selected{border-color:#2563eb;background:#eff6ff;box-shadow:0 0 0 3px rgba(37,99,235,.14)}

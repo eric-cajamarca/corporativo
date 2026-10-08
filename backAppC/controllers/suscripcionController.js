@@ -415,6 +415,32 @@ const cancelarDowngrade = async (req, res) => {
   }
 };
 
+const renovarEmpresaAdmin = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const payload = req.body || {};
+    const data = await withPool((pool) =>
+      suscripcionConciliacionService.renovarPlanEmpresaAdmin(pool, req.user, payload)
+    );
+    return res.status(200).json({
+      ok: true,
+      data,
+      message: 'Suscripción renovada exitosamente y plan activado.'
+    });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({ message: 'No autorizado para gestionar suscripciones.' });
+    }
+    if (error.message === 'DATOS_INCOMPLETOS' || error.message === 'EMPRESA_NO_ENCONTRADA') {
+      return res.status(400).json({ message: error.message });
+    }
+    console.error('renovarEmpresaAdmin:', error);
+    return res.status(500).json({ message: error.message || 'Error al renovar suscripción' });
+  }
+};
+
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
@@ -429,5 +455,6 @@ module.exports = {
   conciliacionCulqiCsv,
   listarPagosManuales,
   confirmarPagoManual,
-  eliminarPagoManual
+  eliminarPagoManual,
+  renovarEmpresaAdmin
 };

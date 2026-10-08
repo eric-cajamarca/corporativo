@@ -26,5 +26,6 @@ api.get('/suscripcion/conciliacion/culqi.csv', auth.auth, suscripcionController.
 api.get('/suscripcion/pagos-manuales', auth.auth, suscripcionController.listarPagosManuales);
 api.post('/suscripcion/pagos-manuales/confirmar', auth.auth, suscripcionController.confirmarPagoManual);
 api.post('/suscripcion/pagos-manuales/eliminar', auth.auth, suscripcionController.eliminarPagoManual);
+api.post('/suscripcion/renovar-empresa', auth.auth, suscripcionController.renovarEmpresaAdmin);
 
 module.exports = api;

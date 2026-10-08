@@ -42,6 +42,7 @@ import { AuthService } from '../../../services/auth.service';
 import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
 import { EmpresaService } from '../../../services/empresa.service';
 import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
+import { BarcodeScannerModalService } from '../../../services/barcode-scanner-modal.service';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -197,6 +198,7 @@ export class CreateComprasComponent {
     private inventarioModal: InventarioModalService,
     private _productoCrearModal: ProductoCrearModalService,
     private buscadorProductosModal: BuscadorProductosModalService,
+    private barcodeScannerModal: BarcodeScannerModalService,
     private _router: Router,
     private modalService: NgbModal,
     private auth: AuthService,
@@ -1140,15 +1142,28 @@ export class CreateComprasComponent {
     });
   }
 
+  async abrirEscanerModalCompras(): Promise<void> {
+    if (this.nuevoProducto?.useCorrelativo) return;
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      if (!this.nuevoProducto) {
+        this.nuevoProducto = {};
+      }
+      this.nuevoProducto.codigo = codigo.trim();
+      this.vincularProductoPorCodigoEnModal();
+    }
+  }
+
   private buscarProductoCatalogoPorCodigo(codigo: string): Record<string, unknown> | null {
     const key = String(codigo ?? '').trim().toUpperCase();
     if (!key) return null;
     const catalogo = Array.isArray(this.productos_const) ? this.productos_const : [];
     const encontrado = catalogo.find(
-      (p: Record<string, unknown>) =>
-        String(p?.['codigo'] ?? p?.['Codigo'] ?? '')
-          .trim()
-          .toUpperCase() === key
+      (p: Record<string, unknown>) => {
+        const cod = String(p?.['codigo'] ?? p?.['Codigo'] ?? '').trim().toUpperCase();
+        const ean = String(p?.['codigoEan'] ?? p?.['CodigoEan'] ?? p?.['ean'] ?? '').trim().toUpperCase();
+        return cod === key || ean === key;
+      }
     );
     return encontrado || null;
   }

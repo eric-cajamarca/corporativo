@@ -13,6 +13,7 @@ import { esRubroFarmacia } from '../../../utils/rubro-empresa.util';
 import { opcionesFormaFarmaceutica } from '../../../utils/formas-farmaceuticas.util';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
+import { BarcodeScannerModalService } from '../../../services/barcode-scanner-modal.service';
 
 declare var iziToast: any;
 
@@ -65,7 +66,8 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
     private marcaService: MarcaService,
     private presentacionService: PresentacionService,
     private empresaService: EmpresaService,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private barcodeScannerModal: BarcodeScannerModalService
   ) {}
 
   ngOnInit(): void {
@@ -244,6 +246,24 @@ export class UpdateProductoComponent implements OnInit, OnDestroy {
   hasError(field: string): boolean {
     const c = this.productoForm.get(field);
     return !!(c?.invalid && c?.touched);
+  }
+
+  async abrirEscanerCodigo(): Promise<void> {
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      this.productoForm.patchValue({ codigo });
+      this.productoForm.get('codigo')?.markAsDirty();
+      this.productoForm.get('codigo')?.markAsTouched();
+    }
+  }
+
+  async abrirEscanerCodigoEan(): Promise<void> {
+    const codigo = await this.barcodeScannerModal.abrir();
+    if (codigo) {
+      this.productoForm.patchValue({ codigoEan: codigo });
+      this.productoForm.get('codigoEan')?.markAsDirty();
+      this.productoForm.get('codigoEan')?.markAsTouched();
+    }
   }
 
   getError(field: string): string {

@@ -2,10 +2,13 @@
 // SIEMPRE usa PascalCase para interfaces/models en TypeScript (regla 6.1)
 
 export interface UserData {
+  idEmpresa?: string | null;
   razonSocial: string;
   nombres: string;
   rol: string;
   lastVerified: number;
+  email?: string;
+  ruc?: string;
 }
 
 export interface LoginRequest {

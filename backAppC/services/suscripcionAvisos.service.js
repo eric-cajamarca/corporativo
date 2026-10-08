@@ -14,6 +14,7 @@ const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion
 const onboardingAutomationRepository = require('../repositories/onboardingAutomation.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 const plantillas = require('../utils/suscripcionAvisoPlantillas.util');
+const { getPagoManualSuscripcionConfig } = require('../config/pagoManualSuscripcion.config');
 
 const EVENTO_POR_VENCER = 'SUSCRIPCION_POR_VENCER';
 const EVENTO_VENCIDA = 'SUSCRIPCION_VENCIDA';
@@ -185,14 +186,15 @@ async function enviarAvisoMultiCanal(pool, row, params) {
   return { whatsapp: rWhatsapp, email: rEmail, enviados };
 }
 
-function contenidoSegunTipo(row) {
+function contenidoSegunTipo(row, pagoManual) {
   const base = {
     razonSocial: row.razonSocial,
     planCode: row.planCode,
     billingCycle: row.billingCycle,
     fechaFin: row.fechaFin,
     diasRestantes: row.diasRestantes,
-    frontendUrl: emailService.getFrontendUrl()
+    frontendUrl: emailService.getFrontendUrl(),
+    pagoManual
   };
   if (row.tipoAviso === 'POR_VENCER') {
     return {
@@ -212,6 +214,13 @@ function contenidoSegunTipo(row) {
  * Ciclo del job: pre-avisos y vencidas. Un fallo por empresa no corta el resto.
  */
 async function ejecutarCicloVencimientos(pool) {
+  let pagoManual = null;
+  try {
+    pagoManual = await getPagoManualSuscripcionConfig(pool);
+  } catch (errPago) {
+    console.error('suscripcionAvisos pagoManual:', errPago?.message || errPago);
+  }
+
   const filas = await empresaSuscripcionRepository.listarParaAvisoVencimiento(pool, diasPreaviso());
   const tope = maxEmpresasPorCiclo();
   const pausa = pausaEntreEnviosMs();
@@ -224,7 +233,7 @@ async function ejecutarCicloVencimientos(pool) {
     if (procesadas >= tope) break;
     procesadas += 1;
     try {
-      const plan = contenidoSegunTipo(row);
+      const plan = contenidoSegunTipo(row, pagoManual);
       const r = await enviarAvisoMultiCanal(pool, row, plan);
       enviados += r.enviados;
       if (r.whatsapp === 'error' || r.email === 'error') errores += 1;
