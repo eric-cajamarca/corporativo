@@ -772,6 +772,29 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     return this.planCode() === 'demo';
   }
 
+  limpiarRuc(): void {
+    this.demoRuc = (this.demoRuc || '').replace(/\D/g, '').slice(0, 11);
+  }
+
+  limpiarCelular(): void {
+    let c = (this.demoCelular || '').replace(/\D/g, '');
+    if (c.length === 11 && c.startsWith('519')) {
+      c = c.slice(2);
+    }
+    this.demoCelular = c.slice(0, 9);
+  }
+
+  validarRucSunat(ruc: string): boolean {
+    if (!/^(10|15|17|20)\d{9}$/.test(ruc)) return false;
+    const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    let suma = 0;
+    for (let i = 0; i < 10; i++) {
+      suma += Number(ruc.charAt(i)) * factores[i];
+    }
+    const digitoVerificador = (11 - (suma % 11)) % 10;
+    return digitoVerificador === Number(ruc.charAt(10));
+  }
+
   private claveTemporal(): string {
     const letras = 'abcdefghjkmnpqrstuvwxyz';
     let extra = '';
@@ -780,48 +803,74 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Demo: crea la empresa inactiva y pide el código de 6 dígitos. Sin ese código no entra.
+   * Demo: valida RUC en SUNAT (activo), correo y celular (Perú).
+   * Crea la empresa inactiva y envía el código de 6 dígitos.
    */
   async empezarDemo(): Promise<void> {
     const ruc = (this.demoRuc || '').replace(/\D/g, '');
-    const correo = (this.demoCorreo || '').trim();
-    const celular = (this.demoCelular || '').replace(/\D/g, '');
+    const correo = (this.demoCorreo || '').trim().toLowerCase();
+    let celular = (this.demoCelular || '').replace(/\D/g, '');
+    if (celular.length === 11 && celular.startsWith('519')) {
+      celular = celular.slice(2);
+    }
+
     this.errorMsg.set(null);
-    if (!/^\d{11}$/.test(ruc)) {
-      this.errorMsg.set('Ingrese un RUC de 11 dígitos.');
+
+    if (ruc.length !== 11 || !this.validarRucSunat(ruc)) {
+      this.errorMsg.set('El RUC no es válido, intente con otro RUC');
       return;
     }
     if (!this.esEmailValido(correo)) {
-      this.errorMsg.set('Ingrese un correo válido.');
+      this.errorMsg.set('Ingrese un correo electrónico válido (ej. usuario@dominio.com).');
       return;
     }
     if (!/^9\d{8}$/.test(celular)) {
-      this.errorMsg.set('Ingrese un celular de 9 dígitos que empiece en 9.');
+      this.errorMsg.set('Ingrese un celular válido de Perú (9 dígitos que comience con 9).');
       return;
     }
+
     this.demoRuc = ruc;
     this.demoCorreo = correo;
     this.demoCelular = celular;
     this.procesando.set(true);
 
-    let razonSocial = `Empresa ${ruc}`;
-    let direccion = 'Sin dirección';
-    let ubigeo = '';
-    let condicion = '';
-    let estSunat = '';
+    let sunatData: any = null;
     try {
       const response = await firstValueFrom(this.apiperu.getRucInfoPublic(ruc));
-      const data = response?.data ?? response;
-      if (data && !response?.error && response?.success !== false) {
-        if (data.razonSocial) razonSocial = String(data.razonSocial);
-        if (data.direccion) direccion = String(data.direccion);
-        if (data.ubigeo) ubigeo = String(data.ubigeo).replace(/\D/g, '');
-        if (data.condicion) condicion = String(data.condicion);
-        if (data.estado) estSunat = String(data.estado);
+      if (response?.error || response?.success === false) {
+        this.procesando.set(false);
+        this.errorMsg.set(response?.error || 'El RUC no existe, ingrese un RUC válido.');
+        return;
       }
-    } catch {
-      /* Si SUNAT no responde, la empresa se crea con el RUC y se completa después. */
+      sunatData = response?.data ?? response;
+    } catch (err: any) {
+      this.procesando.set(false);
+      const msg = err?.error?.error || err?.error?.message;
+      this.errorMsg.set(msg || 'No se pudo consultar el RUC en SUNAT. Intente de nuevo en unos segundos.');
+      return;
     }
+
+    if (!sunatData || !sunatData.razonSocial) {
+      this.procesando.set(false);
+      this.errorMsg.set('El RUC no es válido, intente con otro RUC');
+      return;
+    }
+
+    const estadoSunat = String(sunatData.estado || '').trim().toUpperCase();
+    if (estadoSunat && estadoSunat !== 'ACTIVO') {
+      this.procesando.set(false);
+      this.errorMsg.set(`El RUC se encuentra en estado "${estadoSunat}" ante SUNAT. Para crear su demo, el RUC debe encontrarse ACTIVO.`);
+      return;
+    }
+
+    const razonSocial = String(sunatData.razonSocial).trim();
+    const direccion = sunatData.direccion ? String(sunatData.direccion).trim() : 'Sin dirección';
+    const ubigeo = sunatData.ubigeo ? String(sunatData.ubigeo).replace(/\D/g, '') : '';
+    const condicion = sunatData.condicion ? String(sunatData.condicion).trim() : 'HABIDO';
+    const estSunat = estadoSunat || 'ACTIVO';
+    const departamento = sunatData.departamento || '';
+    const provincia = sunatData.provincia || '';
+    const distrito = sunatData.distrito || '';
 
     const clave = this.claveTemporal();
     try {
@@ -834,7 +883,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           idDocumento: '6',
           ruc,
           razon_Social: razonSocial,
-          nombre_Comercial: '',
+          nombre_Comercial: sunatData.nombreComercial || '',
           correo,
           celular,
           password: clave,
@@ -843,6 +892,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           estSunat,
           direccion,
           ubigeo,
+          region: departamento,
+          provincia,
+          distrito,
           codpais: 'PEN',
           solicitudDemo: true,
           checkoutOrderNumber: order

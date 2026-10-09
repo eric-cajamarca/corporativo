@@ -668,6 +668,20 @@ async function llamarGemini(textoEntrada, comercial, historial, nlu) {
 function aplicarCierreComercial(out) {
   if (!out || !out.comercial) return out;
   const com = out.comercial;
+  const tieneCelular = ficha.celularValido(com.celular || com.celularWeb);
+
+  if (!tieneCelular) {
+    com.turnosSinCelular = (com.turnosSinCelular || 0) + 1;
+    const esMomentoOportuno = com.turnosSinCelular >= 3 || (com.turnosSinCelular >= 2 && (out.plantilla === 'planes' || com.intencionCompra === 'alta'));
+    const pideContactoYa = /\b(celular|whatsapp|tel[eé]fono|n[uú]mero|ll[aá]mad|agendar)\b/i.test(out.respuesta || '');
+    if (esMomentoOportuno && !pideContactoYa && !out.quiereLlamada && out.accion !== 'ofrecer_llamada') {
+      out.respuesta = `${out.respuesta}\n\n💡 _Si deseas que un asesor de ventas real te contacte o te ayude con una demostración a tu medida, compártenos tu número de celular._`.trim();
+      com.turnosSinCelular = 0;
+    }
+  } else {
+    com.turnosSinCelular = 0;
+  }
+
   if (!ficha.tieneRubro(com)) {
     if (out.pedirDato === 'rubro' || (out.accion === 'preguntar' && ficha.parecePreguntaRubro(out.respuesta))) {
       com.esperandoRubro = true;

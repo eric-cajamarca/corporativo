@@ -54,10 +54,11 @@
               inputmode="numeric"
               maxlength="11"
               autocomplete="off"
-              placeholder="11 dígitos"
+              placeholder="11 dígitos (ej. 20600000000)"
               [(ngModel)]="demoRuc"
+              (input)="limpiarRuc()"
               name="demoRuc" />
-            <label class="checkout-section-title d-block" for="demoCorreo">Correo</label>
+            <label class="checkout-section-title d-block" for="demoCorreo">Correo electrónico</label>
             <input
               id="demoCorreo"
               type="email"
@@ -67,21 +68,28 @@
               [(ngModel)]="demoCorreo"
               name="demoCorreo" />
             <label class="checkout-section-title d-block" for="demoCelular">Celular</label>
-            <input
-              id="demoCelular"
-              class="form-control checkout-input mb-3"
-              inputmode="numeric"
-              maxlength="9"
-              autocomplete="tel"
-              placeholder="9 dígitos"
-              [(ngModel)]="demoCelular"
-              name="demoCelular" />
+            <div class="input-group mb-3">
+              <span class="input-group-text bg-light fw-bold text-muted border-end-0">+51</span>
+              <input
+                id="demoCelular"
+                class="form-control checkout-input border-start-0 ps-1"
+                inputmode="numeric"
+                maxlength="9"
+                autocomplete="tel"
+                placeholder="9 dígitos (ej. 987654321)"
+                [(ngModel)]="demoCelular"
+                (input)="limpiarCelular()"
+                name="demoCelular" />
+            </div>
+            <p class="checkout-hint mt-n2 mb-3">
+              Le enviaremos el código de activación por WhatsApp (+51) y por correo.
+            </p>
             <button
               type="button"
               class="btn btn-checkout-primary w-100"
               [disabled]="procesando()"
               (click)="empezarDemo()">
-              {{ procesando() ? 'Enviando el código…' : 'Empezar' }}
+              {{ procesando() ? 'Validando en SUNAT y activando demo…' : 'Empezar demo gratis' }}
             </button>
             <p class="checkout-hint mt-3 mb-0">
               Al pulsar Empezar aceptas los

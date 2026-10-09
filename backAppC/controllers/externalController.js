@@ -54,14 +54,29 @@ function normalizeCee(raw) {
   };
 }
 
+function esRucValidoSunat(ruc) {
+  const r = String(ruc || '').replace(/\D/g, '');
+  if (!/^(10|15|17|20)\d{9}$/.test(r)) return false;
+  const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let suma = 0;
+  for (let i = 0; i < 10; i++) {
+    suma += Number(r.charAt(i)) * factores[i];
+  }
+  const digitoVerificador = (11 - (suma % 11)) % 10;
+  return digitoVerificador === Number(r.charAt(10));
+}
+
 function normalizeRuc(raw) {
   const o = raw && (raw.data !== undefined ? raw.data : raw) || {};
   const razonSocial = pick(o, 'razonSocial', 'RazonSocial', 'nombre_o_razon_social', 'razon_social', 'nombre', 'nombreComercial');
   const ubigeoRaw = pick(o, 'ubigeo', 'Ubigeo', 'ubigeo_sunat');
   const ubigeo = Array.isArray(ubigeoRaw) ? (ubigeoRaw[ubigeoRaw.length - 1] || ubigeoRaw[0]) : ubigeoRaw;
+  const estado = pick(o, 'estado', 'Estado') || 'ACTIVO';
+  const condicion = pick(o, 'condicion', 'Condicion') || 'HABIDO';
   return {
     razonSocial,
-    estado: pick(o, 'estado', 'Estado', 'condicion', 'Condicion') || 'ACTIVO',
+    estado: String(estado).trim().toUpperCase(),
+    condicion: String(condicion).trim().toUpperCase(),
     ubigeo: ubigeo || undefined,
     direccion: pick(o, 'direccion', 'Direccion', 'domicilioFiscal', 'direccion_completa'),
     departamento: pick(o, 'departamento', 'Departamento'),
@@ -242,8 +257,8 @@ async function getRuc(req, res) {
 async function getRucPublico(req, res) {
   try {
     const ruc = String(req.params.ruc || '').replace(/\D/g, '');
-    if (ruc.length !== 11) {
-      return res.status(400).json({ error: 'Ingrese un RUC de 11 dígitos' });
+    if (ruc.length !== 11 || !esRucValidoSunat(ruc)) {
+      return res.status(400).json({ error: 'El RUC no es válido, intente con otro RUC' });
     }
 
     let token = tokenFactilizaEnv();
@@ -257,8 +272,9 @@ async function getRucPublico(req, res) {
       console.error('externalController getRucPublico DB:', err.message);
     }
 
+    let factilizaResult = null;
     if (token) {
-      const factilizaResult = await tryFactilizaWithToken(`/ruc/info/${ruc}`, token, 12000);
+      factilizaResult = await tryFactilizaWithToken(`/ruc/info/${ruc}`, token, 12000);
       if (factilizaResult.ok && factilizaResult.inner) {
         return res.status(200).json({ _source: 'factiliza', data: normalizeRuc(factilizaResult.raw) });
       }
@@ -272,10 +288,16 @@ async function getRucPublico(req, res) {
       }
     }
 
+    const errMsg = (apisRes && apisRes.raw && apisRes.raw.message) || (factilizaResult && factilizaResult.raw && factilizaResult.raw.message) || '';
+    const esNoEncontrado = /no\s*(encontrado|existe)|not\s*found/i.test(errMsg)
+      || (factilizaResult && factilizaResult.status === 404)
+      || (apisRes && apisRes.status === 404);
+
     return res.status(200).json({
       _source: token ? 'factiliza' : 'apisperu',
-      error: (apisRes && apisRes.raw && apisRes.raw.message)
-        || 'No se pudo consultar el RUC en SUNAT. Intente de nuevo en unos segundos.'
+      error: esNoEncontrado
+        ? 'El RUC no es válido, intente con otro RUC'
+        : (errMsg || 'No se pudo consultar el RUC en SUNAT. Intente de nuevo en unos segundos.')
     });
   } catch (err) {
     console.error('externalController getRucPublico:', err.message);

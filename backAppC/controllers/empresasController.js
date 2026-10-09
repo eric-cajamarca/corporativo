@@ -83,6 +83,7 @@ const emailService = require('../services/email.service');
 const empresasAdministracionService = require('../services/empresasAdministracion.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
 const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
+const suscripcionAvisosService = require('../services/suscripcionAvisos.service');
 const whatsappBotLeadComercial = require('../services/whatsappBotLeadComercial.service');
 const { isSaas } = require('../config/deployment.config');
 
@@ -102,8 +103,11 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo, claveAcce
   if (!telefono || String(telefono).trim() === '') {
     return { sent: false, error: 'Número de WhatsApp destino vacío.' };
   }
-  // Normalizar: quitar prefijo whatsapp: y + para enviar solo dígitos (ej. 51999999999)
-  const numeroNormalizado = String(telefono).trim().replace(/^whatsapp:/i, '').replace(/^\+/, '');
+  // Normalizar: quitar prefijo whatsapp: y +, y si tiene 9 dígitos (Perú), anteponer 51
+  let numeroNormalizado = String(telefono || '').trim().replace(/^whatsapp:/i, '').replace(/^\+/, '').replace(/\D/g, '');
+  if (numeroNormalizado.length === 9 && numeroNormalizado.startsWith('9')) {
+    numeroNormalizado = `51${numeroNormalizado}`;
+  }
   const clave = String(claveAcceso || '').trim();
   const text = clave
     ? `Tu código de verificación para activar tu empresa es: ${codigo}\nTu clave de acceso: ${clave}\nCámbiala después de entrar.`
@@ -185,6 +189,29 @@ const createEmpresa = async function (req, res, next) {
                     data: undefined
                 });
             }
+            if (demo) {
+                const rucLimpio = String(ruc || '').replace(/\D/g, '');
+                if (!/^(10|15|17|20)\d{9}$/.test(rucLimpio)) {
+                    return res.status(400).send({
+                        message: 'El RUC no es válido, intente con otro RUC',
+                        data: undefined
+                    });
+                }
+                const celLimpio = String(celular || '').replace(/\D/g, '');
+                const cel9 = celLimpio.length === 11 && celLimpio.startsWith('519') ? celLimpio.slice(2) : celLimpio;
+                if (!/^9\d{8}$/.test(cel9)) {
+                    return res.status(400).send({
+                        message: 'El celular debe ser un número válido de 9 dígitos que comience con 9.',
+                        data: undefined
+                    });
+                }
+                if (estSunat && String(estSunat).trim().toUpperCase() !== 'ACTIVO') {
+                    return res.status(400).send({
+                        message: `El RUC se encuentra en estado "${estSunat}" ante SUNAT. Debe encontrarse ACTIVO para crear la demo.`,
+                        data: undefined
+                    });
+                }
+            }
         }
         await withPool(async (pool) => {
             const existentes = await empresasAdministracionService.buscarPorRuc(pool, ruc);
@@ -259,6 +286,27 @@ const createEmpresa = async function (req, res, next) {
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
                 const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo, claveAcceso);
                 const resultadoEmail = await enviarCodigoActivacionCorreo(correo, verificacion.codigo, claveAcceso);
+
+                // Notificación comercial al admin de plataforma con los datos completos de la demo o plan de pago
+                suscripcionAvisosService.notificarRegistroEmpresaAdmin(pool, {
+                    idEmpresa,
+                    razon_Social,
+                    ruc,
+                    condicion,
+                    estSunat,
+                    celular,
+                    correo,
+                    claveAcceso,
+                    codigoActivacion: verificacion.codigo,
+                    esDemo: !!req.body.solicitudDemo,
+                    checkoutOrderNumber: (req.body.checkoutOrderNumber || '').trim() || null,
+                    direccion: req.body.direccion,
+                    region: req.body.region,
+                    provincia: req.body.provincia,
+                    distrito: req.body.distrito
+                }).catch((errAviso) => {
+                    console.error('notificarRegistroEmpresaAdmin error:', errAviso.message);
+                });
 
                 const mensaje = construirMensajeActivacion(resultadoWhatsApp, resultadoEmail);
 

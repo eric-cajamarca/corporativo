@@ -185,6 +185,9 @@ async function avisarSoporteSiCorresponde(idEmpresa, ctx, ia, slots) {
     }
   }
   if (com.intencionCompra === 'alta' && !com.avisoAltaOk && !com.avisoLlamadaOk) {
+    if (ctx.canal === 'web' && !ficha.celularValido(celularLead)) {
+      return { ok: false, skipped: true, reason: 'web_sin_celular' };
+    }
     try {
       const r = await whatsappBotEscalamiento.notificarInteresComercial(idEmpresa, { ...payload, motivo: 'alta' });
       if (r?.ok) {

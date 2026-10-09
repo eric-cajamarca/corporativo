@@ -12,6 +12,8 @@ const emailService = require('./email.service');
 const seguridadAlertasService = require('./seguridadAlertas.service');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const onboardingAutomationRepository = require('../repositories/onboardingAutomation.repository');
+const suscripcionRepository = require('../repositories/suscripcion.repository');
+const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 const plantillas = require('../utils/suscripcionAvisoPlantillas.util');
 const { getPagoManualSuscripcionConfig } = require('../config/pagoManualSuscripcion.config');
@@ -289,9 +291,89 @@ async function notificarPagoConfirmado(pool, datos) {
   }
 }
 
+/**
+ * Notificación comercial inmediata al WhatsApp del administrador de plataforma
+ * cuando se registra una nueva cuenta demo o una cuenta con plan de pago.
+ */
+async function notificarRegistroEmpresaAdmin(pool, datos) {
+  try {
+    const idPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
+    let celPrincipal = idPrincipal ? await suscripcionRepository.obtenerCelularEmpresa(pool, idPrincipal) : null;
+    const cfg = getPagoManualSuscripcionConfig();
+    const destinoRaw = celPrincipal || cfg.whatsappE164 || process.env.PAGO_MANUAL_WHATSAPP;
+    const destino = normalizarTelefonoWhatsApp(destinoRaw).digitos;
+
+    if (!destino || destino.length < 9) {
+      logAviso('warn', 'notificar_registro_admin_sin_destino', { destinoRaw });
+      return { ok: false, reason: 'sin_destino_admin' };
+    }
+
+    let celCliente = String(datos.celular || '').replace(/\D/g, '');
+    if (celCliente.length === 9 && celCliente.startsWith('9')) {
+      celCliente = `51${celCliente}`;
+    }
+
+    const locArr = [datos.distrito, datos.provincia, datos.region].filter(Boolean);
+    const ubicacion = locArr.length > 0 ? locArr.join(', ') : (datos.direccion || 'Perú');
+
+    let planNombre = 'Demo 14 días (Gratis)';
+    if (!datos.esDemo) {
+      if (datos.checkoutOrderNumber) {
+        try {
+          const chk = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, datos.checkoutOrderNumber);
+          if (chk?.planCode) {
+            const ciclo = chk.billingCycle === 'yearly' ? 'Anual' : 'Mensual';
+            const monto = Number(chk.montoSoles || 0).toFixed(2);
+            planNombre = `Plan ${String(chk.planCode).toUpperCase()} (${ciclo} - S/ ${monto})`;
+          } else {
+            planNombre = `Plan de pago (Orden: ${datos.checkoutOrderNumber})`;
+          }
+        } catch {
+          planNombre = `Plan de pago (Orden: ${datos.checkoutOrderNumber})`;
+        }
+      } else {
+        planNombre = 'Plan de pago';
+      }
+    }
+
+    const saludo = `Hola ${datos.razon_Social || ''}, vi que te registraste en EFAF ERP (${datos.esDemo ? 'cuenta Demo' : 'plan de pago'}). ¿Pudiste ingresar o necesitas ayuda con la configuración inicial?`.trim();
+    const linkWa = celCliente ? `https://wa.me/${celCliente}?text=${encodeURIComponent(saludo)}` : null;
+
+    const lineas = [
+      datos.esDemo
+        ? '🚀 *¡Nueva Cuenta Demo Registrada en EFAF ERP!*'
+        : '🎉 *¡Nueva Cuenta Empresa Registrada en EFAF ERP!*',
+      '',
+      `🏢 *Empresa:* ${datos.razon_Social || 'Sin razón social'}`,
+      `🆔 *RUC:* ${datos.ruc || '—'}${datos.estSunat ? ` (${datos.estSunat}${datos.condicion ? ` · ${datos.condicion}` : ''})` : ''}`,
+      `📱 *Celular:* ${celCliente ? `+${celCliente}` : 'No indicado'}`,
+      `✉️ *Correo:* ${datos.correo || 'No indicado'}`,
+      `📍 *Ubicación:* ${ubicacion}`,
+      `🔑 *Código activación:* *${datos.codigoActivacion || '—'}*${datos.claveAcceso ? ` (Clave: ${datos.claveAcceso})` : ''}`,
+      `⏰ *Plan:* ${planNombre}`,
+      ''
+    ];
+
+    if (linkWa) {
+      lineas.push(
+        '👉 *Escribir al cliente por WhatsApp:*',
+        linkWa
+      );
+    }
+
+    const texto = lineas.join('\n');
+    const r = await seguridadAlertasService.enviarWhatsAppPlataforma(pool, destino, texto);
+    return { ok: Boolean(r?.ok), canal: r?.canal };
+  } catch (err) {
+    logAviso('error', 'notificar_registro_admin_error', { err: String(err.message || err) });
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   ejecutarCicloVencimientos,
   notificarPagoConfirmado,
+  notificarRegistroEmpresaAdmin,
   EVENTO_POR_VENCER,
   EVENTO_VENCIDA,
   EVENTO_PAGO_CONFIRMADO

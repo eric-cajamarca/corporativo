@@ -118,9 +118,11 @@ async function cargarContextoPrincipal(idEmpresa) {
 function turnoBienvenida(conv) {
   return {
     respuesta: [
-      'Hola. Soy el asesor comercial de *EFAFERP* (BUSINESS SOFT).',
-      'Cuéntame a qué se dedica tu negocio y en qué te ayudo.',
-      'Si quieres *demo* o *pagar*, te guío en la web. También podemos agendar *LLAMADA* con soporte.'
+      '¡Hola! 👋 Soy el asesor comercial de *EFAFERP* (BUSINESS SOFT).',
+      '',
+      'Para orientarte mejor y brindarte una atención personalizada, ¿me indicas tu *nombre*, tu número de *celular* y a qué *rubro* o tipo de negocio te dedicas?',
+      '',
+      '(Si prefieres, también puedes hacerme tu consulta directamente).'
     ].join('\n'),
     conv: { estado: 'comercial_ia', slots: conv.slots || {}, candidatos: [] }
   };
