@@ -58,8 +58,10 @@ function textoPlanesReales(datos) {
     lineas.push(`• *${p.nombre || p.planCode}*${precios ? `: ${precios}` : ''}`);
     if (p.descripcionCorta) lineas.push(`  ${String(p.descripcionCorta).slice(0, 160)}`);
   }
-  lineas.push('', 'La *demo* es 14 días gratis. El pago (tarjeta, Yape, Plin o depósito) se hace en la web; yo no cobro.');
-  lineas.push('Si quieres un plan, dímelo y te doy el enlace o los datos de pago.');
+  lineas.push('• *Enterprise*: a cotizar según requerimientos (multi-empresa multi-RUC, servidor dedicado/propio y soporte prioritario).');
+  lineas.push('', '💡 En pago anual tienes *2 meses gratis*. La configuración SUNAT es *100% gratuita* y va incluida.');
+  lineas.push('La *demo* es 14 días gratis. El pago se realiza de forma directa y segura en la web.');
+  lineas.push('¿Cuántos locales o qué necesidad especial tiene tu empresa?');
   return lineas.join('\n');
 }
 

@@ -10,7 +10,7 @@ import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-
 const SESSION_KEY = 'efaferp.chatComercial.sessionId';
 const SALUDO: ChatComercialMensaje = {
   role: 'model',
-  text: '¡Hola! 👋 Soy el asesor comercial de EFAFERP (BUSINESS SOFT).\n\nPara orientarte mejor y brindarte una atención personalizada, ¿me indicas tu nombre, tu número de celular y a qué rubro o negocio te dedicas?\n\n(Si prefieres, también puedes hacerme cualquier consulta directamente).'
+  text: '¡Hola! Qué gusto saludarte 👋 Soy tu asesor comercial en EFAFERP (BUSINESS SOFT).\n\nEstoy aquí para orientarte y ayudarte a encontrar la mejor opción para tu negocio, con total transparencia.\n\nCuéntame, ¿cómo te llamas y qué tipo de tienda o negocio tienes? (O si tienes alguna consulta puntual sobre precios, stock o facturación SUNAT, dime con toda confianza).'
 };
 
 @Component({
@@ -68,12 +68,32 @@ export class ChatComercialPublicoComponent {
     const spa = this.rutaSpaMismaVentana(url);
     if (!spa) return;
     ev.preventDefault();
-    this.ui.abrir();
+    this.ui.cerrar();
     void this.router.navigateByUrl(spa);
   }
 
   esEnlaceExterno(url: string): boolean {
     return this.rutaSpaMismaVentana(url) == null;
+  }
+
+  etiquetaEnlace(url: string): string {
+    const u = String(url || '').toLowerCase();
+    if (u.includes('/suscribirse/demo') || u.includes('demo')) {
+      return '🚀 Probar demo 14 días gratis';
+    }
+    if (u.includes('/planes')) {
+      return '📋 Ver planes y precios';
+    }
+    if (u.includes('/suscribirse/')) {
+      return '💳 Contratar plan';
+    }
+    if (u.includes('/flayers') || u.includes('guia') || u.includes('guías')) {
+      return '📖 Ver guía práctica';
+    }
+    if (u.includes('libro-reclamaciones')) {
+      return '📄 Libro de reclamaciones';
+    }
+    return '🔗 Ir a la página';
   }
 
   private rutaSpaMismaVentana(raw: string): string | null {
@@ -119,7 +139,31 @@ export class ChatComercialPublicoComponent {
   }
 
   textoVisible(texto: string): string {
-    return String(texto || '').replace(/\*([^*]+)\*/g, '$1');
+    return String(texto || '')
+      .replace(/(?:1\.\s*Abre:?\s*)https?:\/\/[^\s)]+/gi, '1. Ingresa a la demo desde el botón de abajo:')
+      .replace(/(?:Demo:?\s*)https?:\/\/[^\s)]+/gi, 'Puedes probar la demo desde el botón de abajo:')
+      .replace(/(?:Precios vigentes y transparentes en:?\s*)https?:\/\/[^\s)]+/gi, 'Puedes consultar los planes y precios desde el botón de abajo:')
+      .replace(/(?:👉\s*\*?Ver planes y pagar:\*?\s*)https?:\/\/[^\s)]+/gi, 'Accede a los planes y opciones de pago con el botón de abajo:')
+      .replace(/👉\s*https?:\/\/[^\s)]+/gi, '')
+      .replace(/https?:\/\/[^\s)]+/g, '')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  reiniciarChat(): void {
+    this.mensajes = [SALUDO];
+    this.sessionId = null;
+    this.error = '';
+    this.enviando = false;
+    this.form.reset();
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 
   enviar(): void {

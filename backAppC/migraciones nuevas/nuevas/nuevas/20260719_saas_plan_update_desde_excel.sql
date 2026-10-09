@@ -17,7 +17,7 @@ GO
 
 UPDATE dbo.SaasPlan SET
     descripcionCorta = N'Incluye todo el sistema + whatsapp vinculado.',
-    beneficiosJson = N'["Hasta 4 usuarios y 1 sucursal","Hasta 120 comprobantes SUNAT aceptados al mes","Hasta 600 productos en catálogo","Incluye WhatsApp vinculado"]',
+    beneficiosJson = N'["Hasta 4 usuarios y 1 sucursal","Hasta 120 comprobantes SUNAT aceptados al mes","Hasta 600 productos en catálogo","WhatsApp vinculado"]',
     precioMensualPen = 49.00,
     precioAnualPen = 490.00,
     maxUsuarios = 4,
@@ -33,7 +33,7 @@ GO
 
 UPDATE dbo.SaasPlan SET
     descripcionCorta = N'Prueba el sistema 14 días.',
-    beneficiosJson = N'["Hasta 2 usuarios y 1 sucursal","Hasta 30 comprobantes SUNAT al mes","Hasta 200 productos en catálogo","WhatsApp manual (sin bot de pedidos)"]',
+    beneficiosJson = N'["Hasta 2 usuarios y 1 sucursal","Hasta 30 comprobantes SUNAT al mes","Hasta 200 productos en catálogo","WhatsApp vinculado"]',
     precioMensualPen = 0.00,
     precioAnualPen = 0.00,
     maxUsuarios = 2,

@@ -167,6 +167,27 @@ async function avisarSoporteSiCorresponde(idEmpresa, ctx, ia, slots) {
     }
   }
 
+  if (com.interesEnterprise && ficha.esNombrePersona(com.nombre) && ficha.celularValido(celularLead) && !com.avisoEnterpriseOk) {
+    slots.comercial = com;
+    try {
+      const r = await whatsappBotEscalamiento.notificarInteresComercial(idEmpresa, {
+        ...payload,
+        motivo: 'cotizacion_enterprise'
+      });
+      if (r?.ok) {
+        com.avisoEnterpriseEnviado = true;
+        com.avisoEnterpriseOk = true;
+        slots.comercial = com;
+        return r;
+      }
+      console.error('whatsappBotComercial aviso enterprise no enviado:', r?.error || r?.skipped);
+      return r || { ok: false };
+    } catch (err) {
+      console.error('whatsappBotComercial aviso enterprise:', err.message);
+      return { ok: false, error: err.message };
+    }
+  }
+
   if (listaParaAvisarLlamada) {
     slots.comercial = com;
     try {

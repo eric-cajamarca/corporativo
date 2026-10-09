@@ -64,7 +64,7 @@ function saveConv(sessionId, conv) {
   sesiones.set(sessionId, { conv, expira: Date.now() + TTL_MS });
 }
 
-function adaptarRespuestaWeb(texto, llamadaAgendada, com) {
+function adaptarRespuestaWeb(texto, recienAgendada, com, yaEstabaAgendada = false) {
   let t = String(texto || '')
     .replace(/Si prefieres hablar ahora, escribe \*AGENTE\*\.?/gi, '')
     .replace(/escribe \*AGENTE\*/gi, 'pide una llamada aquí')
@@ -87,15 +87,45 @@ function adaptarRespuestaWeb(texto, llamadaAgendada, com) {
   // Eliminar referencias a "horario 2" o números solos como horario
   t = t.replace(/\bhorario\s+2\b/gi, 'horario acordado');
 
-  if (llamadaAgendada && com && ficha.esNombrePersona(com.nombre)) {
+  const tieneCelularValido = ficha.celularValido(com?.celular || com?.celularWeb);
+
+  // Si no hay celular válido en el chat web, NUNCA prometer llamada
+  if (!tieneCelularValido) {
+    t = t.replace(/\b(te llamamos hoy antes de las 6:00 pm|te llamaremos hoy antes de las 6:00 pm|un asesor te contactar[aá] hoy antes de las 6:00 pm)\b/gi, 'si nos compartes tu celular, un asesor comercial te contactará con gusto');
+  }
+
+  // Si la llamada recién se agendó en ESTE turno exacto, emitir el mensaje de confirmación
+  if (recienAgendada && com && ficha.esNombrePersona(com.nombre) && tieneCelularValido) {
     const cel = com.celular || com.celularWeb || '';
     const celTxt = cel ? ` al *${cel}*` : '';
-    t = [
-      `Listo, *${com.nombre}*. Te llamamos hoy antes de las 6:00 pm${celTxt}.`,
-      'También te escribiremos por WhatsApp. Un asesor de BUSINESS SOFT se comunicará contigo.'
-    ].join('\n');
-  } else if (llamadaAgendada && !/te contactará|te llamamos/i.test(t)) {
-    t += '\n\nUn asesor de BUSINESS SOFT te contactará hoy antes de las 6:00 pm. No necesitas abrir WhatsApp.';
+    if (com.interesEnterprise) {
+      const rubroTxt = (com.rubro || com.rubroLibre) ? ` para tu empresa en el rubro de *${com.rubro || com.rubroLibre}*` : '';
+      t = [
+        `¡Muchas gracias, *${com.nombre}*! Hemos registrado tu solicitud de cotización para el plan *Enterprise*${rubroTxt}.`,
+        '',
+        `Un asesor de *BUSINESS SOFT COMPANY* revisará tus requerimientos y te contactará vía *WhatsApp*${celTxt} a la brevedad posible para brindarte la propuesta técnica y comercial a tu medida.`,
+        '',
+        '¿Tienes alguna duda técnica o requerimiento específico que quieras revisar mientras tanto?'
+      ].join('\n');
+    } else {
+      const horTxt = (com.mejorHorario && com.mejorHorario !== 'Hoy antes de las 6:00 pm')
+        ? ` en tu horario preferido (*${com.mejorHorario}*)`
+        : '';
+      t = [
+        `¡Listo, *${com.nombre}*! Hemos registrado tus datos de contacto${celTxt}${horTxt}.`,
+        'Un asesor de BUSINESS SOFT se comunicará contigo por llamada o WhatsApp para coordinar.',
+        '',
+        '¿Tienes alguna duda puntual que quieras revisar mientras tanto, o prefieres ir probando la demo gratis de 14 días?'
+      ].join('\n');
+    }
+  } else if (!yaEstabaAgendada && !recienAgendada && !tieneCelularValido && /te contactará hoy/i.test(t)) {
+    t = t.replace(/Un asesor de BUSINESS SOFT te contactará hoy antes de las 6:00 pm\.?/gi, 'Déjanos tu celular si deseas que un asesor te contacte.');
+  }
+
+  // Asegurar que si dice "en el siguiente enlace" tenga la URL
+  if (/\b(en el siguiente enlace|en este enlace|al siguiente enlace)\b/i.test(t) && !/https?:\/\/[^\s)]+/i.test(t)) {
+    const urlExtra = /demo/i.test(t) ? 'https://efaferp.com/suscribirse/demo' : 'https://efaferp.com/planes';
+    t = `${t}\n👉 ${urlExtra}`.trim();
   }
 
   return t.replace(/\n{3,}/g, '\n\n').trim();
@@ -138,11 +168,13 @@ async function cargarContextoPrincipal(idEmpresa) {
 function turnoBienvenida(conv) {
   return {
     respuesta: [
-      '¡Hola! 👋 Soy el asesor comercial de *EFAFERP* (BUSINESS SOFT).',
+      '¡Hola! Qué gusto saludarte. 👋 Soy tu asesor comercial en *EFAFERP* (BUSINESS SOFT COMPANY).',
       '',
-      'Para orientarte mejor y brindarte una atención personalizada, ¿me indicas tu *nombre*, tu número de *celular* y a qué *rubro* o tipo de negocio te dedicas?',
+      'Estoy aquí para ayudarte a ordenar las ventas, controlar el inventario y facilitar la facturación SUNAT de tu negocio sin complicaciones ni pérdidas de tiempo.',
       '',
-      '(Si prefieres, también puedes hacerme tu consulta directamente).'
+      'Para orientarte de la mejor manera: ¿cómo te llamas, cuál es tu número de *WhatsApp* y a qué *rubro* se dedica tu negocio?',
+      '',
+      '_Si tienes una consulta puntual (precios, funciones, stock o SUNAT), dímela con toda confianza y te respondo de inmediato._ 😊'
     ].join('\n'),
     conv: { estado: 'comercial_ia', slots: conv.slots || {}, candidatos: [] }
   };
@@ -167,9 +199,67 @@ async function procesar(body) {
   }
 
   const conv = getConv(sessionId);
-  const celularTurno = extraerCelularPeru(texto) || conv.slots?.comercial?.celularWeb || null;
-  if (celularTurno) {
-    conv.slots = { ...(conv.slots || {}), comercial: { ...(conv.slots?.comercial || {}), celularWeb: celularTurno } };
+  const comPrev = conv.slots?.comercial || {};
+  const yaEstabaAgendada = Boolean(comPrev.avisoLlamadaOk || comPrev.confirmacionLlamadaEnviadaWeb);
+
+  // 1. Manejo inmediato si el cliente expresa confusión ("no entiendo", "no me queda claro", etc.)
+  if (ficha.pareceConfundido(texto)) {
+    return {
+      sessionId,
+      respuesta: ficha.textoClienteConfundido(),
+      imagenUrl: null,
+      llamadaAgendada: llamadaConfirmada(comPrev),
+      avisoEnviado: false
+    };
+  }
+
+  // 2. Manejo cordial y no repetitivo para agradecimientos
+  if (/^(gracias|muchas gracias|mil gracias|ok gracias|listo gracias)$/i.test(texto)) {
+    const nomTxt = ficha.esNombrePersona(comPrev.nombre) ? `, *${comPrev.nombre}*` : '';
+    const tieneCel = ficha.celularValido(comPrev.celular || comPrev.celularWeb);
+    let resp = '';
+    if (tieneCel) {
+      resp = `¡Con mucho gusto${nomTxt}! Ya tenemos tus datos de contacto registrados para coordinar. Si tienes cualquier otra duda sobre EFAFERP, aquí sigo para orientarte.`;
+    } else {
+      resp = `¡Con mucho gusto${nomTxt}! Si tienes cualquier otra duda sobre el sistema o los planes, dime con confianza. Y si deseas que un asesor comercial te llame para coordinar, déjame tu número de WhatsApp y tu nombre.`;
+    }
+    return {
+      sessionId,
+      respuesta: resp,
+      imagenUrl: null,
+      llamadaAgendada: llamadaConfirmada(comPrev),
+      avisoEnviado: false
+    };
+  }
+
+  // 3. Manejo natural para confirmaciones simples ("ok", "dale", "perfecto")
+  if (/^(ok|okay|dale|perfecto|listo|de acuerdo|bueno|bien|entendido)$/i.test(texto)) {
+    const nomTxt = ficha.esNombrePersona(comPrev.nombre) ? `, *${comPrev.nombre}*` : '';
+    const tieneCel = ficha.celularValido(comPrev.celular || comPrev.celularWeb);
+    let resp = `¡Excelente${nomTxt}! ¿Hay alguna función o duda que quisieras revisar (facturación SUNAT, inventario, control de caja o WhatsApp)?`;
+    if (!tieneCel) {
+      resp += '\n\nTambién puedes dejarnos tu número de celular o WhatsApp si deseas una demostración guiada con un asesor.';
+    }
+    return {
+      sessionId,
+      respuesta: resp,
+      imagenUrl: null,
+      llamadaAgendada: llamadaConfirmada(comPrev),
+      avisoEnviado: false
+    };
+  }
+
+  const celularTurno = extraerCelularPeru(texto) || comPrev.celularWeb || null;
+  const esInteresEnterpriseTurno = ficha.pareceCotizacionEnterprise(texto) || comPrev.interesEnterprise;
+  if (celularTurno || esInteresEnterpriseTurno) {
+    conv.slots = {
+      ...(conv.slots || {}),
+      comercial: {
+        ...(conv.slots?.comercial || {}),
+        ...(celularTurno ? { celularWeb: celularTurno } : {}),
+        ...(esInteresEnterpriseTurno ? { interesEnterprise: true, planCode: 'enterprise', intencionCompra: 'alta' } : {})
+      }
+    };
   }
 
   const ctxWa = await cargarContextoPrincipal(idEmpresa);
@@ -215,17 +305,20 @@ async function procesar(body) {
   }
 
   const nextConv = turno.conv || conv;
-  saveConv(sessionId, nextConv);
-
   const com = nextConv.slots?.comercial || {};
-  if (ficha.esNombrePersona(com.nombre) && ficha.celularValido(com.celular || com.celularWeb)) {
-    if (!com.mejorHorario) com.mejorHorario = 'Hoy antes de las 6:00 pm';
-    com.quiereLlamada = true;
-    com.esperandoDatosLlamada = false;
-  }
   const agendada = llamadaConfirmada(com);
-  let avisoEnviado = Boolean(turno.avisoEnviado || com.avisoLlamadaOk);
-  if (agendada && !avisoEnviado) {
+  const recienAgendada = agendada && !yaEstabaAgendada;
+
+  if (agendada) {
+    if (!com.mejorHorario) com.mejorHorario = 'Horario de oficina (lun–vie 9:00 a 18:00)';
+    com.quiereLlamada = false;
+    com.esperandoDatosLlamada = false;
+    com.confirmacionLlamadaEnviadaWeb = true;
+  }
+
+  let avisoEnviado = Boolean(turno.avisoEnviado || com.avisoLlamadaOk || com.avisoEnterpriseOk);
+  const listoParaAvisoEnterprise = com.interesEnterprise && !com.avisoEnterpriseOk && ficha.esNombrePersona(com.nombre) && ficha.celularValido(com.celular || com.celularWeb);
+  if ((recienAgendada || listoParaAvisoEnterprise) && !avisoEnviado) {
     const extra = await whatsappBotComercial.avisarSoporteSiCorresponde(
       idEmpresa,
       ctx,
@@ -233,12 +326,18 @@ async function procesar(body) {
       nextConv.slots
     );
     avisoEnviado = Boolean(extra?.ok);
-    saveConv(sessionId, nextConv);
+    if (com.interesEnterprise) {
+      com.avisoEnterpriseOk = true;
+    } else {
+      com.avisoLlamadaOk = true;
+    }
   }
+
+  saveConv(sessionId, nextConv);
 
   return {
     sessionId,
-    respuesta: adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), agendada, com),
+    respuesta: adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), recienAgendada, com, yaEstabaAgendada),
     imagenUrl: imagenUrlDeTurno(turno),
     llamadaAgendada: agendada,
     avisoEnviado

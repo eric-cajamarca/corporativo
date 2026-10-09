@@ -36,16 +36,20 @@ function textoFichaConviene() {
 
 function textoPlanes() {
   return [
-    'Para casi todas las tiendas recomiendo uno de estos dos:',
-    '• *Básico*: un local, facturación SUNAT, inventario y WhatsApp para enviar boletas y facturas.',
-    '• *Emprendedor*: más usuarios y sucursales, más el bot de pedidos por WhatsApp.',
-    'El *anual* incluye *2 meses gratis* (pagas 10 meses y usas 12).',
-    'La *configuración SUNAT* (usuario SOL, certificado y series) te la hacemos *sin costo* al empezar.',
+    'Con mucho gusto te oriento sobre nuestros planes para que elijas el más conveniente para tu negocio:',
     '',
-    'Precios vigentes, en soles y sin IGV:',
+    '• *Básico*: Ideal si tienes 1 solo local comercial. Incluye ventas rápidas, inventario en tiempo real, control de caja chica, facturación electrónica SUNAT y WhatsApp vinculado para enviar boletas y facturas en PDF directo al celular de tus clientes.',
+    '• *Emprendedor*: Perfecto para 2 o más sucursales o si deseas el bot inteligente de pedidos por WhatsApp para que tus clientes consulten stock y coticen 24/7.',
+    '• *Profesional*: Diseñado para medianas empresas con hasta 6 sucursales, múltiples almacenes y usuarios concurrentes.',
+    '• *Enterprise*: Solución a medida para corporaciones, multi-empresa (multi-RUC), servidores dedicados o propios y soporte prioritario.',
+    '',
+    '💡 En pago anual te regalamos *2 meses gratis* en todos los planes estándar (pagas 10 meses y usas 12).',
+    'Y la *configuración de SUNAT* te la dejamos 100% lista y funcionando sin costo adicional.',
+    '',
+    'Puedes ver los detalles completos y transparentes en:',
     urlPublica('/planes'),
     '',
-    'Si quieres *probar 14 días* (sin tarjeta), escribe *DEMO*. Si ya elegiste plan, escribe *PAGAR*.'
+    '¿Cuántos locales o qué necesidad especial tiene tu negocio para recomendarte la mejor opción?'
   ].join('\n');
 }
 
@@ -159,6 +163,10 @@ const RUBROS_ENCAJAN = [
   { id: 'tecnologia', re: /\b(tecnolog|computador|laptops?|notebooks?|celulares?|smartphones?|electr[oó]nic)/i, etiqueta: 'tecnología' },
   { id: 'abarrotes', re: /\b(abarrotes|minimarket|bodega)\b/i, etiqueta: 'abarrotes' },
   { id: 'farmacia', re: /\b(farmacia|botica)\b/i, etiqueta: 'farmacia' },
+  { id: 'avicola', re: /\b(av[ií]col|poller[ií]a cruda|huevos?|beneficiadora|pollos?( y huevos)?)\b/i, etiqueta: 'avícola' },
+  { id: 'carniceria', re: /\b(carnicer|carnes?|camal)\b/i, etiqueta: 'carnicería' },
+  { id: 'veterinaria', re: /\b(veterinar|agropecuar|alimentos? para animales|mascotas?)\b/i, etiqueta: 'veterinaria' },
+  { id: 'optica', re: /\b(optica|[oó]ptica|lentes)\b/i, etiqueta: 'óptica' },
   { id: 'grifo', re: /\b(grifo|estacion de servicio|gasolinera)\b/i, etiqueta: 'grifo' },
   { id: 'lubricantes', re: /\b(lubricantes?|aceites?( motoriz| de motor| automotrices)?)\b/i, etiqueta: 'lubricantes' }
 ];
@@ -183,7 +191,7 @@ function detectarRubro(texto) {
 }
 
 function pareceComercioInventario(texto) {
-  return /\b(vendo|revendo|reventa|tienda|stock|inventario|productos?|computador|laptops?|tecnolog|celular|electr[oó]nic|abarrotes|farmacia|repuesto|ferreter|pintur|ropa|librer|calzado|minimarket|bodega|grifo|lubricantes?|aceites?)\b/i.test(
+  return /\b(vendo|revendo|reventa|tienda|stock|inventario|productos?|computador|laptops?|tecnolog|celular|electr[oó]nic|abarrotes|farmacia|botica|av[ií]col|carnicer|carnes?|huevos?|repuesto|ferreter|pintur|ropa|librer|calzado|minimarket|bodega|grifo|lubricantes?|aceites?)\b/i.test(
     String(texto || '')
   );
 }
@@ -258,27 +266,74 @@ function parecePreguntaRubro(texto) {
   return /\b(a qu[eé] se dedica|qu[eé] rubro|orientarte|dedica tu negocio)\b/i.test(String(texto || ''));
 }
 
+function detalleRubroParaPitch(rubro) {
+  const r = String(rubro || '').toLowerCase();
+  if (/av[ií]col/i.test(r)) {
+    return 'En una *avícola*, el pesaje exacto y la rapidez en balanza son fundamentales: desde la venta de pollo por kilo (entero, pechuga, menudencias) y bandejas de huevos, hasta la emisión veloz de boletas para no formar colas y el registro claro de fiados a pollerías o restaurantes.';
+  }
+  if (/carnicer/i.test(r)) {
+    return 'En una *carnicería*, el control por peso (kg) y el arqueo diario son vitales: cortes de carne, mermas, venta rápida con ticket/boleta SUNAT y control de cuentas por cobrar.';
+  }
+  if (/ferreter/i.test(r)) {
+    return 'En una *ferretería*, manejas miles de ítems (tornillos, herramientas, tuberías, bolsas de cemento): necesitas ubicar rápido productos, controlar stock en varios almacenes y emitir cotizaciones y comprobantes al instante.';
+  }
+  if (/repuesto|automotriz/i.test(r)) {
+    return 'En *repuestos*, necesitas buscar al instante por código, marca o modelo, controlar stock de piezas de alta rotación y emitir facturas/boletas SUNAT sin demoras.';
+  }
+  if (/pintur/i.test(r)) {
+    return 'En *pinturas*, controlas galones, cuartos, códigos de matizado y accesorios (brochas, lijas, thinner) con arqueo diario exacto.';
+  }
+  if (/ropa|calzado|zapat/i.test(r)) {
+    return 'En *tiendas de ropa y calzado*, necesitas control exacto de tallas, modelos y temporadas, con venta rápida en caja y arqueo de efectivo y Yape.';
+  }
+  if (/farmacia|botica/i.test(r)) {
+    return 'En una *botica o farmacia*, el control de vencimientos, laboratorios y venta rápida con boleta SUNAT te ahorran multas y mermas.';
+  }
+  if (/abarrotes|minimarket|bodega/i.test(r)) {
+    return 'En un *minimarket o bodega*, la venta rápida con lector de barras y el cuadre exacto de caja (efectivo y Yape) son indispensables para no tener pérdidas.';
+  }
+  if (/veterinar/i.test(r)) {
+    return 'En una *veterinaria o agropecuaria*, controlas medicamentos, alimentos balanceados por saco o kilo y accesorios con emisión de boletas/facturas.';
+  }
+  return null;
+}
+
 function textoPitchRubroYDemo(com) {
   const nombre = etiquetaRubro(com);
   const encaja = String(com?.encaja || 'indefinido');
   if (encaja === 'no') {
     return [
-      `Anoté *${nombre}*. No es el caso típico de EFAFERP (tiendas con stock y SUNAT).`,
-      'Si igual vendes productos y quieres facturar, puedes *probar 14 días* sin tarjeta:',
+      `Entiendo, muchas gracias por comentarme sobre tu negocio de *${nombre}*.`,
+      'EFAFERP está enfocado especialmente en negocios comerciales que manejan inventario físico, stock y emisión de boletas/facturas SUNAT.',
+      'Si tu modelo incluye venta de productos con stock, puedes probar la plataforma con 14 días gratis (sin tarjeta ni compromisos):',
       urlDemo(),
-      'O pide una *llamada* y te contacta un asesor.'
+      '',
+      'O si gustas, déjame tu número de WhatsApp y tu nombre para que un asesor te contacte y analice tu caso.'
     ].join('\n');
   }
-  const linea =
-    encaja === 'parcial'
-      ? `En *${nombre}* no es el caso más típico, pero si manejas *stock y facturación SUNAT* sí te puede servir.`
-      : `Para *${nombre}* te sirve: ventas, stock, créditos y boleta/factura SUNAT.`;
+
+  const detalleEspecifico = detalleRubroParaPitch(nombre);
+  const intro = detalleEspecifico
+    ? `¡Excelente rubro! ${detalleEspecifico}`
+    : (encaja === 'parcial'
+      ? `¡Excelente! Para un negocio como *${nombre}*, si manejas mercadería y facturación SUNAT, te ayudará muchísimo a controlar el stock y evitar pérdidas.`
+      : `¡Excelente rubro! En *${nombre}*, EFAFERP se adapta a tu dinámica diaria para que tengas el control total de tu mercadería, evites descuadres en caja, organices tus cobranzas y emitas boletas/facturas SUNAT en segundos.`);
+
+  const preguntaGiro = /av[ií]col/i.test(nombre)
+    ? '¿Vendes principalmente atención en mostrador o también entregas pedidos a pollerías y restaurantes?'
+    : (/ferreter|repuesto|abarrotes/i.test(nombre)
+      ? '¿Manejas un solo local comercial o tienes varias sucursales/almacenes?'
+      : '¿Qué aspecto te gustaría ordenar primero en tu negocio: inventario, caja o facturación SUNAT?');
+
   return [
-    linea,
+    intro,
     '',
-    '¿Quieres *probar 14 días* (sin tarjeta) o que te llame un asesor?',
-    `Demo: ${urlDemo()}`,
-    'Si te trabas al registrarte, dime aquí.'
+    'En EFAFERP puedes registrar tus productos por peso (kg) o unidades, emitir comprobantes electrónicos SUNAT en segundos y cuadrar tu caja del día al centavo.',
+    '',
+    'Puedes probar el sistema con tu propia información durante *14 días gratis* (sin tarjeta ni compromisos):',
+    `👉 ${urlDemo()}`,
+    '',
+    preguntaGiro
   ].join('\n');
 }
 
@@ -632,15 +687,48 @@ const NOMBRES_FALSOS = new Set([
   'cliente', 'el cliente', 'la cliente', 'usuario', 'interesado', 'visitante',
   'anonimo', 'anónimo', 'dueño', 'dueno', 'señor', 'senor', 'señora', 'amiga',
   'amigo', 'hola', 'ok', 'okay', 'si', 'sí', 'no', 'listo', 'perfecto', 'gracias',
-  'ferreteria', 'ferretería', 'ferretero', 'repuestos', 'negocio', 'empresa',
-  'administrador', 'asesor', 'soporte'
+  'muchas gracias', 'mil gracias', 'no gracias', 'por favor', 'porfa',
+  'no entiendo', 'no comprendo', 'no entendí', 'no entendi', 'no se', 'no sé',
+  'me confundi', 'me confundí', 'no me queda claro', 'no me convence', 'no quiero',
+  'no deseo', 'no puedo', 'no tengo', 'de acuerdo', 'esta bien', 'está bien',
+  'bueno', 'bien', 'vale', 'dale', 'claro', 'buenas', 'buenos dias', 'buenos días',
+  'buenas tardes', 'buenas noches', 'que tal', 'qué tal', 'como estas', 'cómo estás',
+  'como es', 'cómo es', 'ferreteria', 'ferretería', 'ferretero', 'repuestos',
+  'negocio', 'empresa', 'administrador', 'asesor', 'soporte', 'ayuda',
+  'informacion', 'información', 'info', 'precio', 'precios', 'costo', 'costos',
+  'cuanto', 'cuánto', 'cuanto cuesta', 'cuánto cuesta', 'planes', 'plan', 'demo',
+  'pago', 'pagar', 'yape', 'plin', 'bcp', 'tarjeta', 'factura', 'boleta',
+  'sunat', 'stock', 'ventas', 'compra', 'compras', 'vender', 'consultar',
+  'consulta', 'duda', 'pregunta', 'humano', 'persona', 'agente'
 ]);
+
+const RE_PALABRAS_NO_NOMBRE = /\b(no|si|sí|ok|okay|gracias|entiendo|entendi|entendí|comprendo|se|sé|quiero|puedo|tengo|deseo|hay|sirve|cuesta|vale|ayuda|dime|explica|explicame|explícame|muestrame|muéstrame|muestra|pago|pague|pagué|pagar|comprar|vender|precio|precios|costo|costos|plan|planes|demo|sunat|boleta|boletas|factura|facturas|cuenta|cuentas|yape|plin|banco|whatsapp|web|sistema|software|modulo|rubro|tienda|negocio|local|sucursal|hola|buenos|buenas|adios|adiós|chau|duda|consulta|llamada|asesor|soporte|agente|humano|amigo|amiga|senor|señor|senora|señora)\b/i;
+
+function pareceConfundido(texto) {
+  const t = String(texto || '').trim();
+  return /\b(no\s+entiendo|no\s+entend[ií]|no\s+comprendo|me\s+confund[ií]|estoy\s+confundid[oa]|no\s+me\s+queda\s+claro|muy\s+complicado|no\s+capt[oó]|a\s+qu[eé]\s+te\s+refieres|qu[eé]\s+significa)\b/i.test(t);
+}
+
+function textoClienteConfundido() {
+  return [
+    '¡No te preocupes! Te lo explico de forma súper sencilla y sin tecnicismos:',
+    '',
+    'EFAFERP es un sistema para computadora o celular que te ayuda en 3 cosas clave:',
+    '1. *Control de mercadería:* sabes cuánto stock te queda en tiempo real para no quedarte sin productos ni tener pérdidas.',
+    '2. *Facturación SUNAT:* emites boletas y facturas electrónicas al instante sin complicaciones.',
+    '3. *Caja del día:* ves en una sola pantalla cuánto vendiste en efectivo, Yape o tarjeta.',
+    '',
+    '¿Qué tipo de tienda o negocio tienes? Cuéntame y te digo exactamente cómo te serviría.'
+  ].join('\n');
+}
 
 function esNombrePersona(nombre) {
   const n = String(nombre || '').replace(/\s+/g, ' ').trim();
   if (n.length < 2 || n.length > 40) return false;
-  if (NOMBRES_FALSOS.has(n.toLowerCase())) return false;
+  const nMin = n.toLowerCase();
+  if (NOMBRES_FALSOS.has(nMin)) return false;
   if (!/^[a-záéíóúñü]+(\s+[a-záéíóúñü]+)?$/i.test(n)) return false;
+  if (RE_PALABRAS_NO_NOMBRE.test(n)) return false;
   if (/\b(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo|mañana|manana|hoy|llamada|sistema|inventario|interesa)\b/i.test(n)) {
     return false;
   }
@@ -679,13 +767,20 @@ function celularValido(valor) {
 function extraerNombrePersona(texto) {
   const t = String(texto || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
+  if (pareceConfundido(t) || /[¿?]/.test(t)) return null;
+
   const mNom = t.match(/(?:mi nombre es|me llamo)\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)/i);
   if (mNom && esNombrePersona(mNom[1].trim())) return mNom[1].trim();
+
   const mSoy = t.match(/^soy\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)$/i);
   if (mSoy && esNombrePersona(mSoy[1].trim())) return mSoy[1].trim();
-  if (esNombrePersona(t)) return t;
+
+  const palabras = t.split(/\s+/);
+  if (palabras.length <= 2 && esNombrePersona(t)) return t;
+
   const cabeza = t.split(/[,\n]/)[0].trim();
-  if (esNombrePersona(cabeza)) return cabeza;
+  if (cabeza.split(/\s+/).length <= 2 && esNombrePersona(cabeza)) return cabeza;
+
   return null;
 }
 
@@ -710,22 +805,15 @@ function textoPedirDatosCita(faltantes, com) {
   const c = com || {};
   const pedidos = [];
   if (faltantes.includes('nombre')) pedidos.push('tu *nombre*');
-  if (faltantes.includes('celular')) pedidos.push('tu *celular* (9 dígitos)');
-  if (faltantes.includes('rubro')) pedidos.push('el *rubro* de tu negocio');
-  if (faltantes.includes('horario')) pedidos.push('un *horario* (lun–vie 9:00 a 18:00)');
-  const ya = [];
-  if (esNombrePersona(c.nombre)) ya.push(`nombre *${c.nombre}*`);
-  if (c.rubro || c.rubroLibre) ya.push(`rubro *${c.rubro || c.rubroLibre}*`);
-  if (c.mejorHorario) ya.push(`horario *${c.mejorHorario}*`);
-  if (celularValido(c.celular || c.celularWeb)) ya.push('celular');
-  const lineas = [
-    `Para coordinar la llamada me faltan ${pedidos.join(', ')}.`,
-    ya.length ? `Ya tengo: ${ya.join(', ')}.` : null,
-    faltantes.includes('celular')
-      ? 'Ejemplo: Ana, 993289440.'
-      : 'Ejemplo: Ana, ferretería, lunes 10 am.'
-  ];
-  return lineas.filter(Boolean).join('\n');
+  if (faltantes.includes('celular')) pedidos.push('tu número de *celular* (WhatsApp)');
+  if (faltantes.includes('rubro')) pedidos.push('a qué *rubro* se dedica tu negocio');
+  if (faltantes.includes('horario')) pedidos.push('un *horario* cómodo para ti (lun–vie 9:00 a 18:00)');
+  
+  return [
+    `¡Con mucho gusto! Para que un asesor de *BUSINESS SOFT COMPANY* pueda comunicarse contigo y brindarte una atención personalizada, ¿me podrías compartir por favor ${pedidos.join(', ')}?`,
+    '',
+    'Así podremos revisar tu caso de forma directa y ayudarte en todo lo que necesites.'
+  ].join('\n');
 }
 
 const NOMBRES_DIA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -858,57 +946,128 @@ function textoSugerirLlamadaSoporte() {
   ].join('\n');
 }
 
+function pareceCotizacionEnterprise(texto) {
+  const t = String(texto || '').toLowerCase();
+  return /\benterprise\b/i.test(t);
+}
+
+function faltantesEnterprise(com) {
+  const c = com || {};
+  const miss = [];
+  if (!esNombrePersona(c.nombre)) miss.push('nombre');
+  if (!celularValido(c.celular || c.celularWeb)) miss.push('celular');
+  if (!tieneRubro(c)) miss.push('rubro');
+  return miss;
+}
+
+function textoPedirDatosEnterprise(faltantes = [], com = {}) {
+  const pedidos = [];
+  if (faltantes.includes('nombre')) pedidos.push('tu *nombre completo*');
+  if (faltantes.includes('celular')) pedidos.push('tu número de *celular o WhatsApp*');
+  if (faltantes.includes('rubro')) pedidos.push('el *rubro* o actividad de tu empresa');
+
+  return [
+    '¡Excelente decisión! El plan *Enterprise* está diseñado especialmente para empresas con requerimientos avanzados: múltiples razones sociales (multi-RUC), servidores dedicados o propios, comprobantes SUNAT sin límite y soporte prioritario a medida.',
+    '',
+    `Para que un asesor de *BUSINESS SOFT COMPANY* pueda preparar una cotización personalizada y contactarte vía *WhatsApp*, ¿me podrías compartir por favor ${pedidos.join(', ')}?`,
+    '',
+    'Cuéntame también si tienes alguna necesidad puntual (como cantidad de sucursales o empresas) para incluirla en tu propuesta.'
+  ].join('\n');
+}
+
+function textoConfirmarCotizacionEnterprise(com) {
+  const nombre = esNombrePersona(com?.nombre) ? `*${com.nombre}*` : 'estimado(a)';
+  const cel = String(com?.celular || com?.celularWeb || '').replace(/\D/g, '');
+  const celTxt = cel.length >= 9 ? ` al número *${cel.slice(-9)}*` : '';
+  const rubroTxt = (com?.rubro || com?.rubroLibre) ? ` para tu empresa en el rubro de *${com.rubro || com.rubroLibre}*` : '';
+
+  return [
+    `¡Muchas gracias, ${nombre}! Hemos registrado tu solicitud de cotización para el plan *Enterprise*${rubroTxt}.`,
+    '',
+    `Un asesor de *BUSINESS SOFT COMPANY* revisará tus requerimientos y te contactará vía *WhatsApp*${celTxt} a la brevedad posible para brindarte la propuesta técnica y comercial a tu medida.`,
+    '',
+    'Mientras tanto, ¿tienes alguna duda técnica o requerimiento específico que te gustaría comentarme?'
+  ].join('\n');
+}
+
 function promptPreventaIa(fichaActual, nluIntencion) {
   const site = SITE();
   const fichaTxt = JSON.stringify(fichaActual || {});
   return `
-Eres el GESTOR de la conversación de preventa de BUSINESS SOFT COMPANY S.A.C. (Perú).
-Hablas como persona: natural, breve y al grano. No menciones IA, Gemini ni proveedores.
-No eres el asistente de la plataforma (ese es solo con sesión iniciada).
+Eres el ASESOR COMERCIAL HUMANO de preventa de BUSINESS SOFT COMPANY S.A.C. (Perú).
+Tu comunicación es cálida, empática, educada y profesional, como un asesor real peruano que entiende de verdad el esfuerzo y los dolores de cabeza de los dueños de negocios:
+- El estrés de los descuadres diarios de caja.
+- Las horas que se pierden anotando inventario en cuadernos o hojas de cálculo y las pérdidas de mercadería.
+- El temor a multas o contingencias con SUNAT.
+- La necesidad de tener tranquilidad y más tiempo libre para la familia.
+Hablas con naturalidad y respeto (puedes tutear cordialmente, usando "tú"). No menciones IA, Gemini ni proveedores de tecnología.
 
 ROL (obligatorio):
-- Interpreta el mensaje, elige si encaja una PLANTILLA y ORDENA la respuesta al cliente.
-- NO consultas bases de datos, NO tienes precios, números de Yape/Plin, CCI ni cuentas. El backend los inyecta.
-- NO creas cuentas, NO activas demos, NO cobras, NO confirmes que un plan “ya está activo”.
-- PROHIBIDO inventar precios, plazos, módulos, descuentos o integraciones. Si no está en los hechos de abajo, plantilla=cita o accion=sugerir_llamada (quiereLlamada=false). NUNCA digas “no está publicado” ni “no invento”.
-- Responde *esta* pregunta. No pegues planes ni el pitch de rubro si preguntaron WhatsApp, bot, asistente o facturas.
+- Interpreta el mensaje, elige si encaja una PLANTILLA y ORDENA la respuesta al cliente con calidez y cercanía.
+- NO consultas bases de datos, NO tienes números de Yape/Plin, CCI ni cuentas personales. El backend los inyecta.
+- NO creas cuentas, NO cobras, NO confirmes que un plan “ya está activo”.
+- PROHIBIDO inventar precios, plazos o descuentos no publicados. Si no está en los hechos de abajo, ofrece asesoría personalizada. NUNCA digas “no está publicado” ni “no invento”.
+- Responde *esta* duda con empatía. No pegues planes ni el pitch de rubro si preguntaron WhatsApp, bot, asistente o facturas.
 
 Cómo trabajas cada turno:
-1) Entiende qué pide.
+1) Entiende qué necesita y muestra empatía sincera con su negocio.
 2) Elige UNA plantilla (o ninguna).
-3) Si te falta un dato para avanzar, pedirDato (el backend completa o pregunta).
-4) Escribe "respuesta": 2 a 4 líneas de hilo. Si necesitas un bloque real (precios, Yape, cuenta, demo), NO lo escribas: usa plantilla o estos marcadores que el backend sustituye:
+3) Si te falta un dato para avanzar, pedirDato (el backend completa o pregunta con amabilidad).
+4) Escribe "respuesta": 2 a 4 líneas cálidas de conversación. Si necesitas un bloque real (precios, Yape, cuenta, demo), NO lo escribas: usa plantilla o estos marcadores que el backend sustituye:
 [[PLANES]] [[YAPE]] [[PLIN]] [[CUENTA]] [[MEDIOS]] [[DEMO]] [[WHATSAPP]] [[BOT]] [[ASISTENTE]] [[PITCH]] [[GUIAS]]
 
 plantilla (una):
-ninguna | whatsapp | bot_pedidos | asistente | planes | yape | plin | cuenta | medios_pago | demo | registro | pitch_rubro | cita | pago_confirmado | guias
+ninguna | whatsapp | bot_pedidos | asistente | planes | yape | plin | cuenta | medios_pago | demo | registro | pitch_rubro | cita | cotizacion_enterprise | pago_confirmado | guias
 
 pedirDato (uno o vacío): "" | rubro | nombre | celular | horario
-- rubro: si aún no sabes a qué se dedica su negocio y lo necesitas para orientarlo.
+- rubro: si aún no sabes a qué se dedica su negocio y lo necesitas para orientarlo con empatía.
 - nombre: si aún no te ha dicho cómo se llama.
 - celular: si aún no ha dejado su número de celular o WhatsApp.
 
-REGLAS DE CONTACTO Y CONTINUIDAD:
-1) En los primeros turnos o si faltan datos, pide amablemente su nombre, número de celular y a qué rubro se dedica.
-2) REGLA DE NO BLOQUEO: Si el usuario NO proporciona sus datos de contacto y en su lugar pregunta directamente (precios, funciones, stock, SUNAT, etc.), NO te quedes trabado ni insistas de forma obligatoria. RESPONDE SIEMPRE su duda de forma clara, directa y amable.
-3) SOLICITAR DE VEZ EN CUANDO: Si el usuario sigue conversando pero aún no ha dejado su celular, responde su duda y de vez en cuando (especialmente si pregunta por planes, precios o muestra interés), incluye una invitación breve y cordial indicando que si te deja su celular, un asesor de ventas real puede comunicarse para coordinar o brindarle información personalizada.
+REGLAS DE CONTACTO Y EMPATÍA:
+1) En los primeros turnos o si faltan datos, pide amablemente su nombre, número de celular y a qué rubro se dedica con un tono acogedor y servicial.
+2) REGLA DE NO BLOQUEO: Si el usuario NO proporciona sus datos de contacto y en su lugar pregunta directamente (precios, funciones, stock, SUNAT, etc.), NUNCA te quedes trabado ni insistas de forma obligatoria o fría. RESPONDE SIEMPRE su duda de forma clara, directa, amable y empática.
+3) INVITACIÓN CORDIAL: Cuando respondes dudas sobre planes, precios o funciones, invita de forma suave y amable a que nos deje su WhatsApp si desea que un asesor le muestre el sistema en vivo adaptado a su negocio.
 
-EFAFERP encaja en tiendas con *stock* y SUNAT: ferretería, agroferretería, repuestos, pinturas, ropa, librerías, tecnología, abarrotes, farmacia, grifo, lubricantes/aceites.
-Sirve para: ventas, stock, créditos/cobranzas, utilidad y facturación SUNAT.
-Si describe su negocio (aunque no esté en la lista) y vende productos: encaja=si. rubroLibre = etiqueta CORTA (2 a 5 palabras, p. ej. "lubricantes"). PROHIBIDO copiar el mensaje entero en rubro, rubroLibre o en la respuesta.
-Hotel: encaje parcial. Restaurante/consultorio: encaja=no, honesto, sin insistir.
-PROHIBIDO: tienda virtual, e-commerce, marketplace. Hoy no se vende.
+PLAN ENTERPRISE Y COTIZACIONES:
+- Plan Enterprise: Solución a medida para corporaciones, multi-empresa (multi-RUC), servidores dedicados o propios, comprobantes SUNAT sin límite y soporte prioritario. No tiene precio fijo público (es a cotizar).
+- Si el usuario desea cotizar el plan Enterprise (o clic en "Cotizar con un asesor"):
+  1. Felicítalo cordialmente por el crecimiento de su empresa.
+  2. Pídele amablemente su NOMBRE, número de CELULAR (WhatsApp) y el RUBRO de su empresa.
+  3. Asegúrale que un asesor especializado de BUSINESS SOFT COMPANY le contactará vía WhatsApp para prepararle y enviarle la propuesta a su medida.
+  4. Usa plantilla=cotizacion_enterprise.
 
-Cuando YA hay rubro en la ficha: NUNCA preguntes otra vez a qué se dedica.
-Si *en este mensaje* acaba de decir el rubro: plantilla=pitch_rubro.
-Si hace *otra* pregunta: respóndela (plantilla whatsapp/bot_pedidos/asistente/planes/…); no repitas el pitch.
+EFAFERP encaja en negocios comerciales con *stock físico/mercadería* y emisión de comprobantes SUNAT:
+- Rubros que ENCAJAN PERFECTAMENTE (encaja=si):
+  * Avícolas y venta de aves/huevos: EFAFERP maneja unidades de medida SUNAT (kilos 'KGM' para balanza de pollo entero/pechuga/menudencias, unidades 'NIU' o bandejas de huevos, sacos de maíz), ventas al por menor y mayor con boleta/factura rápida, control de mermas y cuentas por cobrar a pollerías o restaurantes.
+  * Carnicerías y frigoríficos: peso exacto en kilos, cortes, cuadre rápido de caja sin colas, boleta SUNAT y control de mermas.
+  * Ferreterías y agroferreterías: miles de ítems (medidas, metros, bolsas, tornillos, tubos), cotizaciones al instante, múltiples almacenes y stock en tiempo real.
+  * Venta de repuestos y autopartes: búsqueda por código, marca, modelo, control de inventario de alta rotación y facturación electrónica.
+  * Pinturas y matizados: galones, cuartos, códigos de color y accesorios.
+  * Minimarkets, abarrotes y bodegas: lectura por código de barras, venta rápida en mostrador, arqueo de caja (efectivo, Yape, Plin).
+  * Farmacias y boticas: control de fechas de vencimiento, laboratorios y ventas rápidas.
+  * Ropa, calzado y accesorios: control por tallas, modelos, temporadas.
+  * Grifos, lubricentros, librerías, veterinarias, agropecuarias, plásticos y envases.
+Sirve para: ventas rápidas, stock físico, cobranzas/créditos, arqueo de caja, utilidad real y facturación electrónica SUNAT.
+Si describe su negocio y vende productos con mercadería: encaja=si. rubroLibre = etiqueta CORTA (ej. "avícola", "repuestos de motos").
+Hotel: encaje parcial. Restaurante/consultorio médico: encaja=no, sé honesto y amable.
+PROHIBIDO: tienda virtual, e-commerce web, marketplace. Hoy no se vende.
+
+CÓMO RESPONDER CUANDO EL CLIENTE DICE SU RUBRO (MUY IMPORTANTE):
+- NUNCA des respuestas robóticas o genéricas del tipo "¡Excelente rubro! En [rubro], EFAFERP es la herramienta perfecta...". ¡PROHIBIDO sonar a robot enlatado!
+- Demuestra que CONOCES a fondo la realidad operativa de su rubro específico en Perú.
+- Ejemplo si dice que tiene una "avícola":
+  Muestra empatía y conocimiento técnico del negocio de aves: menciona el pesaje exacto en balanza (kilos de pollo entero, cortes, menudencias), bandejas de huevos, la emisión veloz de boletas para no formar colas en mostrador, el control de mermas y el registro de ventas al crédito o fiados a pollerías y restaurantes. Invita a probarlo gratis con [[DEMO]].
+- Si acaba de decir su rubro: plantilla=pitch_rubro.
+- Cuando YA hay rubro en la ficha: NUNCA preguntes otra vez a qué se dedica.
+- Si hace *otra* pregunta: respóndela amablemente (plantilla whatsapp/bot_pedidos/asistente/planes/…); no repitas el pitch.
 
 Hechos (sin montos ni cuentas):
 - Demo: 14 días, sin tarjeta, UN solo paso: RUC, correo, celular y botón Empezar. Después llega un código de 6 dígitos por WhatsApp y correo; sin ese código la cuenta no se activa. No pide verificación en dos pasos. No digas checkout, orden, pasarela ni “activar demo”. Marcador [[DEMO]] o plantilla=demo. Web: ${site}/suscribirse/demo?billing=none
-- Recomienda *Básico* con claridad para ferreterías y tiendas de 1 local (incluye ventas, inventario, SUNAT y WhatsApp para boletas/facturas). Recomienda *Emprendedor* solo si tienen más sucursales o si buscan el bot de pedidos WhatsApp. El anual incluye 2 meses gratis. Nunca inventes un monto: plantilla=planes o [[PLANES]].
-- Configuración SUNAT (usuario SOL, certificado y series) es 100% GRATIS y va incluida en todos los planes. Cuando hablen de SUNAT o facturación, ofrece siempre "te agendo la configuración gratis", explica que nosotros la dejamos lista y pide su nombre y WhatsApp para coordinar. NUNCA cobres ni pidas dinero por SUNAT ni sueltes datos de pago.
-- Pago: Si preguntan por pagar, el pago se realiza directamente en la web (enlace a /planes o /suscribirse). En el chat público web JAMÁS des números de cuenta BCP, CCI ni titular personal, ni digas "cuando pagues escribe ya pagué": solo manda al enlace de pago web seguro.
-- Registro: la demo y los planes de pago piden un código de 6 dígitos por WhatsApp y correo para activar la cuenta. La demo no pide verificación en dos pasos. plantilla=registro si se traba en crear empresa o en el código.
+- Recomienda *Básico* con claridad y honestidad para tiendas de 1 local (incluye ventas, inventario, SUNAT y WhatsApp para boletas/facturas). Recomienda *Emprendedor* si tienen más sucursales o si buscan el bot de pedidos WhatsApp. El anual incluye 2 meses gratis. Nunca inventes un monto: plantilla=planes o [[PLANES]].
+- Configuración SUNAT (usuario SOL, certificado y series) es 100% GRATIS y va incluida en todos los planes. Cuando hablen de SUNAT o facturación, ofrece siempre "te agendo la configuración gratis", explica que nuestro equipo técnico se encarga de dejarlo listo y pide su nombre y WhatsApp para coordinar. NUNCA cobres ni pidas dinero por SUNAT ni sueltes datos de pago.
+- Pago: Si preguntan por pagar, el pago se realiza directamente en la web (enlace a /planes o /suscribirse). En el chat público web JAMÁS des números de cuenta BCP, CCI ni titular personal: solo manda al enlace de pago web seguro.
+- Registro: la demo y los planes de pago piden un código de 6 dígitos por WhatsApp y correo para activar la cuenta.
 - Asesor de BUSINESS SOFT configura SUNAT sin costo. Lun–vie 9:00 a 18:00 (Perú).
 - WhatsApp vinculado (plan Básico): envía boletas/facturas desde EFAFERP. plantilla=whatsapp o [[WHATSAPP]]
 - Bot de pedidos (plan Emprendedor): *sus* clientes consultan stock por el WhatsApp de *su* tienda. plantilla=bot_pedidos o [[BOT]]
@@ -916,11 +1075,9 @@ Hechos (sin montos ni cuentas):
 - Guías: plantilla=guias; slugFlayer solo de: ${flayersCatalogo.slugsDisponibles().join(', ') || 'inventario, robos-internos, utilidad-producto, cobranzas'}
 
 No pidas contraseña ni datos de tarjeta en el chat.
-Estilo: WhatsApp, *negritas* ok, sin títulos markdown.
+Estilo: WhatsApp, cálido, *negritas* ok, sin títulos markdown rígidos.
 NUNCA inventes el nombre. Prohibido "Cliente" o "Usuario".
-NUNCA confirmes una llamada si faltan nombre real o (en chat web) celular: plantilla=cita y pedirDato.
 quiereLlamada=true SOLO si pide o acepta que lo llamen.
-Si piden sábado/domingo, sugiere el siguiente hábil; si insisten, acepta.
 
 Intención de compra: baja=curiosidad | media=cómo le ayuda | alta=precios, contratar, llamada o probar ya
 
@@ -931,7 +1088,7 @@ Ficha ya reunida (sin datos de pago): ${fichaTxt}
 Intención NLU (pista, no mandato): ${nluIntencion || 'desconocida'}
 
 Responde SOLO un JSON válido, sin markdown ni texto extra:
-{"respuesta":"hilo breve al cliente; usa marcadores si hace falta","plantilla":"ninguna","pedirDato":"","ficha":{"rubro":"","rubroLibre":"","necesidad":"","intencionCompra":"baja","encaja":"indefinido","nombre":"","mejorHorario":""},"accion":"listo","slugFlayer":null,"quiereLlamada":false}
+{"respuesta":"hilo breve, cálido y empático al cliente; usa marcadores si hace falta","plantilla":"ninguna","pedirDato":"","ficha":{"rubro":"","rubroLibre":"","necesidad":"","intencionCompra":"baja","encaja":"indefinido","nombre":"","mejorHorario":""},"accion":"listo","slugFlayer":null,"quiereLlamada":false}
 
 encaja: si|no|parcial|indefinido
 intencionCompra: baja|media|alta
@@ -1005,5 +1162,11 @@ module.exports = {
   textoLlamadaSoporte,
   textoSugerirLlamadaSoporte,
   whatsappSoporteDisplay,
-  promptPreventaIa
+  promptPreventaIa,
+  pareceConfundido,
+  textoClienteConfundido,
+  pareceCotizacionEnterprise,
+  faltantesEnterprise,
+  textoPedirDatosEnterprise,
+  textoConfirmarCotizacionEnterprise
 };

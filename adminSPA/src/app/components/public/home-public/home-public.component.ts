@@ -343,6 +343,10 @@ export class HomePublicComponent implements OnInit, OnDestroy {
     return planCode === 'basico';
   }
 
+  cotizarEnterprise(): void {
+    this.chatUi.abrir('Hola, deseo cotizar el plan Enterprise para mi empresa.');
+  }
+
   private safeUrl(url: string): SafeResourceUrl {
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }

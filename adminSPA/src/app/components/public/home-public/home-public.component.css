@@ -580,6 +580,11 @@
   background: #cc0000;
 }
 
+.plan-card {
+  display: flex;
+  flex-direction: column;
+}
+
 .plan-card--featured {
   border: 2px solid #4f7cff;
   box-shadow: 0 16px 32px rgba(79, 124, 255, 0.2);
@@ -611,6 +616,7 @@
   list-style: none;
   padding: 0;
   margin: 0 0 16px;
+  flex-grow: 1;
 }
 
 .plan-limites li {

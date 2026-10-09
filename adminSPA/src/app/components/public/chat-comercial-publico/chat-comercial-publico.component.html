@@ -17,9 +17,14 @@
         <strong>Asesor comercial</strong>
         <span>Respondemos dudas con datos reales. No creamos cuentas ni cobramos</span>
       </div>
-      <button type="button" class="chat-close" (click)="ui.cerrar()" aria-label="Cerrar chat">
-        <i class="bi bi-x-lg" aria-hidden="true"></i>
-      </button>
+      <div class="chat-head-actions">
+        <button type="button" class="chat-btn-action" (click)="reiniciarChat()" title="Empezar de nuevo" aria-label="Empezar de nuevo">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="chat-btn-action chat-close" (click)="ui.cerrar()" title="Cerrar chat" aria-label="Cerrar chat">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+      </div>
     </header>
 
     <div class="chat-msgs" #listaMensajes>
@@ -46,7 +51,9 @@
                   [href]="url"
                   [attr.target]="esEnlaceExterno(url) ? '_blank' : null"
                   rel="noopener"
-                  (click)="abrirEnlace($event, url)">Abrir enlace</a>
+                  (click)="abrirEnlace($event, url)">
+                  {{ etiquetaEnlace(url) }}
+                </a>
               }
             </div>
           }

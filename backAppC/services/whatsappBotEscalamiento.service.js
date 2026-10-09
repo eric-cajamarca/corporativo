@@ -186,6 +186,8 @@ async function notificarInteresComercial(idEmpresa, params) {
     ? (esWeb
       ? '*Lead web dice que ya pagó el plan* 💸'
       : '*Lead WhatsApp dice que ya pagó el plan* 💸')
+    : motivo === 'cotizacion_enterprise'
+      ? '*Solicitud de Cotización Plan Enterprise* 🏢'
     : motivo === 'llamada'
       ? (esWeb
         ? '*Lead web EFAFERP pide llamada de soporte* 📞'
@@ -195,6 +197,8 @@ async function notificarInteresComercial(idEmpresa, params) {
         : '*Interesado EFAFERP con alta intención* ✨');
   const cierre = motivo === 'pago_reportado'
     ? 'Valida el voucher en el checkout. El bot NO activó el plan.'
+    : motivo === 'cotizacion_enterprise'
+      ? 'Contáctalo por WhatsApp para enviarle la propuesta y cotización Enterprise.'
     : esWeb
       ? 'Contáctalo tú. El visitante no abre WhatsApp desde la web.'
       : 'El bot sigue atendiendo. Contáctalo para agendar o cerrar.';

@@ -114,6 +114,12 @@ function mergeFicha(prev, incoming, textoEntrada) {
   if (prev?.errorPantalla) out.errorPantalla = prev.errorPantalla;
   if (prev?.pagoReportado || src.pagoReportado) out.pagoReportado = true;
   if (prev?.avisoPagoOk) out.avisoPagoOk = true;
+  if (ficha.pareceCotizacionEnterprise(textoEntrada) || prev?.interesEnterprise || src?.interesEnterprise) {
+    out.interesEnterprise = true;
+    out.planCode = 'enterprise';
+    out.intencionCompra = 'alta';
+  }
+  if (prev?.avisoEnterpriseOk || src?.avisoEnterpriseOk) out.avisoEnterpriseOk = true;
   return out;
 }
 
@@ -353,6 +359,7 @@ const PLANTILLAS = new Set([
   'registro',
   'pitch_rubro',
   'cita',
+  'cotizacion_enterprise',
   'pago_confirmado',
   'guias'
 ]);
@@ -364,6 +371,7 @@ const PLANTILLAS_FORZAR_BLOQUE = new Set([
   'cuenta',
   'medios_pago',
   'pago_confirmado',
+  'cotizacion_enterprise',
   'demo',
   'registro'
 ]);
@@ -387,6 +395,7 @@ function accionDesdePlantilla(plantilla, accionParsed) {
     registro: 'acompanar_demo',
     pitch_rubro: 'ofrecer_demo',
     cita: 'ofrecer_llamada',
+    cotizacion_enterprise: 'ofrecer_llamada',
     pago_confirmado: 'aviso_pago_manual',
     guias: 'enviar_guia'
   };
@@ -447,6 +456,12 @@ function bloquePlantilla(id, comercial, publicDatos) {
       return ficha.tieneRubro(comercial) ? ficha.textoPitchRubroYDemo(comercial) : null;
     case 'cita':
       return ficha.textoLlamadaSoporte(true, comercial, { requiereCelular: Boolean(comercial?.requiereCelular) });
+    case 'cotizacion_enterprise': {
+      const miss = ficha.faltantesEnterprise(comercial);
+      return miss.length > 0
+        ? ficha.textoPedirDatosEnterprise(miss, comercial)
+        : ficha.textoConfirmarCotizacionEnterprise(comercial);
+    }
     case 'pago_confirmado':
       return esWeb ? 'Quedó anotado tu aviso de pago. Un asesor validará la acreditación y te confirmaremos a tu WhatsApp y correo.' : pubDatos.textoConfirmaPagoCliente();
     case 'guias':
@@ -479,16 +494,19 @@ function inyectarMarcadores(texto, comercial, publicDatos) {
   return r.replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function pedirDatoTexto(dato) {
+function pedirDatoTexto(dato, comercial = {}) {
   switch (String(dato || '').toLowerCase()) {
     case 'rubro':
-      return 'Para orientarte: ¿a qué se dedica tu negocio? (qué vendes).';
+      return !comercial.rubro ? 'Para orientarte de la mejor manera: ¿a qué rubro o productos se dedica tu negocio?' : '';
     case 'nombre':
-      return '¿Cómo te llamas?';
+      if (comercial.nombre || comercial.nombrePreguntado) return '';
+      comercial.nombrePreguntado = true;
+      return '¿Cómo es tu nombre para poder dirigirme a ti con confianza?';
     case 'celular':
-      return 'Pásame tu celular de 9 dígitos (empieza en 9).';
+      if (comercial.celular || comercial.celularWeb) return '';
+      return '¿Me podrías compartir tu número de celular o WhatsApp para coordinar contigo?';
     case 'horario':
-      return '¿En qué horario te queda una llamada? (lun–vie 9:00 a 18:00, Perú).';
+      return '¿En qué horario te resultaría más cómodo conversar? (lun–vie 9:00 a 18:00, hora de Perú).';
     default:
       return '';
   }
@@ -502,6 +520,9 @@ function empiezaIgual(a, b, n = 28) {
 }
 
 function inferirPlantillaDatoReal(plantilla, texto, nlu, parsed) {
+  if (ficha.pareceCotizacionEnterprise(texto) || parsed?.plantilla === 'cotizacion_enterprise') {
+    return 'cotizacion_enterprise';
+  }
   if (plantilla !== 'ninguna') return plantilla;
   if (parsed.accion === 'enviar_planes') return 'planes';
   if (parsed.accion === 'aviso_pago_manual' || pubDatos.pareceConfirmaPago(texto, nlu)) return 'pago_confirmado';
@@ -527,18 +548,42 @@ function componerGestor(parsed, comercial, publicDatos) {
   if (bloque) {
     if (!respuesta) {
       respuesta = bloque;
+    } else if (plantilla === 'planes') {
+      // Mostrar la lista completa de planes solo una vez. En turnos subsiguientes no repetir toda la lista de 5 planes
+      if (!comercial.planesEnviados) {
+        if (!empiezaIgual(respuesta, bloque)) {
+          respuesta = `${respuesta}\n\n${bloque}`.trim();
+        }
+        comercial.planesEnviados = true;
+      } else if (!/https?:\/\/[^\s)]+/i.test(respuesta)) {
+        respuesta = `${respuesta}\n\nPuedes consultar todos los planes en detalle aquí: https://efaferp.com/planes`.trim();
+      }
     } else if (PLANTILLAS_FORZAR_BLOQUE.has(plantilla) && !empiezaIgual(respuesta, bloque)) {
       respuesta = `${respuesta}\n\n${bloque}`.trim();
-    } else if (plantilla === 'pitch_rubro' && !/suscribirse\/demo/i.test(respuesta) && !empiezaIgual(respuesta, bloque)) {
-      respuesta = `${respuesta}\n\n${bloque}`.trim();
+    } else if (plantilla === 'pitch_rubro') {
+      if (!respuesta || respuesta.length < 40) {
+        respuesta = bloque;
+      } else if (!/suscribirse\/demo|demo/i.test(respuesta)) {
+        const urlD = ficha.urlDemo();
+        respuesta = `${respuesta}\n\n💡 Puedes probar EFAFERP gratis por 14 días con tu propia información:\n👉 ${urlD}`.trim();
+      }
     } else if (plantilla === 'cita' && respuesta.length < 120) {
       respuesta = `${respuesta}\n\n${bloque}`.trim();
     }
   }
+
+  // Si dice "en el siguiente enlace" pero no puso URL, asegurar que esté
+  if (/\b(en el siguiente enlace|en este enlace|al siguiente enlace)\b/i.test(respuesta) && !/https?:\/\/[^\s)]+/i.test(respuesta)) {
+    const urlExtra = /demo/i.test(respuesta) ? 'https://efaferp.com/suscribirse/demo' : 'https://efaferp.com/planes';
+    respuesta = `${respuesta}\n👉 ${urlExtra}`.trim();
+  }
+
   const pedirDato = String(parsed.pedirDato || '').toLowerCase();
-  const extra = pedirDatoTexto(pedirDato);
-  if (extra && !empiezaIgual(respuesta, extra, 18)) {
-    respuesta = `${respuesta}\n\n${extra}`.trim();
+  if (pedirDato && respuesta.length < 350) {
+    const extra = pedirDatoTexto(pedirDato, comercial);
+    if (extra && !empiezaIgual(respuesta, extra, 18)) {
+      respuesta = `${respuesta}\n\n${extra}`.trim();
+    }
   }
   return { respuesta, plantilla, pedirDato };
 }
@@ -549,8 +594,39 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
   if (comercial.sugirioCambioDia && comercial.nombre) {
     return confirmarOAjustarLlamada({ ...comercial, ...merged, nombre: merged.nombre || comercial.nombre }, t);
   }
+  if (ficha.pareceConfundido(t)) {
+    return {
+      respuesta: ficha.textoClienteConfundido(),
+      comercial: { ...merged, esperandoDatosLlamada: false, quiereLlamada: false },
+      accion: 'preguntar',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+  }
   if (parecePedidoLlamada(t, nlu, comercial) && !ficha.textoRespuestaModulo(t)) {
     return pedirDatosOConfirmar(merged, t, Boolean(comercial.requiereCelular));
+  }
+  if (ficha.pareceCotizacionEnterprise(t) || (comercial.interesEnterprise && ficha.faltantesEnterprise(merged).length > 0)) {
+    const miss = ficha.faltantesEnterprise(merged);
+    return {
+      respuesta: ficha.textoPedirDatosEnterprise(miss, merged),
+      comercial: { ...merged, interesEnterprise: true, planCode: 'enterprise', intencionCompra: 'alta', esperandoDatosEnterprise: true },
+      accion: 'ofrecer_llamada',
+      slugFlayer: null,
+      quiereLlamada: false,
+      plantilla: 'cotizacion_enterprise',
+      pedirDato: miss[0] || ''
+    };
+  }
+  if (comercial.interesEnterprise && ficha.faltantesEnterprise(merged).length === 0 && !comercial.avisoEnterpriseOk) {
+    return {
+      respuesta: ficha.textoConfirmarCotizacionEnterprise(merged),
+      comercial: { ...merged, esperandoDatosEnterprise: false, intencionCompra: 'alta' },
+      accion: 'listo',
+      slugFlayer: null,
+      quiereLlamada: false,
+      plantilla: 'cotizacion_enterprise'
+    };
   }
   if (/\b(sunat|facturaci[oó]n|usuario\s+sol|certificado\s+digital|boletas?\s+electr[oó]nicas?|facturas?\s+electr[oó]nicas?)\b/i.test(t)) {
     return {
@@ -706,7 +782,10 @@ function aplicarCierreComercial(out) {
     const esMomentoOportuno = com.turnosSinCelular >= 3 || (com.turnosSinCelular >= 2 && (out.plantilla === 'planes' || com.intencionCompra === 'alta'));
     const pideContactoYa = /\b(celular|whatsapp|tel[eé]fono|n[uú]mero|ll[aá]mad|agendar)\b/i.test(out.respuesta || '');
     if (esMomentoOportuno && !pideContactoYa && !out.quiereLlamada && out.accion !== 'ofrecer_llamada') {
-      out.respuesta = `${out.respuesta}\n\n💡 _Si deseas que un asesor de ventas real te contacte o te ayude con una demostración a tu medida, compártenos tu número de celular._`.trim();
+      const inviteMsg = com.canal === 'web'
+        ? '💡 Si deseas que un asesor de ventas te contacte o te ayude con una demostración guiada, déjanos tu número de celular.'
+        : '💡 _Si deseas que un asesor de ventas real te contacte o te ayude con una demostración a tu medida, compártenos tu número de celular._';
+      out.respuesta = `${out.respuesta}\n\n${inviteMsg}`.trim();
       com.turnosSinCelular = 0;
     }
   } else {
@@ -770,6 +849,17 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
   mergedEarly.planCode = comercial.planCode;
   mergedEarly.billingCycle = comercial.billingCycle;
 
+  if (ficha.pareceConfundido(texto)) {
+    const outConf = {
+      respuesta: ficha.textoClienteConfundido(),
+      comercial: { ...limpiarDatosEfimeros(mergedEarly), esperandoDatosLlamada: false, quiereLlamada: false },
+      accion: 'preguntar',
+      slugFlayer: null,
+      quiereLlamada: false
+    };
+    return conHistorial(outConf, historial, texto, requiereCelular);
+  }
+
   if (parecePausaCita(texto) && (comercial.esperandoDatosLlamada || mergedEarly.esperandoDatosLlamada)) {
     comercial.esperandoDatosLlamada = false;
     comercial.quiereLlamada = false;
@@ -782,6 +872,25 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
     trace('4.BACKEND_SIN_GEMINI', { motivo: 'cita_relleno', accion: outCita.accion, faltantes: ficha.faltantesCita(outCita.comercial, { requiereCelular }) });
     trace('4c.RESPUESTA_BACKEND', { texto: outCita.respuesta });
     return conHistorial(outCita, historial, texto, requiereCelular);
+  }
+
+  if (mergedEarly.esperandoDatosEnterprise) {
+    const missEarly = ficha.faltantesEnterprise(mergedEarly);
+    if (!missEarly.length) {
+      mergedEarly.esperandoDatosEnterprise = false;
+      const outEnt = {
+        respuesta: ficha.textoConfirmarCotizacionEnterprise(mergedEarly),
+        comercial: mergedEarly,
+        accion: 'listo',
+        slugFlayer: null,
+        quiereLlamada: false,
+        plantilla: 'cotizacion_enterprise',
+        pedirDato: ''
+      };
+      trace('4.BACKEND_SIN_GEMINI', { motivo: 'cotizacion_enterprise_completa', comercial: mergedEarly });
+      trace('4c.RESPUESTA_BACKEND', { texto: outEnt.respuesta });
+      return conHistorial(outEnt, historial, texto, requiereCelular);
+    }
   }
 
   const flujo = resolverFlujoTurno(texto, nlu, mergedEarly, comercial.rutaActual);
@@ -799,12 +908,14 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
 
     const rubroNuevoEsteTurno = !ficha.tieneRubro(comercial) && ficha.tieneRubro(merged);
     if (rubroNuevoEsteTurno && plantilla === 'ninguna' && !ficha.parecePreguntaModulo(texto) && !pubDatos.parecePreguntaPlanes(texto, nlu)) {
-      const pitch = ficha.textoPitchRubroYDemo(merged);
-      if (!empiezaIgual(respuesta, pitch)) {
-        respuesta = `${respuesta}\n\n${pitch}`.trim();
-      }
       plantilla = 'pitch_rubro';
       accion = merged.encaja === 'no' ? 'sugerir_llamada' : 'ofrecer_demo';
+      if (!respuesta || respuesta.length < 40) {
+        respuesta = ficha.textoPitchRubroYDemo(merged);
+      } else if (!/suscribirse\/demo|demo/i.test(respuesta)) {
+        const urlD = ficha.urlDemo();
+        respuesta = `${respuesta}\n\n💡 Puedes probar EFAFERP gratis por 14 días con tu propia información:\n👉 ${urlD}`.trim();
+      }
     }
 
     const pidioLlamada = parecePedidoLlamadaEsteTurno(texto, nlu);
@@ -828,6 +939,26 @@ async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal
         }
         if (!respuesta || respuesta.length < 20) {
           respuesta = ficha.textoPedirDatosCita(miss, merged);
+        }
+      }
+    }
+    if (plantilla === 'cotizacion_enterprise' || ficha.pareceCotizacionEnterprise(texto) || merged.interesEnterprise) {
+      merged.interesEnterprise = true;
+      merged.planCode = 'enterprise';
+      merged.intencionCompra = 'alta';
+      plantilla = 'cotizacion_enterprise';
+      const missEnt = ficha.faltantesEnterprise(merged);
+      if (missEnt.length > 0) {
+        merged.esperandoDatosEnterprise = true;
+        pedirDato = missEnt[0] || '';
+        accion = 'ofrecer_llamada';
+        if (!respuesta || respuesta.length < 35 || !ficha.pareceCotizacionEnterprise(respuesta)) {
+          respuesta = ficha.textoPedirDatosEnterprise(missEnt, merged);
+        }
+      } else {
+        merged.esperandoDatosEnterprise = false;
+        if (!comercial.avisoEnterpriseOk) {
+          respuesta = ficha.textoConfirmarCotizacionEnterprise(merged);
         }
       }
     }

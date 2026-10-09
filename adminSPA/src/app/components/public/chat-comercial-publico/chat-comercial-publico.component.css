@@ -58,13 +58,33 @@
   opacity: 0.85;
 }
 
-.chat-close {
+.chat-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chat-btn-action {
   border: 0;
   background: transparent;
   color: #fff;
-  font-size: 1.1rem;
-  padding: 4px;
+  font-size: 1.15rem;
+  padding: 6px 8px;
+  min-width: 36px;
+  min-height: 36px;
   cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.chat-btn-action:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .chat-msgs {
@@ -108,20 +128,34 @@
 
 .chat-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .chat-link {
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #1f3b73;
+  background: #1f3b73;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 0.84rem;
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 8px 12px;
   text-decoration: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 2px 6px rgba(31, 59, 115, 0.2);
+  cursor: pointer;
+  text-align: center;
+}
+
+.chat-link:hover {
+  background: #17305e;
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .chat-typing,
@@ -177,5 +211,38 @@
     justify-content: center;
     padding: 0;
     font-size: 1.25rem;
+  }
+
+  .chat-panel {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    z-index: 1099;
+  }
+
+  .chat-head {
+    padding: 14px 16px;
+    border-radius: 0;
+  }
+
+  .chat-msgs {
+    padding: 14px;
+  }
+
+  .chat-form {
+    padding: 10px 14px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .chat-burbuja {
+    max-width: 95%;
+    font-size: 0.92rem;
   }
 }
