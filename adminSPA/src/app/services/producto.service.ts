@@ -397,4 +397,14 @@ export class ProductoService {
         })
       );
   }
+
+  precargarCatalogoDemo(rubro?: string): Observable<any> {
+    return this._http
+      .post(`${this.url}productos/precargar-catalogo-demo`, { rubro }, { withCredentials: true })
+      .pipe(
+        tap(() => {
+          this.limpiarCacheListaProductos();
+        })
+      );
+  }
 }

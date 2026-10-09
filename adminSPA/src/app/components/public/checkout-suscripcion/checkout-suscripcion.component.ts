@@ -61,6 +61,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   demoRuc = '';
   demoCorreo = '';
   demoCelular = '';
+  demoRubro = '';
   demoClave = '';
   demoCodigo = '';
   idEmpresaDemo = signal('');
@@ -98,6 +99,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.billingCycle.set(billing === 'none' || billing === 'yearly' || billing === 'monthly' ? billing : 'monthly');
       const cel = (this.route.snapshot.queryParamMap.get('celular') || '').replace(/\D/g, '').slice(-9);
       if (/^9\d{8}$/.test(cel)) this.demoCelular = cel;
+      const rubroQuery = (this.route.snapshot.queryParamMap.get('rubro') || '').trim();
+      if (rubroQuery) this.demoRubro = rubroQuery;
       if (plan === 'demo') {
         this.procesando.set(false);
         return;
@@ -908,6 +911,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           ruc,
           razon_Social: razonSocial,
           nombre_Comercial: sunatData.nombreComercial || '',
+          rubro: this.demoRubro || sunatData.actividadEconomica || '',
           correo,
           celular,
           password: clave,

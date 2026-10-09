@@ -558,6 +558,13 @@ function componerGestor(parsed, comercial, publicDatos) {
       } else if (!/https?:\/\/[^\s)]+/i.test(respuesta)) {
         respuesta = `${respuesta}\n\nPuedes consultar todos los planes en detalle aquí: https://efaferp.com/planes`.trim();
       }
+    } else if (plantilla === 'demo') {
+      // Si la respuesta ya incluye la URL de la demo o los pasos, no concatenar todo el bloque para no duplicar
+      if (!/suscribirse\/demo|c[oó]digo de 6 d[ií]gitos/i.test(respuesta)) {
+        if (!empiezaIgual(respuesta, bloque)) {
+          respuesta = `${respuesta}\n\n${bloque}`.trim();
+        }
+      }
     } else if (PLANTILLAS_FORZAR_BLOQUE.has(plantilla) && !empiezaIgual(respuesta, bloque)) {
       respuesta = `${respuesta}\n\n${bloque}`.trim();
     } else if (plantilla === 'pitch_rubro') {

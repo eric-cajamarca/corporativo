@@ -3,7 +3,7 @@ import { Component, ElementRef, ViewChild, effect, inject } from '@angular/core'
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
-import { ChatComercialMensaje } from '../../../models/chat-comercial-publico.model';
+import { ChatComercialMensaje, QuickChip, EnlaceAccionChat } from '../../../models/chat-comercial-publico.model';
 import { ChatComercialPublicoService } from '../../../services/chat-comercial-publico.service';
 import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 
@@ -12,6 +12,16 @@ const SALUDO: ChatComercialMensaje = {
   role: 'model',
   text: '¡Hola! Qué gusto saludarte 👋 Soy tu asesor comercial en EFAFERP (BUSINESS SOFT).\n\nEstoy aquí para orientarte y ayudarte a encontrar la mejor opción para tu negocio, con total transparencia.\n\nCuéntame, ¿cómo te llamas y qué tipo de tienda o negocio tienes? (O si tienes alguna consulta puntual sobre precios, stock o facturación SUNAT, dime con toda confianza).'
 };
+
+const CHIPS_RUBROS_INICIALES: QuickChip[] = [
+  { id: 'avicola', label: '🍗 Avícola', textToSend: 'Tengo una avícola' },
+  { id: 'ferreteria', label: '🔧 Ferretería', textToSend: 'Tengo una ferretería' },
+  { id: 'abarrotes', label: '📦 Abarrotes / Minimarket', textToSend: 'Tengo un minimarket de abarrotes' },
+  { id: 'repuestos', label: '🏍️ Repuestos', textToSend: 'Tengo una tienda de repuestos' },
+  { id: 'ropa', label: '👕 Ropa / Calzado', textToSend: 'Tengo una tienda de ropa y calzado' },
+  { id: 'botica', label: '💊 Botica / Farmacia', textToSend: 'Tengo una botica o farmacia' },
+  { id: 'carniceria', label: '🥩 Carnicería', textToSend: 'Tengo una carnicería' }
+];
 
 @Component({
   selector: 'app-chat-comercial-publico',
@@ -29,6 +39,7 @@ export class ChatComercialPublicoComponent {
   @ViewChild('listaMensajes') listaMensajes?: ElementRef<HTMLDivElement>;
 
   mensajes: ChatComercialMensaje[] = [SALUDO];
+  chipsActuales: QuickChip[] = [...CHIPS_RUBROS_INICIALES];
   enviando = false;
   error = '';
   sessionId: string | null = null;
@@ -43,6 +54,7 @@ export class ChatComercialPublicoComponent {
     } catch {
       this.sessionId = null;
     }
+    this.chipsActuales = this.sessionId ? [] : [...CHIPS_RUBROS_INICIALES];
 
     effect(() => {
       if (!this.ui.abierto() || this.enviando) return;
@@ -59,8 +71,31 @@ export class ChatComercialPublicoComponent {
     return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(url || ''));
   }
 
+  enlacesMensaje(texto: string): EnlaceAccionChat[] {
+    const rawUrls = String(texto || '').match(/https?:\/\/[^\s)]+/g) || [];
+    const resultado: EnlaceAccionChat[] = [];
+    const etiquetasVistas = new Set<string>();
+    const urlsVistas = new Set<string>();
+
+    for (const raw of rawUrls) {
+      const url = raw.replace(/[.,;:!]+$/, '').trim();
+      if (!url) continue;
+      const urlLower = url.toLowerCase();
+      if (urlsVistas.has(urlLower)) continue;
+
+      const label = this.etiquetaEnlace(url);
+      if (etiquetasVistas.has(label)) continue;
+
+      urlsVistas.add(urlLower);
+      etiquetasVistas.add(label);
+      resultado.push({ url, label });
+    }
+
+    return resultado;
+  }
+
   extraerUrls(texto: string): string[] {
-    return String(texto || '').match(/https?:\/\/[^\s)]+/g) || [];
+    return this.enlacesMensaje(texto).map(e => e.url);
   }
 
   /** Demo, planes y registro en la misma pestaña para no perder el hilo del chat. */
@@ -155,6 +190,7 @@ export class ChatComercialPublicoComponent {
 
   reiniciarChat(): void {
     this.mensajes = [SALUDO];
+    this.chipsActuales = [...CHIPS_RUBROS_INICIALES];
     this.sessionId = null;
     this.error = '';
     this.enviando = false;
@@ -169,13 +205,26 @@ export class ChatComercialPublicoComponent {
   enviar(): void {
     const mensaje = this.form.controls.mensaje.value.trim();
     if (!mensaje) return;
+    this.chipsActuales = [];
     this.form.controls.mensaje.setValue('');
     this.enviarTexto(mensaje);
+  }
+
+  chipsDisponibles(): QuickChip[] {
+    if (this.enviando) return [];
+    return this.chipsActuales;
+  }
+
+  onSelectChip(chip: QuickChip): void {
+    if (this.enviando) return;
+    this.chipsActuales = [];
+    this.enviarTexto(chip.textToSend);
   }
 
   private enviarTexto(mensaje: string): void {
     const texto = String(mensaje || '').trim();
     if (!texto || this.enviando) return;
+    this.chipsActuales = [];
     this.error = '';
     this.mensajes = [...this.mensajes, { role: 'user', text: texto }];
     this.enviando = true;
@@ -206,11 +255,13 @@ export class ChatComercialPublicoComponent {
             imagenUrl: data?.imagenUrl || null
           }
         ];
+        this.chipsActuales = Array.isArray(data?.chips) ? data.chips : [];
         this.enviando = false;
         this.scrollAlFinal();
       },
       error: (err: { error?: { message?: string }; message?: string }) => {
         this.error = err?.error?.message || err?.message || 'No se pudo enviar el mensaje.';
+        this.chipsActuales = [];
         this.enviando = false;
         this.scrollAlFinal();
       }

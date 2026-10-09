@@ -938,6 +938,41 @@ const sugerir_productos_codigo_sunat_batch = async function (req, res) {
   }
 };
 
+const precargar_catalogo_demo = async function (req, res) {
+  try {
+    const idEmpresa = req.user?.empresa;
+    if (!idEmpresa) {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    const catalogoDemoSeed = require('../services/catalogoDemoSeed.service');
+    const result = await withPool(async (pool) => {
+      return catalogoDemoSeed.seedProductosDemoSegunRubro(pool, idEmpresa, {
+        rubro: req.body?.rubro || undefined,
+        idUsuario: req.user.sub || req.user.idUsuario || req.user.id
+      });
+    });
+    if (!result?.ok) {
+      if (result?.razon === 'empresa_ya_tiene_productos') {
+        return res.status(200).send({
+          message: 'La empresa ya cuenta con productos en su inventario.',
+          data: result
+        });
+      }
+      return res.status(400).send({
+        message: result?.error || 'No se pudieron precargar los productos de ejemplo.',
+        data: result
+      });
+    }
+    return res.status(200).send({
+      message: `Se crearon ${result.insertados} productos de ejemplo adaptados a tu rubro (${result.rubro}).`,
+      data: result
+    });
+  } catch (error) {
+    console.error('precargar_catalogo_demo error:', error);
+    return res.status(500).send({ message: error.message || 'Error al precargar catálogo demo', data: undefined });
+  }
+};
+
 module.exports = {
   obtener_productos_todos,
   buscar_productos_venta,
@@ -955,4 +990,5 @@ module.exports = {
   eliminar_producto,
   listar_productos_codigo_sunat,
   sugerir_productos_codigo_sunat_batch,
+  precargar_catalogo_demo,
 };

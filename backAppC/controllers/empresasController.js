@@ -257,6 +257,7 @@ const createEmpresa = async function (req, res, next) {
                     correo,
                     passwordHash: hashedPassword,
                     celular,
+                    rubro: rubro || req.body.rubro || null,
                     idRubro: req.body.idRubro || null,
                     direccion: req.body.direccion || 'Sin dirección',
                     ubigeo: req.body.ubigeo,

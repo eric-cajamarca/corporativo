@@ -33,13 +33,31 @@
       </ng-container>
         
       <ng-container *ngIf="catalogoInicialCargado && totalProductos === 0">
-        <div class="row">
-          <div class="col-12">
-            <div class="alert alert-danger" role="alert">
-              <div class="alert-text">
-                <p>No tienes productos registrados</p>
-              </div>
-            </div>
+        <div class="card-body text-center py-5">
+          <div class="mb-3">
+            <i class="fas fa-boxes fa-3x text-muted opacity-50"></i>
+          </div>
+          <h4 class="fw-bold mb-2">No tienes productos registrados</h4>
+          <p class="text-muted mx-auto mb-4" style="max-width: 480px;">
+            Puedes registrar tus propios productos manualmente o cargar un catálogo inicial de productos de ejemplo adaptados al rubro de tu negocio.
+          </p>
+          <div class="d-flex justify-content-center gap-2 flex-wrap">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="cargandoEjemplos"
+              (click)="cargarEjemplosRubro()">
+              <i class="fas fa-magic me-1" *ngIf="!cargandoEjemplos"></i>
+              <span class="spinner-border spinner-border-sm me-1" *ngIf="cargandoEjemplos"></span>
+              Cargar productos de ejemplo de mi rubro
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              (click)="abrirCrearProducto()">
+              <i class="fas fa-plus me-1"></i>
+              Crear producto manualmente
+            </button>
           </div>
         </div>
       </ng-container>

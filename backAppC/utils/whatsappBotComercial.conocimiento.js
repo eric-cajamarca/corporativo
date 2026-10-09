@@ -331,7 +331,7 @@ function textoPitchRubroYDemo(com) {
     'En EFAFERP puedes registrar tus productos por peso (kg) o unidades, emitir comprobantes electrónicos SUNAT en segundos y cuadrar tu caja del día al centavo.',
     '',
     'Puedes probar el sistema con tu propia información durante *14 días gratis* (sin tarjeta ni compromisos):',
-    `👉 ${urlDemo()}`,
+    `👉 ${urlDemo(nombre)}`,
     '',
     preguntaGiro
   ].join('\n');
@@ -359,8 +359,10 @@ function last9Celular(valor) {
   return /^9\d{8}$/.test(nueve) ? nueve : '';
 }
 
-function urlDemo() {
-  return `${urlPublica('/suscribirse/demo')}?billing=none&origen=bot`;
+function urlDemo(rubro) {
+  const base = `${urlPublica('/suscribirse/demo')}?billing=none&origen=bot`;
+  const r = String(rubro || '').trim();
+  return r ? `${base}&rubro=${encodeURIComponent(r)}` : base;
 }
 
 function urlPlanes() {

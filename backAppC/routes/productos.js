@@ -38,6 +38,8 @@ api.get('/productos/:idProducto/imagenes', auth.auth, productosImagenController.
 api.post('/productos/:idProducto/imagenes', auth.auth, multerConfig.uploadImagenesProducto, productosImagenController.subir);
 api.put('/productos/:idProducto/imagenes/portada', auth.auth, productosImagenController.marcarPortada);
 api.delete('/productos/imagenes/:idImagen', auth.auth, productosImagenController.eliminar);
+// Precarga de catálogo demo según rubro
+api.post('/productos/precargar-catalogo-demo', auth.auth, productosController.precargar_catalogo_demo);
 // CRUD por id
 api.get('/productos/:id', auth.auth, productosController.obtener_productos_id);
 api.post('/productos', auth.auth, productosController.crear_producto);

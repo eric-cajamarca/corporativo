@@ -45,6 +45,8 @@ export class IndexProductoComponent {
   public desactivandoId: string | null = null;
   /** Configuración inventario: galería de imágenes habilitada */
   public productosConImagenes = false;
+  /** Estado de carga al precargar catálogo de ejemplo según rubro */
+  public cargandoEjemplos = false;
 
   etiquetaUnidad(item: Record<string, unknown>): string {
     return descripcionUnidadMedidaProducto(item);
@@ -193,6 +195,53 @@ export class IndexProductoComponent {
   limpiarFiltroBusqueda(): void {
     this.filtro = '';
     this.initData(1);
+  }
+
+  cargarEjemplosRubro(): void {
+    if (this.cargandoEjemplos) return;
+    this.cargandoEjemplos = true;
+    this._productoService.precargarCatalogoDemo().subscribe({
+      next: (resp: any) => {
+        this.cargandoEjemplos = false;
+        if (resp?.data?.ok && resp?.data?.insertados) {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({
+              title: 'Éxito',
+              message: resp.message || `Se cargaron ${resp.data.insertados} productos de muestra adaptados a tu rubro.`,
+              position: 'topRight'
+            });
+          }
+          this.initData(1);
+        } else if (resp?.data?.razon === 'empresa_ya_tiene_productos') {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.info({
+              title: 'Aviso',
+              message: resp.message || 'La empresa ya cuenta con productos registrados.',
+              position: 'topRight'
+            });
+          }
+          this.initData(1);
+        } else {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.warning({
+              title: 'Aviso',
+              message: resp?.data?.error || resp?.message || 'No se pudieron precargar productos.',
+              position: 'topRight'
+            });
+          }
+        }
+      },
+      error: (err: any) => {
+        this.cargandoEjemplos = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: err?.error?.message || err?.message || 'Error al precargar productos de ejemplo.',
+            position: 'topRight'
+          });
+        }
+      }
+    });
   }
 
   /** Búsqueda paginada en servidor. */

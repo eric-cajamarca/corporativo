@@ -173,34 +173,38 @@ async function notificarInteresComercial(idEmpresa, params) {
 
   const f = comercial || {};
   const esWeb = canal === 'web';
+  const celLimpio = String(digitosCelular || '').replace(/\D/g, '');
+  const celFormateado = celLimpio.length === 9 ? `51${celLimpio}` : celLimpio;
+  const linkWa = celLimpio.length >= 9 ? `👉 *Escríbele directo por WhatsApp:* https://wa.me/${celFormateado}` : null;
+
   const contacto = esWeb
     ? [
         `Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(chat de la web pública)`,
         digitosCelular
-          ? `Celular indicado: +${String(digitosCelular).replace(/\D/g, '')}`
+          ? `Celular indicado: +${celFormateado}`
           : 'Celular: no lo dejó en el chat',
         telefonoCliente ? `Sesión: ${String(telefonoCliente).slice(0, 24)}` : null
       ]
     : [`Cliente: ${nombreCliente ? `*${nombreCliente}* ` : ''}(+${telefonoCliente})`];
   const titulo = motivo === 'pago_reportado'
     ? (esWeb
-      ? '*Lead web dice que ya pagó el plan* 💸'
-      : '*Lead WhatsApp dice que ya pagó el plan* 💸')
+      ? '💸 *¡LEAD WEB REPORTÓ PAGO DE PLAN!* 💸'
+      : '💸 *¡PROSPECTO WHATSAPP REPORTÓ PAGO!* 💸')
     : motivo === 'cotizacion_enterprise'
-      ? '*Solicitud de Cotización Plan Enterprise* 🏢'
+      ? '🏢 *¡NUEVA SOLICITUD DE COTIZACIÓN ENTERPRISE!* 🏢'
     : motivo === 'llamada'
       ? (esWeb
-        ? '*Lead web EFAFERP pide llamada de soporte* 📞'
-        : '*Interesado EFAFERP pide llamada de soporte* 📞')
+        ? '📞 *¡LEAD WEB SOLICITÓ CONTACTO / ASESORÍA!* 📞'
+        : '📞 *¡PROSPECTO SOLICITA LLAMADA DE ASESOR!* 📞')
       : (esWeb
-        ? '*Lead web EFAFERP con alta intención* ✨'
-        : '*Interesado EFAFERP con alta intención* ✨');
+        ? '🔥 *¡NUEVO LEAD CALIENTE EN LA WEB!* 🔥'
+        : '🔥 *¡NUEVO PROSPECTO CALIFICADO!* 🔥');
   const cierre = motivo === 'pago_reportado'
     ? 'Valida el voucher en el checkout. El bot NO activó el plan.'
     : motivo === 'cotizacion_enterprise'
-      ? 'Contáctalo por WhatsApp para enviarle la propuesta y cotización Enterprise.'
+      ? 'Contáctalo por WhatsApp a la brevedad para enviarle la propuesta Enterprise.'
     : esWeb
-      ? 'Contáctalo tú. El visitante no abre WhatsApp desde la web.'
+      ? 'Contáctalo de inmediato. El cliente está esperando atención.'
       : 'El bot sigue atendiendo. Contáctalo para agendar o cerrar.';
   const body = [
     titulo,
@@ -208,9 +212,10 @@ async function notificarInteresComercial(idEmpresa, params) {
     `Rubro: ${f.rubro || f.rubroLibre || 'no indicado'}`,
     `Encaje: ${f.encaja || 'indefinido'} | Intención: ${f.intencionCompra || 'n/d'}`,
     f.necesidad ? `Necesidad: ${String(f.necesidad).slice(0, 200)}` : null,
-    f.nombre ? `Nombre para llamada: ${f.nombre}` : null,
-    f.mejorHorario ? `Horario: ${f.mejorHorario}` : null,
+    f.nombre ? `Nombre registrado: ${f.nombre}` : null,
+    f.mejorHorario ? `Horario preferido: ${f.mejorHorario}` : null,
     ultimoMensaje ? `Último mensaje: ${String(ultimoMensaje).slice(0, 220)}` : null,
+    linkWa,
     '',
     cierre
   ].filter(Boolean);

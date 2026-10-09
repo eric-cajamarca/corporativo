@@ -12,6 +12,7 @@ const whatsappBotComercial = require('./whatsappBotComercial.service');
 const whatsappBotNlu = require('./whatsappBotNlu.service');
 const whatsappBotConfigRepository = require('../repositories/whatsappBotConfig.repository');
 const empresaWhatsAppRepository = require('../repositories/empresaWhatsApp.repository');
+const whatsappBotLeadComercial = require('./whatsappBotLeadComercial.service');
 const ficha = require('../utils/whatsappBotComercial.conocimiento');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -128,7 +129,18 @@ function adaptarRespuestaWeb(texto, recienAgendada, com, yaEstabaAgendada = fals
     t = `${t}\n👉 ${urlExtra}`.trim();
   }
 
-  return t.replace(/\n{3,}/g, '\n\n').trim();
+  // Deduplicar URLs idénticas en la respuesta para evitar repeticiones
+  const urlsVistas = new Set();
+  t = t.replace(/https?:\/\/[^\s)]+/g, (match) => {
+    const norm = match.replace(/[.,;:!]+$/, '').toLowerCase();
+    if (urlsVistas.has(norm)) {
+      return '';
+    }
+    urlsVistas.add(norm);
+    return match;
+  });
+
+  return t.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function imagenUrlDeTurno(turno) {
@@ -163,6 +175,65 @@ async function cargarContextoPrincipal(idEmpresa) {
     const vinculado = wa?.telefonoVinculado || null;
     return { config, telefonoVinculadoBot: vinculado, celularEmpresaPrincipal: celularEmpresa };
   });
+}
+
+const CHIPS_RUBROS = [
+  { id: 'avicola', label: '🍗 Avícola', textToSend: 'Tengo una avícola' },
+  { id: 'ferreteria', label: '🔧 Ferretería', textToSend: 'Tengo una ferretería' },
+  { id: 'abarrotes', label: '📦 Abarrotes / Minimarket', textToSend: 'Tengo un minimarket de abarrotes' },
+  { id: 'repuestos', label: '🏍️ Repuestos', textToSend: 'Tengo una tienda de repuestos' },
+  { id: 'ropa', label: '👕 Ropa / Calzado', textToSend: 'Tengo una tienda de ropa y calzado' },
+  { id: 'botica', label: '💊 Botica / Farmacia', textToSend: 'Tengo una botica o farmacia' },
+  { id: 'carniceria', label: '🥩 Carnicería', textToSend: 'Tengo una carnicería' }
+];
+
+const CHIPS_POST_PITCH = [
+  { id: 'demo', label: '🚀 Probar demo gratis', textToSend: 'Quiero probar la demo gratis de 14 días' },
+  { id: 'planes', label: '📋 Planes y precios', textToSend: '¿Cuáles son los planes y precios?' },
+  { id: 'sunat', label: '🧾 Facturación SUNAT gratis', textToSend: '¿Cómo funciona la configuración de SUNAT gratis?' },
+  { id: 'llamada', label: '📞 Solicitar llamada', textToSend: 'Quiero que un asesor me llame' },
+  { id: 'enterprise', label: '🏢 Cotizar Enterprise', textToSend: 'Deseo cotizar el Plan Enterprise' }
+];
+
+function resolverChipsTurno(com, turno, agendada, textoRespuesta) {
+  // 1. Si la llamada ya está agendada o confirmada, NUNCA mostrar chips
+  if (agendada || com?.avisoLlamadaOk || com?.avisoEnterpriseOk || com?.confirmacionLlamadaEnviadaWeb) {
+    return [];
+  }
+
+  // 2. Si el bot está en flujo de captura de datos (esperando llamada o enterprise):
+  if (turno?.accion === 'ofrecer_llamada' || com?.esperandoDatosLlamada || com?.esperandoDatosEnterprise || com?.quiereLlamada) {
+    return [];
+  }
+
+  const pedirDato = String(turno?.pedirDato || com?.pedirDato || '').toLowerCase();
+  if (['nombre', 'celular', 'horario'].includes(pedirDato)) {
+    return [];
+  }
+
+  // 3. Si el texto del bot pide nombre, teléfono, celular o un horario para contactarlo:
+  const t = String(textoRespuesta || '').toLowerCase();
+  const pideDatosContacto =
+    /\b(compartir.*(nombre|celular|horario|tel[eé]fono|whatsapp)|tu nombre|tu n[uú]mero|tu celular|d[eé]jame tu (nombre|n[uú]mero|celular)|un horario c[oó]modo|en qu[eé] horario|c[oó]mo te llamas|ind[ií]canos tu|br[ií]ndanos tu|facil[ií]tanos tu)\b/i.test(t);
+  if (pideDatosContacto) {
+    return [];
+  }
+
+  // 4. Si aún no tenemos rubro y el mensaje pregunta a qué se dedica:
+  const tieneRubro = Boolean(com?.rubro || com?.rubroLibre);
+  if (!tieneRubro && (com?.esperandoRubro || pedirDato === 'rubro' || /\b(rubro|a qu[eé] se dedica|qu[eé] vendes|tipo de tienda|tipo de negocio)\b/i.test(t))) {
+    return CHIPS_RUBROS;
+  }
+
+  // 5. Si acaba de darse el pitch del rubro o se presenta la demo gratuita de su rubro:
+  const esPitchRubro = turno?.plantilla === 'pitch_rubro' || /\b(14 d[ií]as gratis|probar el sistema con tu propia informaci[oó]n|probar efaferp gratis)\b/i.test(t);
+  if (esPitchRubro) {
+    const tieneCel = Boolean(com?.celular || com?.celularWeb);
+    return CHIPS_POST_PITCH.filter(c => !tieneCel || c.id !== 'llamada');
+  }
+
+  // 6. Por defecto en cualquier otro turno conversacional, pantalla limpia
+  return [];
 }
 
 function turnoBienvenida(conv) {
@@ -209,7 +280,8 @@ async function procesar(body) {
       respuesta: ficha.textoClienteConfundido(),
       imagenUrl: null,
       llamadaAgendada: llamadaConfirmada(comPrev),
-      avisoEnviado: false
+      avisoEnviado: false,
+      chips: []
     };
   }
 
@@ -228,7 +300,8 @@ async function procesar(body) {
       respuesta: resp,
       imagenUrl: null,
       llamadaAgendada: llamadaConfirmada(comPrev),
-      avisoEnviado: false
+      avisoEnviado: false,
+      chips: []
     };
   }
 
@@ -245,7 +318,8 @@ async function procesar(body) {
       respuesta: resp,
       imagenUrl: null,
       llamadaAgendada: llamadaConfirmada(comPrev),
-      avisoEnviado: false
+      avisoEnviado: false,
+      chips: []
     };
   }
 
@@ -333,14 +407,30 @@ async function procesar(body) {
     }
   }
 
+  // Guardar y mantener actualizado el lead en la BD (WhatsAppBotLeadComercial)
+  if (com.nombre || com.celular || com.celularWeb || com.rubro || agendada) {
+    whatsappBotLeadComercial.registrarDesdeTurno(
+      idEmpresa,
+      ctx,
+      { comercial: com, quiereLlamada: agendada },
+      texto
+    ).catch((errLead) => {
+      console.error('chatComercialPublico registrarLead error:', errLead.message);
+    });
+  }
+
   saveConv(sessionId, nextConv);
+
+  const respuestaTextoFinal = adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), recienAgendada, com, yaEstabaAgendada);
+  const chipsCalculados = resolverChipsTurno(com, turno, agendada, respuestaTextoFinal);
 
   return {
     sessionId,
-    respuesta: adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), recienAgendada, com, yaEstabaAgendada),
+    respuesta: respuestaTextoFinal,
     imagenUrl: imagenUrlDeTurno(turno),
     llamadaAgendada: agendada,
-    avisoEnviado
+    avisoEnviado,
+    chips: chipsCalculados
   };
 }
 

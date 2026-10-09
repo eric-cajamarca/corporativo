@@ -630,6 +630,13 @@ exports.verificarEmpresaPorCodigo = async (pool, idEmpresa, codigo) => {
 
     try {
         await exports.asegurarDatosMaestrosEmpresa(pool, idEmpresa);
+        const empRub = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT rubro, idRubro FROM Empresas WHERE idEmpresa = @idEmpresa');
+        const catalogoDemoSeed = require('./catalogoDemoSeed.service');
+        await catalogoDemoSeed.seedProductosDemoSegunRubro(pool, idEmpresa, {
+            rubro: empRub.recordset?.[0]?.rubro
+        });
     } catch (errMaestros) {
         console.error('verificarEmpresaPorCodigo asegurarDatosMaestros:', errMaestros.message);
     }
@@ -1596,7 +1603,21 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'datosMaestros', mensaje: error.message });
         }
 
-        
+        // 16. Catálogo de productos precargado según rubro para cuentas de demostración (Onboarding Wow)
+        try {
+            const catalogoDemoSeed = require('./catalogoDemoSeed.service');
+            const seedRes = await catalogoDemoSeed.seedProductosDemoSegunRubro(pool, idEmpresa, {
+                rubro: datosEmpresa?.rubro || datosEmpresa?.idRubro,
+                idSucursal: resultado.sucursal?.idSucursal,
+                idUsuario: resultado.administradorInicial?.idUsuario,
+                idListaPrecio: resultado.listasPrecios?.[0]?.idLista
+            });
+            resultado.catalogoDemo = seedRes;
+        } catch (error) {
+            console.error('⚠️ Error precargando catálogo demo:', error.message);
+            resultado.errores.push({ tipo: 'catalogoDemo', mensaje: error.message });
+        }
+
         return resultado;
 
     } catch (error) {
@@ -1652,6 +1673,19 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             }
         } catch (errMaestros) {
             console.error('obtenerEstadoConfiguracion asegurarDatosMaestros:', errMaestros.message);
+        }
+
+        try {
+            const chkSub = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query("SELECT TOP 1 planCode, estado FROM EmpresaSuscripcion WHERE idEmpresa = @idEmpresa ORDER BY fCreacion DESC");
+            const esDemo = chkSub.recordset?.[0]?.planCode === 'demo' || chkSub.recordset?.[0]?.estado === 'DEMO';
+            if (esDemo) {
+                const catalogoDemoSeed = require('./catalogoDemoSeed.service');
+                await catalogoDemoSeed.seedProductosDemoSegunRubro(pool, idEmpresa);
+            }
+        } catch (errDemoSeed) {
+            console.error('obtenerEstadoConfiguracion demo seed:', errDemoSeed.message);
         }
 
         try {
