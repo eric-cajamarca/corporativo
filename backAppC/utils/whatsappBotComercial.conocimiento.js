@@ -650,9 +650,16 @@ function esNombrePersona(nombre) {
 function extraerHorario(texto) {
   const t = String(texto || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
-  const hora = t.match(/\b(\d{1,2}([:.,]\d{2})?\s*(h|hrs?|am|pm|a\.?m\.?|p\.?m\.?)?)\b/i);
-  const dia = t.match(/\b(mañana|manana|hoy|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/i);
-  const horario = [dia && dia[0], hora && hora[0]].filter(Boolean).join(' ');
+  // Debe ser una hora explícita con am/pm/h/hrs/:00 o precedida por "a las" / "desde las".
+  // NUNCA un número suelto como "2" o "2 vendedores".
+  const mHoraConContexto = t.match(/\b(?:(?:a\s+las?|desde\s+las?)\s+)?(\d{1,2}(?:[:.]\d{2})?\s*(?:h|hrs?|am|pm|a\.?m\.?|p\.?m\.?))\b/i)
+    || t.match(/\b(?:a\s+las?|desde\s+las?)\s+(\d{1,2}(?:[:.]\d{2})?)\b/i)
+    || t.match(/\b(\d{1,2}[:.]\d{2})\b/);
+  const mDia = t.match(/\b(mañana|manana|hoy|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/i);
+  if (!mHoraConContexto && !mDia) return null;
+  const hora = mHoraConContexto ? (mHoraConContexto[1] || mHoraConContexto[0]) : null;
+  const dia = mDia ? mDia[0] : null;
+  const horario = [dia, hora].filter(Boolean).join(' ');
   return horario || null;
 }
 
@@ -898,9 +905,9 @@ Si hace *otra* pregunta: respóndela (plantilla whatsapp/bot_pedidos/asistente/p
 
 Hechos (sin montos ni cuentas):
 - Demo: 14 días, sin tarjeta, UN solo paso: RUC, correo, celular y botón Empezar. Después llega un código de 6 dígitos por WhatsApp y correo; sin ese código la cuenta no se activa. No pide verificación en dos pasos. No digas checkout, orden, pasarela ni “activar demo”. Marcador [[DEMO]] o plantilla=demo. Web: ${site}/suscribirse/demo?billing=none
-- Recomienda *Básico* (un local, WhatsApp para enviar comprobantes) o *Emprendedor* (más usuarios, sucursales y bot de pedidos). Profesional solo si piden alto volumen. El anual incluye 2 meses gratis. Nunca inventes un monto: plantilla=planes o [[PLANES]].
-- Configuración SUNAT (usuario SOL, certificado y series) es *sin costo* al empezar. Ofrécela cuando hablen de facturar, SUNAT o contratar.
-- Pago: Culqi (tarjeta, solo en la web) o Yape / Plin / depósito. plantilla=yape|plin|cuenta|medios_pago. Tú no cobras. Si dice *ya pagué*: plantilla=pago_confirmado (no digas que el plan está activo).
+- Recomienda *Básico* con claridad para ferreterías y tiendas de 1 local (incluye ventas, inventario, SUNAT y WhatsApp para boletas/facturas). Recomienda *Emprendedor* solo si tienen más sucursales o si buscan el bot de pedidos WhatsApp. El anual incluye 2 meses gratis. Nunca inventes un monto: plantilla=planes o [[PLANES]].
+- Configuración SUNAT (usuario SOL, certificado y series) es 100% GRATIS y va incluida en todos los planes. Cuando hablen de SUNAT o facturación, ofrece siempre "te agendo la configuración gratis", explica que nosotros la dejamos lista y pide su nombre y WhatsApp para coordinar. NUNCA cobres ni pidas dinero por SUNAT ni sueltes datos de pago.
+- Pago: Si preguntan por pagar, el pago se realiza directamente en la web (enlace a /planes o /suscribirse). En el chat público web JAMÁS des números de cuenta BCP, CCI ni titular personal, ni digas "cuando pagues escribe ya pagué": solo manda al enlace de pago web seguro.
 - Registro: la demo y los planes de pago piden un código de 6 dígitos por WhatsApp y correo para activar la cuenta. La demo no pide verificación en dos pasos. plantilla=registro si se traba en crear empresa o en el código.
 - Asesor de BUSINESS SOFT configura SUNAT sin costo. Lun–vie 9:00 a 18:00 (Perú).
 - WhatsApp vinculado (plan Básico): envía boletas/facturas desde EFAFERP. plantilla=whatsapp o [[WHATSAPP]]

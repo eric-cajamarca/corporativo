@@ -64,19 +64,41 @@ function saveConv(sessionId, conv) {
   sesiones.set(sessionId, { conv, expira: Date.now() + TTL_MS });
 }
 
-function adaptarRespuestaWeb(texto, llamadaAgendada) {
+function adaptarRespuestaWeb(texto, llamadaAgendada, com) {
   let t = String(texto || '')
     .replace(/Si prefieres hablar ahora, escribe \*AGENTE\*\.?/gi, '')
     .replace(/escribe \*AGENTE\*/gi, 'pide una llamada aquí')
     .replace(/WhatsApp de la oficina:\s*[0-9\s]+/gi, '')
     .replace(/(Un asesor te contactará\.\s*){2,}/gi, 'Un asesor te contactará. ')
     .replace(/Quédate en este chat; un asesor te contactará\.?/gi, '')
-    .replace(/\n{3,}/g, '\n\n')
     .trim();
-  if (llamadaAgendada && !/te contactará/i.test(t)) {
-    t += '\n\nUn asesor de BUSINESS SOFT te contactará. No necesitas abrir WhatsApp.';
+
+  // En el chat público web no se publican cuentas bancarias ni "escribe ya pagué"
+  const teniaDatosBancarios = /\b(cuenta|cta|cci|dep[oó]sito|banco bcp)\b/i.test(t) && /\b\d{10,20}\b/.test(t);
+  if (teniaDatosBancarios || /\b(cuando pagues,? escribe ya pagu[eé]|escribe \*ya pagu[eé]\*)\b/i.test(t)) {
+    t = [
+      'El pago de tu plan se realiza de forma directa y 100% segura en nuestra web:',
+      '👉 *Ver planes y pagar:* https://efaferp.com/planes',
+      '',
+      'Allí puedes elegir tu plan y pagar con *Yape* o *tarjeta de débito/crédito* con confirmación inmediata en pantalla.'
+    ].join('\n');
   }
-  return t;
+
+  // Eliminar referencias a "horario 2" o números solos como horario
+  t = t.replace(/\bhorario\s+2\b/gi, 'horario acordado');
+
+  if (llamadaAgendada && com && ficha.esNombrePersona(com.nombre)) {
+    const cel = com.celular || com.celularWeb || '';
+    const celTxt = cel ? ` al *${cel}*` : '';
+    t = [
+      `Listo, *${com.nombre}*. Te llamamos hoy antes de las 6:00 pm${celTxt}.`,
+      'También te escribiremos por WhatsApp. Un asesor de BUSINESS SOFT se comunicará contigo.'
+    ].join('\n');
+  } else if (llamadaAgendada && !/te contactará|te llamamos/i.test(t)) {
+    t += '\n\nUn asesor de BUSINESS SOFT te contactará hoy antes de las 6:00 pm. No necesitas abrir WhatsApp.';
+  }
+
+  return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function imagenUrlDeTurno(turno) {
@@ -99,9 +121,7 @@ function nluParaWeb(nlu) {
 
 function llamadaConfirmada(com) {
   return (
-    Boolean(com?.quiereLlamada && com?.mejorHorario && !com?.esperandoDatosLlamada)
-    && ficha.esNombrePersona(com?.nombre)
-    && ficha.celularValido(com?.celular || com?.celularWeb)
+    Boolean(ficha.esNombrePersona(com?.nombre) && ficha.celularValido(com?.celular || com?.celularWeb))
   );
 }
 
@@ -198,6 +218,11 @@ async function procesar(body) {
   saveConv(sessionId, nextConv);
 
   const com = nextConv.slots?.comercial || {};
+  if (ficha.esNombrePersona(com.nombre) && ficha.celularValido(com.celular || com.celularWeb)) {
+    if (!com.mejorHorario) com.mejorHorario = 'Hoy antes de las 6:00 pm';
+    com.quiereLlamada = true;
+    com.esperandoDatosLlamada = false;
+  }
   const agendada = llamadaConfirmada(com);
   let avisoEnviado = Boolean(turno.avisoEnviado || com.avisoLlamadaOk);
   if (agendada && !avisoEnviado) {
@@ -213,7 +238,7 @@ async function procesar(body) {
 
   return {
     sessionId,
-    respuesta: adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), agendada),
+    respuesta: adaptarRespuestaWeb(ficha.sanitizarAlucinacionesComercial(turno.respuesta), agendada, com),
     imagenUrl: imagenUrlDeTurno(turno),
     llamadaAgendada: agendada,
     avisoEnviado

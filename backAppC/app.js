@@ -91,8 +91,8 @@ const suscripcionRoutes = require('./routes/suscripcion');
 
 
 const app = express();
-// Tras proxy (nginx, etc.): req.ip y X-Forwarded-For coherentes para login / auditoría
-if (process.env.TRUST_PROXY === '1') {
+// Tras proxy (nginx, Cloudflare, etc.): req.ip y X-Forwarded-For coherentes para rate-limit y auditoría
+if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 

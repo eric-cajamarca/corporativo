@@ -157,7 +157,7 @@ function filaBdAPlanInterno(row) {
   return {
     codigo: row.planCode,
     nombre: row.nombre,
-    descripcionCorta: row.descripcionCorta,
+    descripcionCorta: String(row.descripcionCorta || '').replace(/apliados/gi, 'ampliados'),
     mensualPen: Number(row.precioMensualPen),
     anualPen: Number(row.precioAnualPen),
     maxUsuarios: Number(row.maxUsuarios),
@@ -165,7 +165,7 @@ function filaBdAPlanInterno(row) {
     maxComprobantesSunatAceptados: Number(row.maxComprobantesSunatAceptados ?? 0),
     maxProductosActivos: Number(row.maxProductosActivos ?? 0),
     maxBotConversacionesSimultaneas: Number(row.maxBotConversacionesSimultaneas ?? 0),
-    beneficios: parseBeneficiosJson(row.beneficiosJson)
+    beneficios: parseBeneficiosJson(row.beneficiosJson).map((b) => b.replace(/apliados/gi, 'ampliados'))
   };
 }
 

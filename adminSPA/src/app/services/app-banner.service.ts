@@ -49,15 +49,25 @@ export class AppBannerService {
       const dm = this.permisos.deploymentMode();
       const plan = (this.permisos.planCodeEfectivo() || '').toLowerCase();
       if (dm === 'saas' && plan === 'demo') {
+        const finDemo = estado?.suscripcion?.fechaFin;
+        const dFinDemo = finDemo ? new Date(finDemo) : null;
+        const diasRestantesDemo =
+          dFinDemo && !Number.isNaN(dFinDemo.getTime())
+            ? Math.ceil((dFinDemo.getTime() - Date.now()) / (86400 * 1000))
+            : null;
+
+        const mensajeDemo =
+          diasRestantesDemo !== null && diasRestantesDemo > 0
+            ? `Te quedan ${diasRestantesDemo} día(s) de prueba gratuita. Pasa a un plan oficial para no pausar tu servicio.`
+            : 'Tu período de prueba gratuita ha concluido. Elige un plan para continuar con tus operaciones.';
+
         auto.push({
           id: 'saas-plan-demo',
-          severity: 'info',
-          message:
-            'Está en plan demo: algunas funciones están limitadas. Puede actualizar su plan cuando lo necesite.',
-          link: '/cuenta/suscripcion',
-          linkLabel: 'Ver suscripción',
-          dismissible: true,
-          dismissKey: 'saas-plan-demo'
+          severity: diasRestantesDemo !== null && diasRestantesDemo <= 3 ? 'warning' : 'info',
+          message: mensajeDemo,
+          link: '/cuenta/planes',
+          linkLabel: 'Elegir plan',
+          dismissible: false
         });
       }
 

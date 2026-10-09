@@ -72,8 +72,10 @@
                     <span class="badge bg-primary align-self-start mb-2">Plan actual</span>
                   } @else if (esPlanPendiente(p.planCode)) {
                     <span class="badge bg-success align-self-start mb-2">Desde próxima renovación</span>
+                  } @else if (p.planCode === 'basico') {
+                    <span class="badge bg-primary align-self-start mb-2">Recomendado (1 local)</span>
                   } @else if (p.planCode === 'emprendedor') {
-                    <span class="badge bg-primary align-self-start mb-2">Recomendado</span>
+                    <span class="badge bg-light text-primary border border-primary align-self-start mb-2">Para crecer + Bot</span>
                   }
                   <h2 class="h5 card-title mb-2">{{ p.nombre }}</h2>
                   @if (puedeEditar() && edicion()[p.planCode]; as ed) {
@@ -174,6 +176,47 @@
               </div>
             </div>
           }
+
+          <!-- Tarjeta Enterprise -->
+          <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm planes-card planes-pricing-card border-secondary">
+              <div class="card-body d-flex flex-column">
+                <span class="badge bg-dark align-self-start mb-2">A medida</span>
+                <h2 class="h5 card-title mb-2">Enterprise</h2>
+                <p class="text-muted small mb-3">
+                  Licencia on-premise / servidor propio. Gestores multi-empresa y soporte prioritario.
+                </p>
+                <ul class="planes-beneficios list-unstyled small mb-3 flex-grow-1">
+                  <li class="d-flex gap-2 mb-2">
+                    <span class="text-primary planes-beneficios__bullet" aria-hidden="true">✓</span>
+                    <span>Modo gestora: múltiples razones sociales (multi-RUC)</span>
+                  </li>
+                  <li class="d-flex gap-2 mb-2">
+                    <span class="text-primary planes-beneficios__bullet" aria-hidden="true">✓</span>
+                    <span>Despliegue en servidor propio o dedicado</span>
+                  </li>
+                  <li class="d-flex gap-2 mb-2">
+                    <span class="text-primary planes-beneficios__bullet" aria-hidden="true">✓</span>
+                    <span>Sin límite de comprobantes SUNAT en catálogo</span>
+                  </li>
+                  <li class="d-flex gap-2 mb-2">
+                    <span class="text-primary planes-beneficios__bullet" aria-hidden="true">✓</span>
+                    <span>Soporte, capacitación e implementación a medida</span>
+                  </li>
+                </ul>
+                <div class="border-top pt-3 mt-auto">
+                  <p class="display-6 mb-0 fs-3 fw-bold">A cotizar</p>
+                  <p class="text-muted small mb-3">Cotización comercial según necesidad</p>
+                  <button
+                    type="button"
+                    class="btn btn-outline-dark w-100"
+                    (click)="cotizarEnterprise()">
+                    Cotizar con un asesor
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         @if (planes().length > 0) {
@@ -221,13 +264,13 @@
                     }
                   </tr>
                   <tr>
-                    <td>WhatsApp vinculado + envío manual</td>
+                    <td>WhatsApp integrado (envío de comprobantes)</td>
                     @for (p of planes(); track p.planCode) {
-                      <td class="text-center">Ilimitado</td>
+                      <td class="text-center">✓ Ilimitado</td>
                     }
                   </tr>
                   <tr>
-                    <td>Bot de pedidos WhatsApp</td>
+                    <td>Bot inteligente de pedidos WhatsApp (IA 24/7)</td>
                     @for (p of planes(); track p.planCode) {
                       <td class="text-center">{{ planTieneBot(p) ? '✓' : '—' }}</td>
                     }

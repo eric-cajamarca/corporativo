@@ -16,13 +16,13 @@
             <h2 class="h5 card-title">Resumen</h2>
             <dl class="row mb-0 small">
               <dt class="col-sm-4">Modo despliegue</dt>
-              <dd class="col-sm-8">{{ e.deploymentMode }}</dd>
+              <dd class="col-sm-8">{{ etiquetaModoDespliegue(e.deploymentMode) }}</dd>
               <dt class="col-sm-4">Estado</dt>
-              <dd class="col-sm-8">{{ e.suscripcion?.estado ?? '—' }}</dd>
+              <dd class="col-sm-8">{{ etiquetaEstadoSuscripcion(e.suscripcion?.estado) }}</dd>
               <dt class="col-sm-4">Plan</dt>
               <dd class="col-sm-8">{{ e.planCatalogo?.nombre ?? e.suscripcion?.planCode ?? '—' }}</dd>
               <dt class="col-sm-4">Ciclo</dt>
-              <dd class="col-sm-8">{{ e.suscripcion?.billingCycle ?? '—' }}</dd>
+              <dd class="col-sm-8">{{ etiquetaCiclo(e.suscripcion?.billingCycle) }}</dd>
               <dt class="col-sm-4">Inicio</dt>
               <dd class="col-sm-8">{{ e.suscripcion?.fechaInicio ?? '—' }}</dd>
               <dt class="col-sm-4">Fin</dt>
@@ -314,9 +314,9 @@
                               [class.text-bg-success]="co.estado === 'PAGADO'"
                               [class.text-bg-warning]="co.estado === 'PENDIENTE_VALIDACION' || co.estado === 'PENDIENTE'"
                               [class.text-bg-secondary]="co.estado !== 'PAGADO' && co.estado !== 'PENDIENTE_VALIDACION' && co.estado !== 'PENDIENTE'"
-                            >{{ co.estado }}</span>
+                            >{{ etiquetaEstadoOrden(co.estado) }}</span>
                             @if (co.estado === 'PENDIENTE_VALIDACION') {
-                              <div class="text-muted small mt-1">Esperando validación del voucher (plataforma)</div>
+                              <div class="text-muted small mt-1">Esperando validación de pago por el equipo</div>
                             }
                           </td>
                           <td class="text-nowrap">{{ co.fCreacion ?? '—' }}</td>

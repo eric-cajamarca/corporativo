@@ -207,10 +207,10 @@ export class HomePublicComponent implements OnInit, OnDestroy {
       comentario: 'El control por sucursal nos ayudó a reducir pérdidas y tiempos.'
     },
     {
-      nombre: 'Yeisi F.',
-      negocio: 'Minimarket Fernandez',
-      rubro: 'Minimarket',
-      comentario: 'El sistema es simple de usar y el soporte responde rápido.'
+      nombre: 'Carlos P.',
+      negocio: 'Comercializadora Perales',
+      rubro: 'Ferretería',
+      comentario: 'Controlamos más de 3,500 productos y reducimos el tiempo de facturación y cuadre de caja de 2 horas a 15 minutos.'
     }
   ];
 
@@ -340,7 +340,7 @@ export class HomePublicComponent implements OnInit, OnDestroy {
   }
 
   esPlanDestacado(planCode: string): boolean {
-    return planCode === 'emprendedor';
+    return planCode === 'basico';
   }
 
   private safeUrl(url: string): SafeResourceUrl {

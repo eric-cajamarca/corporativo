@@ -48,7 +48,7 @@ WHERE planCode = N'demo';
 GO
 
 UPDATE dbo.SaasPlan SET
-    descripcionCorta = N'Incluye todo el básico con límites apliados + bot whatsapp.',
+    descripcionCorta = N'Incluye todo el básico con límites ampliados + bot whatsapp.',
     beneficiosJson = N'["Hasta 8 usuarios y 2 sucursales","Hasta 450 comprobantes SUNAT aceptados al mes","Hasta 2 000 productos en catálogo","WhatsApp vinculado + bot de pedidos"]',
     precioMensualPen = 89.00,
     precioAnualPen = 890.00,

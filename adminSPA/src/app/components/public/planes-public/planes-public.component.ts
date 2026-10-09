@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,7 @@ import { SaasPublicService } from '../../../services/saas-public.service';
 import { SaasSubscriptionService } from '../../../services/saas-subscription.service';
 import { AuthService } from '../../../services/auth.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
+import { ChatComercialPublicoUiService } from '../../../services/chat-comercial-publico-ui.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
 import { MiEstadoSuscripcionResponse } from '../../../models/saas-subscription.model';
 import { formatLimitePlan, mesesGratisAnual } from '../../../utils/saas-plan-resumen.util';
@@ -40,6 +41,11 @@ export class PlanesPublicComponent implements OnInit {
   programando = signal(false);
   /** Estado de suscripción si hay sesión (para badges y downgrade). */
   miEstado = signal<MiEstadoSuscripcionResponse | null>(null);
+  readonly chatUi = inject(ChatComercialPublicoUiService);
+
+  cotizarEnterprise(): void {
+    this.chatUi.abrir('Hola, deseo cotizar el plan Enterprise para mi empresa.');
+  }
 
   constructor(
     private saasPublic: SaasPublicService,
@@ -82,11 +88,16 @@ export class PlanesPublicComponent implements OnInit {
     this.errorMsg.set(null);
     this.saasPublic.listarPlanes().subscribe({
       next: (planes) => {
-        this.planes.set(planes);
+        const corregidos = (planes || []).map((p) => ({
+          ...p,
+          descripcionCorta: String(p.descripcionCorta || '').replace(/apliados/gi, 'ampliados'),
+          beneficios: (p.beneficios || []).map((b) => String(b || '').replace(/apliados/gi, 'ampliados'))
+        }));
+        this.planes.set(corregidos);
         this.auth.verifyToken().pipe(take(1)).subscribe({
           next: () => {
             if (this.auth.isAuthenticated()) {
-              this.cargarEstadoYEditor(planes);
+              this.cargarEstadoYEditor(corregidos);
             } else {
               this.puedeEditar.set(false);
               this.edicion.set({});

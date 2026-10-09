@@ -266,10 +266,13 @@ function confirmarOAjustarLlamada(comercial, textoEntrada) {
 function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
   if (!publicDatos) return null;
   const base = { slugFlayer: null, quiereLlamada: false };
+  const esWeb = comercial?.canal === 'web';
   if (pubDatos.pareceConfirmaPago(texto, nlu)) {
     return {
       ...base,
-      respuesta: pubDatos.textoConfirmaPagoCliente(),
+      respuesta: esWeb
+        ? 'Quedó anotado tu aviso de pago. Un asesor validará la acreditación y te confirmaremos a tu WhatsApp y correo.'
+        : pubDatos.textoConfirmaPagoCliente(),
       comercial: { ...comercial, intencionCompra: 'alta', pagoReportado: true },
       accion: 'aviso_pago_manual'
     };
@@ -277,7 +280,7 @@ function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
   if (pubDatos.parecePreguntaYape(texto) && !pubDatos.parecePreguntaPlin(texto)) {
     return {
       ...base,
-      respuesta: pubDatos.textoYapePlin(publicDatos, 'yape'),
+      respuesta: esWeb ? textoPagoWeb() : pubDatos.textoYapePlin(publicDatos, 'yape'),
       comercial: { ...comercial, intencionCompra: 'alta' },
       accion: 'acompanar_pago'
     };
@@ -285,7 +288,7 @@ function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
   if (pubDatos.parecePreguntaPlin(texto)) {
     return {
       ...base,
-      respuesta: pubDatos.textoYapePlin(publicDatos, 'plin'),
+      respuesta: esWeb ? textoPagoWeb() : pubDatos.textoYapePlin(publicDatos, 'plin'),
       comercial: { ...comercial, intencionCompra: 'alta' },
       accion: 'acompanar_pago'
     };
@@ -293,7 +296,7 @@ function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
   if (pubDatos.parecePreguntaCuenta(texto)) {
     return {
       ...base,
-      respuesta: pubDatos.textoCuentaBancaria(publicDatos),
+      respuesta: esWeb ? textoPagoWeb() : pubDatos.textoCuentaBancaria(publicDatos),
       comercial: { ...comercial, intencionCompra: 'alta' },
       accion: 'acompanar_pago'
     };
@@ -301,7 +304,7 @@ function turnoDatoPublico(texto, nlu, comercial, publicDatos) {
   if (pubDatos.parecePreguntaMediosPago(texto)) {
     return {
       ...base,
-      respuesta: pubDatos.textoMediosPago(publicDatos),
+      respuesta: esWeb ? textoPagoWeb() : pubDatos.textoMediosPago(publicDatos),
       comercial: { ...comercial, intencionCompra: 'alta' },
       accion: 'acompanar_pago'
     };
@@ -408,7 +411,17 @@ function fichaParaPrompt(comercial) {
   return f;
 }
 
+function textoPagoWeb() {
+  return [
+    'El pago de tu plan se realiza de forma directa y 100% segura en nuestra web:',
+    '👉 *Ver planes y pagar:* https://efaferp.com/planes',
+    '',
+    'Allí podrás pagar al instante con *Yape* o *tarjeta de débito/crédito* con confirmación en pantalla.'
+  ].join('\n');
+}
+
 function bloquePlantilla(id, comercial, publicDatos) {
+  const esWeb = comercial?.canal === 'web';
   switch (normalizarPlantilla(id)) {
     case 'whatsapp':
       return ficha.textoWhatsAppVinculado();
@@ -419,13 +432,13 @@ function bloquePlantilla(id, comercial, publicDatos) {
     case 'planes':
       return publicDatos ? pubDatos.textoPlanesReales(publicDatos) : ficha.textoPlanes();
     case 'yape':
-      return publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : null;
+      return esWeb ? textoPagoWeb() : (publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : null);
     case 'plin':
-      return publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : null;
+      return esWeb ? textoPagoWeb() : (publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : null);
     case 'cuenta':
-      return publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : null;
+      return esWeb ? textoPagoWeb() : (publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : null);
     case 'medios_pago':
-      return publicDatos ? pubDatos.textoMediosPago(publicDatos) : null;
+      return esWeb ? textoPagoWeb() : (publicDatos ? pubDatos.textoMediosPago(publicDatos) : null);
     case 'demo':
       return ficha.textoAcompanarDemo(comercial, comercial?.rutaActual);
     case 'registro':
@@ -435,7 +448,7 @@ function bloquePlantilla(id, comercial, publicDatos) {
     case 'cita':
       return ficha.textoLlamadaSoporte(true, comercial, { requiereCelular: Boolean(comercial?.requiereCelular) });
     case 'pago_confirmado':
-      return pubDatos.textoConfirmaPagoCliente();
+      return esWeb ? 'Quedó anotado tu aviso de pago. Un asesor validará la acreditación y te confirmaremos a tu WhatsApp y correo.' : pubDatos.textoConfirmaPagoCliente();
     case 'guias':
       return ficha.textoListaFlayers();
     default:
@@ -445,12 +458,14 @@ function bloquePlantilla(id, comercial, publicDatos) {
 
 function inyectarMarcadores(texto, comercial, publicDatos) {
   let r = String(texto || '');
+  const esWeb = comercial?.canal === 'web';
+  const pagoTexto = esWeb ? textoPagoWeb() : '';
   const mapa = {
     '[[PLANES]]': publicDatos ? pubDatos.textoPlanesReales(publicDatos) : ficha.textoPlanes(),
-    '[[YAPE]]': publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : '',
-    '[[PLIN]]': publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : '',
-    '[[CUENTA]]': publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : '',
-    '[[MEDIOS]]': publicDatos ? pubDatos.textoMediosPago(publicDatos) : '',
+    '[[YAPE]]': esWeb ? pagoTexto : (publicDatos ? pubDatos.textoYapePlin(publicDatos, 'yape') : ''),
+    '[[PLIN]]': esWeb ? pagoTexto : (publicDatos ? pubDatos.textoYapePlin(publicDatos, 'plin') : ''),
+    '[[CUENTA]]': esWeb ? pagoTexto : (publicDatos ? pubDatos.textoCuentaBancaria(publicDatos) : ''),
+    '[[MEDIOS]]': esWeb ? pagoTexto : (publicDatos ? pubDatos.textoMediosPago(publicDatos) : ''),
     '[[DEMO]]': ficha.urlDemo(),
     '[[WHATSAPP]]': ficha.textoWhatsAppVinculado(),
     '[[BOT]]': ficha.textoBotPedidos(),
@@ -536,6 +551,22 @@ function fallbackReglas(textoEntrada, comercial, nlu) {
   }
   if (parecePedidoLlamada(t, nlu, comercial) && !ficha.textoRespuestaModulo(t)) {
     return pedirDatosOConfirmar(merged, t, Boolean(comercial.requiereCelular));
+  }
+  if (/\b(sunat|facturaci[oó]n|usuario\s+sol|certificado\s+digital|boletas?\s+electr[oó]nicas?|facturas?\s+electr[oó]nicas?)\b/i.test(t)) {
+    return {
+      respuesta: [
+        '¡La configuración de facturación electrónica SUNAT es *100% gratuita* y va incluida en todos los planes!',
+        '',
+        'Nosotros nos encargamos de todo: usuario SOL secundario, certificado digital y series de comprobantes para que empieces a facturar de inmediato.',
+        '',
+        '¿Te agendo la configuración gratis? Déjame tu número de *WhatsApp* y tu *nombre* para coordinarlo con un asesor técnico.'
+      ].join('\n'),
+      comercial: { ...merged, intencionCompra: 'alta', quiereLlamada: true },
+      accion: 'ofrecer_llamada',
+      slugFlayer: null,
+      quiereLlamada: true,
+      pedirDato: !merged.nombre ? 'nombre' : (!merged.celular ? 'celular' : '')
+    };
   }
   if (/\b(configur|quien me ayuda|quien me acompaña|me ayudan a)\b/i.test(t)) {
     return {
@@ -701,6 +732,7 @@ function aplicarCierreComercial(out) {
  */
 async function procesarTurnoIa({ textoEntrada, slots, nlu, claveRateLimit, canal, rutaActual, pasoRegistro, errorPantalla, publicDatos }) {
   const comercial = { ...(slots?.comercial || {}) };
+  comercial.canal = canal || comercial.canal || 'whatsapp';
   comercial.requiereCelular = canal === 'web' || Boolean(comercial.requiereCelular);
   comercial.publicDatos = publicDatos || null;
   if (rutaActual) comercial.rutaActual = sanitizar(rutaActual, 200);

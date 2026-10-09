@@ -48,8 +48,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   errorLegal = signal(false);
   /** Email inválido o vacío (requisito Culqi / pago manual). */
   errorEmail = signal(false);
-  /** Culqi primero; el otro checkbox agrupa Yape / Plin / BCP. */
-  viaPago: ViaPago = 'culqi';
+  /** Yape / BCP primero por preferencia en Perú. */
+  viaPago: ViaPago = 'manual';
   /** Medio elegido dentro del pago manual. */
   medioPagoManual: MedioPagoManual = 'yape';
   referenciaPago = '';
@@ -793,6 +793,30 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     }
     const digitoVerificador = (11 - (suma % 11)) % 10;
     return digitoVerificador === Number(ruc.charAt(10));
+  }
+
+  rucValido(): boolean {
+    const r = (this.demoRuc || '').replace(/\D/g, '');
+    return r.length === 11 && this.validarRucSunat(r);
+  }
+
+  celularValido(): boolean {
+    const c = (this.demoCelular || '').replace(/\D/g, '');
+    return /^9\d{8}$/.test(c);
+  }
+
+  correoValido(): boolean {
+    return this.esEmailValido((this.demoCorreo || '').trim());
+  }
+
+  nombrePlan(codigo: string | null | undefined): string {
+    const c = (codigo || '').toLowerCase();
+    if (c === 'basico') return 'Básico';
+    if (c === 'emprendedor') return 'Emprendedor';
+    if (c === 'profesional') return 'Profesional';
+    if (c === 'enterprise') return 'Enterprise';
+    if (c === 'demo') return 'Demo';
+    return codigo ? codigo.charAt(0).toUpperCase() + codigo.slice(1) : 'Plan';
   }
 
   private claveTemporal(): string {

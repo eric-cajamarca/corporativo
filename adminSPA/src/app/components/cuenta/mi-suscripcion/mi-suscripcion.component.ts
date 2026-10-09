@@ -233,6 +233,38 @@ export class MiSuscripcionComponent implements OnInit {
     return ciclo || '—';
   }
 
+  etiquetaModoDespliegue(modo: string | null | undefined): string {
+    const m = (modo || '').trim().toLowerCase();
+    if (m === 'saas') return 'En la nube (SaaS)';
+    if (m === 'enterprise') return 'Servidor dedicado / On-premise';
+    return modo || '—';
+  }
+
+  etiquetaEstadoSuscripcion(estado: string | null | undefined): string {
+    const st = (estado || '').trim().toUpperCase();
+    switch (st) {
+      case 'ACTIVA': return 'Activa';
+      case 'DEMO': return 'Prueba gratuita (14 días)';
+      case 'PENDIENTE_VALIDACION': return 'En revisión de pago';
+      case 'PENDIENTE_PAGO': return 'Pendiente de pago';
+      case 'VENCIDA': return 'Vencida';
+      case 'CANCELADA': return 'Cancelada';
+      default: return estado || '—';
+    }
+  }
+
+  etiquetaEstadoOrden(estado: string | null | undefined): string {
+    const st = (estado || '').trim().toUpperCase();
+    switch (st) {
+      case 'PAGADO': return 'Pagado';
+      case 'PENDIENTE_VALIDACION': return 'En revisión';
+      case 'PENDIENTE': return 'Pendiente';
+      case 'EXPIRADO': return 'Expirado';
+      case 'CANCELADO': return 'Cancelado';
+      default: return estado || '—';
+    }
+  }
+
   /** "Ver planes" solo cuando aún no hay contrato (pendiente de pago); si ya hay plan (demo, activa, etc.) → actualizar. */
   etiquetaBotonPlanes(s: SuscripcionEmpresaRow | null | undefined): string {
     const st = (s?.estado || '').trim().toUpperCase();
