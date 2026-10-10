@@ -376,7 +376,7 @@ export class InicioComponent implements OnInit, OnDestroy {
         borderColor: "rgba(102, 126, 234, 1)",
         borderWidth: 2,
         fill: true,
-        tension: 0.4,
+        tension: 0.1,
         pointBackgroundColor: "rgba(102, 126, 234, 1)",
         pointBorderColor: "#fff",
         pointBorderWidth: 2,
@@ -512,6 +512,13 @@ export class InicioComponent implements OnInit, OnDestroy {
    */
   cambiarPeriodo(periodo: string): void {
     this.periodoSeleccionado = periodo;
+    if (periodo === 'Este Mes') {
+      this.vistaGraficoVentas = 'mesPorDia';
+    } else if (periodo === 'Este Año') {
+      this.vistaGraficoVentas = 'doceMeses';
+    } else if (periodo === 'Hoy') {
+      this.vistaGraficoVentas = 'porDiaHora';
+    }
     this.cargarDatosDashboard();
   }
 

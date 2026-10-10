@@ -37,29 +37,55 @@ function resolverPeriodo(periodo) {
   }
 }
 
-/** Cuentas por pagar: suma de Compras con idEstadoPago = 1 (Pendiente). */
-async function obtenerCxPRepo(pool, idEmpresa) {
+/** Cuentas por pagar: suma de Compras con idEstadoPago = 1 (Pendiente) emitidas hasta fechaCorte si se especifica. */
+async function obtenerCxPRepo(pool, idEmpresa, fechaCorte = null) {
   try {
-    const r = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
-        SELECT ISNULL(SUM(c.total), 0) AS saldo
-        FROM Compras c
-        WHERE c.idEmpresa = @idEmpresa AND c.idEstadoPago = 1
-      `);
+    const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    let whereFecha = '';
+    if (fechaCorte) {
+      req.input('fechaCorte', sql.Date, fechaCorte);
+      whereFecha = 'AND CONVERT(DATE, c.fEmision) <= @fechaCorte';
+    }
+    const r = await req.query(`
+      SELECT ISNULL(SUM(c.total), 0) AS saldo
+      FROM Compras c
+      WHERE c.idEmpresa = @idEmpresa AND c.idEstadoPago = 1
+      ${whereFecha}
+    `);
     return Number((r.recordset[0] || {}).saldo || 0);
   } catch (e) {
     return 0;
   }
 }
 
-async function obtenerCuentasPorCobrarRepo(pool, idEmpresa) {
+/** Cuentas por cobrar: saldo vivo al corte de fechaCorte (excluye créditos posteriores). */
+async function obtenerCuentasPorCobrarRepo(pool, idEmpresa, fechaCorte = null) {
   try {
-    const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
-      FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
-    `);
+    const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    let sqlQuery = '';
+    if (fechaCorte) {
+      req.input('fechaCorte', sql.Date, fechaCorte);
+      sqlQuery = `
+        SELECT ISNULL(SUM(cu.montoCuota - ISNULL(pagado.totalPagado, 0)), 0) AS saldo
+        FROM CuotasCredito cu
+        INNER JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito AND cc.idEmpresa = cu.idEmpresa
+        OUTER APPLY (
+          SELECT SUM(pc.montoPagado) AS totalPagado
+          FROM PagosCuotas pc
+          WHERE pc.idCuota = cu.idCuota AND CONVERT(DATE, pc.fechaPago) <= @fechaCorte
+        ) pagado
+        WHERE cu.idEmpresa = @idEmpresa
+          AND CONVERT(DATE, ISNULL(cc.fechaCredito, cu.fechaVencimiento)) <= @fechaCorte
+          AND (cu.montoCuota - ISNULL(pagado.totalPagado, 0)) > 0.01
+      `;
+    } else {
+      sqlQuery = `
+        SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
+        FROM CuotasCredito cu
+        WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
+      `;
+    }
+    const r = await req.query(sqlQuery);
     return Number((r.recordset[0] || {}).saldo || 0);
   } catch (_) {
     return 0;
@@ -68,13 +94,13 @@ async function obtenerCuentasPorCobrarRepo(pool, idEmpresa) {
 
 /**
  * Patrimonio simplificado al cierre del período consultado.
- * Flujo de caja del período (sin aperturas) + inventario + CxC − CxP.
+ * Flujo de caja del período (sin aperturas) + inventario + CxC − CxP a la fecha de corte.
  */
 async function obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin) {
   const [inventarioTotal, cuentasPorCobrar, cuentasPorPagar, flujo] = await Promise.all([
     InventarioRepository.obtenerInventarioValorizadoEmpresa(pool, idEmpresa),
-    obtenerCuentasPorCobrarRepo(pool, idEmpresa),
-    obtenerCxPRepo(pool, idEmpresa),
+    obtenerCuentasPorCobrarRepo(pool, idEmpresa, fechaFin),
+    obtenerCxPRepo(pool, idEmpresa, fechaFin),
     obtenerFlujoCajaPeriodo(pool, idEmpresa, fechaInicio, fechaFin)
   ]);
 
@@ -104,10 +130,11 @@ function mapBalanceDesdePatrimonio(periodo, sit) {
   const activoTotal = sit.activoCorriente + activoFijo;
   const pasivoLargoPlazo = 0;
   const pasivoTotal = sit.pasivoCorriente + pasivoLargoPlazo;
+  // Si pasivoCorriente es 0, el ratio de liquidez no tiene denominador (null), no inventar 99.
   const ratioLiquidez =
     sit.pasivoCorriente > 0
       ? sit.activoCorriente / sit.pasivoCorriente
-      : (sit.activoCorriente > 0 ? 99 : 0);
+      : null;
   const totalPasivoPatrimonio = pasivoTotal + sit.patrimonio;
   const ratioEndeudamiento =
     totalPasivoPatrimonio > 0 ? pasivoTotal / totalPasivoPatrimonio : 0;
@@ -296,9 +323,11 @@ async function obtenerEstadoResultadosRepo(pool, idEmpresa, filtros) {
     .query(`
       SELECT
         CONCAT(YEAR(base.fechaEmision), '-', RIGHT('0' + CAST(MONTH(base.fechaEmision) AS VARCHAR(2)), 2)) AS periodo,
-        ISNULL(SUM(base.totalAjuste), 0) AS ingresos,
+        ISNULL(SUM(base.ingresosNetos), 0) AS ingresos,
+        ISNULL(SUM(base.igvAjuste), 0) AS igvTotal,
+        ISNULL(SUM(base.totalAjuste), 0) AS totalFacturado,
         ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS costoVentas,
-        ISNULL(SUM(base.totalAjuste), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
+        ISNULL(SUM(base.ingresosNetos), 0) - ISNULL(SUM(base.signo * ISNULL(cost.costo, 0)), 0) AS utilidadBruta
       FROM (${SQL_VENTAS_AJUSTADAS_BASE}) base
       LEFT JOIN (${SQL_COSTO_POR_VENTA}) cost ON cost.idVenta = base.idVenta
       GROUP BY YEAR(base.fechaEmision), MONTH(base.fechaEmision)
@@ -315,14 +344,15 @@ async function obtenerEstadoResultadosRepo(pool, idEmpresa, filtros) {
   return (rs.recordset || []).map((r) => {
     const periodo = String(r.periodo || '');
     const ingresos = Number(r.ingresos || 0);
+    const igvTotal = Number(r.igvTotal || 0);
     const costoVentas = Number(r.costoVentas || 0);
     const utilidadBruta = ingresos - costoVentas;
     const gastosOperacion = gastosPorPeriodo[periodo] != null ? gastosPorPeriodo[periodo] : 0;
     const gastosFinancieros = 0;
     const utilidadOperacion = utilidadBruta - gastosOperacion;
     const utilidadAntesImpuestos = utilidadOperacion - gastosFinancieros;
-    const impuestos = 0;
-    const utilidadNeta = utilidadAntesImpuestos - impuestos;
+    const impuestos = igvTotal;
+    const utilidadNeta = utilidadAntesImpuestos;
     return {
       periodo,
       ingresos,
@@ -429,23 +459,18 @@ async function obtenerComprasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fe
 }
 
 /**
- * Ratios financieros del último período con datos reales (CxP, efectivo, rotaciones reales).
+ * Ratios financieros calculados sobre datos reales del período consultado.
  */
-async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
-  const ahora = partesAhoraApp();
-  const mesActual = `${ahora.y}-${ahora.m}`;
-  const { fechaInicio, fechaFin } = periodoARango(mesActual);
+async function obtenerRatiosFinancierosRepo(pool, idEmpresa, filtros = {}) {
+  const rango = resolverRangoConsultaAnalisis(filtros);
+  const { fechaInicio, fechaFin, periodoEtiqueta } = rango;
 
   const [balance, estado, inventarioValor, cxcSaldo, cxpSaldo, ventasCreditoMes, comprasCreditoMes] = await Promise.all([
-    obtenerBalanceGeneralRepo(pool, idEmpresa, { periodo: 'MES_ACTUAL' }),
-    obtenerEstadoResultadosRepo(pool, idEmpresa, { periodoInicio: mesActual, periodoFin: mesActual }),
+    obtenerBalanceGeneralRepo(pool, idEmpresa, { periodo: filtros.periodo || 'MES_ACTUAL', fechaDesde: fechaInicio, fechaHasta: fechaFin }),
+    obtenerEstadoResultadosRepo(pool, idEmpresa, { fechaDesde: fechaInicio, fechaHasta: fechaFin }),
     InventarioRepository.obtenerInventarioValorizadoEmpresa(pool, idEmpresa),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
-      FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO', 'PARCIAL')
-    `).catch(() => ({ recordset: [{ saldo: 0 }] })),
-    obtenerCxPRepo(pool, idEmpresa),
+    obtenerCuentasPorCobrarRepo(pool, idEmpresa, fechaFin),
+    obtenerCxPRepo(pool, idEmpresa, fechaFin),
     obtenerVentasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fechaFin),
     obtenerComprasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fechaFin)
   ]);
@@ -457,35 +482,50 @@ async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
   const utilidadBruta = ingresos - costoVentas;
   const utilidadNeta = Number(er.utilidadNeta || 0);
   const activoCorriente = Number(bg.activoCorriente || 0);
-  const pasivoCorriente = Number(bg.pasivoCorriente || 0) || 1;
-  const activoTotal = Number(bg.activoTotal || 0) || 1;
-  const patrimonio = Number(bg.patrimonio || 0) || 1;
+  const pasivoCorriente = Number(bg.pasivoCorriente || 0);
+  const activoTotal = Number(bg.activoTotal || (activoCorriente + (Number(bg.activoFijo) || 0)));
+  const patrimonio = Number(bg.patrimonio || 0);
   const inventarioVal = Number(inventarioValor || 0);
-  const cxcPromedio = Number((cxcSaldo.recordset[0] || {}).saldo || 0);
-  const cxpPromedio = Number(cxpSaldo);
-  const ventasCredito = Number(ventasCreditoMes);
-  const comprasCredito = Number(comprasCreditoMes);
+  const cxcPromedio = Number(cxcSaldo || 0);
+  const cxpPromedio = Number(cxpSaldo || 0);
+  const ventasCredito = Number(ventasCreditoMes || 0);
+  const comprasCredito = Number(comprasCreditoMes || 0);
 
-  const ratioLiquidezCorriente = activoCorriente / pasivoCorriente;
-  const ratioLiquidezAcida = (activoCorriente - inventarioVal) / pasivoCorriente;
+  // Ratios de liquidez: si el pasivo corriente es 0, no hay división entre 1 ni números inventados
+  const ratioLiquidezCorriente = pasivoCorriente > 0 ? activoCorriente / pasivoCorriente : null;
+  const ratioLiquidezAcida = pasivoCorriente > 0 ? (activoCorriente - inventarioVal) / pasivoCorriente : null;
   const ratioLiquidezInmediata = ratioLiquidezAcida;
+
   const pasivoTotal = Number(bg.pasivoTotal || 0);
-  const ratioDeudaTotal = (pasivoTotal + patrimonio) > 0 ? pasivoTotal / (pasivoTotal + patrimonio) : 0;
+  const totalPasivoPatrimonio = pasivoTotal + patrimonio;
+  const ratioDeudaTotal = totalPasivoPatrimonio > 0 ? pasivoTotal / totalPasivoPatrimonio : 0;
   const ratioDeudaPatrimonio = patrimonio > 0 ? pasivoTotal / patrimonio : 0;
+
   const margenBruto = ingresos > 0 ? utilidadBruta / ingresos : 0;
   const margenOperativo = ingresos > 0 ? (utilidadBruta - Number(er.gastosOperacion || 0)) / ingresos : 0;
   const margenNeto = ingresos > 0 ? utilidadNeta / ingresos : 0;
   const ROA = activoTotal > 0 ? utilidadNeta / activoTotal : 0;
   const ROE = patrimonio > 0 ? utilidadNeta / patrimonio : 0;
+
+  // Días del período consultado (para mensual 30 días aprox.)
+  const diasPeriodo = Math.max(1, Math.round((new Date(fechaFin) - new Date(fechaInicio)) / (1000 * 60 * 60 * 24)) + 1);
+  const diasPeriodoBase = Number.isFinite(diasPeriodo) && diasPeriodo > 0 ? diasPeriodo : 30;
+
+  // Rotación y días de inventario según el período consultado
   const rotacionInventario = inventarioVal > 0 ? costoVentas / inventarioVal : 0;
-  const rotacionCuentasCobrar = cxcPromedio > 0 ? (ventasCredito * 12) / cxcPromedio : 12;
-  const rotacionCuentasPagar = cxpPromedio > 0 ? (comprasCredito * 12) / cxpPromedio : 12;
-  const diasInventario = rotacionInventario > 0 ? 365 / rotacionInventario : 0;
-  const diasCobro = rotacionCuentasCobrar > 0 ? 365 / rotacionCuentasCobrar : 30;
-  const diasPago = rotacionCuentasPagar > 0 ? 365 / rotacionCuentasPagar : 30;
+  const diasInventario = costoVentas > 0 ? Math.round((inventarioVal / costoVentas) * diasPeriodoBase) : 0;
+
+  // Días de cobro y pago
+  const rotacionCuentasCobrar = cxcPromedio > 0 ? (ventasCredito / cxcPromedio) : 0;
+  const diasCobro = ventasCredito > 0 ? Math.round((cxcPromedio / ventasCredito) * diasPeriodoBase) : 0;
+
+  const rotacionCuentasPagar = cxpPromedio > 0 ? (comprasCredito / cxpPromedio) : 0;
+  const diasPago = comprasCredito > 0 ? Math.round((cxpPromedio / comprasCredito) * diasPeriodoBase) : 0;
+
   const cicloConversionEfectivo = Math.round(diasInventario + diasCobro - diasPago);
 
   return {
+    periodo: periodoEtiqueta,
     ratioLiquidezCorriente,
     ratioLiquidezAcida,
     ratioLiquidezInmediata,
@@ -502,6 +542,9 @@ async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
     rotacionInventario,
     rotacionCuentasCobrar,
     rotacionCuentasPagar,
+    diasInventario,
+    diasCobro,
+    diasPago,
     cicloConversionEfectivo
   };
 }
@@ -509,18 +552,30 @@ async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
 /**
  * Diagnóstico financiero: salud, puntuación, fortalezas, debilidades, recomendaciones, ratios críticos.
  */
-async function obtenerDiagnosticoFinancieroRepo(pool, idEmpresa) {
-  const ratios = await obtenerRatiosFinancierosRepo(pool, idEmpresa);
-  const lc = ratios.ratioLiquidezCorriente || 0;
+async function obtenerDiagnosticoFinancieroRepo(pool, idEmpresa, filtros = {}) {
+  const ratios = await obtenerRatiosFinancierosRepo(pool, idEmpresa, filtros);
+  const lc = ratios.ratioLiquidezCorriente;
   const mn = ratios.margenNeto || 0;
   const endeudamiento = ratios.ratioDeudaTotal || 0;
   const ciclo = ratios.cicloConversionEfectivo || 0;
 
   let puntuacion = 0;
-  if (lc >= 2) puntuacion += 25; else if (lc >= 1.5) puntuacion += 20; else if (lc >= 1) puntuacion += 10;
-  if (mn >= 0.1) puntuacion += 25; else if (mn >= 0.05) puntuacion += 15; else if (mn >= 0.02) puntuacion += 5;
-  if (endeudamiento <= 0.6) puntuacion += 25; else if (endeudamiento <= 0.7) puntuacion += 15; else if (endeudamiento <= 0.8) puntuacion += 5;
-  if (ciclo <= 60) puntuacion += 25; else if (ciclo <= 90) puntuacion += 15; else if (ciclo <= 120) puntuacion += 5;
+  // Sin pasivo corriente (lc == null): liquidez plena a corto plazo
+  if (lc == null || lc >= 2) puntuacion += 25;
+  else if (lc >= 1.5) puntuacion += 20;
+  else if (lc >= 1) puntuacion += 10;
+
+  if (mn >= 0.1) puntuacion += 25;
+  else if (mn >= 0.05) puntuacion += 15;
+  else if (mn >= 0.02) puntuacion += 5;
+
+  if (endeudamiento <= 0.6) puntuacion += 25;
+  else if (endeudamiento <= 0.7) puntuacion += 15;
+  else if (endeudamiento <= 0.8) puntuacion += 5;
+
+  if (ciclo <= 60) puntuacion += 25;
+  else if (ciclo <= 90) puntuacion += 15;
+  else if (ciclo <= 120) puntuacion += 5;
 
   let saludFinanciera = 'DEFICIENTE';
   if (puntuacion >= 80) saludFinanciera = 'EXCELENTE';
@@ -529,32 +584,49 @@ async function obtenerDiagnosticoFinancieroRepo(pool, idEmpresa) {
 
   const fortalezas = [];
   const debilidades = [];
-  if (lc >= 1.5) fortalezas.push('Buena liquidez para cubrir obligaciones a corto plazo.');
-  else debilidades.push('Liquidez baja: riesgo de no cubrir deudas corrientes.');
-  if (mn >= 0.05) fortalezas.push('Rentabilidad aceptable sobre ventas.');
-  else debilidades.push('Margen neto bajo: revisar precios y costos.');
+  if (lc == null) {
+    fortalezas.push('Sin pasivos corrientes pendientes: no existe presión de deuda a corto plazo.');
+  } else if (lc >= 1.5) {
+    fortalezas.push('Buena liquidez para cubrir obligaciones a corto plazo.');
+  } else {
+    debilidades.push('Liquidez baja: riesgo de no cubrir deudas corrientes.');
+  }
+
+  if (mn >= 0.05) {
+    fortalezas.push('Rentabilidad aceptable sobre ventas.');
+  } else if (mn > 0) {
+    debilidades.push('Margen neto bajo: margen sobre ventas reducido.');
+  } else {
+    debilidades.push('Sin rentabilidad en el período seleccionado.');
+  }
+
   if (endeudamiento <= 0.6) fortalezas.push('Endeudamiento controlado.');
   else debilidades.push('Alto endeudamiento: monitorear capacidad de pago.');
+
   if (ciclo <= 90) fortalezas.push('Ciclo de conversión de efectivo eficiente.');
   else debilidades.push('Ciclo de efectivo largo: mejorar cobros e inventarios.');
-  if (fortalezas.length === 0) fortalezas.push('La empresa opera con datos registrados; complete información para un diagnóstico más completo.');
 
   const recomendaciones = [];
-  if (lc < 1.5) recomendaciones.push('Mejorar liquidez: acelerar cobros a clientes y reducir inventarios innecesarios.');
-  if (mn < 0.05) recomendaciones.push('Aumentar rentabilidad: revisar precios de venta y controlar costos operativos.');
-  if (endeudamiento > 0.7) recomendaciones.push('Reducir endeudamiento: generar más utilidades retenidas o optimizar estructura de deuda.');
+  if (lc != null && lc < 1.5) recomendaciones.push('Mejorar liquidez: acelerar cobros a clientes y reducir inventarios innecesarios.');
+  if (mn < 0.05) recomendaciones.push('Aumentar rentabilidad: optimizar costos y revisar precios de venta.');
+  if (endeudamiento > 0.7) recomendaciones.push('Reducir endeudamiento: generar utilidades retenidas o amortizar pasivos.');
   if (ciclo > 90) recomendaciones.push('Optimizar ciclo operativo: mejorar gestión de inventarios y acelerar cobros.');
   if (recomendaciones.length === 0) recomendaciones.push('Mantener las buenas prácticas actuales y continuar monitoreando indicadores.');
 
-  const ratioEstado = (valor, optimo) => (valor >= optimo ? 'OPTIMO' : valor >= optimo * 0.7 ? 'ACEPTABLE' : valor >= optimo * 0.4 ? 'PREOCUPANTE' : 'CRITICO');
+  const ratioEstado = (valor, optimo) => {
+    if (valor == null) return 'OPTIMO';
+    return (valor >= optimo ? 'OPTIMO' : valor >= optimo * 0.7 ? 'ACEPTABLE' : valor >= optimo * 0.4 ? 'PREOCUPANTE' : 'CRITICO');
+  };
+
   const ratiosCriticos = [
-    { nombre: 'Liquidez Corriente', valor: lc, rangoOptimo: '> 1.5', estado: ratioEstado(lc, 1.5) },
+    { nombre: 'Liquidez Corriente', valor: lc, rangoOptimo: '> 1.5', estado: lc != null ? ratioEstado(lc, 1.5) : 'OPTIMO' },
     { nombre: 'Margen Neto', valor: mn, rangoOptimo: '> 10%', estado: ratioEstado(mn, 0.1) },
     { nombre: 'Endeudamiento', valor: endeudamiento, rangoOptimo: '< 60%', estado: endeudamiento <= 0.6 ? 'OPTIMO' : endeudamiento <= 0.7 ? 'ACEPTABLE' : endeudamiento <= 0.8 ? 'PREOCUPANTE' : 'CRITICO' },
     { nombre: 'Ciclo Conversión (días)', valor: ciclo, rangoOptimo: '< 60', estado: ciclo <= 60 ? 'OPTIMO' : ciclo <= 90 ? 'ACEPTABLE' : ciclo <= 120 ? 'PREOCUPANTE' : 'CRITICO' }
   ];
 
   return {
+    periodo: ratios.periodo,
     saludFinanciera,
     puntuacion,
     fortalezas,

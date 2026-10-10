@@ -58,7 +58,7 @@ export class DashboardAnalisisComponent implements OnInit {
   public nuevoGasto = {
     fecha: '',
     tipo: 'ADMINISTRACION',
-    monto: 0,
+    monto: null as any,
     descripcion: '',
     esRecurrente: true,
     fechaFin: '',
@@ -121,10 +121,10 @@ export class DashboardAnalisisComponent implements OnInit {
         if (!this.estadoResultados) this.cargarEstadoResultados();
         break;
       case 'ratios':
-        if (!this.ratiosFinancieros) this.cargarRatiosFinancieros();
+        this.cargarRatiosFinancieros();
         break;
       case 'diagnostico':
-        if (!this.diagnosticoFinanciero) this.cargarDiagnosticoFinanciero();
+        this.cargarDiagnosticoFinanciero();
         break;
       case 'gastos':
         this.cargarGastos();
@@ -135,16 +135,53 @@ export class DashboardAnalisisComponent implements OnInit {
     }
   }
 
-  private filtrosConsulta() {
-    const rangoManual =
-      !!this.filtros.fechaDesde &&
-      !!this.filtros.fechaHasta &&
-      (this.vistaActiva === 'resultados' || this.vistaActiva === 'flujo-caja');
+  public filtrosConsulta() {
+    const rangoManual = !!this.filtros.fechaDesde && !!this.filtros.fechaHasta;
     return {
       periodo: this.filtros.periodo || 'MES_ACTUAL',
       fechaDesde: rangoManual ? this.filtros.fechaDesde : undefined,
       fechaHasta: rangoManual ? this.filtros.fechaHasta : undefined
     };
+  }
+
+  onPeriodoChange(periodo: string) {
+    this.filtros.periodo = periodo;
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    switch (periodo) {
+      case 'MES_ACTUAL': {
+        const ini = new Date(y, m, 1);
+        const fin = new Date(y, m + 1, 0);
+        this.filtros.fechaDesde = fmt(ini);
+        this.filtros.fechaHasta = fmt(fin);
+        break;
+      }
+      case 'MES_ANTERIOR': {
+        const ini = new Date(y, m - 1, 1);
+        const fin = new Date(y, m, 0);
+        this.filtros.fechaDesde = fmt(ini);
+        this.filtros.fechaHasta = fmt(fin);
+        break;
+      }
+      case 'TRIMESTRE': {
+        const trim = Math.floor(m / 3);
+        const ini = new Date(y, trim * 3, 1);
+        const fin = new Date(y, trim * 3 + 3, 0);
+        this.filtros.fechaDesde = fmt(ini);
+        this.filtros.fechaHasta = fmt(fin);
+        break;
+      }
+      case 'ANO_ACTUAL': {
+        this.filtros.fechaDesde = `${y}-01-01`;
+        this.filtros.fechaHasta = `${y}-12-31`;
+        break;
+      }
+    }
+    this.aplicarFiltros();
   }
 
   private normalizarGastosRespuesta(data: unknown): {
@@ -177,7 +214,7 @@ export class DashboardAnalisisComponent implements OnInit {
     this.nuevoGasto = {
       fecha: this.filtros.fechaDesde || '',
       tipo: 'ADMINISTRACION',
-      monto: 0,
+      monto: null as any,
       descripcion: '',
       esRecurrente: true,
       fechaFin: '',
@@ -402,7 +439,7 @@ export class DashboardAnalisisComponent implements OnInit {
 
   cargarRatiosFinancieros() {
     this.loading.ratios = true;
-    this.analisisService.obtenerRatiosFinancieros().subscribe({
+    this.analisisService.obtenerRatiosFinancieros(this.filtrosConsulta()).subscribe({
       next: (response) => {
         if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
           this.ratiosFinancieros = response.data;
@@ -423,7 +460,7 @@ export class DashboardAnalisisComponent implements OnInit {
 
   cargarDiagnosticoFinanciero() {
     this.loading.diagnostico = true;
-    this.analisisService.obtenerDiagnosticoFinanciero().subscribe({
+    this.analisisService.obtenerDiagnosticoFinanciero(this.filtrosConsulta()).subscribe({
       next: (response) => {
         if (response.data && typeof response.data === 'object' && response.data.saludFinanciera !== undefined) {
           this.diagnosticoFinanciero = response.data;
@@ -477,6 +514,10 @@ export class DashboardAnalisisComponent implements OnInit {
       this.cargarEstadoResultados();
     } else if (this.vistaActiva === 'flujo-caja') {
       this.cargarFlujoCaja();
+    } else if (this.vistaActiva === 'ratios') {
+      this.cargarRatiosFinancieros();
+    } else if (this.vistaActiva === 'diagnostico') {
+      this.cargarDiagnosticoFinanciero();
     }
   }
 
@@ -592,14 +633,14 @@ export class DashboardAnalisisComponent implements OnInit {
 
     const ratios$ = this.ratiosFinancieros
       ? of(this.ratiosFinancieros)
-      : this.analisisService.obtenerRatiosFinancieros().pipe(
+      : this.analisisService.obtenerRatiosFinancieros(filtrosApi).pipe(
           map((r) => r.data),
           catchError(() => of(null))
         );
 
     const diagnostico$ = this.diagnosticoFinanciero
       ? of(this.diagnosticoFinanciero)
-      : this.analisisService.obtenerDiagnosticoFinanciero().pipe(
+      : this.analisisService.obtenerDiagnosticoFinanciero(filtrosApi).pipe(
           map((r) => r.data),
           catchError(() => of(null))
         );
@@ -722,9 +763,28 @@ export class DashboardAnalisisComponent implements OnInit {
   }
 
   /** Para ratios tipo liquidez (ej. 1.5 = 1.50x), no porcentaje */
-  formatRatio(value: number): string {
+  formatRatio(value: number | null | undefined): string {
     if (value == null || isNaN(value)) return '0.00';
     return Number(value).toFixed(2);
+  }
+
+  formatearValorRatioCritico(rc: any): string {
+    if (!rc || rc.valor == null) {
+      if ((rc?.nombre || '').toLowerCase().includes('liquidez')) {
+        return 'Sin pasivo';
+      }
+      return 'N/A';
+    }
+    const val = Number(rc.valor);
+    if (isNaN(val)) return 'N/A';
+    const nombre = (rc.nombre || '').toLowerCase();
+    if (nombre.includes('margen') || nombre.includes('endeudamiento')) {
+      return (val * 100).toFixed(2) + '%';
+    }
+    if (nombre.includes('ciclo') || nombre.includes('días') || nombre.includes('dias')) {
+      return `${Math.round(val)} días`;
+    }
+    return `${val.toFixed(2)}x`;
   }
 
   seleccionarPeriodoResultados(index: number) {

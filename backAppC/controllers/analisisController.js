@@ -86,7 +86,7 @@ const obtenerEstadoResultados = async (req, res) => {
 const obtenerRatiosFinancieros = async (req, res) => {
   try {
     const ratios = await withPool(async (pool) =>
-      AnalisisServices.obtenerRatiosFinancierosService(pool, req.user)
+      AnalisisServices.obtenerRatiosFinancierosService(pool, req.user, req.query)
     );
 
     res.status(200).send({ data: ratios });
@@ -233,11 +233,11 @@ const obtenerPuntoEquilibrio = async (req, res) => {
   }
 };
 
-// Obtener diagn?stico financiero completo
+// Obtener diagnóstico financiero completo
 const obtenerDiagnosticoFinanciero = async (req, res) => {
   try {
     const diagnostico = await withPool(async (pool) =>
-      AnalisisServices.obtenerDiagnosticoFinancieroService(pool, req.user)
+      AnalisisServices.obtenerDiagnosticoFinancieroService(pool, req.user, req.query)
     );
 
     res.status(200).send({ data: diagnostico });

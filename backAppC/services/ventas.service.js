@@ -1625,7 +1625,17 @@ function agruparLineasReporteVentasDetallado(lineas) {
       importe: Number(row.importeLinea) || 0,
     });
   }
-  return Array.from(map.values());
+
+  const comprobantes = Array.from(map.values());
+  for (const comp of comprobantes) {
+    const sumLineas = comp.lineas.reduce((acc, l) => acc + l.importe, 0);
+    if (Math.abs(sumLineas - comp.total) > 0.05 && comp.descuentos === 0) {
+      comp.total = Number(sumLineas.toFixed(2));
+      comp.subTotal = Number((comp.total / 1.18).toFixed(2));
+      comp.igv = Number((comp.total - comp.subTotal).toFixed(2));
+    }
+  }
+  return comprobantes;
 }
 
 /**

@@ -81,33 +81,32 @@
           </ul>
 
           <!-- Filtros de período -->
-          <div class="row mb-4" *ngIf="vistaActiva === 'dashboard' || vistaActiva === 'balance' || vistaActiva === 'resultados' || vistaActiva === 'flujo-caja'">
-            <div class="col-md-8">
+          <div class="row mb-4" *ngIf="vistaActiva !== 'gastos'">
+            <div class="col-md-9">
               <div class="card">
-                <div class="card-body">
-                  <div class="row">
-                    <div class="col-md-3" *ngIf="vistaActiva === 'dashboard' || vistaActiva === 'balance' || vistaActiva === 'flujo-caja'">
-                      <label class="form-label">Período</label>
-                      <select class="form-select form-select-sm" [(ngModel)]="filtros.periodo">
+                <div class="card-body py-2">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                      <label class="form-label small mb-1">Período predefinido</label>
+                      <select class="form-select form-select-sm" [ngModel]="filtros.periodo" (ngModelChange)="onPeriodoChange($event)">
                         <option value="MES_ACTUAL">Mes Actual</option>
                         <option value="MES_ANTERIOR">Mes Anterior</option>
                         <option value="TRIMESTRE">Trimestre Actual</option>
                         <option value="ANO_ACTUAL">Año Actual</option>
                       </select>
                     </div>
-                    <div class="col-md-3" *ngIf="vistaActiva === 'resultados' || vistaActiva === 'flujo-caja'">
-                      <label class="form-label">Desde</label>
+                    <div class="col-md-3">
+                      <label class="form-label small mb-1">Desde</label>
                       <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde">
                     </div>
-                    <div class="col-md-3" *ngIf="vistaActiva === 'resultados' || vistaActiva === 'flujo-caja'">
-                      <label class="form-label">Hasta</label>
+                    <div class="col-md-3">
+                      <label class="form-label small mb-1">Hasta</label>
                       <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta">
                     </div>
                     <div class="col-md-3">
-                      <label class="form-label">&nbsp;</label>
                       <button class="btn btn-primary btn-sm w-100" (click)="aplicarFiltros()">
-                        <i class="bi bi-filter me-1"></i>
-                        Aplicar
+                        <i class="bi bi-funnel me-1"></i>
+                        Consultar
                       </button>
                     </div>
                   </div>
@@ -136,8 +135,8 @@
                       <h4 class="mb-1">{{formatCurrency(dashboard.ventasTotales)}}</h4>
                       <small class="text-muted">Ventas Totales</small>
                       <div class="mt-2">
-                        <span class="badge" [class]="isPositive(dashboard.crecimientoVentas) ? 'bg-success' : 'bg-danger'">
-                          <i class="bi bi-arrow-up-right" [class]="isPositive(dashboard.crecimientoVentas) ? 'bi-arrow-up' : 'bi-arrow-down'"></i>
+                        <span class="badge" [class]="dashboard.crecimientoVentas > 0 ? 'bg-success' : dashboard.crecimientoVentas < 0 ? 'bg-danger' : 'bg-secondary'">
+                          <i class="bi" [class.bi-arrow-up-right]="dashboard.crecimientoVentas > 0" [class.bi-arrow-down-right]="dashboard.crecimientoVentas < 0" [class.bi-dash]="dashboard.crecimientoVentas === 0"></i>
                           {{formatPercent(dashboard.crecimientoVentas)}}
                         </span>
                       </div>
@@ -169,8 +168,8 @@
                       <h4 class="mb-1">{{formatCurrency(dashboard.flujoCaja)}}</h4>
                       <small class="text-muted">Flujo Caja (período)</small>
                       <div class="mt-2">
-                        <span class="badge" [class]="isPositive(dashboard.flujoCaja) ? 'bg-success' : 'bg-danger'">
-                          {{isPositive(dashboard.flujoCaja) ? 'Positivo' : 'Negativo'}}
+                        <span class="badge" [class]="dashboard.flujoCaja > 0 ? 'bg-success' : dashboard.flujoCaja < 0 ? 'bg-danger' : 'bg-secondary'">
+                          {{dashboard.flujoCaja > 0 ? 'Positivo' : dashboard.flujoCaja < 0 ? 'Negativo' : 'Neutro'}}
                         </span>
                       </div>
                     </div>
@@ -367,7 +366,12 @@
                   <div class="d-flex justify-content-between mb-2"><span>Inventario</span><strong>{{formatCurrency(flujoCaja.inventarioTotal || 0)}}</strong></div>
                   <div class="d-flex justify-content-between mb-2"><span>Por cobrar</span><strong>{{formatCurrency(flujoCaja.cuentasPorCobrar || 0)}}</strong></div>
                   <div class="d-flex justify-content-between mb-2"><span>Flujo caja neto</span><strong>{{formatCurrency(flujoCaja.flujoNeto)}}</strong></div>
-                  <div class="d-flex justify-content-between mb-2"><span>Por pagar</span><strong class="text-danger">− {{formatCurrency(flujoCaja.cuentasPorPagar || 0)}}</strong></div>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span>Por pagar</span>
+                    <strong [class.text-danger]="(flujoCaja.cuentasPorPagar || 0) > 0">
+                      {{ (flujoCaja.cuentasPorPagar || 0) > 0 ? '− ' + formatCurrency(flujoCaja.cuentasPorPagar || 0) : formatCurrency(0) }}
+                    </strong>
+                  </div>
                   <hr>
                   <div class="d-flex justify-content-between"><strong>Patrimonio</strong><strong class="text-warning">{{formatCurrency(flujoCaja.patrimonioEstimado || 0)}}</strong></div>
                 </div>
@@ -498,9 +502,13 @@
 
               <div class="row mt-4">
                 <div class="col-md-6">
-                  <div class="alert" [class]="(balanceGeneral.ratioLiquidez || 0) > 1 ? 'alert-success' : 'alert-warning'">
+                  <div class="alert alert-success" *ngIf="balanceGeneral.ratioLiquidez == null">
+                    <h6>Ratio de Liquidez: N/A</h6>
+                    <small>Sin pasivos corrientes pendientes (solvencia plena a corto plazo)</small>
+                  </div>
+                  <div class="alert" [class]="balanceGeneral.ratioLiquidez >= 1.5 ? 'alert-success' : balanceGeneral.ratioLiquidez >= 1 ? 'alert-info' : 'alert-warning'" *ngIf="balanceGeneral.ratioLiquidez != null">
                     <h6>Ratio de Liquidez: {{formatRatio(balanceGeneral.ratioLiquidez)}}x</h6>
-                    <small>{{(balanceGeneral.ratioLiquidez || 0) > 1 ? 'Buena liquidez' : 'Liquidez baja'}}</small>
+                    <small>{{balanceGeneral.ratioLiquidez >= 1.5 ? 'Buena liquidez' : balanceGeneral.ratioLiquidez >= 1 ? 'Liquidez aceptable' : 'Liquidez baja'}}</small>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -618,16 +626,22 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Corriente</span>
-                        <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
+                        <span class="badge bg-success" *ngIf="ratiosFinancieros.ratioLiquidezCorriente == null">
+                          Sin pasivo corriente
+                        </span>
+                        <span class="badge" [class]="'bg-' + (ratiosFinancieros.ratioLiquidezCorriente >= 1.5 ? 'success' : ratiosFinancieros.ratioLiquidezCorriente >= 1 ? 'primary' : 'warning')" *ngIf="ratiosFinancieros.ratioLiquidezCorriente != null">
                           {{formatRatio(ratiosFinancieros.ratioLiquidezCorriente)}}x
                         </span>
                       </div>
-                      <small class="text-muted">> 1.0 = Óptimo</small>
+                      <small class="text-muted">> 1.5 = Óptimo (Cubrir deudas corrientes)</small>
                     </div>
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Ácido</span>
-                        <span class="badge" [class]="getRatioEstadoColor('ACEPTABLE')">
+                        <span class="badge bg-success" *ngIf="ratiosFinancieros.ratioLiquidezAcida == null">
+                          Sin pasivo corriente
+                        </span>
+                        <span class="badge" [class]="'bg-' + (ratiosFinancieros.ratioLiquidezAcida >= 1 ? 'success' : ratiosFinancieros.ratioLiquidezAcida >= 0.8 ? 'primary' : 'warning')" *ngIf="ratiosFinancieros.ratioLiquidezAcida != null">
                           {{formatRatio(ratiosFinancieros.ratioLiquidezAcida)}}x
                         </span>
                       </div>
@@ -636,7 +650,10 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Inmediato</span>
-                        <span class="badge" [class]="getRatioEstadoColor('ACEPTABLE')">
+                        <span class="badge bg-success" *ngIf="ratiosFinancieros.ratioLiquidezInmediata == null">
+                          Sin pasivo corriente
+                        </span>
+                        <span class="badge" [class]="'bg-' + (ratiosFinancieros.ratioLiquidezInmediata >= 0.8 ? 'success' : ratiosFinancieros.ratioLiquidezInmediata >= 0.5 ? 'primary' : 'warning')" *ngIf="ratiosFinancieros.ratioLiquidezInmediata != null">
                           {{formatRatio(ratiosFinancieros.ratioLiquidezInmediata)}}x
                         </span>
                       </div>
@@ -658,7 +675,7 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Deuda Total</span>
-                        <span class="badge" [class]="getRatioEstadoColor('ACEPTABLE')">
+                        <span class="badge" [class]="'bg-' + (ratiosFinancieros.ratioDeudaTotal <= 0.6 ? 'success' : ratiosFinancieros.ratioDeudaTotal <= 0.7 ? 'primary' : 'danger')">
                           {{formatPercent(ratiosFinancieros.ratioDeudaTotal)}}
                         </span>
                       </div>
@@ -667,7 +684,7 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Deuda/Patrimonio</span>
-                        <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
+                        <span class="badge" [class]="'bg-' + (ratiosFinancieros.ratioDeudaPatrimonio <= 1 ? 'success' : ratiosFinancieros.ratioDeudaPatrimonio <= 1.5 ? 'primary' : 'warning')">
                           {{formatPercent(ratiosFinancieros.ratioDeudaPatrimonio)}}
                         </span>
                       </div>
@@ -676,7 +693,7 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Cobertura Intereses</span>
-                        <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
+                        <span class="badge bg-secondary">
                           {{(ratiosFinancieros.coberturaIntereses) | number:'1.2-2'}}
                         </span>
                       </div>
@@ -861,7 +878,7 @@
                             <tbody>
                               <tr *ngFor="let rc of diagnosticoFinanciero.ratiosCriticos">
                                 <td>{{rc.nombre}}</td>
-                                <td>{{rc.nombre.includes('Liquidez') ? (rc.valor | number:'1.2-2') + 'x' : (rc.valor | number:'1.2-2') + '%'}}</td>
+                                <td><strong>{{formatearValorRatioCritico(rc)}}</strong></td>
                                 <td>{{rc.rangoOptimo}}</td>
                                 <td><span class="badge" [class]="'bg-' + getRatioEstadoColor(rc.estado)">{{rc.estado}}</span></td>
                               </tr>

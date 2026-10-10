@@ -79,9 +79,13 @@ export class AnalisisService {
   }
 
   // Ratios Financieros
-  obtenerRatiosFinancieros(): Observable<any> {
+  obtenerRatiosFinancieros(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'analisis/ratios', {
+    return this._http.get(this.url+'analisis/ratios' + this.buildQueryParams(filtros), {
       headers: headers,
       withCredentials: true
     });
@@ -163,9 +167,13 @@ export class AnalisisService {
   }
 
   // Diagnóstico Financiero
-  obtenerDiagnosticoFinanciero(): Observable<any> {
+  obtenerDiagnosticoFinanciero(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'analisis/diagnostico-financiero', {
+    return this._http.get(this.url+'analisis/diagnostico-financiero' + this.buildQueryParams(filtros), {
       headers: headers,
       withCredentials: true
     });

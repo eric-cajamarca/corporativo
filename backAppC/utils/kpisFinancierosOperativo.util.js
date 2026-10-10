@@ -57,6 +57,16 @@ const SQL_VENTAS_AJUSTADAS_BASE = `
         END AS signo,
         CASE
           WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07')
+            THEN -ABS(ISNULL(v.subtotal, v.total))
+          ELSE ISNULL(v.subtotal, v.total)
+        END AS ingresosNetos,
+        CASE
+          WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07')
+            THEN -ABS(ISNULL(v.igv, 0))
+          ELSE ISNULL(v.igv, 0)
+        END AS igvAjuste,
+        CASE
+          WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07')
             THEN -ABS(ISNULL(v.total, 0))
           ELSE ISNULL(v.total, 0)
         END AS totalAjuste,
@@ -166,7 +176,7 @@ function calcularMargenesYVariaciones({
   const crecimientoVentas =
     ventasTotalesAnterior > 0
       ? (ventasTotales - ventasTotalesAnterior) / ventasTotalesAnterior
-      : 0;
+      : (ventasTotales > 0 ? 1 : 0);
 
   return {
     ingresos,

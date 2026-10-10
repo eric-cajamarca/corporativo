@@ -36,7 +36,7 @@ export interface BalanceGeneral {
   pasivoLargoPlazo: number;
   pasivoTotal: number;
   patrimonio: number;
-  ratioLiquidez: number;
+  ratioLiquidez: number | null;
   ratioEndeudamiento: number;
 }
 
@@ -103,9 +103,9 @@ export interface EstadoResultados {
 
 export interface RatiosFinancieros {
   // Liquidez
-  ratioLiquidezCorriente: number;
-  ratioLiquidezAcida: number;
-  ratioLiquidezInmediata: number;
+  ratioLiquidezCorriente: number | null;
+  ratioLiquidezAcida: number | null;
+  ratioLiquidezInmediata: number | null;
 
   // Solvencia
   ratioDeudaTotal: number;
@@ -125,6 +125,9 @@ export interface RatiosFinancieros {
   rotacionInventario: number;
   rotacionCuentasCobrar: number;
   rotacionCuentasPagar: number;
+  diasInventario?: number;
+  diasCobro?: number;
+  diasPago?: number;
   cicloConversionEfectivo: number;
 }
 
@@ -201,7 +204,7 @@ export interface DiagnosticoFinanciero {
 
 export interface RatioCritico {
   nombre: string;
-  valor: number;
+  valor: number | null;
   rangoOptimo: string;
   estado: 'OPTIMO' | 'ACEPTABLE' | 'PREOCUPANTE' | 'CRITICO';
 }

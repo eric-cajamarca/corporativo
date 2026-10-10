@@ -123,8 +123,8 @@ exports.listarProductosVendidos = async (pool, opts) => {
   if (agrupar) {
     query = `
       SELECT
-        v.idEmpresa,
-        p.idProducto,
+        MIN(v.idEmpresa) AS idEmpresa,
+        MIN(p.idProducto) AS idProducto,
         NULL AS idDetalle,
         NULL AS idVenta,
         CAST(NULL AS VARCHAR(10)) AS fecha,
@@ -133,10 +133,10 @@ exports.listarProductosVendidos = async (pool, opts) => {
         CAST(SUM(ISNULL(dv.costoTotal, dv.cantidad * ISNULL(dv.costoUnitario, 0))) AS DECIMAL(18, 2)) AS costo,
         CAST(SUM(dv.total) AS DECIMAL(18, 2)) AS venta,
         CAST(SUM(dv.total) - SUM(ISNULL(dv.costoTotal, dv.cantidad * ISNULL(dv.costoUnitario, 0))) AS DECIMAL(18, 2)) AS utilidad,
-        ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
+        MIN(ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social))) AS aliasEmpresa
       ${baseFrom}
-      GROUP BY v.idEmpresa, p.idProducto, p.codigo, p.descripcion, e.alias, e.nombreComercial, e.razon_Social
-      ORDER BY MAX(p.descripcion)
+      GROUP BY p.codigo, p.descripcion
+      ORDER BY p.descripcion ASC
     `;
   } else {
     query = `

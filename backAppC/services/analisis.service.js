@@ -26,12 +26,12 @@ exports.obtenerEstadoResultadosService = async (pool, user, filtros) => {
   return estadoResultados;
 };
 
-exports.obtenerRatiosFinancierosService = async (pool, user) => {
+exports.obtenerRatiosFinancierosService = async (pool, user, filtros = {}) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const ratios = await AnalisisRepository.obtenerRatiosFinancierosRepo(pool, user.empresa);
+  const ratios = await AnalisisRepository.obtenerRatiosFinancierosRepo(pool, user.empresa, filtros);
   return ratios;
 };
 
@@ -87,11 +87,11 @@ exports.obtenerPuntoEquilibrioService = async (pool, user) => {
   return puntoEquilibrio;
 };
 
-exports.obtenerDiagnosticoFinancieroService = async (pool, user) => {
+exports.obtenerDiagnosticoFinancieroService = async (pool, user, filtros = {}) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const diagnostico = await AnalisisRepository.obtenerDiagnosticoFinancieroRepo(pool, user.empresa);
+  const diagnostico = await AnalisisRepository.obtenerDiagnosticoFinancieroRepo(pool, user.empresa, filtros);
   return diagnostico;
 };
