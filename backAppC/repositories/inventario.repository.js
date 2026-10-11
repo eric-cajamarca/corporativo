@@ -827,28 +827,20 @@ exports.obtenerCostoUnitarioProducto = async (conn, idEmpresa, idProducto) => {
 
 /**
  * Valorizado total de inventario: prioriza el costo real de adquisición de cada lote disponible.
- * Fallback a p.cUnitario si el lote no tiene costo o para productos sin lotes.
+ * Fallback a p.cUnitario si el lote no tiene costo asignado.
  */
 exports.obtenerInventarioValorizadoEmpresa = async (pool, idEmpresa) => {
   const r = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(`
-      SELECT ISNULL(SUM(val.subtotal), 0) AS valor
-      FROM (
-        SELECT l.cantidadDisponible * CASE 
-          WHEN ISNULL(l.costoUnitario, 0) > 0 THEN l.costoUnitario 
-          ELSE ISNULL(p.cUnitario, 0) 
-        END AS subtotal
-        FROM Lotes l
-        INNER JOIN Productos p ON p.idProducto = l.idProducto AND p.idEmpresa = l.idEmpresa
-        WHERE l.idEmpresa = @idEmpresa AND p.estado = 1 AND l.cantidadDisponible > 0
-        UNION ALL
-        SELECT p.stock * ISNULL(p.cUnitario, 0) AS subtotal
-        FROM Productos p
-        WHERE p.idEmpresa = @idEmpresa AND p.estado = 1 AND p.stock > 0
-          AND NOT EXISTS (SELECT 1 FROM Lotes l2 WHERE l2.idProducto = p.idProducto AND l2.idEmpresa = @idEmpresa)
-      ) val
+      SELECT ISNULL(SUM(l.cantidadDisponible * CASE 
+        WHEN ISNULL(l.costoUnitario, 0) > 0 THEN l.costoUnitario 
+        ELSE ISNULL(p.cUnitario, 0) 
+      END), 0) AS valor
+      FROM Lotes l
+      INNER JOIN Productos p ON p.idProducto = l.idProducto AND p.idEmpresa = l.idEmpresa
+      WHERE l.idEmpresa = @idEmpresa AND p.estado = 1 AND l.cantidadDisponible > 0
     `);
   return Number((r.recordset[0] || {}).valor || 0);
 };

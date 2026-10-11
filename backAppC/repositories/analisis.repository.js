@@ -2,97 +2,15 @@ const sql = require("mssql");
 const AnalisisOperativo = require("./analisisOperativo.repository");
 
 exports.obtenerDashboardEjecutivoRepo = async (pool, idEmpresa, filtros = {}) => {
-  try {
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .query(`
-        SELECT * FROM vw_DashboardFinanciero
-        WHERE idEmpresa = @idEmpresa
-        ORDER BY periodo DESC
-      `);
-    const row = result.recordset && result.recordset[0];
-    if (row) return [row];
-  } catch (err) {
-    if (err.number === 208 || /Invalid object name|vw_DashboardFinanciero/.test(String(err.message))) {
-      const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa, filtros);
-      return [data];
-    }
-    throw err;
-  }
   const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa, filtros);
   return [data];
 };
 
 exports.obtenerBalanceGeneralRepo = async (pool, idEmpresa, filtros = {}) => {
-  try {
-    let query = "SELECT * FROM vw_BalanceGeneral WHERE idEmpresa = @idEmpresa";
-    if (filtros.periodo) query += " AND periodo = @periodo";
-    query += " ORDER BY periodo DESC";
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .input("periodo", sql.VarChar, filtros.periodo || null)
-      .query(query);
-    if (result.recordset && result.recordset.length > 0) {
-      return result.recordset.map((row) => ({
-        periodo: row.periodo,
-        inventarioTotal: Number(row.inventarioTotal || 0),
-        cuentasPorCobrar: Number(row.cuentasPorCobrar || 0),
-        cuentasPorPagar: Number(row.cuentasPorPagar || 0),
-        flujoNetoCaja: Number(row.flujoNetoCaja || 0),
-        activoCorriente: Number(row.activoCorriente || 0),
-        activoFijo: Number(row.activoNoCorriente || row.activoFijo || 0),
-        activoTotal: Number(row.totalActivo || row.activoTotal || 0),
-        pasivoCorriente: Number(row.pasivoCorriente || 0),
-        pasivoLargoPlazo: Number(row.pasivoNoCorriente || row.pasivoLargoPlazo || 0),
-        pasivoTotal: Number(row.totalPasivo || row.pasivoTotal || 0),
-        patrimonio: Number(row.patrimonio || 0),
-        ratioLiquidez: row.ratioLiquidez != null ? Number(row.ratioLiquidez) : 0,
-        ratioEndeudamiento: row.ratioEndeudamiento != null ? Number(row.ratioEndeudamiento) : 0
-      }));
-    }
-  } catch (err) {
-    if (err.number === 208 || /Invalid object name|vw_BalanceGeneral/.test(String(err.message))) {
-      return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, filtros);
-    }
-    throw err;
-  }
   return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, filtros);
 };
 
 exports.obtenerEstadoResultadosRepo = async (pool, idEmpresa, filtros) => {
-  try {
-    let query = "SELECT * FROM vw_EstadoResultados WHERE idEmpresa = @idEmpresa";
-    if (filtros.periodoInicio) query += " AND periodo >= @periodoInicio";
-    if (filtros.periodoFin) query += " AND periodo <= @periodoFin";
-    query += " ORDER BY periodo DESC";
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .input("periodoInicio", sql.VarChar, filtros.periodoInicio || null)
-      .input("periodoFin", sql.VarChar, filtros.periodoFin || null)
-      .query(query);
-    if (result.recordset && result.recordset.length > 0) {
-      return result.recordset.map((r) => ({
-        periodo: r.periodo,
-        ingresos: Number(r.totalIngresos || r.ingresos || 0),
-        costoVentas: Number(r.costoVentas || 0),
-        utilidadBruta: Number(r.utilidadBruta != null ? r.utilidadBruta : (r.totalIngresos || r.ingresos || 0) - (r.costoVentas || 0)),
-        gastosOperacion: Number(r.gastosAdministracion || 0) + Number(r.gastosVentas || 0),
-        utilidadOperacion: Number(r.utilidadOperacional != null ? r.utilidadOperacional : r.utilidadBruta),
-        gastosFinancieros: Number(r.gastosFinancieros || 0),
-        utilidadAntesImpuestos: Number(r.utilidadNeta != null ? r.utilidadNeta : r.utilidadBruta),
-        impuestos: 0,
-        utilidadNeta: Number(r.utilidadNeta != null ? r.utilidadNeta : r.utilidadBruta)
-      }));
-    }
-  } catch (err) {
-    if (err.number === 208 || /Invalid object name|vw_EstadoResultados/.test(String(err.message))) {
-      return AnalisisOperativo.obtenerEstadoResultadosRepo(pool, idEmpresa, filtros);
-    }
-    throw err;
-  }
   return AnalisisOperativo.obtenerEstadoResultadosRepo(pool, idEmpresa, filtros);
 };
 
